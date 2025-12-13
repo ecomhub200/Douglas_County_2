@@ -1,0 +1,58 @@
+name: Download Traffic Data
+
+on:
+  schedule:
+    - cron: '0 11 * * 1'
+  workflow_dispatch:
+    inputs:
+      jurisdiction:
+        description: 'Select Jurisdiction (leave empty to use saved setting)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - henrico
+          - charlotte
+          - chesterfield
+          # Add more jurisdictions as needed
+
+permissions:
+  contents: write
+
+jobs:
+  download-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download crash data
+        run: |
+          JURISDICTION="${{ github.event.inputs.jurisdiction }}"
+          if [ -z "$JURISDICTION" ]; then
+            JURISDICTION=$(python -c "import json; print(json.load(open('config/settings.json'))['selectedJurisdiction'])" 2>/dev/null || echo "henrico")
+          fi
+          echo "Downloading data for: $JURISDICTION"
+          python download_crash_data.py --jurisdiction "$JURISDICTION" --filter countyOnly --output "data/${JURISDICTION}_county_roads.csv"
+          python download_crash_data.py --jurisdiction "$JURISDICTION" --filter countyPlusVDOT --output "data/${JURISDICTION}_no_interstate.csv"
+          python download_crash_data.py --jurisdiction "$JURISDICTION" --filter allRoads --output "data/${JURISDICTION}_all_roads.csv"
+          cp "data/${JURISDICTION}_county_roads.csv" "data/crashes.csv"
+
+      - name: Commit and push
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add data/
+          git diff --staged --quiet || git commit -m "Auto-update: Traffic data - $(date +'%Y-%m-%d')"
+          git push
