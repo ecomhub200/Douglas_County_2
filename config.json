@@ -1,0 +1,1369 @@
+{
+  "appName": "CRASH LENS",
+  "appSubtitle": "Virginia Crash Analysis Tool",
+  "version": "2.0.0",
+
+  "jurisdictions": {
+    "accomack": {
+      "name": "Accomack County",
+      "type": "county",
+      "fips": "001",
+      "jurisCode": "1",
+      "namePatterns": ["ACCOMACK", "001. Accomack County"],
+      "mapCenter": [37.76, -75.66],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "albemarle": {
+      "name": "Albemarle County",
+      "type": "county",
+      "fips": "003",
+      "jurisCode": "2",
+      "namePatterns": ["ALBEMARLE", "002. Albemarle County"],
+      "mapCenter": [38.02, -78.56],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "alleghany": {
+      "name": "Alleghany County",
+      "type": "county",
+      "fips": "005",
+      "jurisCode": "3",
+      "namePatterns": ["ALLEGHANY", "003. Alleghany County"],
+      "mapCenter": [37.79, -79.95],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "amelia": {
+      "name": "Amelia County",
+      "type": "county",
+      "fips": "007",
+      "jurisCode": "4",
+      "namePatterns": ["AMELIA", "004. Amelia County"],
+      "mapCenter": [37.34, -77.98],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "amherst": {
+      "name": "Amherst County",
+      "type": "county",
+      "fips": "009",
+      "jurisCode": "5",
+      "namePatterns": ["AMHERST", "005. Amherst County"],
+      "mapCenter": [37.60, -79.14],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "appomattox": {
+      "name": "Appomattox County",
+      "type": "county",
+      "fips": "011",
+      "jurisCode": "6",
+      "namePatterns": ["APPOMATTOX", "006. Appomattox County"],
+      "mapCenter": [37.37, -78.81],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "arlington": {
+      "name": "Arlington County",
+      "type": "county",
+      "fips": "013",
+      "jurisCode": "7",
+      "namePatterns": ["ARLINGTON", "007. Arlington County"],
+      "mapCenter": [38.88, -77.10],
+      "mapZoom": 12,
+      "maintainsOwnRoads": true
+    },
+    "augusta": {
+      "name": "Augusta County",
+      "type": "county",
+      "fips": "015",
+      "jurisCode": "8",
+      "namePatterns": ["AUGUSTA", "008. Augusta County"],
+      "mapCenter": [38.16, -79.13],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "bath": {
+      "name": "Bath County",
+      "type": "county",
+      "fips": "017",
+      "jurisCode": "9",
+      "namePatterns": ["BATH", "009. Bath County"],
+      "mapCenter": [38.07, -79.73],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "bedford_county": {
+      "name": "Bedford County",
+      "type": "county",
+      "fips": "019",
+      "jurisCode": "10",
+      "namePatterns": ["BEDFORD", "010. Bedford County"],
+      "mapCenter": [37.31, -79.52],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "bland": {
+      "name": "Bland County",
+      "type": "county",
+      "fips": "021",
+      "jurisCode": "11",
+      "namePatterns": ["BLAND", "011. Bland County"],
+      "mapCenter": [37.10, -81.12],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "botetourt": {
+      "name": "Botetourt County",
+      "type": "county",
+      "fips": "023",
+      "jurisCode": "12",
+      "namePatterns": ["BOTETOURT", "012. Botetourt County"],
+      "mapCenter": [37.55, -79.81],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "brunswick": {
+      "name": "Brunswick County",
+      "type": "county",
+      "fips": "025",
+      "jurisCode": "13",
+      "namePatterns": ["BRUNSWICK", "013. Brunswick County"],
+      "mapCenter": [36.76, -77.85],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "buchanan": {
+      "name": "Buchanan County",
+      "type": "county",
+      "fips": "027",
+      "jurisCode": "14",
+      "namePatterns": ["BUCHANAN", "014. Buchanan County"],
+      "mapCenter": [37.27, -82.03],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "buckingham": {
+      "name": "Buckingham County",
+      "type": "county",
+      "fips": "029",
+      "jurisCode": "15",
+      "namePatterns": ["BUCKINGHAM", "015. Buckingham County"],
+      "mapCenter": [37.55, -78.55],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "campbell": {
+      "name": "Campbell County",
+      "type": "county",
+      "fips": "031",
+      "jurisCode": "16",
+      "namePatterns": ["CAMPBELL", "016. Campbell County"],
+      "mapCenter": [37.20, -79.09],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "caroline": {
+      "name": "Caroline County",
+      "type": "county",
+      "fips": "033",
+      "jurisCode": "17",
+      "namePatterns": ["CAROLINE", "017. Caroline County"],
+      "mapCenter": [38.03, -77.35],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "carroll": {
+      "name": "Carroll County",
+      "type": "county",
+      "fips": "035",
+      "jurisCode": "18",
+      "namePatterns": ["CARROLL", "018. Carroll County"],
+      "mapCenter": [36.73, -80.73],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "charles_city": {
+      "name": "Charles City County",
+      "type": "county",
+      "fips": "036",
+      "jurisCode": "19",
+      "namePatterns": ["CHARLES CITY", "019. Charles City County"],
+      "mapCenter": [37.36, -77.06],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "charlotte": {
+      "name": "Charlotte County",
+      "type": "county",
+      "fips": "037",
+      "jurisCode": "20",
+      "namePatterns": ["CHARLOTTE", "020. Charlotte County"],
+      "mapCenter": [37.01, -78.66],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "chesterfield": {
+      "name": "Chesterfield County",
+      "type": "county",
+      "fips": "041",
+      "jurisCode": "21",
+      "namePatterns": ["CHESTERFIELD", "021. Chesterfield County"],
+      "mapCenter": [37.38, -77.50],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "clarke": {
+      "name": "Clarke County",
+      "type": "county",
+      "fips": "043",
+      "jurisCode": "22",
+      "namePatterns": ["CLARKE", "022. Clarke County"],
+      "mapCenter": [39.11, -77.99],
+      "mapZoom": 11,
+      "maintainsOwnRoads": false
+    },
+    "craig": {
+      "name": "Craig County",
+      "type": "county",
+      "fips": "045",
+      "jurisCode": "23",
+      "namePatterns": ["CRAIG", "023. Craig County"],
+      "mapCenter": [37.47, -80.23],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "culpeper": {
+      "name": "Culpeper County",
+      "type": "county",
+      "fips": "047",
+      "jurisCode": "24",
+      "namePatterns": ["CULPEPER", "024. Culpeper County"],
+      "mapCenter": [38.49, -77.96],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "cumberland": {
+      "name": "Cumberland County",
+      "type": "county",
+      "fips": "049",
+      "jurisCode": "25",
+      "namePatterns": ["CUMBERLAND", "025. Cumberland County"],
+      "mapCenter": [37.51, -78.24],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "dickenson": {
+      "name": "Dickenson County",
+      "type": "county",
+      "fips": "051",
+      "jurisCode": "26",
+      "namePatterns": ["DICKENSON", "026. Dickenson County"],
+      "mapCenter": [37.12, -82.35],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "dinwiddie": {
+      "name": "Dinwiddie County",
+      "type": "county",
+      "fips": "053",
+      "jurisCode": "27",
+      "namePatterns": ["DINWIDDIE", "027. Dinwiddie County"],
+      "mapCenter": [37.08, -77.58],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "essex": {
+      "name": "Essex County",
+      "type": "county",
+      "fips": "057",
+      "jurisCode": "28",
+      "namePatterns": ["ESSEX", "028. Essex County"],
+      "mapCenter": [37.94, -76.94],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "fairfax_county": {
+      "name": "Fairfax County",
+      "type": "county",
+      "fips": "059",
+      "jurisCode": "29",
+      "namePatterns": ["FAIRFAX COUNTY", "029. Fairfax County"],
+      "mapCenter": [38.83, -77.28],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "fauquier": {
+      "name": "Fauquier County",
+      "type": "county",
+      "fips": "061",
+      "jurisCode": "30",
+      "namePatterns": ["FAUQUIER", "030. Fauquier County"],
+      "mapCenter": [38.72, -77.81],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "floyd": {
+      "name": "Floyd County",
+      "type": "county",
+      "fips": "063",
+      "jurisCode": "31",
+      "namePatterns": ["FLOYD", "031. Floyd County"],
+      "mapCenter": [36.93, -80.36],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "fluvanna": {
+      "name": "Fluvanna County",
+      "type": "county",
+      "fips": "065",
+      "jurisCode": "32",
+      "namePatterns": ["FLUVANNA", "032. Fluvanna County"],
+      "mapCenter": [37.84, -78.28],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "franklin_county": {
+      "name": "Franklin County",
+      "type": "county",
+      "fips": "067",
+      "jurisCode": "33",
+      "namePatterns": ["FRANKLIN COUNTY", "033. Franklin County"],
+      "mapCenter": [37.00, -79.89],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "frederick": {
+      "name": "Frederick County",
+      "type": "county",
+      "fips": "069",
+      "jurisCode": "34",
+      "namePatterns": ["FREDERICK", "034. Frederick County"],
+      "mapCenter": [39.28, -78.27],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "giles": {
+      "name": "Giles County",
+      "type": "county",
+      "fips": "071",
+      "jurisCode": "35",
+      "namePatterns": ["GILES", "035. Giles County"],
+      "mapCenter": [37.32, -80.66],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "gloucester": {
+      "name": "Gloucester County",
+      "type": "county",
+      "fips": "073",
+      "jurisCode": "36",
+      "namePatterns": ["GLOUCESTER", "036. Gloucester County"],
+      "mapCenter": [37.41, -76.52],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "goochland": {
+      "name": "Goochland County",
+      "type": "county",
+      "fips": "075",
+      "jurisCode": "37",
+      "namePatterns": ["GOOCHLAND", "037. Goochland County"],
+      "mapCenter": [37.72, -77.93],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "grayson": {
+      "name": "Grayson County",
+      "type": "county",
+      "fips": "077",
+      "jurisCode": "38",
+      "namePatterns": ["GRAYSON", "038. Grayson County"],
+      "mapCenter": [36.66, -81.22],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "greene": {
+      "name": "Greene County",
+      "type": "county",
+      "fips": "079",
+      "jurisCode": "39",
+      "namePatterns": ["GREENE", "039. Greene County"],
+      "mapCenter": [38.30, -78.47],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "greensville": {
+      "name": "Greensville County",
+      "type": "county",
+      "fips": "081",
+      "jurisCode": "40",
+      "namePatterns": ["GREENSVILLE", "040. Greensville County"],
+      "mapCenter": [36.68, -77.56],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "halifax": {
+      "name": "Halifax County",
+      "type": "county",
+      "fips": "083",
+      "jurisCode": "41",
+      "namePatterns": ["HALIFAX", "041. Halifax County"],
+      "mapCenter": [36.77, -78.93],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "hanover": {
+      "name": "Hanover County",
+      "type": "county",
+      "fips": "085",
+      "jurisCode": "42",
+      "namePatterns": ["HANOVER", "042. Hanover County"],
+      "mapCenter": [37.76, -77.48],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "henrico": {
+      "name": "Henrico County",
+      "type": "county",
+      "fips": "087",
+      "jurisCode": "43",
+      "namePatterns": ["HENRICO", "043. Henrico County"],
+      "mapCenter": [37.55, -77.45],
+      "mapZoom": 11,
+      "maintainsOwnRoads": true
+    },
+    "henry": {
+      "name": "Henry County",
+      "type": "county",
+      "fips": "089",
+      "jurisCode": "44",
+      "namePatterns": ["HENRY", "044. Henry County"],
+      "mapCenter": [36.68, -79.87],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "highland": {
+      "name": "Highland County",
+      "type": "county",
+      "fips": "091",
+      "jurisCode": "45",
+      "namePatterns": ["HIGHLAND", "045. Highland County"],
+      "mapCenter": [38.37, -79.56],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "isle_of_wight": {
+      "name": "Isle of Wight County",
+      "type": "county",
+      "fips": "093",
+      "jurisCode": "46",
+      "namePatterns": ["ISLE OF WIGHT", "046. Isle of Wight County"],
+      "mapCenter": [36.90, -76.71],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "james_city": {
+      "name": "James City County",
+      "type": "county",
+      "fips": "095",
+      "jurisCode": "47",
+      "namePatterns": ["JAMES CITY", "047. James City County"],
+      "mapCenter": [37.31, -76.78],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "king_and_queen": {
+      "name": "King and Queen County",
+      "type": "county",
+      "fips": "097",
+      "jurisCode": "48",
+      "namePatterns": ["KING AND QUEEN", "048. King and Queen County"],
+      "mapCenter": [37.72, -76.88],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "king_george": {
+      "name": "King George County",
+      "type": "county",
+      "fips": "099",
+      "jurisCode": "49",
+      "namePatterns": ["KING GEORGE", "049. King George County"],
+      "mapCenter": [38.27, -77.16],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "king_william": {
+      "name": "King William County",
+      "type": "county",
+      "fips": "101",
+      "jurisCode": "50",
+      "namePatterns": ["KING WILLIAM", "050. King William County"],
+      "mapCenter": [37.70, -77.08],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "lancaster": {
+      "name": "Lancaster County",
+      "type": "county",
+      "fips": "103",
+      "jurisCode": "51",
+      "namePatterns": ["LANCASTER", "051. Lancaster County"],
+      "mapCenter": [37.70, -76.46],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "lee": {
+      "name": "Lee County",
+      "type": "county",
+      "fips": "105",
+      "jurisCode": "52",
+      "namePatterns": ["LEE", "052. Lee County"],
+      "mapCenter": [36.70, -83.12],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "loudoun": {
+      "name": "Loudoun County",
+      "type": "county",
+      "fips": "107",
+      "jurisCode": "53",
+      "namePatterns": ["LOUDOUN", "053. Loudoun County"],
+      "mapCenter": [39.08, -77.64],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "louisa": {
+      "name": "Louisa County",
+      "type": "county",
+      "fips": "109",
+      "jurisCode": "54",
+      "namePatterns": ["LOUISA", "054. Louisa County"],
+      "mapCenter": [38.00, -78.00],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "lunenburg": {
+      "name": "Lunenburg County",
+      "type": "county",
+      "fips": "111",
+      "jurisCode": "55",
+      "namePatterns": ["LUNENBURG", "055. Lunenburg County"],
+      "mapCenter": [36.95, -78.26],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "madison": {
+      "name": "Madison County",
+      "type": "county",
+      "fips": "113",
+      "jurisCode": "56",
+      "namePatterns": ["MADISON", "056. Madison County"],
+      "mapCenter": [38.41, -78.28],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "mathews": {
+      "name": "Mathews County",
+      "type": "county",
+      "fips": "115",
+      "jurisCode": "57",
+      "namePatterns": ["MATHEWS", "057. Mathews County"],
+      "mapCenter": [37.43, -76.32],
+      "mapZoom": 11,
+      "maintainsOwnRoads": false
+    },
+    "mecklenburg": {
+      "name": "Mecklenburg County",
+      "type": "county",
+      "fips": "117",
+      "jurisCode": "58",
+      "namePatterns": ["MECKLENBURG", "058. Mecklenburg County"],
+      "mapCenter": [36.68, -78.37],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "middlesex": {
+      "name": "Middlesex County",
+      "type": "county",
+      "fips": "119",
+      "jurisCode": "59",
+      "namePatterns": ["MIDDLESEX", "059. Middlesex County"],
+      "mapCenter": [37.61, -76.55],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "montgomery": {
+      "name": "Montgomery County",
+      "type": "county",
+      "fips": "121",
+      "jurisCode": "60",
+      "namePatterns": ["MONTGOMERY", "060. Montgomery County"],
+      "mapCenter": [37.18, -80.39],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "nelson": {
+      "name": "Nelson County",
+      "type": "county",
+      "fips": "125",
+      "jurisCode": "61",
+      "namePatterns": ["NELSON", "061. Nelson County"],
+      "mapCenter": [37.79, -78.88],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "new_kent": {
+      "name": "New Kent County",
+      "type": "county",
+      "fips": "127",
+      "jurisCode": "62",
+      "namePatterns": ["NEW KENT", "062. New Kent County"],
+      "mapCenter": [37.52, -76.98],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "northampton": {
+      "name": "Northampton County",
+      "type": "county",
+      "fips": "131",
+      "jurisCode": "63",
+      "namePatterns": ["NORTHAMPTON", "063. Northampton County"],
+      "mapCenter": [37.30, -75.93],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "northumberland": {
+      "name": "Northumberland County",
+      "type": "county",
+      "fips": "133",
+      "jurisCode": "64",
+      "namePatterns": ["NORTHUMBERLAND", "064. Northumberland County"],
+      "mapCenter": [37.87, -76.43],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "nottoway": {
+      "name": "Nottoway County",
+      "type": "county",
+      "fips": "135",
+      "jurisCode": "65",
+      "namePatterns": ["NOTTOWAY", "065. Nottoway County"],
+      "mapCenter": [37.14, -78.05],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "orange": {
+      "name": "Orange County",
+      "type": "county",
+      "fips": "137",
+      "jurisCode": "66",
+      "namePatterns": ["ORANGE", "066. Orange County"],
+      "mapCenter": [38.24, -78.01],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "page": {
+      "name": "Page County",
+      "type": "county",
+      "fips": "139",
+      "jurisCode": "67",
+      "namePatterns": ["PAGE", "067. Page County"],
+      "mapCenter": [38.62, -78.47],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "patrick": {
+      "name": "Patrick County",
+      "type": "county",
+      "fips": "141",
+      "jurisCode": "68",
+      "namePatterns": ["PATRICK", "068. Patrick County"],
+      "mapCenter": [36.68, -80.28],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "pittsylvania": {
+      "name": "Pittsylvania County",
+      "type": "county",
+      "fips": "143",
+      "jurisCode": "69",
+      "namePatterns": ["PITTSYLVANIA", "069. Pittsylvania County"],
+      "mapCenter": [36.82, -79.39],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "powhatan": {
+      "name": "Powhatan County",
+      "type": "county",
+      "fips": "145",
+      "jurisCode": "70",
+      "namePatterns": ["POWHATAN", "070. Powhatan County"],
+      "mapCenter": [37.55, -77.92],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "prince_edward": {
+      "name": "Prince Edward County",
+      "type": "county",
+      "fips": "147",
+      "jurisCode": "71",
+      "namePatterns": ["PRINCE EDWARD", "071. Prince Edward County"],
+      "mapCenter": [37.23, -78.44],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "prince_george": {
+      "name": "Prince George County",
+      "type": "county",
+      "fips": "149",
+      "jurisCode": "72",
+      "namePatterns": ["PRINCE GEORGE", "072. Prince George County"],
+      "mapCenter": [37.19, -77.22],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "prince_william": {
+      "name": "Prince William County",
+      "type": "county",
+      "fips": "153",
+      "jurisCode": "73",
+      "namePatterns": ["PRINCE WILLIAM", "073. Prince William County"],
+      "mapCenter": [38.70, -77.48],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "pulaski": {
+      "name": "Pulaski County",
+      "type": "county",
+      "fips": "155",
+      "jurisCode": "74",
+      "namePatterns": ["PULASKI", "074. Pulaski County"],
+      "mapCenter": [37.06, -80.72],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "rappahannock": {
+      "name": "Rappahannock County",
+      "type": "county",
+      "fips": "157",
+      "jurisCode": "75",
+      "namePatterns": ["RAPPAHANNOCK", "075. Rappahannock County"],
+      "mapCenter": [38.68, -78.16],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "richmond_county": {
+      "name": "Richmond County",
+      "type": "county",
+      "fips": "159",
+      "jurisCode": "76",
+      "namePatterns": ["RICHMOND COUNTY", "076. Richmond County"],
+      "mapCenter": [37.94, -76.73],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "roanoke_county": {
+      "name": "Roanoke County",
+      "type": "county",
+      "fips": "161",
+      "jurisCode": "77",
+      "namePatterns": ["ROANOKE COUNTY", "077. Roanoke County"],
+      "mapCenter": [37.28, -80.05],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "rockbridge": {
+      "name": "Rockbridge County",
+      "type": "county",
+      "fips": "163",
+      "jurisCode": "78",
+      "namePatterns": ["ROCKBRIDGE", "078. Rockbridge County"],
+      "mapCenter": [37.81, -79.45],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "rockingham": {
+      "name": "Rockingham County",
+      "type": "county",
+      "fips": "165",
+      "jurisCode": "79",
+      "namePatterns": ["ROCKINGHAM", "079. Rockingham County"],
+      "mapCenter": [38.52, -78.88],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "russell": {
+      "name": "Russell County",
+      "type": "county",
+      "fips": "167",
+      "jurisCode": "80",
+      "namePatterns": ["RUSSELL", "080. Russell County"],
+      "mapCenter": [36.93, -82.10],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "scott": {
+      "name": "Scott County",
+      "type": "county",
+      "fips": "169",
+      "jurisCode": "81",
+      "namePatterns": ["SCOTT", "081. Scott County"],
+      "mapCenter": [36.71, -82.61],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "shenandoah": {
+      "name": "Shenandoah County",
+      "type": "county",
+      "fips": "171",
+      "jurisCode": "82",
+      "namePatterns": ["SHENANDOAH", "082. Shenandoah County"],
+      "mapCenter": [38.86, -78.57],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "smyth": {
+      "name": "Smyth County",
+      "type": "county",
+      "fips": "173",
+      "jurisCode": "83",
+      "namePatterns": ["SMYTH", "083. Smyth County"],
+      "mapCenter": [36.85, -81.54],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "southampton": {
+      "name": "Southampton County",
+      "type": "county",
+      "fips": "175",
+      "jurisCode": "84",
+      "namePatterns": ["SOUTHAMPTON", "084. Southampton County"],
+      "mapCenter": [36.72, -77.10],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "spotsylvania": {
+      "name": "Spotsylvania County",
+      "type": "county",
+      "fips": "177",
+      "jurisCode": "85",
+      "namePatterns": ["SPOTSYLVANIA", "085. Spotsylvania County"],
+      "mapCenter": [38.18, -77.65],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "stafford": {
+      "name": "Stafford County",
+      "type": "county",
+      "fips": "179",
+      "jurisCode": "86",
+      "namePatterns": ["STAFFORD", "086. Stafford County"],
+      "mapCenter": [38.42, -77.45],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "surry": {
+      "name": "Surry County",
+      "type": "county",
+      "fips": "181",
+      "jurisCode": "87",
+      "namePatterns": ["SURRY", "087. Surry County"],
+      "mapCenter": [37.12, -76.88],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "sussex": {
+      "name": "Sussex County",
+      "type": "county",
+      "fips": "183",
+      "jurisCode": "88",
+      "namePatterns": ["SUSSEX", "088. Sussex County"],
+      "mapCenter": [36.92, -77.27],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "tazewell": {
+      "name": "Tazewell County",
+      "type": "county",
+      "fips": "185",
+      "jurisCode": "89",
+      "namePatterns": ["TAZEWELL", "089. Tazewell County"],
+      "mapCenter": [37.12, -81.52],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "warren": {
+      "name": "Warren County",
+      "type": "county",
+      "fips": "187",
+      "jurisCode": "90",
+      "namePatterns": ["WARREN", "090. Warren County"],
+      "mapCenter": [38.91, -78.21],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "washington": {
+      "name": "Washington County",
+      "type": "county",
+      "fips": "191",
+      "jurisCode": "91",
+      "namePatterns": ["WASHINGTON", "091. Washington County"],
+      "mapCenter": [36.75, -81.95],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "westmoreland": {
+      "name": "Westmoreland County",
+      "type": "county",
+      "fips": "193",
+      "jurisCode": "92",
+      "namePatterns": ["WESTMORELAND", "092. Westmoreland County"],
+      "mapCenter": [38.11, -76.80],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "wise": {
+      "name": "Wise County",
+      "type": "county",
+      "fips": "195",
+      "jurisCode": "93",
+      "namePatterns": ["WISE", "093. Wise County"],
+      "mapCenter": [36.97, -82.62],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "wythe": {
+      "name": "Wythe County",
+      "type": "county",
+      "fips": "197",
+      "jurisCode": "94",
+      "namePatterns": ["WYTHE", "094. Wythe County"],
+      "mapCenter": [36.92, -81.08],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "york": {
+      "name": "York County",
+      "type": "county",
+      "fips": "199",
+      "jurisCode": "95",
+      "namePatterns": ["YORK", "095. York County"],
+      "mapCenter": [37.22, -76.54],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "alexandria": {
+      "name": "Alexandria City",
+      "type": "city",
+      "fips": "510",
+      "jurisCode": "96",
+      "namePatterns": ["ALEXANDRIA", "096. Alexandria City"],
+      "mapCenter": [38.82, -77.08],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "bristol": {
+      "name": "Bristol City",
+      "type": "city",
+      "fips": "520",
+      "jurisCode": "97",
+      "namePatterns": ["BRISTOL", "097. Bristol City"],
+      "mapCenter": [36.60, -82.19],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "buena_vista": {
+      "name": "Buena Vista City",
+      "type": "city",
+      "fips": "530",
+      "jurisCode": "98",
+      "namePatterns": ["BUENA VISTA", "098. Buena Vista City"],
+      "mapCenter": [37.73, -79.35],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "charlottesville": {
+      "name": "Charlottesville City",
+      "type": "city",
+      "fips": "540",
+      "jurisCode": "99",
+      "namePatterns": ["CHARLOTTESVILLE", "099. Charlottesville City"],
+      "mapCenter": [38.03, -78.48],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "chesapeake": {
+      "name": "Chesapeake City",
+      "type": "city",
+      "fips": "550",
+      "jurisCode": "100",
+      "namePatterns": ["CHESAPEAKE", "100. Chesapeake City"],
+      "mapCenter": [36.77, -76.29],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "colonial_heights": {
+      "name": "Colonial Heights City",
+      "type": "city",
+      "fips": "570",
+      "jurisCode": "101",
+      "namePatterns": ["COLONIAL HEIGHTS", "101. Colonial Heights City"],
+      "mapCenter": [37.26, -77.40],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "covington": {
+      "name": "Covington City",
+      "type": "city",
+      "fips": "580",
+      "jurisCode": "102",
+      "namePatterns": ["COVINGTON", "102. Covington City"],
+      "mapCenter": [37.79, -79.99],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "danville": {
+      "name": "Danville City",
+      "type": "city",
+      "fips": "590",
+      "jurisCode": "103",
+      "namePatterns": ["DANVILLE", "103. Danville City"],
+      "mapCenter": [36.59, -79.39],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "emporia": {
+      "name": "Emporia City",
+      "type": "city",
+      "fips": "595",
+      "jurisCode": "104",
+      "namePatterns": ["EMPORIA", "104. Emporia City"],
+      "mapCenter": [36.69, -77.54],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "fairfax_city": {
+      "name": "Fairfax City",
+      "type": "city",
+      "fips": "600",
+      "jurisCode": "105",
+      "namePatterns": ["FAIRFAX CITY", "105. Fairfax City"],
+      "mapCenter": [38.85, -77.30],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "falls_church": {
+      "name": "Falls Church City",
+      "type": "city",
+      "fips": "610",
+      "jurisCode": "106",
+      "namePatterns": ["FALLS CHURCH", "106. Falls Church City"],
+      "mapCenter": [38.88, -77.17],
+      "mapZoom": 14,
+      "maintainsOwnRoads": false
+    },
+    "franklin_city": {
+      "name": "Franklin City",
+      "type": "city",
+      "fips": "620",
+      "jurisCode": "107",
+      "namePatterns": ["FRANKLIN CITY", "107. Franklin City"],
+      "mapCenter": [36.68, -76.92],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "fredericksburg": {
+      "name": "Fredericksburg City",
+      "type": "city",
+      "fips": "630",
+      "jurisCode": "108",
+      "namePatterns": ["FREDERICKSBURG", "108. Fredericksburg City"],
+      "mapCenter": [38.30, -77.46],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "galax": {
+      "name": "Galax City",
+      "type": "city",
+      "fips": "640",
+      "jurisCode": "109",
+      "namePatterns": ["GALAX", "109. Galax City"],
+      "mapCenter": [36.66, -80.92],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "hampton": {
+      "name": "Hampton City",
+      "type": "city",
+      "fips": "650",
+      "jurisCode": "110",
+      "namePatterns": ["HAMPTON", "110. Hampton City"],
+      "mapCenter": [37.03, -76.35],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "harrisonburg": {
+      "name": "Harrisonburg City",
+      "type": "city",
+      "fips": "660",
+      "jurisCode": "111",
+      "namePatterns": ["HARRISONBURG", "111. Harrisonburg City"],
+      "mapCenter": [38.45, -78.87],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "hopewell": {
+      "name": "Hopewell City",
+      "type": "city",
+      "fips": "670",
+      "jurisCode": "112",
+      "namePatterns": ["HOPEWELL", "112. Hopewell City"],
+      "mapCenter": [37.30, -77.29],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "lexington": {
+      "name": "Lexington City",
+      "type": "city",
+      "fips": "678",
+      "jurisCode": "113",
+      "namePatterns": ["LEXINGTON", "113. Lexington City"],
+      "mapCenter": [37.78, -79.44],
+      "mapZoom": 14,
+      "maintainsOwnRoads": false
+    },
+    "lynchburg": {
+      "name": "Lynchburg City",
+      "type": "city",
+      "fips": "680",
+      "jurisCode": "114",
+      "namePatterns": ["LYNCHBURG", "114. Lynchburg City"],
+      "mapCenter": [37.41, -79.14],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "manassas": {
+      "name": "Manassas City",
+      "type": "city",
+      "fips": "683",
+      "jurisCode": "115",
+      "namePatterns": ["MANASSAS", "115. Manassas City"],
+      "mapCenter": [38.75, -77.47],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "manassas_park": {
+      "name": "Manassas Park City",
+      "type": "city",
+      "fips": "685",
+      "jurisCode": "116",
+      "namePatterns": ["MANASSAS PARK", "116. Manassas Park City"],
+      "mapCenter": [38.77, -77.47],
+      "mapZoom": 14,
+      "maintainsOwnRoads": false
+    },
+    "martinsville": {
+      "name": "Martinsville City",
+      "type": "city",
+      "fips": "690",
+      "jurisCode": "117",
+      "namePatterns": ["MARTINSVILLE", "117. Martinsville City"],
+      "mapCenter": [36.69, -79.87],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "newport_news": {
+      "name": "Newport News City",
+      "type": "city",
+      "fips": "700",
+      "jurisCode": "118",
+      "namePatterns": ["NEWPORT NEWS", "118. Newport News City"],
+      "mapCenter": [37.09, -76.47],
+      "mapZoom": 11,
+      "maintainsOwnRoads": false
+    },
+    "norfolk": {
+      "name": "Norfolk City",
+      "type": "city",
+      "fips": "710",
+      "jurisCode": "119",
+      "namePatterns": ["NORFOLK", "119. Norfolk City"],
+      "mapCenter": [36.85, -76.29],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "norton": {
+      "name": "Norton City",
+      "type": "city",
+      "fips": "720",
+      "jurisCode": "120",
+      "namePatterns": ["NORTON", "120. Norton City"],
+      "mapCenter": [36.93, -82.63],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "petersburg": {
+      "name": "Petersburg City",
+      "type": "city",
+      "fips": "730",
+      "jurisCode": "121",
+      "namePatterns": ["PETERSBURG", "121. Petersburg City"],
+      "mapCenter": [37.23, -77.40],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "poquoson": {
+      "name": "Poquoson City",
+      "type": "city",
+      "fips": "735",
+      "jurisCode": "122",
+      "namePatterns": ["POQUOSON", "122. Poquoson City"],
+      "mapCenter": [37.12, -76.35],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "portsmouth": {
+      "name": "Portsmouth City",
+      "type": "city",
+      "fips": "740",
+      "jurisCode": "123",
+      "namePatterns": ["PORTSMOUTH", "123. Portsmouth City"],
+      "mapCenter": [36.84, -76.35],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "radford": {
+      "name": "Radford City",
+      "type": "city",
+      "fips": "750",
+      "jurisCode": "124",
+      "namePatterns": ["RADFORD", "124. Radford City"],
+      "mapCenter": [37.13, -80.58],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "richmond_city": {
+      "name": "Richmond City",
+      "type": "city",
+      "fips": "760",
+      "jurisCode": "125",
+      "namePatterns": ["RICHMOND CITY", "125. Richmond City"],
+      "mapCenter": [37.54, -77.44],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "roanoke_city": {
+      "name": "Roanoke City",
+      "type": "city",
+      "fips": "770",
+      "jurisCode": "126",
+      "namePatterns": ["ROANOKE CITY", "126. Roanoke City"],
+      "mapCenter": [37.27, -79.94],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "salem": {
+      "name": "Salem City",
+      "type": "city",
+      "fips": "775",
+      "jurisCode": "127",
+      "namePatterns": ["SALEM", "127. Salem City"],
+      "mapCenter": [37.29, -80.05],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "staunton": {
+      "name": "Staunton City",
+      "type": "city",
+      "fips": "790",
+      "jurisCode": "128",
+      "namePatterns": ["STAUNTON", "128. Staunton City"],
+      "mapCenter": [38.15, -79.07],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "suffolk": {
+      "name": "Suffolk City",
+      "type": "city",
+      "fips": "800",
+      "jurisCode": "129",
+      "namePatterns": ["SUFFOLK", "129. Suffolk City"],
+      "mapCenter": [36.73, -76.58],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "virginia_beach": {
+      "name": "Virginia Beach City",
+      "type": "city",
+      "fips": "810",
+      "jurisCode": "130",
+      "namePatterns": ["VIRGINIA BEACH", "130. Virginia Beach City"],
+      "mapCenter": [36.85, -75.98],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "waynesboro": {
+      "name": "Waynesboro City",
+      "type": "city",
+      "fips": "820",
+      "jurisCode": "131",
+      "namePatterns": ["WAYNESBORO", "131. Waynesboro City"],
+      "mapCenter": [38.07, -78.89],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "williamsburg": {
+      "name": "Williamsburg City",
+      "type": "city",
+      "fips": "830",
+      "jurisCode": "132",
+      "namePatterns": ["WILLIAMSBURG", "132. Williamsburg City"],
+      "mapCenter": [37.27, -76.71],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    },
+    "winchester": {
+      "name": "Winchester City",
+      "type": "city",
+      "fips": "840",
+      "jurisCode": "133",
+      "namePatterns": ["WINCHESTER", "133. Winchester City"],
+      "mapCenter": [39.19, -78.17],
+      "mapZoom": 13,
+      "maintainsOwnRoads": false
+    }
+  },
+
+  "filterProfiles": {
+    "countyOnly": {
+      "name": "County/City Roads Only",
+      "description": "Only locally-maintained roads (NonVDOT)",
+      "systemValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT"]
+    },
+    "countyPlusVDOT": {
+      "name": "All Roads (No Interstate)",
+      "description": "Local roads plus VDOT primary/secondary, excluding interstates",
+      "systemValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT", "Primary", "Secondary"],
+      "excludeRoutePatterns": ["^I-\\d+", "^I-64", "^I-95", "^I-295", "^I-85", "^I-81", "^I-77", "^I-66", "^I-664"]
+    },
+    "allRoads": {
+      "name": "All Roads (Including Interstate)",
+      "description": "All road types including interstates",
+      "systemValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT", "Primary", "Secondary", "Interstate"]
+    }
+  },
+
+  "defaults": {
+    "jurisdiction": "henrico",
+    "filterProfile": "countyOnly"
+  },
+
+  "dataSource": {
+    "name": "Virginia Roads",
+    "url": "https://www.virginiaroads.org",
+    "apiUrl": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_test/FeatureServer/0/query",
+    "fallbackUrl": "https://www.virginiaroads.org/api/download/v1/items/101101cecac34f28b38c0846e847bd0b/csv?layers=1"
+  }
+}
