@@ -1,0 +1,233 @@
+name: Download Traffic Data
+
+on:
+  schedule:
+    - cron: '0 11 * * 1'
+  workflow_dispatch:
+    inputs:
+      jurisdiction:
+        description: 'Select Jurisdiction (leave empty to use saved setting)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          # Counties (95)
+          - accomack
+          - albemarle
+          - alleghany
+          - amelia
+          - amherst
+          - appomattox
+          - arlington
+          - augusta
+          - bath
+          - bedford_county
+          - bland
+          - botetourt
+          - brunswick
+          - buchanan
+          - buckingham
+          - campbell
+          - caroline
+          - carroll
+          - charles_city
+          - charlotte
+          - chesterfield
+          - clarke
+          - craig
+          - culpeper
+          - cumberland
+          - dickenson
+          - dinwiddie
+          - essex
+          - fairfax_county
+          - fauquier
+          - floyd
+          - fluvanna
+          - franklin_county
+          - frederick
+          - giles
+          - gloucester
+          - goochland
+          - grayson
+          - greene
+          - greensville
+          - halifax
+          - hanover
+          - henrico
+          - henry
+          - highland
+          - isle_of_wight
+          - james_city
+          - king_and_queen
+          - king_george
+          - king_william
+          - lancaster
+          - lee
+          - loudoun
+          - louisa
+          - lunenburg
+          - madison
+          - mathews
+          - mecklenburg
+          - middlesex
+          - montgomery
+          - nelson
+          - new_kent
+          - northampton
+          - northumberland
+          - nottoway
+          - orange
+          - page
+          - patrick
+          - pittsylvania
+          - powhatan
+          - prince_edward
+          - prince_george
+          - prince_william
+          - pulaski
+          - rappahannock
+          - richmond_county
+          - roanoke_county
+          - rockbridge
+          - rockingham
+          - russell
+          - scott
+          - shenandoah
+          - smyth
+          - southampton
+          - spotsylvania
+          - stafford
+          - surry
+          - sussex
+          - tazewell
+          - warren
+          - washington
+          - westmoreland
+          - wise
+          - wythe
+          - york
+          # Independent Cities (38)
+          - alexandria
+          - bristol
+          - buena_vista
+          - charlottesville
+          - chesapeake
+          - colonial_heights
+          - covington
+          - danville
+          - emporia
+          - fairfax_city
+          - falls_church
+          - franklin_city
+          - fredericksburg
+          - galax
+          - hampton
+          - harrisonburg
+          - hopewell
+          - lexington
+          - lynchburg
+          - manassas
+          - manassas_park
+          - martinsville
+          - newport_news
+          - norfolk
+          - norton
+          - petersburg
+          - poquoson
+          - portsmouth
+          - radford
+          - richmond_city
+          - roanoke_city
+          - salem
+          - staunton
+          - suffolk
+          - virginia_beach
+          - waynesboro
+          - williamsburg
+          - winchester
+
+permissions:
+  contents: write
+
+jobs:
+  download-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Determine jurisdiction
+        id: get-jurisdiction
+        run: |
+          # Check if jurisdiction was provided via workflow_dispatch
+          INPUT_JURISDICTION="${{ github.event.inputs.jurisdiction }}"
+
+          if [ -n "$INPUT_JURISDICTION" ]; then
+            echo "Using workflow input jurisdiction: $INPUT_JURISDICTION"
+            echo "jurisdiction=$INPUT_JURISDICTION" >> $GITHUB_OUTPUT
+          else
+            # Read from settings.json for scheduled runs
+            if [ -f "config/settings.json" ]; then
+              SAVED_JURISDICTION=$(python -c "import json; print(json.load(open('config/settings.json'))['selectedJurisdiction'])")
+              echo "Using saved jurisdiction from settings: $SAVED_JURISDICTION"
+              echo "jurisdiction=$SAVED_JURISDICTION" >> $GITHUB_OUTPUT
+            else
+              echo "No settings file found, using default: henrico"
+              echo "jurisdiction=henrico" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Download crash data (all 3 road type filters)
+        run: |
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+          echo "=========================================="
+          echo "Downloading data for: $JURISDICTION"
+          echo "=========================================="
+
+          # Download County/City Roads Only
+          echo ">>> Downloading County/City Roads Only..."
+          python download_crash_data.py --jurisdiction "$JURISDICTION" --filter countyOnly --output "data/${JURISDICTION}_county_roads.csv"
+
+          # Download All Roads (No Interstate)
+          echo ">>> Downloading All Roads (No Interstate)..."
+          python download_crash_data.py --jurisdiction "$JURISDICTION" --filter countyPlusVDOT --output "data/${JURISDICTION}_no_interstate.csv"
+
+          # Download All Roads (Including Interstate)
+          echo ">>> Downloading All Roads (Including Interstate)..."
+          python download_crash_data.py --jurisdiction "$JURISDICTION" --filter allRoads --output "data/${JURISDICTION}_all_roads.csv"
+
+          # Also create crashes.csv as the default (county roads only)
+          echo ">>> Creating default crashes.csv..."
+          cp "data/${JURISDICTION}_county_roads.csv" "data/crashes.csv"
+
+          echo "=========================================="
+          echo "Download complete!"
+          echo "Generated files:"
+          ls -la data/*.csv
+          echo "=========================================="
+
+      - name: Download grants data
+        continue-on-error: true
+        run: python download_grants_data.py
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/
+          git diff --staged --quiet || git commit -m "Auto-update: Traffic data - $(date +'%Y-%m-%d')"
+          git push || echo "No changes to push"
