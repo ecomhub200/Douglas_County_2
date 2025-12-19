@@ -186,7 +186,6 @@ Each card launches a **Guided Workflow** (see Section 4).
   ├── Using filters effectively
   └── Common questions
 
-▶ Safety Focus
 ▶ Map
 ▶ Hotspots
 ▶ Analysis
