@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing - CRASH LENS</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="icon" href="assets/images/favicon.ico" type="image/x-icon">
+  <style>
+    .pricing-hero {
+      padding: 8rem 0 4rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pricing-hero h1 {
+      font-size: 2.5rem;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .pricing-hero p {
+      font-size: 1.125rem;
+      color: var(--text-dark);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .pricing-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+
+    .pricing-toggle span {
+      color: var(--text-dark);
+    }
+
+    .pricing-toggle span.active {
+      color: var(--white);
+    }
+
+    .toggle-switch {
+      width: 50px;
+      height: 26px;
+      background: var(--border-dark);
+      border-radius: 13px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.3s ease;
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      background: var(--white);
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.3s ease;
+    }
+
+    .toggle-switch.annual::after {
+      transform: translateX(24px);
+    }
+
+    .toggle-switch.annual {
+      background: var(--primary);
+    }
+
+    .save-badge {
+      background: var(--success);
+      color: var(--white);
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .pricing-card {
+      background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .pricing-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(30, 64, 175, 0.5);
+    }
+
+    .pricing-card.popular {
+      border-color: var(--primary);
+      transform: scale(1.02);
+    }
+
+    .pricing-card.popular:hover {
+      transform: scale(1.02) translateY(-4px);
+    }
+
+    .popular-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--primary-gradient);
+      color: var(--white);
+      padding: 0.25rem 1rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .plan-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--white);
+      margin-bottom: 0.5rem;
+    }
+
+    .plan-desc {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .plan-price {
+      margin-bottom: 1.5rem;
+    }
+
+    .price-amount {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .price-period {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+    }
+
+    .plan-features {
+      list-style: none;
+      margin-bottom: 2rem;
+    }
+
+    .plan-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.5rem 0;
+      color: var(--text-dark);
+      font-size: 0.875rem;
+    }
+
+    .plan-features li svg {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      color: var(--success);
+    }
+
+    .plan-btn {
+      width: 100%;
+      padding: 0.875rem;
+      border-radius: var(--radius);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .plan-btn-primary {
+      background: var(--primary-gradient);
+      color: var(--white);
+      border: none;
+    }
+
+    .plan-btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .plan-btn-outline {
+      background: transparent;
+      color: var(--white);
+      border: 1px solid var(--border-dark);
+    }
+
+    .plan-btn-outline:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    /* Add-ons Section */
+    .addons-section {
+      background: var(--bg-dark-secondary);
+      padding: 4rem 0;
+      margin-top: 4rem;
+    }
+
+    .addons-section h2 {
+      text-align: center;
+      color: var(--white);
+      margin-bottom: 0.5rem;
+    }
+
+    .addons-section .subtitle {
+      text-align: center;
+      color: var(--text-dark);
+      margin-bottom: 2rem;
+    }
+
+    .addons-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .addon-card {
+      background: var(--bg-dark-card);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .addon-card h3 {
+      color: var(--white);
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .addon-card .price {
+      color: var(--primary);
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    /* FAQ Section */
+    .faq-section {
+      padding: 4rem 0;
+    }
+
+    .faq-section h2 {
+      text-align: center;
+      color: var(--white);
+      margin-bottom: 2rem;
+    }
+
+    .faq-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .faq-item h3 {
+      color: var(--white);
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .faq-item p {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    .footer {
+      background: var(--bg-dark-secondary);
+      border-top: 1px solid var(--border-dark);
+      padding: 3rem 0 1.5rem;
+    }
+
+    .footer-content {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .footer-brand {
+      max-width: 250px;
+    }
+
+    .footer-brand h3 {
+      color: var(--white);
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .footer-brand p {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+    }
+
+    .footer-links h4 {
+      color: var(--white);
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .footer-links ul {
+      list-style: none;
+    }
+
+    .footer-links li {
+      margin-bottom: 0.5rem;
+    }
+
+    .footer-links a {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      transition: color 0.2s ease;
+    }
+
+    .footer-links a:hover {
+      color: var(--white);
+    }
+
+    .footer-bottom {
+      text-align: center;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border-dark);
+      color: var(--text-dark);
+      font-size: 0.875rem;
+    }
+
+    @media (max-width: 768px) {
+      .pricing-hero h1 {
+        font-size: 2rem;
+      }
+
+      .pricing-card.popular {
+        transform: none;
+      }
+
+      .pricing-card.popular:hover {
+        transform: translateY(-4px);
+      }
+    }
+  </style>
+</head>
+<body class="dark">
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="/" class="nav-logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="6" fill="currentColor"/>
+          <line x1="16" y1="2" x2="16" y2="8" stroke="currentColor" stroke-width="2"/>
+          <line x1="16" y1="24" x2="16" y2="30" stroke="currentColor" stroke-width="2"/>
+          <line x1="2" y1="16" x2="8" y2="16" stroke="currentColor" stroke-width="2"/>
+          <line x1="24" y1="16" x2="30" y2="16" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        CRASH LENS
+      </a>
+      <div class="nav-links">
+        <a href="/features.html" class="nav-link">Features</a>
+        <a href="/pricing.html" class="nav-link active">Pricing</a>
+        <a href="/resources.html" class="nav-link">Resources</a>
+      </div>
+      <div class="nav-actions">
+        <a href="/login" class="nav-link hide-mobile">Sign In</a>
+        <a href="/login" class="btn btn-gradient">Start Free Trial</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Pricing Hero -->
+  <section class="pricing-hero">
+    <div class="glow-primary" style="top: -100px; left: 20%;"></div>
+    <div class="container">
+      <h1>Simple, Transparent Pricing</h1>
+      <p>Start with a 14-day free trial. No credit card required. Choose the plan that works for your team.</p>
+
+      <div class="pricing-toggle">
+        <span class="active">Monthly</span>
+        <div class="toggle-switch" id="billingToggle"></div>
+        <span>Annual</span>
+        <span class="save-badge">Save 20%</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing Cards -->
+  <section class="pricing-grid">
+    <!-- Free Trial -->
+    <div class="pricing-card">
+      <div class="plan-name">Free Trial</div>
+      <div class="plan-desc">Perfect for evaluation</div>
+      <div class="plan-price">
+        <span class="price-amount">$0</span>
+        <span class="price-period">for 14 days</span>
+      </div>
+      <ul class="plan-features">
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Full access to all features
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          AI Assistant (bring your own key)
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          All analysis tools
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Export capabilities
+        </li>
+      </ul>
+      <button class="plan-btn plan-btn-outline">Start Free Trial</button>
+    </div>
+
+    <!-- Individual -->
+    <div class="pricing-card popular">
+      <span class="popular-badge">Most Popular</span>
+      <div class="plan-name">Individual</div>
+      <div class="plan-desc">For independent professionals</div>
+      <div class="plan-price">
+        <span class="price-amount" data-monthly="$150" data-annual="$120">$150</span>
+        <span class="price-period">/month</span>
+      </div>
+      <ul class="plan-features">
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Everything in Free Trial
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          100 AI queries/month included
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Use your own API key (unlimited)
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Priority support
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          1 user seat
+        </li>
+      </ul>
+      <button class="plan-btn plan-btn-primary">Get Started</button>
+    </div>
+
+    <!-- Team -->
+    <div class="pricing-card">
+      <div class="plan-name">Team</div>
+      <div class="plan-desc">For small teams and departments</div>
+      <div class="plan-price">
+        <span class="price-amount" data-monthly="$500" data-annual="$400">$500</span>
+        <span class="price-period">/month</span>
+      </div>
+      <ul class="plan-features">
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Everything in Individual
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          500 AI queries/month included
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Up to 5 user seats
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Team management dashboard
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Shared workspaces
+        </li>
+      </ul>
+      <button class="plan-btn plan-btn-outline">Get Started</button>
+    </div>
+
+    <!-- Agency -->
+    <div class="pricing-card">
+      <div class="plan-name">Agency</div>
+      <div class="plan-desc">For large organizations</div>
+      <div class="plan-price">
+        <span class="price-amount">Custom</span>
+        <span class="price-period">pricing</span>
+      </div>
+      <ul class="plan-features">
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Everything in Team
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          1000+ AI queries/month
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Unlimited user seats
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Dedicated account manager
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+          Custom integrations & training
+        </li>
+      </ul>
+      <button class="plan-btn plan-btn-outline">Contact Sales</button>
+    </div>
+  </section>
+
+  <!-- Add-ons -->
+  <section class="addons-section">
+    <div class="container">
+      <h2>Optional Add-ons</h2>
+      <p class="subtitle">Extend your plan as needed</p>
+      <div class="addons-grid">
+        <div class="addon-card">
+          <h3>Additional User Seat</h3>
+          <div class="price">+$75/user/month</div>
+        </div>
+        <div class="addon-card">
+          <h3>Extra AI Queries</h3>
+          <div class="price">+$25 per 100 queries</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq-section">
+    <div class="container">
+      <h2>Frequently Asked Questions</h2>
+      <div class="faq-grid">
+        <div class="faq-item">
+          <h3>What happens after the free trial?</h3>
+          <p>After 14 days, you can choose a paid plan to continue. Your data and settings are preserved when you upgrade.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Can I use my own API key?</h3>
+          <p>Yes! All plans support "bring your own key" for unlimited AI queries using your Claude API key.</p>
+        </div>
+        <div class="faq-item">
+          <h3>What payment methods do you accept?</h3>
+          <p>We accept all major credit cards and can arrange invoicing for Agency plans.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Can I switch plans later?</h3>
+          <p>Yes, you can upgrade or downgrade at any time. Changes take effect on your next billing cycle.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <h3>CRASH LENS</h3>
+          <p>Professional crash analysis tools for Virginia transportation agencies.</p>
+        </div>
+        <div class="footer-links">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="/features.html">Features</a></li>
+            <li><a href="/pricing.html">Pricing</a></li>
+            <li><a href="/resources.html">Resources</a></li>
+          </ul>
+        </div>
+        <div class="footer-links">
+          <h4>Support</h4>
+          <ul>
+            <li><a href="#">Documentation</a></li>
+            <li><a href="#">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-links">
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms of Service</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2024 CRASH LENS. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Billing toggle
+    const toggle = document.getElementById('billingToggle');
+    const prices = document.querySelectorAll('.price-amount[data-monthly]');
+    const periodSpans = document.querySelectorAll('.price-period');
+    const toggleSpans = document.querySelectorAll('.pricing-toggle span:not(.save-badge)');
+
+    toggle.addEventListener('click', () => {
+      toggle.classList.toggle('annual');
+      const isAnnual = toggle.classList.contains('annual');
+
+      // Update active state on labels
+      toggleSpans[0].classList.toggle('active', !isAnnual);
+      toggleSpans[1].classList.toggle('active', isAnnual);
+
+      // Update prices
+      prices.forEach(price => {
+        price.textContent = isAnnual ? price.dataset.annual : price.dataset.monthly;
+      });
+    });
+
+    // Button clicks - redirect to login/signup
+    document.querySelectorAll('.plan-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        window.location.href = '/login';
+      });
+    });
+  </script>
+</body>
+</html>
