@@ -177,12 +177,15 @@
     }
 
     .plan-btn {
+      display: block;
       width: 100%;
       padding: 0.875rem;
       border-radius: var(--radius);
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
+      text-align: center;
+      text-decoration: none;
     }
 
     .plan-btn-primary {
@@ -435,7 +438,7 @@
           Export capabilities
         </li>
       </ul>
-      <button class="plan-btn plan-btn-outline">Start Free Trial</button>
+      <a href="/henrico_crash_tool/login/" class="plan-btn plan-btn-outline">Start Free Trial</a>
     </div>
 
     <!-- Individual -->
@@ -469,7 +472,7 @@
           1 user seat
         </li>
       </ul>
-      <button class="plan-btn plan-btn-primary">Get Started</button>
+      <a href="/henrico_crash_tool/login/" class="plan-btn plan-btn-primary">Get Started</a>
     </div>
 
     <!-- Team -->
@@ -502,7 +505,7 @@
           Shared workspaces
         </li>
       </ul>
-      <button class="plan-btn plan-btn-outline">Get Started</button>
+      <a href="/henrico_crash_tool/login/" class="plan-btn plan-btn-outline">Get Started</a>
     </div>
 
     <!-- Agency -->
@@ -535,7 +538,7 @@
           Custom integrations & training
         </li>
       </ul>
-      <button class="plan-btn plan-btn-outline">Contact Sales</button>
+      <a href="/henrico_crash_tool/login/" class="plan-btn plan-btn-outline">Contact Sales</a>
     </div>
   </section>
 
@@ -640,12 +643,6 @@
       });
     });
 
-    // Button clicks - redirect to login/signup
-    document.querySelectorAll('.plan-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        window.location.href = '/henrico_crash_tool/login/';
-      });
-    });
   </script>
 </body>
 </html>
