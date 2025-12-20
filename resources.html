@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resources - CRASH LENS</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="icon" href="assets/images/favicon.ico" type="image/x-icon">
+  <style>
+    .resources-hero {
+      padding: 8rem 0 4rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .resources-hero h1 {
+      font-size: 2.5rem;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .resources-hero p {
+      font-size: 1.125rem;
+      color: var(--text-dark);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .resources-section {
+      padding: 4rem 0;
+    }
+
+    .resources-section h2 {
+      text-align: center;
+      color: var(--white);
+      margin-bottom: 0.5rem;
+    }
+
+    .resources-section .subtitle {
+      text-align: center;
+      color: var(--text-dark);
+      margin-bottom: 2rem;
+    }
+
+    .resources-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .resource-card {
+      background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      transition: all 0.3s ease;
+    }
+
+    .resource-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(30, 64, 175, 0.5);
+    }
+
+    .resource-card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .resource-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(30, 64, 175, 0.2);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .resource-icon svg {
+      width: 24px;
+      height: 24px;
+      color: var(--primary);
+    }
+
+    .resource-card h3 {
+      color: var(--white);
+      font-size: 1.125rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .resource-type {
+      font-size: 0.75rem;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .resource-card p {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+
+    .resource-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--primary);
+      font-weight: 500;
+      font-size: 0.875rem;
+    }
+
+    .resource-link:hover {
+      color: var(--white);
+    }
+
+    .resource-link svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* External Links Section */
+    .external-section {
+      background: var(--bg-dark-secondary);
+      padding: 4rem 0;
+    }
+
+    .external-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .external-card {
+      background: var(--bg-dark-card);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      transition: all 0.2s ease;
+    }
+
+    .external-card:hover {
+      border-color: var(--primary);
+      transform: translateX(4px);
+    }
+
+    .external-card h4 {
+      color: var(--white);
+      font-size: 0.875rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .external-card p {
+      color: var(--text-dark);
+      font-size: 0.75rem;
+    }
+
+    /* Support Section */
+    .support-section {
+      padding: 4rem 0;
+    }
+
+    .support-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .support-card {
+      background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .support-card-icon {
+      width: 64px;
+      height: 64px;
+      background: rgba(30, 64, 175, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+
+    .support-card-icon svg {
+      width: 32px;
+      height: 32px;
+      color: var(--primary);
+    }
+
+    .support-card h3 {
+      color: var(--white);
+      margin-bottom: 0.5rem;
+    }
+
+    .support-card p {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Footer */
+    .footer {
+      background: var(--bg-dark-secondary);
+      border-top: 1px solid var(--border-dark);
+      padding: 3rem 0 1.5rem;
+    }
+
+    .footer-content {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .footer-brand {
+      max-width: 250px;
+    }
+
+    .footer-brand h3 {
+      color: var(--white);
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .footer-brand p {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+    }
+
+    .footer-links h4 {
+      color: var(--white);
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .footer-links ul {
+      list-style: none;
+    }
+
+    .footer-links li {
+      margin-bottom: 0.5rem;
+    }
+
+    .footer-links a {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      transition: color 0.2s ease;
+    }
+
+    .footer-links a:hover {
+      color: var(--white);
+    }
+
+    .footer-bottom {
+      text-align: center;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border-dark);
+      color: var(--text-dark);
+      font-size: 0.875rem;
+    }
+
+    @media (max-width: 768px) {
+      .resources-hero h1 {
+        font-size: 2rem;
+      }
+    }
+  </style>
+</head>
+<body class="dark">
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="/" class="nav-logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="6" fill="currentColor"/>
+          <line x1="16" y1="2" x2="16" y2="8" stroke="currentColor" stroke-width="2"/>
+          <line x1="16" y1="24" x2="16" y2="30" stroke="currentColor" stroke-width="2"/>
+          <line x1="2" y1="16" x2="8" y2="16" stroke="currentColor" stroke-width="2"/>
+          <line x1="24" y1="16" x2="30" y2="16" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        CRASH LENS
+      </a>
+      <div class="nav-links">
+        <a href="/features.html" class="nav-link">Features</a>
+        <a href="/pricing.html" class="nav-link">Pricing</a>
+        <a href="/resources.html" class="nav-link active">Resources</a>
+      </div>
+      <div class="nav-actions">
+        <a href="/login" class="nav-link hide-mobile">Sign In</a>
+        <a href="/login" class="btn btn-gradient">Start Free Trial</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="resources-hero">
+    <div class="glow-primary" style="top: -100px; left: 40%;"></div>
+    <div class="container">
+      <h1>Resources & Documentation</h1>
+      <p>Guides, tutorials, and reference materials to help you get the most out of CRASH LENS.</p>
+    </div>
+  </section>
+
+  <!-- Documentation -->
+  <section class="resources-section">
+    <div class="container">
+      <h2>Documentation</h2>
+      <p class="subtitle">Learn how to use CRASH LENS effectively</p>
+      <div class="resources-grid">
+        <div class="resource-card">
+          <div class="resource-card-header">
+            <div class="resource-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+              </svg>
+            </div>
+            <div>
+              <h3>Getting Started Guide</h3>
+              <span class="resource-type">Tutorial</span>
+            </div>
+          </div>
+          <p>Step-by-step introduction to CRASH LENS. Learn the basics of crash mapping, filtering, and analysis.</p>
+          <a href="#" class="resource-link">
+            Read Guide
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+
+        <div class="resource-card">
+          <div class="resource-card-header">
+            <div class="resource-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+                <point cx="12" cy="17"/>
+              </svg>
+            </div>
+            <div>
+              <h3>AI Assistant Guide</h3>
+              <span class="resource-type">Tutorial</span>
+            </div>
+          </div>
+          <p>Learn how to use the AI assistant effectively. Tips for writing queries and interpreting recommendations.</p>
+          <a href="#" class="resource-link">
+            Read Guide
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+
+        <div class="resource-card">
+          <div class="resource-card-header">
+            <div class="resource-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="12" cy="8" r="2"/>
+                <circle cx="12" cy="16" r="2"/>
+              </svg>
+            </div>
+            <div>
+              <h3>Signal Warrant Analysis</h3>
+              <span class="resource-type">Reference</span>
+            </div>
+          </div>
+          <p>Comprehensive guide to signal warrant analysis. Understand MUTCD requirements and how to interpret results.</p>
+          <a href="#" class="resource-link">
+            Read Guide
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+
+        <div class="resource-card">
+          <div class="resource-card-header">
+            <div class="resource-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <path d="M14 2v6h6"/>
+              </svg>
+            </div>
+            <div>
+              <h3>Export & Reporting</h3>
+              <span class="resource-type">Reference</span>
+            </div>
+          </div>
+          <p>Learn how to export data and generate professional PDF reports for presentations and documentation.</p>
+          <a href="#" class="resource-link">
+            Read Guide
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- External Resources -->
+  <section class="external-section">
+    <div class="container">
+      <h2>External Resources</h2>
+      <p class="subtitle">Helpful links for traffic safety professionals</p>
+      <div class="external-grid">
+        <a href="https://mutcd.fhwa.dot.gov/" target="_blank" class="external-card">
+          <div class="resource-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </div>
+          <div>
+            <h4>MUTCD</h4>
+            <p>Manual on Uniform Traffic Control Devices</p>
+          </div>
+        </a>
+
+        <a href="https://safety.fhwa.dot.gov/" target="_blank" class="external-card">
+          <div class="resource-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </div>
+          <div>
+            <h4>FHWA Safety</h4>
+            <p>Federal Highway Administration Safety</p>
+          </div>
+        </a>
+
+        <a href="https://www.virginiadot.org/" target="_blank" class="external-card">
+          <div class="resource-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </div>
+          <div>
+            <h4>VDOT</h4>
+            <p>Virginia Department of Transportation</p>
+          </div>
+        </a>
+
+        <a href="https://www.nhtsa.gov/" target="_blank" class="external-card">
+          <div class="resource-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </div>
+          <div>
+            <h4>NHTSA</h4>
+            <p>National Highway Traffic Safety Admin</p>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Support -->
+  <section class="support-section">
+    <div class="container">
+      <h2>Need Help?</h2>
+      <p class="subtitle">We're here to support you</p>
+      <div class="support-grid">
+        <div class="support-card">
+          <div class="support-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            </svg>
+          </div>
+          <h3>Contact Support</h3>
+          <p>Have questions? Our team is ready to help with any issues or questions.</p>
+          <a href="mailto:support@crashlens.com" class="btn btn-outline-light">Email Support</a>
+        </div>
+
+        <div class="support-card">
+          <div class="support-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+              <path d="M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+          </div>
+          <h3>Request a Demo</h3>
+          <p>Want to see CRASH LENS in action? Schedule a personalized demo with our team.</p>
+          <a href="#" class="btn btn-outline-light">Schedule Demo</a>
+        </div>
+
+        <div class="support-card">
+          <div class="support-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+              <path d="M12 17h.01"/>
+            </svg>
+          </div>
+          <h3>FAQ</h3>
+          <p>Find quick answers to common questions about CRASH LENS features and pricing.</p>
+          <a href="/pricing.html#faq" class="btn btn-outline-light">View FAQ</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <h3>CRASH LENS</h3>
+          <p>Professional crash analysis tools for Virginia transportation agencies.</p>
+        </div>
+        <div class="footer-links">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="/features.html">Features</a></li>
+            <li><a href="/pricing.html">Pricing</a></li>
+            <li><a href="/resources.html">Resources</a></li>
+          </ul>
+        </div>
+        <div class="footer-links">
+          <h4>Support</h4>
+          <ul>
+            <li><a href="#">Documentation</a></li>
+            <li><a href="#">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-links">
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms of Service</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2024 CRASH LENS. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
