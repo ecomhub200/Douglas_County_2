@@ -355,6 +355,42 @@
       }
     }
 
+    .mobile-menu {
+      display: none;
+      flex-direction: column;
+      padding: 1rem 1.5rem 1.5rem;
+      background: rgba(6, 18, 32, 0.98);
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .mobile-menu.show {
+      display: flex;
+    }
+
+    @media (min-width: 768px) {
+      .mobile-menu {
+        display: none !important;
+      }
+    }
+
+    .mobile-menu-link {
+      padding: 0.75rem 0;
+      color: var(--text-dark);
+      font-weight: 500;
+      border-bottom: 1px solid var(--border-dark);
+      text-decoration: none;
+    }
+
+    .mobile-menu-link:hover {
+      color: var(--white);
+    }
+
+    .mobile-menu-divider {
+      height: 1px;
+      background: var(--border-dark);
+      margin: 0.5rem 0;
+    }
+
     .form-link {
       color: #60a5fa;
     }
@@ -379,12 +415,22 @@
       <div class="nav-actions">
         <a href="/henrico_crash_tool/login/" class="btn btn-outline-light hide-mobile">Sign In</a>
         <a href="/henrico_crash_tool/login/" class="btn btn-gradient">Get Started</a>
-        <button class="mobile-menu-btn hide-desktop">
+        <button class="mobile-menu-btn hide-desktop" onclick="toggleMobileMenu()">
           <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
         </button>
       </div>
+    </div>
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="/henrico_crash_tool/" class="mobile-menu-link">Home</a>
+      <a href="/henrico_crash_tool/features.html" class="mobile-menu-link">Features</a>
+      <a href="/henrico_crash_tool/pricing.html" class="mobile-menu-link">Pricing</a>
+      <a href="/henrico_crash_tool/resources.html" class="mobile-menu-link">Resources</a>
+      <div class="mobile-menu-divider"></div>
+      <a href="/henrico_crash_tool/login/" class="mobile-menu-link">Sign In</a>
+      <a href="/henrico_crash_tool/login/" class="btn btn-gradient" style="width:100%;margin-top:0.5rem;">Get Started</a>
     </div>
   </nav>
 
@@ -556,5 +602,21 @@
       </div>
     </div>
   </footer>
+
+  <script>
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      menu.classList.toggle('show');
+    }
+
+    // Close mobile menu when clicking outside
+    document.addEventListener('click', function(e) {
+      const menu = document.getElementById('mobileMenu');
+      const btn = document.querySelector('.mobile-menu-btn');
+      if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.remove('show');
+      }
+    });
+  </script>
 </body>
 </html>
