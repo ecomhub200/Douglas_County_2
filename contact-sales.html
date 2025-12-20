@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Sales - CRASH LENS</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="icon" href="assets/images/favicon.ico" type="image/x-icon">
+  <style>
+    .contact-hero {
+      padding: 8rem 0 4rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .contact-hero h1 {
+      font-size: 2.5rem;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .contact-hero p {
+      font-size: 1.125rem;
+      color: var(--text-dark);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .contact-section {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+    }
+
+    @media (max-width: 768px) {
+      .contact-grid {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+    }
+
+    .contact-info {
+      padding: 2rem;
+      background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius-lg);
+    }
+
+    .contact-info h2 {
+      color: var(--white);
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .contact-info-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .contact-info-item svg {
+      width: 24px;
+      height: 24px;
+      color: var(--primary);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .contact-info-item h3 {
+      color: var(--white);
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .contact-info-item p {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .contact-info-item a {
+      color: var(--primary);
+    }
+
+    .contact-info-item a:hover {
+      text-decoration: underline;
+    }
+
+    .agency-benefits {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .agency-benefits h3 {
+      color: var(--white);
+      font-size: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .agency-benefits ul {
+      list-style: none;
+    }
+
+    .agency-benefits li {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .agency-benefits li svg {
+      width: 16px;
+      height: 16px;
+      color: var(--success);
+    }
+
+    .contact-form-container {
+      background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+    }
+
+    .contact-form-container h2 {
+      color: var(--white);
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+      display: block;
+      color: var(--white);
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+
+    .form-group label .required {
+      color: var(--danger);
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: var(--bg-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius);
+      color: var(--white);
+      font-size: 0.875rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.2);
+    }
+
+    .form-control::placeholder {
+      color: var(--gray);
+    }
+
+    textarea.form-control {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    select.form-control {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23adbdcc' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+      background-position: right 0.75rem center;
+      background-repeat: no-repeat;
+      background-size: 1.5em 1.5em;
+      padding-right: 2.5rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 480px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 1rem;
+      background: var(--primary-gradient);
+      color: var(--white);
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .form-note {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: rgba(30, 64, 175, 0.1);
+      border-radius: var(--radius);
+      font-size: 0.8rem;
+      color: var(--text-dark);
+      text-align: center;
+    }
+
+    .form-note svg {
+      width: 16px;
+      height: 16px;
+      display: inline;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+
+    /* Success Message */
+    .success-message {
+      display: none;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .success-message.show {
+      display: block;
+    }
+
+    .success-message svg {
+      width: 64px;
+      height: 64px;
+      color: var(--success);
+      margin-bottom: 1rem;
+    }
+
+    .success-message h3 {
+      color: var(--white);
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .success-message p {
+      color: var(--text-dark);
+      margin-bottom: 1.5rem;
+    }
+
+    /* Footer */
+    .footer {
+      background: var(--bg-dark-secondary);
+      border-top: 1px solid var(--border-dark);
+      padding: 3rem 0 1.5rem;
+    }
+
+    .footer-content {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 2rem;
+      margin-bottom: 2rem;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 0 1.5rem;
+    }
+
+    .footer-brand {
+      max-width: 250px;
+    }
+
+    .footer-brand h3 {
+      color: var(--white);
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .footer-brand p {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+    }
+
+    .footer-links h4 {
+      color: var(--white);
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .footer-links ul {
+      list-style: none;
+    }
+
+    .footer-links li {
+      margin-bottom: 0.5rem;
+    }
+
+    .footer-links a {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      transition: color 0.2s ease;
+    }
+
+    .footer-links a:hover {
+      color: var(--white);
+    }
+
+    .footer-bottom {
+      text-align: center;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border-dark);
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  </style>
+</head>
+<body class="dark">
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="/henrico_crash_tool/" class="nav-logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16" cy="16" r="6" fill="currentColor"/>
+          <line x1="16" y1="2" x2="16" y2="8" stroke="currentColor" stroke-width="2"/>
+          <line x1="16" y1="24" x2="16" y2="30" stroke="currentColor" stroke-width="2"/>
+          <line x1="2" y1="16" x2="8" y2="16" stroke="currentColor" stroke-width="2"/>
+          <line x1="24" y1="16" x2="30" y2="16" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        CRASH LENS
+      </a>
+      <div class="nav-links">
+        <a href="/henrico_crash_tool/features.html" class="nav-link">Features</a>
+        <a href="/henrico_crash_tool/pricing.html" class="nav-link">Pricing</a>
+        <a href="/henrico_crash_tool/resources.html" class="nav-link">Resources</a>
+      </div>
+      <div class="nav-actions">
+        <a href="/henrico_crash_tool/login/" class="nav-link hide-mobile">Sign In</a>
+        <a href="/henrico_crash_tool/login/" class="btn btn-gradient">Start Free Trial</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Contact Hero -->
+  <section class="contact-hero">
+    <div class="glow-primary" style="top: -100px; left: 20%;"></div>
+    <div class="container">
+      <h1>Contact Our Sales Team</h1>
+      <p>Ready to scale crash analysis across your organization? Let's discuss how CRASH LENS can help your agency achieve its safety goals.</p>
+    </div>
+  </section>
+
+  <!-- Contact Section -->
+  <section class="contact-section">
+    <div class="contact-grid">
+      <!-- Contact Information -->
+      <div class="contact-info">
+        <h2>Get in Touch</h2>
+
+        <div class="contact-info-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          <div>
+            <h3>Email Us</h3>
+            <p><a href="mailto:aicreasai@gmail.com">aicreasai@gmail.com</a></p>
+            <p>We typically respond within 24 hours</p>
+          </div>
+        </div>
+
+        <div class="contact-info-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <div>
+            <h3>Response Time</h3>
+            <p>Our team is available Monday through Friday, 9 AM - 5 PM EST</p>
+          </div>
+        </div>
+
+        <div class="agency-benefits">
+          <h3>Agency Plan Includes:</h3>
+          <ul>
+            <li>
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Everything in Team plan
+            </li>
+            <li>
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              1000+ AI queries/month
+            </li>
+            <li>
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Unlimited user seats
+            </li>
+            <li>
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Dedicated account manager
+            </li>
+            <li>
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Custom integrations & training
+            </li>
+            <li>
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Invoice billing available
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Contact Form -->
+      <div class="contact-form-container">
+        <h2>Request Information</h2>
+
+        <!-- Form with Formspree -->
+        <form id="contactForm" action="https://formspree.io/f/xpwzgkvq" method="POST">
+          <!-- Hidden field to identify the form -->
+          <input type="hidden" name="_subject" value="Agency Plan Inquiry - CRASH LENS">
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="firstName">First Name <span class="required">*</span></label>
+              <input type="text" id="firstName" name="firstName" class="form-control" placeholder="John" required>
+            </div>
+            <div class="form-group">
+              <label for="lastName">Last Name <span class="required">*</span></label>
+              <input type="text" id="lastName" name="lastName" class="form-control" placeholder="Smith" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="email">Work Email <span class="required">*</span></label>
+            <input type="email" id="email" name="email" class="form-control" placeholder="john.smith@agency.gov" required>
+          </div>
+
+          <div class="form-group">
+            <label for="organization">Organization <span class="required">*</span></label>
+            <input type="text" id="organization" name="organization" class="form-control" placeholder="Virginia Department of Transportation" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="phone">Phone Number</label>
+              <input type="tel" id="phone" name="phone" class="form-control" placeholder="(555) 123-4567">
+            </div>
+            <div class="form-group">
+              <label for="teamSize">Team Size <span class="required">*</span></label>
+              <select id="teamSize" name="teamSize" class="form-control" required>
+                <option value="">Select team size</option>
+                <option value="5-10">5-10 users</option>
+                <option value="11-25">11-25 users</option>
+                <option value="26-50">26-50 users</option>
+                <option value="51-100">51-100 users</option>
+                <option value="100+">100+ users</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="message">How can we help? <span class="required">*</span></label>
+            <textarea id="message" name="message" class="form-control" placeholder="Tell us about your organization's crash analysis needs and any specific requirements..." required></textarea>
+          </div>
+
+          <button type="submit" class="submit-btn" id="submitBtn">
+            Send Inquiry
+          </button>
+
+          <div class="form-note">
+            <svg viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+            </svg>
+            Your information is secure and will never be shared with third parties.
+          </div>
+        </form>
+
+        <!-- Success Message (shown after form submission) -->
+        <div class="success-message" id="successMessage">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          <h3>Thank You!</h3>
+          <p>Your inquiry has been received. Our sales team will contact you within 24 hours.</p>
+          <a href="/henrico_crash_tool/pricing.html" class="btn btn-outline-light">Back to Pricing</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <div class="footer-brand">
+        <h3>CRASH LENS</h3>
+        <p>Professional crash analysis tools for Virginia transportation agencies.</p>
+      </div>
+      <div class="footer-links">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="/henrico_crash_tool/features.html">Features</a></li>
+          <li><a href="/henrico_crash_tool/pricing.html">Pricing</a></li>
+          <li><a href="/henrico_crash_tool/resources.html">Resources</a></li>
+        </ul>
+      </div>
+      <div class="footer-links">
+        <h4>Support</h4>
+        <ul>
+          <li><a href="#">Documentation</a></li>
+          <li><a href="/henrico_crash_tool/contact-sales.html">Contact Sales</a></li>
+        </ul>
+      </div>
+      <div class="footer-links">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="#">Privacy Policy</a></li>
+          <li><a href="#">Terms of Service</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2024 CRASH LENS. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    // Handle form submission
+    const form = document.getElementById('contactForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const successMessage = document.getElementById('successMessage');
+
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      // Disable submit button and show loading state
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending...';
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          // Hide form and show success message
+          form.style.display = 'none';
+          successMessage.classList.add('show');
+        } else {
+          throw new Error('Form submission failed');
+        }
+      } catch (error) {
+        // Show error and re-enable button
+        alert('There was an error sending your message. Please try again or email us directly at aicreasai@gmail.com');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send Inquiry';
+      }
+    });
+  </script>
+</body>
+</html>
