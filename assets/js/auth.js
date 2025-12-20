@@ -133,7 +133,7 @@ const CrashLensAuth = {
     try {
       await firebase.auth().signOut();
       console.log('Sign out successful');
-      window.location.href = '/login';
+      window.location.href = '/henrico_crash_tool/login/';
     } catch (error) {
       console.error('Sign out error:', error);
       throw error;
@@ -251,7 +251,7 @@ const CrashLensAuth = {
    * Require authentication - redirect to login if not signed in
    * Use at the top of protected pages
    */
-  requireAuth: function(redirectUrl = '/login') {
+  requireAuth: function(redirectUrl = '/henrico_crash_tool/login/') {
     return new Promise((resolve) => {
       this.init((user) => {
         if (!user) {
@@ -270,7 +270,7 @@ const CrashLensAuth = {
    * Redirect to app if already signed in
    * Use on login page to skip login if already authenticated
    */
-  redirectIfAuthenticated: function(redirectUrl = '/app') {
+  redirectIfAuthenticated: function(redirectUrl = '/henrico_crash_tool/app/') {
     return new Promise((resolve) => {
       this.init((user) => {
         if (user) {

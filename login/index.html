@@ -344,7 +344,7 @@
   <div class="login-container">
     <div class="login-card animate-fadeInUp">
       <!-- Back link -->
-      <a href="/" class="back-link">
+      <a href="/henrico_crash_tool/" class="back-link">
         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
         </svg>
@@ -593,7 +593,7 @@
       hideMessages();
       try {
         await CrashLensAuth.signInWithMicrosoft();
-        window.location.href = '/app';
+        window.location.href = '/henrico_crash_tool/app/';
       } catch (error) {
         showError(CrashLensAuth.getErrorMessage(error));
       }
@@ -604,7 +604,7 @@
       hideMessages();
       try {
         await CrashLensAuth.signInWithGoogle();
-        window.location.href = '/app';
+        window.location.href = '/henrico_crash_tool/app/';
       } catch (error) {
         showError(CrashLensAuth.getErrorMessage(error));
       }
@@ -621,7 +621,7 @@
 
       try {
         await CrashLensAuth.signInWithEmail(email, password);
-        window.location.href = '/app';
+        window.location.href = '/henrico_crash_tool/app/';
       } catch (error) {
         showError(CrashLensAuth.getErrorMessage(error));
         setLoading('signinBtn', false);
@@ -640,7 +640,7 @@
 
       try {
         await CrashLensAuth.signUpWithEmail(email, password, name);
-        window.location.href = '/app';
+        window.location.href = '/henrico_crash_tool/app/';
       } catch (error) {
         showError(CrashLensAuth.getErrorMessage(error));
         setLoading('signupBtn', false);
