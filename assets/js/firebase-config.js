@@ -9,14 +9,14 @@
  * 5. Replace the placeholder values with your actual Firebase config
  */
 
-// Firebase configuration - REPLACE THESE VALUES
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY_HERE",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBg1QtvbcYxyrhbw0tmpyBiD-zzoCWbxyM",
+  authDomain: "crash-lens-f50e7.firebaseapp.com",
+  projectId: "crash-lens-f50e7",
+  storageBucket: "crash-lens-f50e7.firebasestorage.app",
+  messagingSenderId: "345091421318",
+  appId: "1:345091421318:web:88f99469eb0ce73c734d07"
 };
 
 // Check if config is set
