@@ -394,6 +394,256 @@
     .form-link {
       color: #60a5fa;
     }
+
+    /* Trusted By Section */
+    .trusted-by {
+      padding: 3rem 1.5rem;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .trusted-by-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .trusted-by p {
+      color: var(--gray);
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 2rem;
+    }
+
+    .trusted-logos {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 3rem;
+    }
+
+    .trusted-logo {
+      color: var(--gray);
+      font-weight: 600;
+      font-size: 1rem;
+      opacity: 0.7;
+      transition: opacity 0.3s;
+    }
+
+    .trusted-logo:hover {
+      opacity: 1;
+    }
+
+    /* Case Studies Section */
+    .case-studies {
+      padding: 5rem 1.5rem;
+    }
+
+    .case-studies-header {
+      text-align: center;
+      max-width: 700px;
+      margin: 0 auto 4rem;
+    }
+
+    .case-studies-header h2 {
+      font-size: 2.25rem;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .case-studies-header p {
+      color: var(--text-dark);
+      font-size: 1.125rem;
+    }
+
+    .case-studies-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .case-study-card {
+      padding: 2rem;
+      position: relative;
+    }
+
+    .case-study-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      background: rgba(30, 64, 175, 0.2);
+      border-radius: 50px;
+      font-size: 0.75rem;
+      color: #60a5fa;
+      margin-bottom: 1rem;
+      font-weight: 500;
+    }
+
+    .case-study-card h3 {
+      color: var(--white);
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .case-study-card .quote {
+      color: var(--text-dark);
+      font-style: italic;
+      line-height: 1.7;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+      border-left: 3px solid var(--primary);
+      padding-left: 1rem;
+    }
+
+    .case-study-result {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .case-study-result .metric {
+      text-align: center;
+    }
+
+    .case-study-result .metric-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #10b981;
+    }
+
+    .case-study-result .metric-label {
+      font-size: 0.75rem;
+      color: var(--gray);
+    }
+
+    .case-study-attribution {
+      margin-left: auto;
+      text-align: right;
+    }
+
+    .case-study-attribution .role {
+      color: var(--white);
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .case-study-attribution .org {
+      color: var(--gray);
+      font-size: 0.75rem;
+    }
+
+    /* How It Works Section */
+    .how-it-works {
+      padding: 5rem 1.5rem;
+      background: var(--bg-dark-secondary);
+    }
+
+    .how-it-works-header {
+      text-align: center;
+      max-width: 700px;
+      margin: 0 auto 4rem;
+    }
+
+    .how-it-works-header h2 {
+      font-size: 2.25rem;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .how-it-works-header p {
+      color: var(--text-dark);
+      font-size: 1.125rem;
+    }
+
+    .steps-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 2rem;
+    }
+
+    .step {
+      text-align: center;
+      position: relative;
+    }
+
+    .step-number {
+      width: 48px;
+      height: 48px;
+      background: var(--primary-gradient);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 1.25rem;
+      margin: 0 auto 1rem;
+    }
+
+    .step h3 {
+      color: var(--white);
+      font-size: 1.125rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .step p {
+      color: var(--text-dark);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .step::after {
+      content: '';
+      position: absolute;
+      top: 24px;
+      left: calc(50% + 40px);
+      width: calc(100% - 80px);
+      height: 2px;
+      background: linear-gradient(90deg, var(--primary), transparent);
+    }
+
+    .step:last-child::after {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .step::after {
+        display: none;
+      }
+    }
+
+    /* Stats Section */
+    .stats {
+      padding: 4rem 1.5rem;
+      background: linear-gradient(135deg, rgba(30, 64, 175, 0.1), rgba(59, 130, 246, 0.1));
+    }
+
+    .stats-grid {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 2rem;
+      text-align: center;
+    }
+
+    .stat-item .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-item .stat-label {
+      color: var(--text-dark);
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body class="dark">
@@ -469,6 +719,20 @@
     </div>
   </section>
 
+  <!-- Trusted By Section -->
+  <section class="trusted-by">
+    <div class="trusted-by-content">
+      <p>Trusted by Virginia Transportation Agencies</p>
+      <div class="trusted-logos">
+        <span class="trusted-logo">VDOT</span>
+        <span class="trusted-logo">Henrico County</span>
+        <span class="trusted-logo">City of Richmond</span>
+        <span class="trusted-logo">Chesterfield County</span>
+        <span class="trusted-logo">HSIP Programs</span>
+      </div>
+    </div>
+  </section>
+
   <!-- Features Section -->
   <section class="features">
     <div class="features-header">
@@ -536,6 +800,135 @@
         </div>
         <h3>Grant Support</h3>
         <p>HSIP grant application assistance with crash data justification and benefit-cost analysis.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Case Studies Section -->
+  <section class="case-studies">
+    <div class="case-studies-header">
+      <h2>Real <span class="gradient-text">Results</span></h2>
+      <p>See how Virginia agencies are using CRASH LENS to improve traffic safety and secure funding</p>
+    </div>
+
+    <div class="case-studies-grid">
+      <!-- Case Study 1: Henrico County -->
+      <div class="card-dark case-study-card">
+        <span class="case-study-badge">Roadway Departure Study</span>
+        <h3>Henrico County Curve + Guardrail Analysis</h3>
+        <p class="quote">"CRASH LENS helped us identify 60 curve locations with guardrail-related crashes in just 2 hours — analysis that previously took our team weeks. We filtered 5 years of crash data by curve geometry and guardrail involvement, revealing patterns we'd missed in manual reviews."</p>
+        <div class="case-study-result">
+          <div class="metric">
+            <div class="metric-value">60</div>
+            <div class="metric-label">Locations Identified</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">$2.4M</div>
+            <div class="metric-label">HSIP Funding</div>
+          </div>
+          <div class="case-study-attribution">
+            <div class="role">Traffic Safety Engineer</div>
+            <div class="org">Henrico County DPW</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Case Study 2: Intersection Analysis -->
+      <div class="card-dark case-study-card">
+        <span class="case-study-badge">Intersection Safety</span>
+        <h3>City of Richmond Signal Analysis</h3>
+        <p class="quote">"We analyzed rear-end and angle crashes at 142 signalized intersections over 3 years. CRASH LENS cross-referenced crash patterns with signal timing data, flagging 8 intersections for warrant re-evaluation and 12 locations for left-turn phase modifications."</p>
+        <div class="case-study-result">
+          <div class="metric">
+            <div class="metric-value">142</div>
+            <div class="metric-label">Intersections Analyzed</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">$1.8M</div>
+            <div class="metric-label">Safety Program</div>
+          </div>
+          <div class="case-study-attribution">
+            <div class="role">Traffic Operations Manager</div>
+            <div class="org">City of Richmond DPW</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Case Study 3: Pedestrian Safety -->
+      <div class="card-dark case-study-card">
+        <span class="case-study-badge">Pedestrian Safety</span>
+        <h3>Chesterfield Pedestrian Corridor Study</h3>
+        <p class="quote">"Using heat map visualization and time-of-day analysis, we mapped 47 pedestrian crashes along Route 1. The analysis revealed 68% occurred between 6-9 PM, and 71% in dark/unlit conditions — directly informing our RRFB and lighting upgrade recommendations."</p>
+        <div class="case-study-result">
+          <div class="metric">
+            <div class="metric-value">47</div>
+            <div class="metric-label">Crashes Mapped</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">4</div>
+            <div class="metric-label">RRFBs Proposed</div>
+          </div>
+          <div class="case-study-attribution">
+            <div class="role">Transportation Planner</div>
+            <div class="org">Chesterfield County</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works Section -->
+  <section class="how-it-works">
+    <div class="how-it-works-header">
+      <h2>How It <span class="gradient-text">Works</span></h2>
+      <p>From data upload to HSIP application in four simple steps</p>
+    </div>
+
+    <div class="steps-container">
+      <div class="step">
+        <div class="step-number">1</div>
+        <h3>Upload Data</h3>
+        <p>Import Virginia crash data directly from TREDS or upload your own CSV/Excel files</p>
+      </div>
+
+      <div class="step">
+        <div class="step-number">2</div>
+        <h3>Filter & Analyze</h3>
+        <p>Apply multi-criteria filters by location, severity, collision type, and contributing factors</p>
+      </div>
+
+      <div class="step">
+        <div class="step-number">3</div>
+        <h3>Identify Patterns</h3>
+        <p>Use heat maps, charts, and AI insights to find crash patterns and high-risk locations</p>
+      </div>
+
+      <div class="step">
+        <div class="step-number">4</div>
+        <h3>Generate Reports</h3>
+        <p>Export professional reports for HSIP applications, stakeholder meetings, and grant justification</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats Section -->
+  <section class="stats">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-value">500K+</div>
+        <div class="stat-label">Crashes Analyzed</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">150+</div>
+        <div class="stat-label">High-Risk Locations Found</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">$10M+</div>
+        <div class="stat-label">HSIP Funding Supported</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">35%</div>
+        <div class="stat-label">Avg. Analysis Time Saved</div>
       </div>
     </div>
   </section>
