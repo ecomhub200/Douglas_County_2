@@ -138,6 +138,98 @@ const CrashLensAuth = {
   },
 
   /**
+   * Send email verification to current user
+   */
+  sendVerificationEmail: async function() {
+    if (!this.currentUser) {
+      throw new Error('No user signed in');
+    }
+
+    try {
+      await this.currentUser.sendEmailVerification({
+        url: window.location.origin + CRASH_LENS_BASE + '/login/?verified=true',
+        handleCodeInApp: false
+      });
+      console.log('Verification email sent');
+      return true;
+    } catch (error) {
+      console.error('Send verification email error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Check if current user's email is verified
+   */
+  isEmailVerified: function() {
+    if (!this.currentUser) return false;
+
+    // OAuth providers (Google, Microsoft) are considered pre-verified
+    const provider = this.currentUser.providerData[0]?.providerId;
+    if (provider === 'google.com' || provider === 'microsoft.com') {
+      return true;
+    }
+
+    return this.currentUser.emailVerified;
+  },
+
+  /**
+   * Reload user and check email verification status
+   * Call this to get fresh verification status
+   */
+  checkEmailVerification: async function() {
+    if (!this.currentUser) return false;
+
+    try {
+      await this.currentUser.reload();
+      // Update current user reference after reload
+      this.currentUser = firebase.auth().currentUser;
+
+      const verified = this.isEmailVerified();
+
+      // If just verified, activate trial
+      if (verified && this.userData && !this.userData.emailVerified) {
+        await this.activateTrialAfterVerification();
+      }
+
+      return verified;
+    } catch (error) {
+      console.error('Error checking email verification:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Activate trial period after email verification
+   * Called when user verifies their email
+   */
+  activateTrialAfterVerification: async function() {
+    if (!this.currentUser) return;
+
+    const userRef = firebase.firestore().collection('users').doc(this.currentUser.uid);
+    const now = firebase.firestore.Timestamp.now();
+    const trialEndsAt = new firebase.firestore.Timestamp(
+      now.seconds + (14 * 24 * 60 * 60), // 14 days from verification
+      now.nanoseconds
+    );
+
+    try {
+      await userRef.update({
+        emailVerified: true,
+        emailVerifiedAt: now,
+        trialEndsAt: trialEndsAt,
+        trialStartedAt: now
+      });
+
+      // Update local userData
+      this.userData = await this.getUserData();
+      console.log('Trial activated after email verification');
+    } catch (error) {
+      console.error('Error activating trial:', error);
+    }
+  },
+
+  /**
    * Sign out
    */
   signOut: async function() {
@@ -154,6 +246,7 @@ const CrashLensAuth = {
   /**
    * Ensure user document exists in Firestore
    * Creates new document for first-time users
+   * Trial only starts after email verification for email/password users
    */
   ensureUserDocument: async function(user) {
     if (!user) return null;
@@ -164,23 +257,37 @@ const CrashLensAuth = {
     if (!doc.exists) {
       // Create new user document
       const now = firebase.firestore.Timestamp.now();
-      const trialEndsAt = new firebase.firestore.Timestamp(
-        now.seconds + (14 * 24 * 60 * 60), // 14 days from now
-        now.nanoseconds
-      );
+      const provider = user.providerData[0]?.providerId || 'unknown';
+
+      // OAuth providers (Google, Microsoft) are pre-verified
+      const isOAuthProvider = provider === 'google.com' || provider === 'microsoft.com';
+      const isVerified = isOAuthProvider || user.emailVerified;
+
+      // Only start trial if email is verified (OAuth users start immediately)
+      const trialEndsAt = isVerified
+        ? new firebase.firestore.Timestamp(
+            now.seconds + (14 * 24 * 60 * 60), // 14 days from now
+            now.nanoseconds
+          )
+        : null; // No trial until verified
 
       const newUser = {
         email: user.email,
         displayName: user.displayName || '',
         photoURL: user.photoURL || '',
-        provider: user.providerData[0]?.providerId || 'unknown',
+        provider: provider,
         createdAt: now,
+
+        // Email verification tracking
+        emailVerified: isVerified,
+        emailVerifiedAt: isVerified ? now : null,
 
         // Subscription (default to trial)
         plan: 'trial',
         billingCycle: null,
         trialEndsAt: trialEndsAt,
-        subscriptionStatus: 'active',
+        trialStartedAt: isVerified ? now : null,
+        subscriptionStatus: isVerified ? 'active' : 'pending_verification',
         stripeCustomerId: null,
 
         // AI Assistant
@@ -196,7 +303,7 @@ const CrashLensAuth = {
       };
 
       await userRef.set(newUser);
-      console.log('New user document created');
+      console.log('New user document created', isVerified ? '(trial started)' : '(pending verification)');
       return newUser;
     }
 
@@ -229,6 +336,11 @@ const CrashLensAuth = {
     if (!this.userData) return false;
 
     const { plan, subscriptionStatus, trialEndsAt } = this.userData;
+
+    // Pending verification - no active subscription yet
+    if (subscriptionStatus === 'pending_verification') {
+      return false;
+    }
 
     // Check trial
     if (plan === 'trial') {
@@ -312,10 +424,26 @@ const CrashLensAuth = {
       'auth/invalid-email': 'Please enter a valid email address.',
       'auth/too-many-requests': 'Too many attempts. Please try again later.',
       'auth/popup-closed-by-user': 'Sign in cancelled.',
-      'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign in method.'
+      'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign in method.',
+      'auth/too-many-requests': 'Too many verification emails sent. Please wait before trying again.'
     };
 
     return errorMessages[error.code] || error.message || 'An error occurred. Please try again.';
+  },
+
+  /**
+   * Check if user needs email verification
+   */
+  needsEmailVerification: function() {
+    if (!this.currentUser) return false;
+
+    // OAuth providers don't need verification
+    const provider = this.currentUser.providerData[0]?.providerId;
+    if (provider === 'google.com' || provider === 'microsoft.com') {
+      return false;
+    }
+
+    return !this.currentUser.emailVerified;
   }
 };
 
