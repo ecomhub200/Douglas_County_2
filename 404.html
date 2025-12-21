@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page Not Found - CRASH LENS</title>
+  <meta name="description" content="The page you're looking for could not be found.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data/images/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="data/images/favicon-32x32.png">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="assets/css/styles.css">
+
+  <style>
+    .error-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .error-content {
+      max-width: 500px;
+    }
+
+    .error-code {
+      font-size: 8rem;
+      font-weight: 700;
+      background: var(--primary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+      margin-bottom: 1rem;
+    }
+
+    .error-title {
+      font-size: 1.75rem;
+      font-weight: 600;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .error-description {
+      color: var(--text-dark);
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .error-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .error-links {
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .error-links-title {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .error-links-list {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .error-links-list a {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    .error-links-list a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body class="dark">
+  <div class="error-container">
+    <div class="error-content animate-fadeInUp">
+      <div class="error-code">404</div>
+      <h1 class="error-title">Page Not Found</h1>
+      <p class="error-description">
+        The page you're looking for doesn't exist or has been moved.
+        Let's get you back on track.
+      </p>
+      <div class="error-buttons">
+        <a href="./" class="btn btn-gradient">Go to Home</a>
+        <a href="./login/" class="btn btn-outline-light">Sign In</a>
+      </div>
+      <div class="error-links">
+        <p class="error-links-title">Or try one of these pages:</p>
+        <div class="error-links-list">
+          <a href="./features.html">Features</a>
+          <a href="./pricing.html">Pricing</a>
+          <a href="./resources.html">Resources</a>
+          <a href="./contact-sales.html">Contact</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
