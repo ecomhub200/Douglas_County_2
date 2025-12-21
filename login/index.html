@@ -533,7 +533,7 @@
     // Check if already authenticated
     document.addEventListener('DOMContentLoaded', function() {
       if (window.isFirebaseConfigured) {
-        CrashLensAuth.redirectIfAuthenticated('/app');
+        CrashLensAuth.redirectIfAuthenticated(); // Uses dynamic base path detection
       }
     });
 

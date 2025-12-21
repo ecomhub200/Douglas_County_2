@@ -5,6 +5,17 @@
  * Supports: Microsoft, Google, Email/Password
  */
 
+// Dynamic base path detection - works for both root and subdirectory deployments
+const CRASH_LENS_BASE = (function() {
+  const path = window.location.pathname;
+  // Check if deployed in a subdirectory (e.g., /henrico_crash_tool/)
+  const match = path.match(/^(\/[^/]+)\//);
+  if (match && match[1] !== '/login' && match[1] !== '/app') {
+    return match[1];
+  }
+  return '';
+})();
+
 const CrashLensAuth = {
   // Current user state
   currentUser: null,
@@ -133,7 +144,7 @@ const CrashLensAuth = {
     try {
       await firebase.auth().signOut();
       console.log('Sign out successful');
-      window.location.href = '/henrico_crash_tool/login/';
+      window.location.href = CRASH_LENS_BASE + '/login/';
     } catch (error) {
       console.error('Sign out error:', error);
       throw error;
@@ -251,7 +262,8 @@ const CrashLensAuth = {
    * Require authentication - redirect to login if not signed in
    * Use at the top of protected pages
    */
-  requireAuth: function(redirectUrl = '/henrico_crash_tool/login/') {
+  requireAuth: function(redirectUrl = null) {
+    redirectUrl = redirectUrl || (CRASH_LENS_BASE + '/login/');
     return new Promise((resolve) => {
       this.init((user) => {
         if (!user) {
@@ -270,7 +282,8 @@ const CrashLensAuth = {
    * Redirect to app if already signed in
    * Use on login page to skip login if already authenticated
    */
-  redirectIfAuthenticated: function(redirectUrl = '/henrico_crash_tool/app/') {
+  redirectIfAuthenticated: function(redirectUrl = null) {
+    redirectUrl = redirectUrl || (CRASH_LENS_BASE + '/app/');
     return new Promise((resolve) => {
       this.init((user) => {
         if (user) {
