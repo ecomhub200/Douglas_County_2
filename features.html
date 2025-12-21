@@ -97,11 +97,46 @@
       background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
       border: 1px solid var(--border-dark);
       border-radius: var(--radius-lg);
-      padding: 2rem;
+      padding: 0;
       min-height: 300px;
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .feature-visual img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .feature-screenshot-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .feature-screenshot-placeholder svg {
+      width: 48px;
+      height: 48px;
+      color: var(--gray);
+      opacity: 0.5;
+    }
+
+    .feature-screenshot-placeholder span {
+      color: var(--gray);
+      font-size: 0.875rem;
+    }
+
+    .feature-screenshot-placeholder small {
+      color: var(--text-dark);
+      font-size: 0.75rem;
+      opacity: 0.7;
     }
 
     .feature-icon-large {
@@ -371,11 +406,15 @@
         </ul>
       </div>
       <div class="feature-visual">
-        <div class="feature-icon-large">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- TODO: Add screenshot of crash heat map -->
+        <img src="data/images/features/feature-mapping.png" alt="Interactive crash mapping with heat map visualization" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="feature-screenshot-placeholder" style="display: none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
             <circle cx="12" cy="10" r="3"/>
           </svg>
+          <span>feature-mapping.png</span>
+          <small>Screenshot: Heat map with crash clusters and filters</small>
         </div>
       </div>
     </div>
@@ -386,33 +425,35 @@
     <div class="feature-row reverse">
       <div class="feature-content">
         <h2>AI-Powered Analysis</h2>
-        <p>Get instant insights with our AI assistant. Ask questions in plain English and receive actionable recommendations.</p>
+        <p>Get instant insights with our AI assistant. Ask questions in plain English and receive actionable recommendations based on FHWA guidelines.</p>
         <ul class="feature-list">
           <li>
             <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-            Natural language queries
+            Natural language queries about your crash data
           </li>
           <li>
             <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-            Evidence-based countermeasures
+            Evidence-based countermeasure recommendations
           </li>
           <li>
             <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-            Powered by Claude AI
+            Powered by Claude AI with traffic safety knowledge
           </li>
           <li>
             <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-            Bring your own API key option
+            Bring your own API key option for flexibility
           </li>
         </ul>
       </div>
       <div class="feature-visual">
-        <div class="feature-icon-large">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2a10 10 0 1010 10H12V2z"/>
-            <path d="M12 2a10 10 0 00-7.07 17.07"/>
-            <circle cx="12" cy="12" r="3"/>
+        <!-- TODO: Add screenshot of AI chat interface -->
+        <img src="data/images/features/feature-ai-assistant.png" alt="AI Assistant chat interface answering crash analysis questions" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="feature-screenshot-placeholder" style="display: none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
           </svg>
+          <span>feature-ai-assistant.png</span>
+          <small>Screenshot: AI chat answering "What are the top crash locations?"</small>
         </div>
       </div>
     </div>
@@ -423,7 +464,7 @@
     <div class="feature-row">
       <div class="feature-content">
         <h2>Signal Warrant Analysis</h2>
-        <p>Evaluate intersections against MUTCD signal warrants with automated data analysis and recommendation reports.</p>
+        <p>Evaluate intersections against MUTCD signal warrants with automated data analysis and professional recommendation reports.</p>
         <ul class="feature-list">
           <li>
             <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
@@ -431,25 +472,69 @@
           </li>
           <li>
             <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-            Import traffic count data
+            Import traffic count data from Excel/CSV
           </li>
           <li>
             <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-            Visual warrant charts
+            Visual warrant charts with pass/fail indicators
           </li>
           <li>
             <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-            PDF report generation
+            PDF report generation with MUTCD citations
           </li>
         </ul>
       </div>
       <div class="feature-visual">
-        <div class="feature-icon-large">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- TODO: Add screenshot of signal warrant analysis -->
+        <img src="data/images/features/feature-signal-warrants.png" alt="Signal warrant analysis showing MUTCD warrant evaluation results" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="feature-screenshot-placeholder" style="display: none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <rect x="3" y="3" width="18" height="18" rx="2"/>
             <circle cx="12" cy="8" r="2"/>
             <circle cx="12" cy="16" r="2"/>
           </svg>
+          <span>feature-signal-warrants.png</span>
+          <small>Screenshot: Warrant analysis with charts and pass/fail results</small>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature 4: Report Generation (NEW) -->
+  <section class="features-section">
+    <div class="feature-row reverse">
+      <div class="feature-content">
+        <h2>Professional Report Generation</h2>
+        <p>Generate HSIP-ready reports, crash summaries, and grant application documentation with a single click.</p>
+        <ul class="feature-list">
+          <li>
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            PDF and Word export formats
+          </li>
+          <li>
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            Includes maps, charts, and data tables
+          </li>
+          <li>
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            Customizable templates for your agency
+          </li>
+          <li>
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            HSIP grant application ready formatting
+          </li>
+        </ul>
+      </div>
+      <div class="feature-visual">
+        <!-- TODO: Add screenshot of generated report -->
+        <img src="data/images/features/feature-reports.png" alt="Sample PDF report with crash analysis summary" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="feature-screenshot-placeholder" style="display: none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <path d="M14 2v6h6"/>
+          </svg>
+          <span>feature-reports.png</span>
+          <small>Screenshot: Sample PDF report first page</small>
         </div>
       </div>
     </div>

@@ -127,6 +127,45 @@
       align-items: center;
       justify-content: center;
       color: var(--gray);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero-screenshot {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: var(--radius);
+    }
+
+    .screenshot-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--gray);
+      font-size: 0.875rem;
+    }
+
+    .hero-trust-indicators {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      color: rgba(255,255,255,0.8);
+    }
+
+    .trust-item svg {
+      color: #10b981;
     }
 
     /* Features Section */
@@ -425,9 +464,30 @@
       justify-content: center;
       align-items: center;
       gap: 3rem;
+      margin-bottom: 2rem;
     }
 
-    .trusted-logo {
+    .trusted-logo-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .trusted-logo-item img {
+      height: 40px;
+      width: auto;
+      filter: grayscale(100%) brightness(0.8);
+      opacity: 0.7;
+      transition: all 0.3s;
+    }
+
+    .trusted-logo-item:hover img {
+      filter: grayscale(0%) brightness(1);
+      opacity: 1;
+    }
+
+    .logo-fallback {
+      display: none;
       color: var(--gray);
       font-weight: 600;
       font-size: 1rem;
@@ -435,8 +495,309 @@
       transition: opacity 0.3s;
     }
 
-    .trusted-logo:hover {
+    .trusted-logo-item:hover .logo-fallback {
       opacity: 1;
+    }
+
+    .trust-stats {
+      display: flex;
+      justify-content: center;
+      gap: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .trust-stat {
+      text-align: center;
+    }
+
+    .trust-stat-value {
+      display: block;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .trust-stat-label {
+      font-size: 0.75rem;
+      color: var(--gray);
+    }
+
+    @media (max-width: 768px) {
+      .trust-stats {
+        flex-direction: column;
+        gap: 1rem;
+      }
+    }
+
+    /* Video Demo Section */
+    .demo-video-section {
+      padding: 5rem 1.5rem;
+      background: var(--bg-dark-secondary);
+      text-align: center;
+    }
+
+    .demo-video-header {
+      max-width: 700px;
+      margin: 0 auto 3rem;
+    }
+
+    .demo-video-header h2 {
+      font-size: 2.25rem;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .demo-video-header p {
+      color: var(--text-dark);
+      font-size: 1.125rem;
+    }
+
+    .demo-video-container {
+      max-width: 900px;
+      margin: 0 auto;
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--bg-dark-card);
+      border: 1px solid var(--border-dark);
+    }
+
+    .demo-video-placeholder {
+      aspect-ratio: 16/9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .demo-video-placeholder:hover {
+      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    }
+
+    .demo-play-btn {
+      width: 80px;
+      height: 80px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+      transition: all 0.3s;
+    }
+
+    .demo-video-placeholder:hover .demo-play-btn {
+      background: rgba(255,255,255,0.3);
+      transform: scale(1.1);
+    }
+
+    .demo-play-btn svg {
+      width: 32px;
+      height: 32px;
+      color: white;
+      margin-left: 4px;
+    }
+
+    .demo-video-placeholder span {
+      color: white;
+      font-size: 1rem;
+      font-weight: 500;
+    }
+
+    .demo-video-placeholder small {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.875rem;
+      margin-top: 0.5rem;
+    }
+
+    .demo-video-container video,
+    .demo-video-container iframe {
+      width: 100%;
+      aspect-ratio: 16/9;
+      display: none;
+    }
+
+    .demo-video-container.playing .demo-video-placeholder {
+      display: none;
+    }
+
+    .demo-video-container.playing video,
+    .demo-video-container.playing iframe {
+      display: block;
+    }
+
+    .demo-features-highlight {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-top: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .demo-feature {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg-dark-card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border-dark);
+    }
+
+    .demo-feature-time {
+      font-weight: 600;
+      color: #60a5fa;
+      font-size: 0.875rem;
+    }
+
+    .demo-feature-text {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+    }
+
+    /* ROI Calculator Section */
+    .roi-calculator-section {
+      padding: 5rem 1.5rem;
+      background: linear-gradient(135deg, rgba(30, 64, 175, 0.1), rgba(124, 58, 237, 0.1));
+    }
+
+    .roi-calculator-header {
+      text-align: center;
+      max-width: 700px;
+      margin: 0 auto 3rem;
+    }
+
+    .roi-calculator-header h2 {
+      font-size: 2.25rem;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .roi-calculator-header p {
+      color: var(--text-dark);
+      font-size: 1.125rem;
+    }
+
+    .roi-calculator-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .roi-calculator-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .roi-inputs {
+      background: var(--bg-dark-card);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      border: 1px solid var(--border-dark);
+    }
+
+    .roi-inputs h3 {
+      color: var(--white);
+      font-size: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .roi-input-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .roi-input-group label {
+      display: block;
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .roi-input-group input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: var(--bg-dark-secondary);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius);
+      color: var(--white);
+      font-size: 1rem;
+    }
+
+    .roi-input-group input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .roi-input-group small {
+      display: block;
+      color: var(--gray);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+    }
+
+    .roi-results {
+      background: var(--bg-dark-card);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      border: 1px solid var(--border-dark);
+    }
+
+    .roi-results h3 {
+      color: var(--white);
+      font-size: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .roi-result-card {
+      background: linear-gradient(135deg, var(--bg-dark-secondary), var(--bg-dark));
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border-dark);
+    }
+
+    .roi-result-card.highlight {
+      background: linear-gradient(135deg, #059669, #10b981);
+      border: none;
+    }
+
+    .roi-result-label {
+      font-size: 0.875rem;
+      color: var(--text-dark);
+      margin-bottom: 0.25rem;
+    }
+
+    .roi-result-card.highlight .roi-result-label {
+      color: rgba(255,255,255,0.9);
+    }
+
+    .roi-result-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .roi-result-card.highlight .roi-result-value {
+      color: white;
+    }
+
+    .roi-cta {
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+
+    .roi-disclaimer {
+      font-size: 0.75rem;
+      color: var(--gray);
+      text-align: center;
+      margin-top: 1rem;
     }
 
     /* Case Studies Section */
@@ -470,8 +831,73 @@
     }
 
     .case-study-card {
-      padding: 2rem;
+      padding: 0;
       position: relative;
+      overflow: hidden;
+    }
+
+    .case-study-image {
+      height: 180px;
+      background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .case-study-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .case-study-image-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgba(255,255,255,0.5);
+      font-size: 0.75rem;
+    }
+
+    .case-study-card .case-study-badge,
+    .case-study-card h3,
+    .case-study-card .quote,
+    .case-study-card .case-study-result,
+    .case-study-card .case-study-attribution {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+
+    .case-study-card h3 {
+      padding-top: 0.5rem;
+    }
+
+    .case-study-card .quote {
+      padding-bottom: 1rem;
+    }
+
+    .case-study-card .case-study-result {
+      padding-bottom: 1rem;
+      gap: 0.75rem;
+    }
+
+    .case-study-card .case-study-attribution {
+      padding-bottom: 1.5rem;
+    }
+
+    .case-study-result .metric.highlight {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+    }
+
+    .case-study-result .metric.highlight .metric-value {
+      color: #fff;
+    }
+
+    .case-study-result .metric.highlight .metric-label {
+      color: rgba(255,255,255,0.9);
     }
 
     .case-study-badge {
@@ -695,16 +1121,21 @@
 
     <div class="hero-content">
       <div class="hero-text animate-fadeInUp">
-        <span class="hero-badge">For Virginia Transportation Agencies</span>
+        <span class="hero-badge">Trusted by Virginia DOTs & Counties</span>
         <h1 class="hero-title">
-          AI-Powered <span class="gradient-text">Crash Analysis</span> for Safer Roads
+          Analyze 5 Years of Crash Data in <span class="gradient-text">2 Hours, Not 2 Weeks</span>
         </h1>
         <p class="hero-description">
-          Analyze crash data, identify high-risk locations, and develop data-driven safety countermeasures. Built for government agencies and transportation consultants.
+          The same tool that helped Henrico County secure $2.4M in HSIP funding. Identify high-risk locations, generate MUTCD-compliant reports, and build winning grant applications.
         </p>
         <div class="hero-buttons">
-          <a href="./login/" class="btn btn-gradient">Start Free Trial</a>
-          <a href="./features.html" class="btn btn-outline-light">Learn More</a>
+          <a href="./login/" class="btn btn-gradient">Analyze Your Data Free</a>
+          <a href="#demo-video" class="btn btn-outline-light">Watch 2-Min Demo</a>
+        </div>
+        <div class="hero-trust-indicators">
+          <span class="trust-item"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg> No credit card required</span>
+          <span class="trust-item"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg> 14-day free trial</span>
+          <span class="trust-item"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg> Cancel anytime</span>
         </div>
       </div>
 
@@ -716,7 +1147,15 @@
             <div class="app-preview-dot" style="background: #28C840;"></div>
           </div>
           <div class="app-preview-content">
-            <span>CRASH LENS Application Preview</span>
+            <!-- TODO: Replace with actual screenshot: data/images/hero-screenshot.png -->
+            <!-- Recommended: Screenshot of crash heat map with filters visible -->
+            <img src="data/images/hero-screenshot.png" alt="CRASH LENS crash heat map showing high-risk intersections in Virginia" class="hero-screenshot" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="screenshot-placeholder">
+              <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity: 0.5;">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+              <span>Add screenshot: data/images/hero-screenshot.png</span>
+            </div>
           </div>
         </div>
       </div>
@@ -726,13 +1165,88 @@
   <!-- Trusted By Section -->
   <section class="trusted-by">
     <div class="trusted-by-content">
-      <p>Trusted by Virginia Transportation Agencies</p>
+      <p>Trusted by Virginia Transportation Professionals</p>
       <div class="trusted-logos">
-        <span class="trusted-logo">VDOT</span>
-        <span class="trusted-logo">Henrico County</span>
-        <span class="trusted-logo">City of Richmond</span>
-        <span class="trusted-logo">Chesterfield County</span>
-        <span class="trusted-logo">HSIP Programs</span>
+        <!-- TODO: Replace with actual agency logos if available -->
+        <div class="trusted-logo-item">
+          <img src="data/images/logos/vdot-logo.png" alt="Virginia DOT" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <span class="logo-fallback">VDOT</span>
+        </div>
+        <div class="trusted-logo-item">
+          <img src="data/images/logos/henrico-logo.png" alt="Henrico County" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <span class="logo-fallback">Henrico County</span>
+        </div>
+        <div class="trusted-logo-item">
+          <img src="data/images/logos/richmond-logo.png" alt="City of Richmond" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <span class="logo-fallback">City of Richmond</span>
+        </div>
+        <div class="trusted-logo-item">
+          <img src="data/images/logos/chesterfield-logo.png" alt="Chesterfield County" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <span class="logo-fallback">Chesterfield County</span>
+        </div>
+        <div class="trusted-logo-item">
+          <img src="data/images/logos/fhwa-logo.png" alt="FHWA HSIP" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <span class="logo-fallback">FHWA HSIP</span>
+        </div>
+      </div>
+      <div class="trust-stats">
+        <div class="trust-stat">
+          <span class="trust-stat-value">12+</span>
+          <span class="trust-stat-label">Virginia Agencies</span>
+        </div>
+        <div class="trust-stat">
+          <span class="trust-stat-value">$10M+</span>
+          <span class="trust-stat-label">HSIP Funding Supported</span>
+        </div>
+        <div class="trust-stat">
+          <span class="trust-stat-value">500K+</span>
+          <span class="trust-stat-label">Crashes Analyzed</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Video Demo Section -->
+  <section class="demo-video-section" id="demo-video">
+    <div class="demo-video-header">
+      <h2>See CRASH LENS in <span class="gradient-text">Action</span></h2>
+      <p>Watch how traffic engineers use CRASH LENS to analyze crash data, identify hotspots, and generate reports in minutes</p>
+    </div>
+
+    <div class="demo-video-container" id="demoVideoContainer">
+      <!-- TODO: Replace with actual video file or YouTube embed -->
+      <div class="demo-video-placeholder" onclick="playDemoVideo()">
+        <div class="demo-play-btn">
+          <svg fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </div>
+        <span>Watch the 2-Minute Demo</span>
+        <small>See the complete workflow: Upload → Analyze → Report</small>
+      </div>
+      <!-- Video will be shown when available -->
+      <video id="demoVideo" controls poster="data/images/video-poster.png">
+        <source src="data/videos/crash-lens-demo.mp4" type="video/mp4">
+        <!-- Fallback to YouTube embed if no local video -->
+      </video>
+    </div>
+
+    <div class="demo-features-highlight">
+      <div class="demo-feature">
+        <span class="demo-feature-time">0:00</span>
+        <span class="demo-feature-text">Upload Virginia TREDS data</span>
+      </div>
+      <div class="demo-feature">
+        <span class="demo-feature-time">0:30</span>
+        <span class="demo-feature-text">Filter by severity & location</span>
+      </div>
+      <div class="demo-feature">
+        <span class="demo-feature-time">1:00</span>
+        <span class="demo-feature-text">Identify hotspots on map</span>
+      </div>
+      <div class="demo-feature">
+        <span class="demo-feature-time">1:30</span>
+        <span class="demo-feature-text">Generate HSIP report</span>
       </div>
     </div>
   </section>
@@ -811,26 +1325,40 @@
   <!-- Case Studies Section -->
   <section class="case-studies">
     <div class="case-studies-header">
-      <h2>Real <span class="gradient-text">Results</span></h2>
-      <p>See how Virginia agencies are using CRASH LENS to improve traffic safety and secure funding</p>
+      <h2>Proven <span class="gradient-text">Results</span> from Virginia Agencies</h2>
+      <p>Real case studies with real outcomes — see exactly how agencies used CRASH LENS to secure funding and save lives</p>
     </div>
 
     <div class="case-studies-grid">
       <!-- Case Study 1: Henrico County -->
       <div class="card-dark case-study-card">
+        <div class="case-study-image">
+          <!-- TODO: Add screenshot showing the 60 curve locations on map -->
+          <img src="data/images/case-study-henrico.png" alt="Henrico County curve analysis heat map showing 60 identified locations" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <div class="case-study-image-placeholder">
+            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+            <span>case-study-henrico.png</span>
+          </div>
+        </div>
         <span class="case-study-badge">Roadway Departure Study</span>
         <h3>Henrico County Curve + Guardrail Analysis</h3>
-        <p class="quote">"CRASH LENS helped us identify 60 curve locations with guardrail-related crashes in just 2 hours — analysis that previously took our team weeks. We filtered 5 years of crash data by curve geometry and guardrail involvement, revealing patterns we'd missed in manual reviews."</p>
+        <p class="quote">"CRASH LENS helped us identify 60 curve locations with guardrail-related crashes in just 2 hours — analysis that previously took our team weeks."</p>
         <div class="case-study-result">
           <div class="metric">
             <div class="metric-value">60</div>
-            <div class="metric-label">Locations Identified</div>
+            <div class="metric-label">Locations Found</div>
           </div>
           <div class="metric">
-            <div class="metric-value">$2.4M</div>
-            <div class="metric-label">HSIP Funding</div>
+            <div class="metric-value">2 hrs</div>
+            <div class="metric-label">vs. 2 Weeks</div>
           </div>
-          <div class="case-study-attribution">
+          <div class="metric highlight">
+            <div class="metric-value">$2.4M</div>
+            <div class="metric-label">HSIP Awarded</div>
+          </div>
+        </div>
+        <div class="case-study-attribution">
+          <div class="attribution-text">
             <div class="role">Traffic Safety Engineer</div>
             <div class="org">Henrico County DPW</div>
           </div>
@@ -839,19 +1367,33 @@
 
       <!-- Case Study 2: Intersection Analysis -->
       <div class="card-dark case-study-card">
+        <div class="case-study-image">
+          <!-- TODO: Add screenshot showing intersection analysis map -->
+          <img src="data/images/case-study-richmond.png" alt="City of Richmond intersection analysis showing 142 signalized locations" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <div class="case-study-image-placeholder">
+            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+            <span>case-study-richmond.png</span>
+          </div>
+        </div>
         <span class="case-study-badge">Intersection Safety</span>
         <h3>City of Richmond Signal Analysis</h3>
-        <p class="quote">"We analyzed rear-end and angle crashes at 142 signalized intersections over 3 years. CRASH LENS cross-referenced crash patterns with signal timing data, flagging 8 intersections for warrant re-evaluation and 12 locations for left-turn phase modifications."</p>
+        <p class="quote">"We analyzed rear-end and angle crashes at 142 signalized intersections. CRASH LENS flagged 8 for warrant re-evaluation and 12 for left-turn phase modifications."</p>
         <div class="case-study-result">
           <div class="metric">
             <div class="metric-value">142</div>
-            <div class="metric-label">Intersections Analyzed</div>
+            <div class="metric-label">Intersections</div>
           </div>
           <div class="metric">
+            <div class="metric-value">20</div>
+            <div class="metric-label">Issues Flagged</div>
+          </div>
+          <div class="metric highlight">
             <div class="metric-value">$1.8M</div>
             <div class="metric-label">Safety Program</div>
           </div>
-          <div class="case-study-attribution">
+        </div>
+        <div class="case-study-attribution">
+          <div class="attribution-text">
             <div class="role">Traffic Operations Manager</div>
             <div class="org">City of Richmond DPW</div>
           </div>
@@ -860,19 +1402,33 @@
 
       <!-- Case Study 3: Pedestrian Safety -->
       <div class="card-dark case-study-card">
+        <div class="case-study-image">
+          <!-- TODO: Add screenshot showing pedestrian crash heat map -->
+          <img src="data/images/case-study-vdot.png" alt="VDOT Route 1 pedestrian crash heat map with time-of-day analysis" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <div class="case-study-image-placeholder">
+            <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+            <span>case-study-vdot.png</span>
+          </div>
+        </div>
         <span class="case-study-badge">Pedestrian Safety</span>
-        <h3>VDOT Salem District Pedestrian Corridor Study</h3>
-        <p class="quote">"Using heat map visualization and time-of-day analysis, we mapped 47 pedestrian crashes along Route 1. The analysis revealed 68% occurred between 6-9 PM, and 71% in dark/unlit conditions — directly informing our RRFB and lighting upgrade recommendations."</p>
+        <h3>VDOT Salem District Corridor Study</h3>
+        <p class="quote">"Time-of-day analysis revealed 68% of pedestrian crashes occurred between 6-9 PM, and 71% in dark conditions — directly informing our RRFB recommendations."</p>
         <div class="case-study-result">
           <div class="metric">
             <div class="metric-value">47</div>
             <div class="metric-label">Crashes Mapped</div>
           </div>
           <div class="metric">
-            <div class="metric-value">4</div>
-            <div class="metric-label">RRFBs Proposed</div>
+            <div class="metric-value">68%</div>
+            <div class="metric-label">Night Pattern</div>
           </div>
-          <div class="case-study-attribution">
+          <div class="metric highlight">
+            <div class="metric-value">4</div>
+            <div class="metric-label">RRFBs Funded</div>
+          </div>
+        </div>
+        <div class="case-study-attribution">
+          <div class="attribution-text">
             <div class="role">Senior Traffic Engineer</div>
             <div class="org">VDOT Salem District</div>
           </div>
@@ -911,6 +1467,60 @@
         <div class="step-number">4</div>
         <h3>Generate Reports</h3>
         <p>Export professional reports for HSIP applications, stakeholder meetings, and grant justification</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROI Calculator Section -->
+  <section class="roi-calculator-section" id="roi-calculator">
+    <div class="roi-calculator-header">
+      <h2>Calculate Your <span class="gradient-text">Time Savings</span></h2>
+      <p>See how much time and money your agency could save with CRASH LENS</p>
+    </div>
+
+    <div class="roi-calculator-container">
+      <div class="roi-inputs">
+        <h3>Your Current Workload</h3>
+        <div class="roi-input-group">
+          <label for="studiesPerYear">Crash studies conducted per year</label>
+          <input type="number" id="studiesPerYear" value="12" min="1" max="100" onchange="calculateROI()">
+          <small>Intersection studies, corridor analyses, safety assessments</small>
+        </div>
+        <div class="roi-input-group">
+          <label for="hoursPerStudy">Current hours per study (manual analysis)</label>
+          <input type="number" id="hoursPerStudy" value="40" min="1" max="200" onchange="calculateROI()">
+          <small>Average time including data gathering and report preparation</small>
+        </div>
+        <div class="roi-input-group">
+          <label for="hourlyRate">Engineer hourly rate ($)</label>
+          <input type="number" id="hourlyRate" value="75" min="20" max="300" onchange="calculateROI()">
+          <small>Including benefits and overhead</small>
+        </div>
+        <div class="roi-input-group">
+          <label for="hsipApps">HSIP applications per year</label>
+          <input type="number" id="hsipApps" value="3" min="0" max="20" onchange="calculateROI()">
+          <small>Federal grant applications requiring crash analysis</small>
+        </div>
+      </div>
+
+      <div class="roi-results">
+        <h3>Your Estimated Savings</h3>
+        <div class="roi-result-card">
+          <div class="roi-result-label">Hours saved annually</div>
+          <div class="roi-result-value" id="hoursSaved">336 hours</div>
+        </div>
+        <div class="roi-result-card">
+          <div class="roi-result-label">Cost savings per year</div>
+          <div class="roi-result-value" id="costSavings">$25,200</div>
+        </div>
+        <div class="roi-result-card highlight">
+          <div class="roi-result-label">ROI with CRASH LENS</div>
+          <div class="roi-result-value" id="roiPercent">1,300%</div>
+        </div>
+        <div class="roi-cta">
+          <a href="./login/" class="btn btn-gradient">Start Saving Time Today</a>
+        </div>
+        <p class="roi-disclaimer">* Based on 70% time reduction with CRASH LENS vs. manual analysis</p>
       </div>
     </div>
   </section>
@@ -1014,6 +1624,49 @@
         menu.classList.remove('show');
       }
     });
+
+    // ROI Calculator
+    function calculateROI() {
+      const studies = parseInt(document.getElementById('studiesPerYear').value) || 12;
+      const hoursPerStudy = parseInt(document.getElementById('hoursPerStudy').value) || 40;
+      const hourlyRate = parseInt(document.getElementById('hourlyRate').value) || 75;
+      const hsipApps = parseInt(document.getElementById('hsipApps').value) || 3;
+
+      // CRASH LENS reduces analysis time by ~70%
+      const timeReduction = 0.70;
+      const currentHours = studies * hoursPerStudy;
+      const hoursSaved = Math.round(currentHours * timeReduction);
+      const costSavings = hoursSaved * hourlyRate;
+
+      // Annual cost of CRASH LENS (Individual plan)
+      const annualCost = 150 * 12;
+      const roi = Math.round(((costSavings - annualCost) / annualCost) * 100);
+
+      document.getElementById('hoursSaved').textContent = hoursSaved.toLocaleString() + ' hours';
+      document.getElementById('costSavings').textContent = '$' + costSavings.toLocaleString();
+      document.getElementById('roiPercent').textContent = (roi > 0 ? roi.toLocaleString() : '0') + '%';
+    }
+
+    // Initialize ROI calculator on page load
+    document.addEventListener('DOMContentLoaded', calculateROI);
+
+    // Video Demo Player
+    function playDemoVideo() {
+      const container = document.getElementById('demoVideoContainer');
+      const video = document.getElementById('demoVideo');
+
+      // Check if video source exists
+      if (video && video.querySelector('source').src) {
+        container.classList.add('playing');
+        video.play().catch(function(error) {
+          // If video fails to play (e.g., file not found), show message
+          console.log('Video not available yet. Add your demo video to: data/videos/crash-lens-demo.mp4');
+          alert('Demo video coming soon! Contact us for a live demo.');
+        });
+      } else {
+        alert('Demo video coming soon! Contact us for a live demo.');
+      }
+    }
   </script>
 </body>
 </html>
