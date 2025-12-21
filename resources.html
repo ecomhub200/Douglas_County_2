@@ -14,6 +14,15 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Crash Lens">
+  <!-- EmailJS SDK for sending emails to users -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script type="text/javascript">
+    (function(){
+      // Initialize EmailJS with your public key
+      // Sign up at https://www.emailjs.com/ to get your keys (free tier: 200 emails/month)
+      emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); // Replace with your EmailJS public key
+    })();
+  </script>
   <style>
     .resources-hero {
       padding: 8rem 0 4rem;
@@ -850,7 +859,7 @@
         <h3 style="color: #059669;">Success!</h3>
         <p style="margin-bottom: 0.5rem;">Your download is ready:</p>
         <p style="font-weight: 600; margin-bottom: 1rem;" id="successResourceTitle">Resource Title</p>
-        <p style="font-size: 0.875rem; color: var(--text-dark); margin-bottom: 1.5rem;">We've also sent a copy to your email with the download link.</p>
+        <p id="emailStatusMessage" style="font-size: 0.875rem; color: var(--text-dark); margin-bottom: 1.5rem;">Your download is ready below.</p>
         <a href="#" id="downloadLink" target="_blank" class="btn btn-gradient" style="display: block; text-decoration: none; margin-bottom: 0.75rem;">
           Open Resource
         </a>
@@ -906,8 +915,21 @@
       document.getElementById('downloadName').value = '';
       document.getElementById('downloadSuccess').style.display = 'none';
       document.getElementById('downloadForm').style.display = 'block';
+
+      // Reset the submit button state
+      const submitBtn = document.querySelector('#downloadForm .btn-gradient');
+      submitBtn.textContent = 'Get Download';
+      submitBtn.disabled = false;
       isSubmitting = false;
     }
+
+    // EmailJS Configuration - UPDATE THESE VALUES
+    // 1. Sign up at https://www.emailjs.com/ (free: 200 emails/month)
+    // 2. Create an email service (Gmail, Outlook, etc.)
+    // 3. Create an email template with variables: {{to_name}}, {{to_email}}, {{resource_title}}, {{download_url}}
+    // 4. Replace these values with your own:
+    const EMAILJS_SERVICE_ID = 'service_crashlens';  // Your EmailJS service ID
+    const EMAILJS_TEMPLATE_ID = 'template_download'; // Your EmailJS template ID
 
     async function submitDownload() {
       if (isSubmitting) return;
@@ -935,9 +957,29 @@
       const baseUrl = window.location.origin + window.location.pathname.replace('resources.html', '');
       const downloadUrl = baseUrl + resourceInfo.url;
 
-      // Send to Formspree to capture lead and send email
+      // Store lead info and try to send email
+      let emailSent = false;
+
+      // Try to send email via EmailJS (sends directly to the user)
       try {
-        const response = await fetch('https://formspree.io/f/mwveovvd', {
+        if (typeof emailjs !== 'undefined' && EMAILJS_SERVICE_ID !== 'service_crashlens') {
+          await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+            to_name: name,
+            to_email: email,
+            resource_title: resourceInfo.title,
+            download_url: downloadUrl,
+            reply_to: 'support@crashlens.com'
+          });
+          emailSent = true;
+          console.log('Email sent successfully via EmailJS');
+        }
+      } catch (emailError) {
+        console.warn('EmailJS not configured or failed:', emailError);
+      }
+
+      // Also save lead to Formspree (for your records)
+      try {
+        await fetch('https://formspree.io/f/mwveovvd', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -948,27 +990,37 @@
             name: name,
             resource: resourceInfo.title,
             downloadUrl: downloadUrl,
-            _subject: `Your Free Download: ${resourceInfo.title}`,
-            message: `Hi ${name},\n\nThank you for downloading "${resourceInfo.title}" from CRASH LENS!\n\nAccess your resource here:\n${downloadUrl}\n\nYou can view this guide in your browser and use the "Print / Save PDF" button to save a copy.\n\nBest regards,\nThe CRASH LENS Team\n\n---\nVisit us at: https://ecomhub200.github.io/henrico_crash_tool/\nQuestions? Reply to this email.`
+            timestamp: new Date().toISOString()
           })
         });
-
-        // Show success regardless of Formspree response (to ensure good UX)
-        showDownloadSuccess(resourceInfo, downloadUrl);
-
-      } catch (error) {
-        console.error('Email submission error:', error);
-        // Still show success and provide download - don't block user experience
-        showDownloadSuccess(resourceInfo, downloadUrl);
+        console.log('Lead saved to Formspree');
+      } catch (formError) {
+        console.warn('Formspree submission failed:', formError);
       }
+
+      // Show success with download link
+      showDownloadSuccess(resourceInfo, downloadUrl, emailSent);
     }
 
-    function showDownloadSuccess(resourceInfo, downloadUrl) {
+    function showDownloadSuccess(resourceInfo, downloadUrl, emailSent) {
       // Hide form, show success message with download link
       document.getElementById('downloadForm').style.display = 'none';
       document.getElementById('downloadSuccess').style.display = 'block';
       document.getElementById('successResourceTitle').textContent = resourceInfo.title;
       document.getElementById('downloadLink').href = resourceInfo.url;
+
+      // Update email status message
+      const emailStatusEl = document.getElementById('emailStatusMessage');
+      if (emailStatusEl) {
+        if (emailSent) {
+          emailStatusEl.textContent = "We've also sent a copy to your email with the download link.";
+          emailStatusEl.style.color = '#059669';
+        } else {
+          emailStatusEl.textContent = "Your download is ready below. Bookmark this page to access resources anytime.";
+          emailStatusEl.style.color = 'var(--text-dark)';
+        }
+      }
+
       document.getElementById('downloadLink').onclick = function() {
         // Track download
         console.log('Resource downloaded:', resourceInfo.title);
