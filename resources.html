@@ -18,9 +18,7 @@
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script type="text/javascript">
     (function(){
-      // Initialize EmailJS with your public key
-      // Sign up at https://www.emailjs.com/ to get your keys (free tier: 200 emails/month)
-      emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); // Replace with your EmailJS public key
+      emailjs.init("ysVfC-aSOTPAGrzBX");
     })();
   </script>
   <style>
@@ -923,13 +921,9 @@
       isSubmitting = false;
     }
 
-    // EmailJS Configuration - UPDATE THESE VALUES
-    // 1. Sign up at https://www.emailjs.com/ (free: 200 emails/month)
-    // 2. Create an email service (Gmail, Outlook, etc.)
-    // 3. Create an email template with variables: {{to_name}}, {{to_email}}, {{resource_title}}, {{download_url}}
-    // 4. Replace these values with your own:
-    const EMAILJS_SERVICE_ID = 'service_crashlens';  // Your EmailJS service ID
-    const EMAILJS_TEMPLATE_ID = 'template_download'; // Your EmailJS template ID
+    // EmailJS Configuration
+    const EMAILJS_SERVICE_ID = 'service_dq6pj2p';
+    const EMAILJS_TEMPLATE_ID = 'template_45jewga';
 
     async function submitDownload() {
       if (isSubmitting) return;
@@ -962,7 +956,7 @@
 
       // Try to send email via EmailJS (sends directly to the user)
       try {
-        if (typeof emailjs !== 'undefined' && EMAILJS_SERVICE_ID !== 'service_crashlens') {
+        if (typeof emailjs !== 'undefined') {
           await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
             to_name: name,
             to_email: email,
