@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service - CRASH LENS</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data/images/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="data/images/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="data/images/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e3a5f">
+  <style>
+    .legal-hero {
+      padding: 8rem 0 3rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .legal-hero h1 {
+      font-size: 2.5rem;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .legal-hero .last-updated {
+      font-size: 0.875rem;
+      color: var(--gray);
+    }
+
+    .legal-content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 5rem;
+    }
+
+    .legal-content h2 {
+      font-size: 1.5rem;
+      color: var(--white);
+      margin: 2.5rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .legal-content h3 {
+      font-size: 1.125rem;
+      color: var(--white);
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    .legal-content p {
+      color: var(--text-dark);
+      margin-bottom: 1rem;
+      line-height: 1.8;
+    }
+
+    .legal-content ul, .legal-content ol {
+      color: var(--text-dark);
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+    }
+
+    .legal-content li {
+      margin-bottom: 0.5rem;
+      line-height: 1.7;
+    }
+
+    .legal-content a {
+      color: #60a5fa;
+    }
+
+    .legal-content a:hover {
+      color: #93c5fd;
+      text-decoration: underline;
+    }
+
+    .highlight-box {
+      background: rgba(30, 64, 175, 0.15);
+      border: 1px solid rgba(30, 64, 175, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .highlight-box h4 {
+      color: #60a5fa;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+    }
+
+    .warning-box {
+      background: rgba(217, 119, 6, 0.15);
+      border: 1px solid rgba(217, 119, 6, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .warning-box h4 {
+      color: #fbbf24;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+    }
+
+    .critical-box {
+      background: rgba(220, 38, 38, 0.15);
+      border: 2px solid rgba(220, 38, 38, 0.5);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .critical-box h4 {
+      color: #f87171;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .critical-box p {
+      color: #fca5a5;
+    }
+
+    .all-caps {
+      text-transform: uppercase;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+
+    .legal-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    .legal-table th,
+    .legal-table td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border: 1px solid var(--border-dark);
+    }
+
+    .legal-table th {
+      background: var(--bg-dark-card);
+      color: var(--white);
+      font-weight: 600;
+    }
+
+    .legal-table td {
+      color: var(--text-dark);
+    }
+
+    .footer {
+      padding: 3rem 1.5rem;
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .footer-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      text-align: center;
+    }
+
+    @media (min-width: 768px) {
+      .footer-content {
+        flex-direction: row;
+        justify-content: space-between;
+        text-align: left;
+      }
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--white);
+      font-weight: 600;
+    }
+
+    .footer-logo img {
+      height: 32px;
+      width: 32px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .footer-links a {
+      color: var(--text-dark);
+      text-decoration: none;
+    }
+
+    .footer-links a:hover {
+      color: var(--white);
+    }
+
+    .footer-copy {
+      color: var(--gray);
+      font-size: 0.875rem;
+    }
+
+    /* Navigation */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1rem 1.5rem;
+      background: rgba(10, 26, 46, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .nav-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--white);
+      text-decoration: none;
+    }
+
+    .nav-logo img {
+      height: 32px;
+      width: 32px;
+    }
+
+    .nav-links {
+      display: none;
+      gap: 2rem;
+    }
+
+    @media (min-width: 768px) {
+      .nav-links {
+        display: flex;
+      }
+    }
+
+    .nav-links a {
+      color: var(--text-dark);
+      text-decoration: none;
+      font-size: 0.875rem;
+    }
+
+    .nav-links a:hover {
+      color: var(--white);
+    }
+
+    .nav-cta {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 767px) {
+      .nav-cta .btn-outline-light {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body class="dark">
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-content">
+      <a href="./" class="nav-logo">
+        <img src="data/images/favicon.svg" alt="CRASH LENS">
+        CRASH LENS
+      </a>
+      <div class="nav-links">
+        <a href="./features.html">Features</a>
+        <a href="./pricing.html">Pricing</a>
+        <a href="./resources.html">Resources</a>
+      </div>
+      <div class="nav-cta">
+        <a href="./login/" class="btn btn-outline-light">Sign In</a>
+        <a href="./login/" class="btn btn-gradient">Start Free Trial</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="legal-hero">
+    <h1>Terms of Service</h1>
+    <p class="last-updated">Last Updated: December 21, 2025</p>
+  </section>
+
+  <!-- Content -->
+  <div class="legal-content">
+    <p>Welcome to CRASH LENS. These Terms of Service ("Terms") constitute a legally binding agreement between you ("User," "you," or "your") and CRASH LENS ("Company," "we," "us," or "our") governing your access to and use of our crash analysis platform, website, and related services (collectively, the "Service").</p>
+
+    <div class="critical-box">
+      <h4>Important Legal Notice - Please Read Carefully</h4>
+      <p>BY ACCESSING OR USING CRASH LENS, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY THESE TERMS OF SERVICE. IF YOU DO NOT AGREE TO THESE TERMS, YOU MUST NOT ACCESS OR USE THE SERVICE.</p>
+      <p style="margin-bottom: 0;">THESE TERMS CONTAIN IMPORTANT PROVISIONS INCLUDING LIMITATIONS OF LIABILITY, DISCLAIMERS OF WARRANTIES, INDEMNIFICATION OBLIGATIONS, AND A BINDING ARBITRATION CLAUSE. PLEASE READ SECTIONS 9-14 CAREFULLY.</p>
+    </div>
+
+    <h2>1. Acceptance of Terms</h2>
+    <p>By creating an account, accessing, or using the Service, you represent and warrant that:</p>
+    <ul>
+      <li>You are at least 18 years of age</li>
+      <li>You have the legal capacity to enter into binding contracts</li>
+      <li>If using the Service on behalf of an organization, you have the authority to bind that organization to these Terms</li>
+      <li>Your use of the Service complies with all applicable laws and regulations</li>
+      <li>You have read and understand our <a href="./privacy-policy.html">Privacy Policy</a></li>
+    </ul>
+
+    <h2>2. Description of Service</h2>
+    <p>CRASH LENS provides a web-based platform designed to assist traffic safety professionals in analyzing crash data, identifying patterns, and developing safety recommendations. The Service includes:</p>
+    <ul>
+      <li>Crash data visualization and mapping tools</li>
+      <li>Statistical analysis and trend identification</li>
+      <li>AI-assisted analysis and countermeasure recommendations</li>
+      <li>Report generation capabilities</li>
+      <li>Integration with Virginia crash data sources (TREDS, Virginia Roads)</li>
+      <li>Professional resources and educational materials</li>
+    </ul>
+
+    <div class="critical-box">
+      <h4>Professional Decision-Making Disclaimer</h4>
+      <p>THE SERVICE IS PROVIDED AS A PROFESSIONAL ASSISTANCE TOOL ONLY. CRASH LENS DOES NOT REPLACE THE INDEPENDENT PROFESSIONAL JUDGMENT, EXPERTISE, AND RESPONSIBILITIES OF LICENSED ENGINEERS, TRAFFIC SAFETY PROFESSIONALS, OR GOVERNMENT OFFICIALS.</p>
+      <p style="margin-bottom: 0;">ALL OUTPUTS, RECOMMENDATIONS, ANALYSES, AND REPORTS GENERATED BY THE SERVICE ARE FOR INFORMATIONAL AND REFERENCE PURPOSES ONLY. YOU ARE SOLELY RESPONSIBLE FOR INDEPENDENTLY VERIFYING ALL DATA, VALIDATING ALL RECOMMENDATIONS, AND MAKING YOUR OWN PROFESSIONAL DETERMINATIONS REGARDING ANY ACTIONS TAKEN OR NOT TAKEN.</p>
+    </div>
+
+    <h2>3. Account Registration and Security</h2>
+
+    <h3>3.1 Account Creation</h3>
+    <p>To access certain features of the Service, you must create an account. When creating an account, you agree to:</p>
+    <ul>
+      <li>Provide accurate, current, and complete information</li>
+      <li>Maintain and promptly update your account information</li>
+      <li>Keep your password secure and confidential</li>
+      <li>Not share your account credentials with others</li>
+      <li>Notify us immediately of any unauthorized access</li>
+    </ul>
+
+    <h3>3.2 Account Responsibility</h3>
+    <p>You are solely responsible for all activities that occur under your account. We are not liable for any loss or damage arising from unauthorized use of your account.</p>
+
+    <h2>4. Subscription Plans and Payment</h2>
+
+    <h3>4.1 Subscription Tiers</h3>
+    <p>The Service is offered through various subscription plans:</p>
+    <ul>
+      <li><strong>Free Trial:</strong> 14-day full access for evaluation purposes</li>
+      <li><strong>Individual Plan:</strong> Single user access with included AI queries</li>
+      <li><strong>Team Plan:</strong> Multi-user access with enhanced AI query allocation</li>
+      <li><strong>Agency Plan:</strong> Custom solutions for government agencies</li>
+    </ul>
+
+    <h3>4.2 Payment Terms</h3>
+    <ul>
+      <li>Subscription fees are billed in advance on a monthly or annual basis</li>
+      <li>All fees are non-refundable except as expressly provided herein or required by law</li>
+      <li>We reserve the right to change pricing with 30 days' notice</li>
+      <li>Failure to pay may result in suspension or termination of your account</li>
+    </ul>
+
+    <h3>4.3 Bring Your Own API Key</h3>
+    <p>All plans support "bring your own key" for AI features using your own Claude API key. You are responsible for compliance with Anthropic's terms of service and any associated costs.</p>
+
+    <h2>5. Acceptable Use Policy</h2>
+
+    <h3>5.1 Permitted Uses</h3>
+    <p>You may use the Service for:</p>
+    <ul>
+      <li>Professional crash data analysis and safety planning</li>
+      <li>Generating reports for internal use or regulatory submissions</li>
+      <li>Supporting grant applications (e.g., HSIP)</li>
+      <li>Educational and training purposes within your organization</li>
+    </ul>
+
+    <h3>5.2 Prohibited Uses</h3>
+    <p>You agree NOT to:</p>
+    <ul>
+      <li>Use the Service for any unlawful purpose</li>
+      <li>Upload data you are not authorized to process</li>
+      <li>Attempt to gain unauthorized access to any part of the Service</li>
+      <li>Reverse engineer, decompile, or disassemble the Service</li>
+      <li>Use automated means to access the Service (except approved APIs)</li>
+      <li>Transmit viruses, malware, or harmful code</li>
+      <li>Interfere with or disrupt the Service or servers</li>
+      <li>Resell, sublicense, or redistribute the Service without authorization</li>
+      <li>Use the Service to develop competing products</li>
+      <li>Misrepresent your identity or organizational affiliation</li>
+    </ul>
+
+    <h2>6. Data and Content</h2>
+
+    <h3>6.1 Your Data</h3>
+    <p>You retain ownership of all data you upload to the Service ("User Data"). By uploading data, you grant us a limited license to process, store, and display your data solely for the purpose of providing the Service to you.</p>
+
+    <h3>6.2 Data Responsibility</h3>
+    <p>You are solely responsible for:</p>
+    <ul>
+      <li>The accuracy and legality of User Data</li>
+      <li>Obtaining necessary authorizations to upload and process crash data</li>
+      <li>Compliance with data protection laws applicable to your jurisdiction</li>
+      <li>Redacting personally identifiable information (PII) as appropriate</li>
+      <li>Maintaining backups of your data</li>
+    </ul>
+
+    <h3>6.3 Third-Party Data Sources</h3>
+    <p>The Service integrates with external data sources including Virginia Roads, TREDS, and ArcGIS. We do not control the accuracy, availability, or completeness of third-party data. Your use of third-party data is subject to those providers' terms and conditions.</p>
+
+    <h2>7. Intellectual Property</h2>
+
+    <h3>7.1 Our Intellectual Property</h3>
+    <p>The Service, including all software, algorithms, designs, text, graphics, logos, and other content (excluding User Data), is owned by CRASH LENS and protected by intellectual property laws. Nothing in these Terms grants you any right to use our trademarks, service marks, or trade dress.</p>
+
+    <h3>7.2 Limited License</h3>
+    <p>Subject to your compliance with these Terms, we grant you a limited, non-exclusive, non-transferable, revocable license to access and use the Service for your internal business purposes during the subscription term.</p>
+
+    <h3>7.3 Feedback</h3>
+    <p>If you provide feedback, suggestions, or ideas about the Service, you grant us the right to use that feedback without restriction or compensation to you.</p>
+
+    <h2>8. Confidentiality</h2>
+    <p>We will treat your User Data and account information as confidential, subject to our Privacy Policy. However, we may disclose information if required by law, legal process, or government request.</p>
+
+    <h2>9. Disclaimers of Warranties</h2>
+
+    <div class="critical-box">
+      <h4>Important Warranty Disclaimers</h4>
+      <p class="all-caps">THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED. TO THE FULLEST EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, INCLUDING BUT NOT LIMITED TO:</p>
+      <ul style="color: #fca5a5;">
+        <li>IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE</li>
+        <li>WARRANTIES OF TITLE AND NON-INFRINGEMENT</li>
+        <li>WARRANTIES THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR SECURE</li>
+        <li>WARRANTIES REGARDING THE ACCURACY, RELIABILITY, OR COMPLETENESS OF ANY DATA, ANALYSIS, OR OUTPUT</li>
+        <li>WARRANTIES THAT THE SERVICE WILL MEET YOUR SPECIFIC REQUIREMENTS</li>
+      </ul>
+    </div>
+
+    <h3>9.1 No Warranty on Data Accuracy</h3>
+    <p class="all-caps">WE DO NOT WARRANT THE ACCURACY, COMPLETENESS, RELIABILITY, OR TIMELINESS OF ANY CRASH DATA, ANALYSIS RESULTS, AI-GENERATED RECOMMENDATIONS, COUNTERMEASURE SUGGESTIONS, OR OTHER OUTPUTS PROVIDED BY THE SERVICE. CRASH DATA IS OBTAINED FROM THIRD-PARTY SOURCES AND MAY CONTAIN ERRORS, OMISSIONS, OR OUTDATED INFORMATION.</p>
+
+    <h3>9.2 No Professional Advice</h3>
+    <p class="all-caps">THE SERVICE DOES NOT PROVIDE PROFESSIONAL ENGINEERING, LEGAL, MEDICAL, OR OTHER PROFESSIONAL ADVICE. ANY INFORMATION OR RECOMMENDATIONS PROVIDED BY THE SERVICE ARE FOR INFORMATIONAL PURPOSES ONLY AND SHOULD NOT BE RELIED UPON AS A SUBSTITUTE FOR PROFESSIONAL JUDGMENT AND INDEPENDENT VERIFICATION.</p>
+
+    <h3>9.3 Third-Party Services</h3>
+    <p>We make no warranties regarding any third-party services, data providers, or integrations. Your use of third-party services is at your own risk.</p>
+
+    <h2>10. Limitation of Liability</h2>
+
+    <div class="critical-box">
+      <h4>Critical Limitation of Liability</h4>
+      <p class="all-caps">TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL CRASH LENS, ITS OFFICERS, DIRECTORS, EMPLOYEES, AGENTS, SUPPLIERS, LICENSORS, OR AFFILIATES BE LIABLE FOR ANY:</p>
+      <ul style="color: #fca5a5;">
+        <li>INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, PUNITIVE, OR EXEMPLARY DAMAGES</li>
+        <li>DAMAGES FOR LOSS OF PROFITS, GOODWILL, DATA, OR OTHER INTANGIBLE LOSSES</li>
+        <li>DAMAGES RESULTING FROM PERSONAL INJURY, BODILY HARM, OR DEATH</li>
+        <li>DAMAGES ARISING FROM TRAFFIC ACCIDENTS, ROAD INCIDENTS, OR TRANSPORTATION-RELATED INJURIES</li>
+        <li>DAMAGES ARISING FROM DECISIONS MADE OR ACTIONS TAKEN BASED ON SERVICE OUTPUTS</li>
+        <li>DAMAGES FROM UNAUTHORIZED ACCESS TO OR ALTERATION OF YOUR DATA</li>
+        <li>DAMAGES FROM ERRORS, INACCURACIES, OR OMISSIONS IN DATA OR ANALYSIS</li>
+      </ul>
+      <p style="margin-bottom: 0;">WHETHER BASED ON WARRANTY, CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY, OR ANY OTHER LEGAL THEORY, EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.</p>
+    </div>
+
+    <h3>10.1 Maximum Liability Cap</h3>
+    <p class="all-caps">IN NO EVENT SHALL OUR TOTAL LIABILITY TO YOU FOR ALL CLAIMS ARISING OUT OF OR RELATING TO THE SERVICE EXCEED THE GREATER OF: (A) THE AMOUNT YOU PAID US IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM, OR (B) ONE HUNDRED DOLLARS ($100).</p>
+
+    <h3>10.2 Essential Basis of the Bargain</h3>
+    <p>You acknowledge that these limitations of liability are an essential element of the agreement between you and CRASH LENS, and that the Service would not be provided to you without these limitations.</p>
+
+    <h2>11. Traffic Safety and Engineering Disclaimers</h2>
+
+    <div class="critical-box">
+      <h4>Critical Traffic Safety Disclaimer</h4>
+      <p class="all-caps">CRASH LENS IS A DATA ANALYSIS AND VISUALIZATION TOOL DESIGNED TO ASSIST TRAFFIC SAFETY PROFESSIONALS. THE SERVICE IS NOT A SUBSTITUTE FOR PROFESSIONAL ENGINEERING JUDGMENT, FIELD INVESTIGATIONS, SITE-SPECIFIC ANALYSIS, OR COMPLIANCE WITH APPLICABLE STANDARDS AND REGULATIONS.</p>
+    </div>
+
+    <h3>11.1 No Guarantee of Safety Outcomes</h3>
+    <p class="all-caps">WE MAKE NO REPRESENTATIONS OR WARRANTIES THAT USE OF THE SERVICE WILL RESULT IN IMPROVED TRAFFIC SAFETY, REDUCED CRASHES, PREVENTED INJURIES, OR SAVED LIVES. TRAFFIC SAFETY IS INFLUENCED BY NUMEROUS FACTORS BEYOND THE SCOPE OF ANY ANALYTICAL TOOL.</p>
+
+    <h3>11.2 Professional Responsibility</h3>
+    <p>Users who are licensed professional engineers, transportation planners, or government officials acknowledge and agree that:</p>
+    <ul>
+      <li>They bear sole professional responsibility for all engineering decisions</li>
+      <li>Service outputs must be independently verified through field investigations and engineering analysis</li>
+      <li>Recommendations must be evaluated for site-specific conditions, constraints, and feasibility</li>
+      <li>All work must comply with MUTCD, AASHTO, FHWA, and other applicable standards</li>
+      <li>Professional engineering judgment cannot be delegated to software tools</li>
+    </ul>
+
+    <h3>11.3 Data Verification Obligation</h3>
+    <p class="all-caps">YOU ARE REQUIRED TO INDEPENDENTLY VERIFY ALL CRASH DATA, LOCATION INFORMATION, AND ANALYSIS RESULTS BEFORE MAKING ANY ENGINEERING DECISIONS OR RECOMMENDATIONS. CRASH DATA FROM ANY SOURCE MAY CONTAIN ERRORS IN LOCATION CODING, SEVERITY CLASSIFICATION, CONTRIBUTING FACTORS, OR OTHER FIELDS.</p>
+
+    <h3>11.4 No Liability for Road Incidents</h3>
+    <p class="all-caps">CRASH LENS, ITS OWNERS, OPERATORS, EMPLOYEES, AND AFFILIATES SHALL NOT BE LIABLE FOR ANY TRAFFIC CRASHES, PERSONAL INJURIES, PROPERTY DAMAGE, OR DEATHS THAT OCCUR ON ANY ROADWAY, REGARDLESS OF WHETHER:</p>
+    <ul>
+      <li>THE SERVICE WAS USED TO ANALYZE THAT LOCATION</li>
+      <li>RECOMMENDATIONS FROM THE SERVICE WERE IMPLEMENTED OR NOT IMPLEMENTED</li>
+      <li>THE SERVICE IDENTIFIED OR FAILED TO IDENTIFY SAFETY CONCERNS</li>
+      <li>THE USER RELIED ON SERVICE OUTPUTS IN MAKING DECISIONS</li>
+    </ul>
+
+    <h3>11.5 AI-Generated Content Disclaimer</h3>
+    <p class="all-caps">AI-GENERATED ANALYSES, RECOMMENDATIONS, AND REPORTS ARE PROVIDED FOR REFERENCE ONLY. AI OUTPUTS MAY CONTAIN ERRORS, HALLUCINATIONS, OR INAPPROPRIATE RECOMMENDATIONS. ALL AI-GENERATED CONTENT MUST BE REVIEWED BY A QUALIFIED PROFESSIONAL BEFORE USE.</p>
+
+    <h2>12. Indemnification</h2>
+
+    <div class="warning-box">
+      <h4>Indemnification Obligations</h4>
+      <p style="margin-bottom: 0;">You agree to indemnify, defend, and hold harmless CRASH LENS and its officers, directors, employees, agents, suppliers, licensors, and affiliates from and against any and all claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys' fees) arising out of or related to:</p>
+    </div>
+
+    <ul>
+      <li>Your use of the Service or any outputs generated thereby</li>
+      <li>Any breach of these Terms by you</li>
+      <li>Any violation of applicable laws or regulations by you</li>
+      <li>Any claims by third parties arising from your use of the Service</li>
+      <li>Any traffic safety decisions, engineering recommendations, or actions you take based on Service outputs</li>
+      <li>Any injuries, deaths, property damage, or other losses related to roadway incidents in connection with locations you analyzed using the Service</li>
+      <li>Your violation of any rights of any third party</li>
+      <li>Any data you upload or process through the Service</li>
+    </ul>
+
+    <p>This indemnification obligation will survive termination of these Terms and your use of the Service.</p>
+
+    <h2>13. Dispute Resolution</h2>
+
+    <h3>13.1 Informal Resolution</h3>
+    <p>Before initiating any formal dispute resolution, you agree to contact us at <a href="mailto:legal@crashlens.com">legal@crashlens.com</a> and attempt to resolve the dispute informally for at least 30 days.</p>
+
+    <h3>13.2 Binding Arbitration</h3>
+    <p>If we cannot resolve a dispute informally, you and CRASH LENS agree that any dispute, claim, or controversy arising out of or relating to these Terms or the Service shall be resolved by binding arbitration administered by the American Arbitration Association (AAA) in accordance with its Commercial Arbitration Rules. The arbitration shall be conducted in Virginia, USA.</p>
+
+    <h3>13.3 Class Action Waiver</h3>
+    <p class="all-caps">YOU AND CRASH LENS AGREE THAT EACH MAY BRING CLAIMS AGAINST THE OTHER ONLY IN YOUR OR ITS INDIVIDUAL CAPACITY AND NOT AS A PLAINTIFF OR CLASS MEMBER IN ANY PURPORTED CLASS OR REPRESENTATIVE PROCEEDING.</p>
+
+    <h3>13.4 Small Claims Exception</h3>
+    <p>Notwithstanding the above, either party may bring an individual action in small claims court for disputes within that court's jurisdiction.</p>
+
+    <h2>14. Governing Law</h2>
+    <p>These Terms shall be governed by and construed in accordance with the laws of the Commonwealth of Virginia, United States, without regard to its conflict of law principles. To the extent litigation is permitted, you consent to the exclusive jurisdiction and venue of state and federal courts located in Virginia.</p>
+
+    <h2>15. Termination</h2>
+
+    <h3>15.1 Termination by You</h3>
+    <p>You may terminate your account at any time by contacting us or using account settings. Upon termination, you will lose access to the Service and your data may be deleted according to our data retention policy.</p>
+
+    <h3>15.2 Termination by Us</h3>
+    <p>We may suspend or terminate your access to the Service at any time, with or without cause, with or without notice, including for:</p>
+    <ul>
+      <li>Breach of these Terms</li>
+      <li>Non-payment of fees</li>
+      <li>Conduct that we determine is harmful to other users, us, or third parties</li>
+      <li>Extended periods of inactivity</li>
+    </ul>
+
+    <h3>15.3 Effect of Termination</h3>
+    <p>Upon termination, your right to use the Service ceases immediately. Sections 6.2, 7, 9-14, 16, and 17 survive termination.</p>
+
+    <h2>16. General Provisions</h2>
+
+    <h3>16.1 Entire Agreement</h3>
+    <p>These Terms, together with our Privacy Policy, constitute the entire agreement between you and CRASH LENS regarding the Service and supersede all prior agreements and understandings.</p>
+
+    <h3>16.2 Severability</h3>
+    <p>If any provision of these Terms is found to be unenforceable, that provision will be limited or eliminated to the minimum extent necessary, and the remaining provisions will remain in full force and effect.</p>
+
+    <h3>16.3 Waiver</h3>
+    <p>Our failure to enforce any right or provision of these Terms will not be considered a waiver of those rights.</p>
+
+    <h3>16.4 Assignment</h3>
+    <p>You may not assign or transfer these Terms without our prior written consent. We may assign these Terms without restriction.</p>
+
+    <h3>16.5 Force Majeure</h3>
+    <p>We shall not be liable for any failure or delay in performance due to circumstances beyond our reasonable control, including natural disasters, acts of government, labor disputes, or internet service disruptions.</p>
+
+    <h3>16.6 Notices</h3>
+    <p>We may provide notices to you via email, posting on the Service, or other reasonable means. You may provide notices to us at the contact information below.</p>
+
+    <h2>17. Changes to Terms</h2>
+    <p>We reserve the right to modify these Terms at any time. We will provide notice of material changes by:</p>
+    <ul>
+      <li>Posting the updated Terms with a new "Last Updated" date</li>
+      <li>Sending email notification to registered users</li>
+      <li>Displaying a prominent notice within the Service</li>
+    </ul>
+    <p>Your continued use of the Service after changes become effective constitutes acceptance of the modified Terms. If you do not agree to the modified Terms, you must stop using the Service.</p>
+
+    <h2>18. Government Users</h2>
+    <p>If you are using the Service on behalf of a government agency:</p>
+    <ul>
+      <li>These Terms are subject to applicable federal, state, and local laws governing contracts with government entities</li>
+      <li>If any provision conflicts with mandatory government contracting requirements, that provision may be modified to the minimum extent necessary</li>
+      <li>You represent that you have authority to bind your agency to these Terms</li>
+    </ul>
+
+    <h2>19. Export Compliance</h2>
+    <p>You agree to comply with all applicable export control laws and regulations. You represent that you are not located in, or a national of, any country subject to U.S. sanctions.</p>
+
+    <h2>20. Contact Information</h2>
+    <p>For questions about these Terms of Service, please contact us:</p>
+    <div class="highlight-box">
+      <p><strong>CRASH LENS</strong><br>
+      Legal Inquiries: <a href="mailto:legal@crashlens.com">legal@crashlens.com</a><br>
+      General Support: <a href="mailto:support@crashlens.com">support@crashlens.com</a><br>
+      Sales: <a href="mailto:sales@crashlens.com">sales@crashlens.com</a></p>
+    </div>
+
+    <div class="critical-box">
+      <h4>Acknowledgment</h4>
+      <p style="margin-bottom: 0;">BY USING CRASH LENS, YOU ACKNOWLEDGE THAT YOU HAVE READ THESE TERMS OF SERVICE, UNDERSTAND THEM, AND AGREE TO BE BOUND BY THEM. YOU ALSO ACKNOWLEDGE THAT THESE TERMS, TOGETHER WITH THE PRIVACY POLICY, REPRESENT THE COMPLETE AND EXCLUSIVE STATEMENT OF THE AGREEMENT BETWEEN YOU AND CRASH LENS, AND THAT THEY SUPERSEDE ANY PROPOSAL OR PRIOR AGREEMENT, ORAL OR WRITTEN, AND ANY OTHER COMMUNICATIONS BETWEEN YOU AND CRASH LENS RELATING TO THE SUBJECT MATTER OF THESE TERMS.</p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <div class="footer-logo">
+        <img src="data/images/favicon.svg" alt="CRASH LENS">
+        <span>CRASH LENS</span>
+      </div>
+
+      <div class="footer-links">
+        <a href="./features.html">Features</a>
+        <a href="./pricing.html">Pricing</a>
+        <a href="./resources.html">Resources</a>
+        <a href="./privacy-policy.html">Privacy Policy</a>
+        <a href="./terms-of-service.html">Terms of Service</a>
+      </div>
+
+      <div class="footer-copy">
+        &copy; 2025 CRASH LENS. All rights reserved.
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
