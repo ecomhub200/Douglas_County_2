@@ -301,6 +301,86 @@
       display: block;
     }
 
+    /* Verification pending state */
+    .verification-pending {
+      text-align: center;
+      padding: 1rem 0;
+    }
+
+    .verification-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 1.5rem;
+      background: rgba(59, 130, 246, 0.1);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .verification-icon svg {
+      width: 40px;
+      height: 40px;
+      color: var(--primary);
+    }
+
+    .verification-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--white);
+      margin-bottom: 0.75rem;
+    }
+
+    .verification-text {
+      color: var(--text-dark);
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+
+    .verification-email {
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    .resend-btn {
+      background: transparent;
+      border: 1px solid var(--border-dark);
+      color: var(--text-dark);
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: all 0.2s ease;
+      margin-top: 1rem;
+    }
+
+    .resend-btn:hover {
+      border-color: var(--primary);
+      color: var(--white);
+    }
+
+    .resend-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .resend-timer {
+      color: var(--gray);
+      font-size: 0.875rem;
+      margin-top: 0.5rem;
+    }
+
+    .change-email-link {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      margin-top: 1.5rem;
+      display: block;
+    }
+
+    .change-email-link:hover {
+      color: var(--white);
+    }
+
     /* Loading spinner */
     .spinner {
       width: 20px;
@@ -522,6 +602,38 @@
           <a href="#" class="form-link" onclick="switchTab('signin')">Back to Sign In</a>
         </p>
       </div>
+
+      <!-- Email Verification Pending -->
+      <div class="auth-form" id="verifyForm">
+        <div class="verification-pending">
+          <div class="verification-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <h3 class="verification-title">Verify your email</h3>
+          <p class="verification-text">
+            We've sent a verification link to<br>
+            <span class="verification-email" id="verificationEmail">your@email.com</span>
+          </p>
+          <p class="verification-text" style="font-size: 0.875rem;">
+            Click the link in the email to verify your account and start your 14-day free trial.
+          </p>
+
+          <button class="submit-btn" onclick="checkVerificationStatus()">
+            I've verified my email
+          </button>
+
+          <button class="resend-btn" id="resendBtn" onclick="resendVerificationEmail()">
+            Resend verification email
+          </button>
+          <div class="resend-timer" id="resendTimer" style="display: none;"></div>
+
+          <a href="#" class="change-email-link" onclick="signOutAndRestart(event)">
+            Use a different email address
+          </a>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -530,12 +642,56 @@
   <script src="../assets/js/auth.js"></script>
 
   <script>
+    // Resend email cooldown tracking
+    let resendCooldown = 0;
+    let resendInterval = null;
+
     // Check if already authenticated
     document.addEventListener('DOMContentLoaded', function() {
       if (window.isFirebaseConfigured) {
-        CrashLensAuth.redirectIfAuthenticated(); // Uses dynamic base path detection
+        // Check for verified=true query param (user clicked email link)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('verified') === 'true') {
+          // User came back from email verification
+          handleVerificationReturn();
+        } else {
+          // Normal flow - check auth state
+          CrashLensAuth.init(async (user) => {
+            if (user) {
+              // Check if user needs email verification
+              if (CrashLensAuth.needsEmailVerification()) {
+                showVerificationPending(user.email);
+              } else {
+                // Verified - redirect to app
+                const intended = sessionStorage.getItem('authRedirect');
+                sessionStorage.removeItem('authRedirect');
+                window.location.href = intended || '../app/';
+              }
+            }
+          });
+        }
       }
     });
+
+    // Handle user returning after clicking verification link
+    async function handleVerificationReturn() {
+      CrashLensAuth.init(async (user) => {
+        if (user) {
+          const verified = await CrashLensAuth.checkEmailVerification();
+          if (verified) {
+            showSuccess('Email verified! Starting your 14-day trial...');
+            setTimeout(() => {
+              window.location.href = '../app/';
+            }, 1500);
+          } else {
+            showVerificationPending(user.email);
+            showError('Email not yet verified. Please check your inbox and click the verification link.');
+          }
+        } else {
+          switchTab('signin');
+        }
+      });
+    }
 
     // Tab switching
     function switchTab(tab) {
@@ -551,14 +707,29 @@
       const titles = {
         signin: { title: 'Welcome back', subtitle: 'Sign in to access your crash analysis tools' },
         signup: { title: 'Create an account', subtitle: 'Start your 14-day free trial today' },
-        forgot: { title: 'Reset password', subtitle: 'We\'ll send you a reset link' }
+        forgot: { title: 'Reset password', subtitle: 'We\'ll send you a reset link' },
+        verify: { title: 'Check your inbox', subtitle: 'Verify your email to continue' }
       };
 
       document.getElementById('formTitle').textContent = titles[tab]?.title || '';
       document.getElementById('formSubtitle').textContent = titles[tab]?.subtitle || '';
 
+      // Hide tabs for verify form
+      const authTabs = document.querySelector('.auth-tabs');
+      if (tab === 'verify') {
+        authTabs.style.display = 'none';
+      } else {
+        authTabs.style.display = 'flex';
+      }
+
       // Clear messages
       hideMessages();
+    }
+
+    // Show verification pending UI
+    function showVerificationPending(email) {
+      document.getElementById('verificationEmail').textContent = email;
+      switchTab('verify');
     }
 
     // Show/hide messages
@@ -627,7 +798,14 @@
 
       try {
         await CrashLensAuth.signInWithEmail(email, password);
-        window.location.href = '../app/';
+
+        // Check if email needs verification
+        if (CrashLensAuth.needsEmailVerification()) {
+          showVerificationPending(email);
+          setLoading('signinBtn', false);
+        } else {
+          window.location.href = '../app/';
+        }
       } catch (error) {
         showError(CrashLensAuth.getErrorMessage(error));
         setLoading('signinBtn', false);
@@ -646,7 +824,14 @@
 
       try {
         await CrashLensAuth.signUpWithEmail(email, password, name);
-        window.location.href = '../app/';
+
+        // Send verification email
+        await CrashLensAuth.sendVerificationEmail();
+
+        // Show verification pending UI
+        showVerificationPending(email);
+        showSuccess('Verification email sent! Please check your inbox.');
+        setLoading('signupBtn', false);
       } catch (error) {
         showError(CrashLensAuth.getErrorMessage(error));
         setLoading('signupBtn', false);
@@ -674,6 +859,85 @@
       } catch (error) {
         showError(CrashLensAuth.getErrorMessage(error));
         setLoading('resetBtn', false);
+      }
+    }
+
+    // Resend verification email
+    async function resendVerificationEmail() {
+      if (resendCooldown > 0) return;
+
+      const resendBtn = document.getElementById('resendBtn');
+      const resendTimer = document.getElementById('resendTimer');
+
+      hideMessages();
+      resendBtn.disabled = true;
+
+      try {
+        await CrashLensAuth.sendVerificationEmail();
+        showSuccess('Verification email sent! Please check your inbox.');
+
+        // Start 60 second cooldown
+        resendCooldown = 60;
+        resendTimer.style.display = 'block';
+        updateResendTimer();
+
+        resendInterval = setInterval(() => {
+          resendCooldown--;
+          updateResendTimer();
+
+          if (resendCooldown <= 0) {
+            clearInterval(resendInterval);
+            resendBtn.disabled = false;
+            resendTimer.style.display = 'none';
+          }
+        }, 1000);
+
+      } catch (error) {
+        showError(CrashLensAuth.getErrorMessage(error));
+        resendBtn.disabled = false;
+      }
+    }
+
+    // Update resend timer display
+    function updateResendTimer() {
+      const resendTimer = document.getElementById('resendTimer');
+      resendTimer.textContent = `You can resend in ${resendCooldown} seconds`;
+    }
+
+    // Check if email has been verified
+    async function checkVerificationStatus() {
+      hideMessages();
+
+      try {
+        const verified = await CrashLensAuth.checkEmailVerification();
+
+        if (verified) {
+          showSuccess('Email verified! Starting your 14-day trial...');
+          setTimeout(() => {
+            window.location.href = '../app/';
+          }, 1500);
+        } else {
+          showError('Email not yet verified. Please click the link in your email.');
+        }
+      } catch (error) {
+        showError('Error checking verification status. Please try again.');
+      }
+    }
+
+    // Sign out and allow user to use different email
+    async function signOutAndRestart(event) {
+      event.preventDefault();
+
+      try {
+        await firebase.auth().signOut();
+        // Clear any cooldown state
+        if (resendInterval) {
+          clearInterval(resendInterval);
+        }
+        resendCooldown = 0;
+        switchTab('signup');
+      } catch (error) {
+        showError('Error signing out. Please refresh the page.');
       }
     }
   </script>
