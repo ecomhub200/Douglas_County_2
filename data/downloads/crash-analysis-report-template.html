@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crash Analysis Report Template - CRASH LENS</title>
+  <style>
+    :root {
+      --primary: #1e40af;
+      --primary-light: #3b82f6;
+      --dark: #0f172a;
+      --gray: #64748b;
+      --light: #f8fafc;
+      --border: #e2e8f0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Times New Roman', Times, serif;
+      line-height: 1.6;
+      color: var(--dark);
+      background: white;
+      font-size: 12pt;
+    }
+
+    .template-info {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 2rem;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .template-info h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .template-info p {
+      opacity: 0.9;
+    }
+
+    .instructions {
+      background: #eff6ff;
+      border: 2px dashed var(--primary);
+      padding: 1.5rem;
+      margin: 1rem 2rem;
+      border-radius: 8px;
+    }
+
+    .instructions h2 {
+      color: var(--primary);
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .instructions ul {
+      margin-left: 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    .instructions li {
+      margin-bottom: 0.25rem;
+    }
+
+    .report-container {
+      max-width: 8.5in;
+      margin: 0 auto;
+      padding: 1in;
+      background: white;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+
+    /* Report Styles */
+    .report-header {
+      text-align: center;
+      border-bottom: 2px solid var(--dark);
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .report-header .agency {
+      font-size: 14pt;
+      font-weight: bold;
+      color: var(--dark);
+    }
+
+    .report-header .title {
+      font-size: 18pt;
+      font-weight: bold;
+      margin: 0.5rem 0;
+      color: var(--dark);
+    }
+
+    .report-header .subtitle {
+      font-size: 12pt;
+      color: var(--gray);
+    }
+
+    .placeholder {
+      background: #fef3c7;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      font-family: Arial, sans-serif;
+      font-size: 10pt;
+    }
+
+    .section {
+      margin: 1.5rem 0;
+    }
+
+    .section-title {
+      font-size: 14pt;
+      font-weight: bold;
+      color: var(--dark);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.25rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .subsection-title {
+      font-size: 12pt;
+      font-weight: bold;
+      color: var(--dark);
+      margin: 1rem 0 0.5rem;
+    }
+
+    p {
+      margin-bottom: 0.75rem;
+      text-align: justify;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 11pt;
+    }
+
+    .data-table th, .data-table td {
+      border: 1px solid var(--border);
+      padding: 0.5rem;
+      text-align: left;
+    }
+
+    .data-table th {
+      background: var(--light);
+      font-weight: bold;
+    }
+
+    .data-table tr:nth-child(even) {
+      background: #fafafa;
+    }
+
+    .figure-placeholder {
+      border: 2px dashed var(--border);
+      padding: 2rem;
+      text-align: center;
+      margin: 1rem 0;
+      background: var(--light);
+      color: var(--gray);
+    }
+
+    .figure-caption {
+      text-align: center;
+      font-style: italic;
+      font-size: 10pt;
+      color: var(--gray);
+      margin-top: 0.5rem;
+    }
+
+    .recommendation-box {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-left: 4px solid #22c55e;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+
+    .recommendation-box h4 {
+      color: #166534;
+      margin-bottom: 0.5rem;
+    }
+
+    .signature-block {
+      margin-top: 2rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .signature {
+      width: 45%;
+    }
+
+    .signature-line {
+      border-top: 1px solid var(--dark);
+      margin-top: 2rem;
+      padding-top: 0.25rem;
+    }
+
+    .print-btn {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-family: Arial, sans-serif;
+      box-shadow: 0 4px 12px rgba(30,64,175,0.3);
+    }
+
+    .print-btn:hover {
+      background: var(--primary-light);
+    }
+
+    @media print {
+      .template-info, .instructions, .print-btn {
+        display: none;
+      }
+
+      body {
+        background: white;
+      }
+
+      .report-container {
+        box-shadow: none;
+        padding: 0;
+        max-width: none;
+      }
+
+      .section {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="template-info">
+    <h1>Crash Analysis Report Template</h1>
+    <p>Professional template for intersection and corridor crash analysis reports</p>
+    <p style="font-size: 0.875rem; margin-top: 0.5rem;">Provided by CRASH LENS - Professional Crash Analysis Tools</p>
+  </div>
+
+  <div class="instructions">
+    <h2>How to Use This Template</h2>
+    <ul>
+      <li><strong>Yellow highlighted text</strong> indicates placeholders - replace with your project-specific information</li>
+      <li>Print or save as PDF to use as a starting point for your report</li>
+      <li>Add additional sections as needed for your specific analysis</li>
+      <li>Include actual maps, charts, and collision diagrams in place of figure placeholders</li>
+      <li>Customize agency header and formatting to match your organization's standards</li>
+    </ul>
+  </div>
+
+  <div class="report-container">
+    <!-- Report Header -->
+    <header class="report-header">
+      <div class="agency"><span class="placeholder">[Agency Name]</span></div>
+      <div class="title">CRASH ANALYSIS REPORT</div>
+      <div class="subtitle">
+        <span class="placeholder">[Location Name/Intersection]</span><br>
+        <span class="placeholder">[City/County]</span>, Virginia
+      </div>
+    </header>
+
+    <!-- Report Info Box -->
+    <table class="data-table" style="margin-bottom: 1.5rem;">
+      <tr>
+        <td><strong>Report Date:</strong></td>
+        <td><span class="placeholder">[Date]</span></td>
+        <td><strong>Project Number:</strong></td>
+        <td><span class="placeholder">[Project #]</span></td>
+      </tr>
+      <tr>
+        <td><strong>Prepared By:</strong></td>
+        <td><span class="placeholder">[Name, Title]</span></td>
+        <td><strong>Study Period:</strong></td>
+        <td><span class="placeholder">[Start Date]</span> to <span class="placeholder">[End Date]</span></td>
+      </tr>
+    </table>
+
+    <!-- Executive Summary -->
+    <section class="section">
+      <h2 class="section-title">1. Executive Summary</h2>
+      <p>
+        This report presents a comprehensive crash analysis for <span class="placeholder">[Location]</span> in <span class="placeholder">[City/County]</span>, Virginia.
+        The analysis covers a <span class="placeholder">[X]</span>-year period from <span class="placeholder">[Start Date]</span> to <span class="placeholder">[End Date]</span>.
+      </p>
+      <p>
+        <strong>Key Findings:</strong>
+      </p>
+      <ul style="margin-left: 1.5rem; margin-bottom: 0.75rem;">
+        <li>A total of <span class="placeholder">[X]</span> crashes occurred during the study period, including <span class="placeholder">[X]</span> fatal and <span class="placeholder">[X]</span> injury crashes.</li>
+        <li>The predominant crash type was <span class="placeholder">[crash type]</span>, accounting for <span class="placeholder">[X]</span>% of all crashes.</li>
+        <li>The crash rate of <span class="placeholder">[X.XX]</span> crashes per MEV is <span class="placeholder">[above/below/at]</span> the statewide average of <span class="placeholder">[X.XX]</span>.</li>
+        <li>Primary contributing factors include <span class="placeholder">[factors]</span>.</li>
+      </ul>
+      <p>
+        <strong>Recommendations:</strong> Based on this analysis, the following countermeasures are recommended: <span class="placeholder">[brief summary of recommendations]</span>.
+      </p>
+    </section>
+
+    <!-- Introduction -->
+    <section class="section">
+      <h2 class="section-title">2. Introduction</h2>
+
+      <h3 class="subsection-title">2.1 Purpose</h3>
+      <p>
+        The purpose of this crash analysis is to identify crash patterns, contributing factors, and potential countermeasures
+        for <span class="placeholder">[Location]</span>. This location was selected for analysis based on <span class="placeholder">[reason - e.g., citizen complaints, high crash frequency, fatal crash occurrence, HSIP screening]</span>.
+      </p>
+
+      <h3 class="subsection-title">2.2 Study Area</h3>
+      <p>
+        The study area encompasses <span class="placeholder">[describe limits - e.g., the intersection of Main Street and Oak Avenue, or the corridor from MP 12.5 to MP 14.2]</span>.
+        <span class="placeholder">[Describe key features: number of lanes, traffic control, pedestrian facilities, adjacent land use, etc.]</span>
+      </p>
+
+      <div class="figure-placeholder">
+        <strong>FIGURE 1: Study Area Location Map</strong><br>
+        <span style="font-size: 10pt;">[Insert aerial photo or location map showing study limits and key features]</span>
+      </div>
+      <p class="figure-caption">Figure 1: Study Area Location Map</p>
+
+      <h3 class="subsection-title">2.3 Data Sources</h3>
+      <p>The following data sources were used for this analysis:</p>
+      <ul style="margin-left: 1.5rem;">
+        <li>Virginia TREDS crash data (<span class="placeholder">[years]</span>)</li>
+        <li>VDOT traffic volume data (AADT: <span class="placeholder">[volume]</span> vpd)</li>
+        <li>Field observations conducted on <span class="placeholder">[date]</span></li>
+        <li><span class="placeholder">[Other data sources]</span></li>
+      </ul>
+    </section>
+
+    <!-- Crash Data Summary -->
+    <section class="section">
+      <h2 class="section-title">3. Crash Data Summary</h2>
+
+      <h3 class="subsection-title">3.1 Crash Frequency and Severity</h3>
+      <p>
+        During the <span class="placeholder">[X]</span>-year study period, a total of <span class="placeholder">[X]</span> crashes were reported at this location.
+        Table 1 summarizes the crash frequency and severity distribution.
+      </p>
+
+      <table class="data-table">
+        <tr>
+          <th>Year</th>
+          <th>Fatal (K)</th>
+          <th>Serious Injury (A)</th>
+          <th>Minor Injury (B)</th>
+          <th>Possible Injury (C)</th>
+          <th>PDO (O)</th>
+          <th>Total</th>
+        </tr>
+        <tr>
+          <td><span class="placeholder">[Year 1]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+        </tr>
+        <tr>
+          <td><span class="placeholder">[Year 2]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+        </tr>
+        <tr>
+          <td><span class="placeholder">[Year 3]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+        </tr>
+        <tr style="font-weight: bold;">
+          <td>Total</td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+        </tr>
+      </table>
+      <p class="figure-caption">Table 1: Crash Frequency by Year and Severity</p>
+
+      <h3 class="subsection-title">3.2 Crash Rate Analysis</h3>
+      <p>
+        Using an Average Annual Daily Traffic (AADT) of <span class="placeholder">[X,XXX]</span> vehicles per day, the crash rates were calculated as follows:
+      </p>
+      <table class="data-table">
+        <tr>
+          <th>Metric</th>
+          <th>Study Location</th>
+          <th>Statewide Average</th>
+          <th>Comparison</th>
+        </tr>
+        <tr>
+          <td>Crash Rate (per MEV)</td>
+          <td><span class="placeholder">[X.XX]</span></td>
+          <td><span class="placeholder">[X.XX]</span></td>
+          <td><span class="placeholder">[X%] above/below</span></td>
+        </tr>
+        <tr>
+          <td>Fatal + Injury Rate (per MEV)</td>
+          <td><span class="placeholder">[X.XX]</span></td>
+          <td><span class="placeholder">[X.XX]</span></td>
+          <td><span class="placeholder">[X%] above/below</span></td>
+        </tr>
+        <tr>
+          <td>EPDO Score</td>
+          <td><span class="placeholder">[XXX]</span></td>
+          <td>N/A</td>
+          <td>-</td>
+        </tr>
+      </table>
+      <p class="figure-caption">Table 2: Crash Rate Comparison</p>
+
+      <h3 class="subsection-title">3.3 Crash Type Distribution</h3>
+      <p>Table 3 shows the distribution of crashes by manner of collision:</p>
+      <table class="data-table">
+        <tr>
+          <th>Crash Type</th>
+          <th>Count</th>
+          <th>Percentage</th>
+          <th>Fatal + Injury</th>
+        </tr>
+        <tr>
+          <td>Rear End</td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span>%</td>
+          <td><span class="placeholder">[X]</span></td>
+        </tr>
+        <tr>
+          <td>Angle</td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span>%</td>
+          <td><span class="placeholder">[X]</span></td>
+        </tr>
+        <tr>
+          <td>Sideswipe - Same Direction</td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span>%</td>
+          <td><span class="placeholder">[X]</span></td>
+        </tr>
+        <tr>
+          <td><span class="placeholder">[Other Types]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span>%</td>
+          <td><span class="placeholder">[X]</span></td>
+        </tr>
+        <tr style="font-weight: bold;">
+          <td>Total</td>
+          <td><span class="placeholder">[X]</span></td>
+          <td>100%</td>
+          <td><span class="placeholder">[X]</span></td>
+        </tr>
+      </table>
+      <p class="figure-caption">Table 3: Crash Type Distribution</p>
+    </section>
+
+    <!-- Crash Pattern Analysis -->
+    <section class="section">
+      <h2 class="section-title">4. Crash Pattern Analysis</h2>
+
+      <h3 class="subsection-title">4.1 Collision Diagram</h3>
+      <div class="figure-placeholder">
+        <strong>FIGURE 2: Collision Diagram</strong><br>
+        <span style="font-size: 10pt;">[Insert collision diagram showing crash locations, types, and movements]</span>
+      </div>
+      <p class="figure-caption">Figure 2: Collision Diagram (<span class="placeholder">[Years]</span>)</p>
+
+      <h3 class="subsection-title">4.2 Temporal Patterns</h3>
+      <p>Analysis of crash occurrence by time of day and day of week revealed the following patterns:</p>
+      <ul style="margin-left: 1.5rem;">
+        <li><strong>Peak Hours:</strong> <span class="placeholder">[X]</span>% of crashes occurred during <span class="placeholder">[time period]</span></li>
+        <li><strong>Day of Week:</strong> <span class="placeholder">[Day]</span> had the highest crash frequency with <span class="placeholder">[X]</span> crashes</li>
+        <li><strong>Seasonal:</strong> <span class="placeholder">[Describe any seasonal patterns]</span></li>
+      </ul>
+
+      <div class="figure-placeholder">
+        <strong>FIGURE 3: Crash Distribution by Time of Day</strong><br>
+        <span style="font-size: 10pt;">[Insert time-of-day histogram or heat map]</span>
+      </div>
+      <p class="figure-caption">Figure 3: Crash Distribution by Time of Day</p>
+
+      <h3 class="subsection-title">4.3 Contributing Factors</h3>
+      <p>The primary contributing factors identified in the crash reports include:</p>
+      <table class="data-table">
+        <tr>
+          <th>Contributing Factor</th>
+          <th>Count</th>
+          <th>Percentage</th>
+        </tr>
+        <tr>
+          <td><span class="placeholder">[Factor 1]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span>%</td>
+        </tr>
+        <tr>
+          <td><span class="placeholder">[Factor 2]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span>%</td>
+        </tr>
+        <tr>
+          <td><span class="placeholder">[Factor 3]</span></td>
+          <td><span class="placeholder">[X]</span></td>
+          <td><span class="placeholder">[X]</span>%</td>
+        </tr>
+      </table>
+      <p class="figure-caption">Table 4: Contributing Factors</p>
+
+      <h3 class="subsection-title">4.4 Environmental Conditions</h3>
+      <p>
+        Analysis of environmental conditions at the time of crashes revealed:
+      </p>
+      <ul style="margin-left: 1.5rem;">
+        <li><strong>Light Conditions:</strong> <span class="placeholder">[X]</span>% occurred during dark conditions</li>
+        <li><strong>Weather:</strong> <span class="placeholder">[X]</span>% occurred during rain/wet conditions</li>
+        <li><strong>Road Surface:</strong> <span class="placeholder">[X]</span>% occurred on wet pavement</li>
+      </ul>
+    </section>
+
+    <!-- Field Observations -->
+    <section class="section">
+      <h2 class="section-title">5. Field Observations</h2>
+      <p>
+        A field review was conducted on <span class="placeholder">[Date]</span> to observe traffic operations and identify potential safety concerns.
+        Key observations include:
+      </p>
+      <ul style="margin-left: 1.5rem;">
+        <li><span class="placeholder">[Observation 1 - e.g., sight distance limitations]</span></li>
+        <li><span class="placeholder">[Observation 2 - e.g., signal timing issues]</span></li>
+        <li><span class="placeholder">[Observation 3 - e.g., pedestrian crossing behavior]</span></li>
+        <li><span class="placeholder">[Observation 4 - e.g., pavement marking condition]</span></li>
+      </ul>
+
+      <div class="figure-placeholder">
+        <strong>FIGURE 4: Site Photos</strong><br>
+        <span style="font-size: 10pt;">[Insert representative site photos showing key features and concerns]</span>
+      </div>
+      <p class="figure-caption">Figure 4: Site Photographs</p>
+    </section>
+
+    <!-- Recommendations -->
+    <section class="section">
+      <h2 class="section-title">6. Recommendations</h2>
+      <p>
+        Based on the crash pattern analysis and field observations, the following countermeasures are recommended:
+      </p>
+
+      <div class="recommendation-box">
+        <h4>Recommendation 1: <span class="placeholder">[Countermeasure Name]</span></h4>
+        <p><strong>Description:</strong> <span class="placeholder">[Describe the countermeasure]</span></p>
+        <p><strong>Target Crash Type:</strong> <span class="placeholder">[Crash type addressed]</span></p>
+        <p><strong>Expected CMF:</strong> <span class="placeholder">[X.XX]</span> (Source: <span class="placeholder">[CMF Clearinghouse ID or study]</span>)</p>
+        <p><strong>Estimated Cost:</strong> <span class="placeholder">[$XXX,XXX]</span></p>
+      </div>
+
+      <div class="recommendation-box">
+        <h4>Recommendation 2: <span class="placeholder">[Countermeasure Name]</span></h4>
+        <p><strong>Description:</strong> <span class="placeholder">[Describe the countermeasure]</span></p>
+        <p><strong>Target Crash Type:</strong> <span class="placeholder">[Crash type addressed]</span></p>
+        <p><strong>Expected CMF:</strong> <span class="placeholder">[X.XX]</span> (Source: <span class="placeholder">[CMF Clearinghouse ID or study]</span>)</p>
+        <p><strong>Estimated Cost:</strong> <span class="placeholder">[$XXX,XXX]</span></p>
+      </div>
+
+      <div class="recommendation-box">
+        <h4>Recommendation 3: <span class="placeholder">[Countermeasure Name]</span></h4>
+        <p><strong>Description:</strong> <span class="placeholder">[Describe the countermeasure]</span></p>
+        <p><strong>Target Crash Type:</strong> <span class="placeholder">[Crash type addressed]</span></p>
+        <p><strong>Expected CMF:</strong> <span class="placeholder">[X.XX]</span> (Source: <span class="placeholder">[CMF Clearinghouse ID or study]</span>)</p>
+        <p><strong>Estimated Cost:</strong> <span class="placeholder">[$XXX,XXX]</span></p>
+      </div>
+
+      <h3 class="subsection-title">6.1 Benefit-Cost Summary</h3>
+      <table class="data-table">
+        <tr>
+          <th>Recommendation</th>
+          <th>Est. Crashes Reduced/Year</th>
+          <th>Annual Benefit</th>
+          <th>Cost</th>
+          <th>B/C Ratio</th>
+        </tr>
+        <tr>
+          <td><span class="placeholder">[Rec 1]</span></td>
+          <td><span class="placeholder">[X.X]</span></td>
+          <td><span class="placeholder">$XXX,XXX</span></td>
+          <td><span class="placeholder">$XXX,XXX</span></td>
+          <td><span class="placeholder">[X.X]</span></td>
+        </tr>
+        <tr>
+          <td><span class="placeholder">[Rec 2]</span></td>
+          <td><span class="placeholder">[X.X]</span></td>
+          <td><span class="placeholder">$XXX,XXX</span></td>
+          <td><span class="placeholder">$XXX,XXX</span></td>
+          <td><span class="placeholder">[X.X]</span></td>
+        </tr>
+        <tr>
+          <td><span class="placeholder">[Rec 3]</span></td>
+          <td><span class="placeholder">[X.X]</span></td>
+          <td><span class="placeholder">$XXX,XXX</span></td>
+          <td><span class="placeholder">$XXX,XXX</span></td>
+          <td><span class="placeholder">[X.X]</span></td>
+        </tr>
+      </table>
+      <p class="figure-caption">Table 5: Benefit-Cost Summary</p>
+    </section>
+
+    <!-- Conclusion -->
+    <section class="section">
+      <h2 class="section-title">7. Conclusion</h2>
+      <p>
+        This crash analysis identified <span class="placeholder">[key findings summary]</span> at <span class="placeholder">[Location]</span>.
+        The recommended countermeasures are expected to reduce crashes by approximately <span class="placeholder">[X]</span>% with a combined benefit-cost ratio of <span class="placeholder">[X.X]</span>.
+      </p>
+      <p>
+        <span class="placeholder">[Additional conclusions and next steps]</span>
+      </p>
+    </section>
+
+    <!-- Appendices Reference -->
+    <section class="section">
+      <h2 class="section-title">Appendices</h2>
+      <ul style="margin-left: 1.5rem;">
+        <li>Appendix A: Detailed Crash Listing</li>
+        <li>Appendix B: Traffic Volume Data</li>
+        <li>Appendix C: Field Review Photos</li>
+        <li>Appendix D: Benefit-Cost Calculations</li>
+      </ul>
+    </section>
+
+    <!-- Signature Block -->
+    <div class="signature-block">
+      <div class="signature">
+        <div class="signature-line">
+          <span class="placeholder">[Preparer Name]</span><br>
+          <span class="placeholder">[Title]</span><br>
+          Date: _________________
+        </div>
+      </div>
+      <div class="signature">
+        <div class="signature-line">
+          <span class="placeholder">[Reviewer Name]</span>, P.E.<br>
+          <span class="placeholder">[Title]</span><br>
+          Date: _________________
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+</body>
+</html>

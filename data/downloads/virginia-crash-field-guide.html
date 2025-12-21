@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virginia Crash Data Field Guide - CRASH LENS</title>
+  <style>
+    :root {
+      --primary: #1e40af;
+      --primary-light: #3b82f6;
+      --dark: #0f172a;
+      --gray: #64748b;
+      --light: #f8fafc;
+      --border: #e2e8f0;
+      --success: #10b981;
+      --warning: #f59e0b;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      line-height: 1.6;
+      color: var(--dark);
+      background: var(--light);
+    }
+
+    .container {
+      max-width: 850px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 1.1rem;
+    }
+
+    .brand {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      margin-top: 1rem;
+    }
+
+    .toc {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .toc h2 {
+      color: var(--primary);
+      margin-bottom: 1rem;
+      font-size: 1.25rem;
+    }
+
+    .toc ul {
+      list-style: none;
+      columns: 2;
+    }
+
+    .toc li {
+      padding: 0.25rem 0;
+    }
+
+    .toc a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+
+    .section {
+      margin: 2rem 0;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .section h2 {
+      color: var(--primary);
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .section h3 {
+      color: var(--dark);
+      font-size: 1.1rem;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    .section h4 {
+      color: var(--gray);
+      font-size: 0.95rem;
+      margin: 1rem 0 0.5rem;
+      font-weight: 600;
+    }
+
+    .field-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+
+    .field-table th, .field-table td {
+      padding: 0.6rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+
+    .field-table th {
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+    }
+
+    .field-table tr:nth-child(even) {
+      background: var(--light);
+    }
+
+    .code-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+    }
+
+    .code-table th, .code-table td {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+
+    .code-table th {
+      background: #f1f5f9;
+      color: var(--dark);
+      font-weight: 600;
+    }
+
+    .code-badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      background: var(--primary);
+      color: white;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+
+    .tip-box {
+      background: #eff6ff;
+      border-left: 4px solid var(--primary);
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .tip-box strong {
+      color: var(--primary);
+    }
+
+    .warning-box {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .warning-box strong {
+      color: #92400e;
+    }
+
+    .success-box {
+      background: #d1fae5;
+      border-left: 4px solid var(--success);
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .success-box strong {
+      color: #065f46;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--gray);
+      font-size: 0.875rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    .print-btn {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      box-shadow: 0 4px 12px rgba(30,64,175,0.3);
+    }
+
+    .print-btn:hover {
+      background: var(--primary-light);
+    }
+
+    @media print {
+      .print-btn, .toc {
+        display: none;
+      }
+
+      body {
+        background: white;
+      }
+
+      .container {
+        padding: 0;
+      }
+
+      .section {
+        box-shadow: none;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .toc ul {
+        columns: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>Virginia Crash Data Field Guide</h1>
+    <p>Comprehensive Reference for Virginia TREDS Crash Data Analysis</p>
+    <div class="brand">Provided by CRASH LENS - Professional Crash Analysis Tools</div>
+  </header>
+
+  <div class="container">
+    <nav class="toc">
+      <h2>Table of Contents</h2>
+      <ul>
+        <li><a href="#intro">1. Introduction to TREDS</a></li>
+        <li><a href="#crash-level">2. Crash-Level Fields</a></li>
+        <li><a href="#location">3. Location Fields</a></li>
+        <li><a href="#severity">4. Severity Classification</a></li>
+        <li><a href="#crash-type">5. Crash Type Codes</a></li>
+        <li><a href="#contributing">6. Contributing Factors</a></li>
+        <li><a href="#vehicle">7. Vehicle Data</a></li>
+        <li><a href="#person">8. Person Data</a></li>
+        <li><a href="#road">9. Road Characteristics</a></li>
+        <li><a href="#environment">10. Environmental Factors</a></li>
+        <li><a href="#analysis">11. Analysis Best Practices</a></li>
+        <li><a href="#quality">12. Data Quality Notes</a></li>
+      </ul>
+    </nav>
+
+    <section class="section" id="intro">
+      <h2>1. Introduction to Virginia TREDS</h2>
+      <p>The Traffic Records Electronic Data System (TREDS) is Virginia's comprehensive crash reporting system maintained by the Virginia Department of Motor Vehicles (DMV). All reportable crashes in Virginia are documented in TREDS using standardized data elements that comply with the Model Minimum Uniform Crash Criteria (MMUCC).</p>
+
+      <h3>Reportable Crash Criteria</h3>
+      <p>In Virginia, a crash must be reported if it results in:</p>
+      <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+        <li>Injury or death to any person</li>
+        <li>Total property damage of $1,500 or more</li>
+        <li>Damage to state or local government property</li>
+      </ul>
+
+      <div class="tip-box">
+        <strong>Note:</strong> Crashes below the reporting threshold are not captured in TREDS data. When analyzing crash patterns, remember that minor property-damage-only crashes may be underrepresented.
+      </div>
+    </section>
+
+    <section class="section" id="crash-level">
+      <h2>2. Crash-Level Fields</h2>
+      <p>These fields describe the overall crash event and are fundamental to any crash analysis.</p>
+
+      <table class="field-table">
+        <tr>
+          <th>Field Name</th>
+          <th>Description</th>
+          <th>Format</th>
+        </tr>
+        <tr>
+          <td>CRASH_ID</td>
+          <td>Unique identifier for each crash record</td>
+          <td>Numeric (12 digits)</td>
+        </tr>
+        <tr>
+          <td>CRASH_DATE</td>
+          <td>Date the crash occurred</td>
+          <td>YYYY-MM-DD</td>
+        </tr>
+        <tr>
+          <td>CRASH_TIME</td>
+          <td>Time the crash occurred (24-hour format)</td>
+          <td>HH:MM</td>
+        </tr>
+        <tr>
+          <td>DAY_OF_WEEK</td>
+          <td>Day of week (1=Sunday through 7=Saturday)</td>
+          <td>Numeric (1-7)</td>
+        </tr>
+        <tr>
+          <td>TOTAL_VEHICLES</td>
+          <td>Number of motor vehicles involved</td>
+          <td>Numeric</td>
+        </tr>
+        <tr>
+          <td>TOTAL_PERSONS</td>
+          <td>Total persons involved (occupants + pedestrians)</td>
+          <td>Numeric</td>
+        </tr>
+        <tr>
+          <td>CRASH_SEVERITY</td>
+          <td>Most severe injury in crash (KABCO scale)</td>
+          <td>Character (K/A/B/C/O)</td>
+        </tr>
+      </table>
+    </section>
+
+    <section class="section" id="location">
+      <h2>3. Location Fields</h2>
+      <p>Location data enables spatial analysis and crash mapping. Virginia uses multiple location systems.</p>
+
+      <table class="field-table">
+        <tr>
+          <th>Field Name</th>
+          <th>Description</th>
+          <th>Format</th>
+        </tr>
+        <tr>
+          <td>LATITUDE</td>
+          <td>GPS latitude coordinate</td>
+          <td>Decimal degrees</td>
+        </tr>
+        <tr>
+          <td>LONGITUDE</td>
+          <td>GPS longitude coordinate</td>
+          <td>Decimal degrees (negative)</td>
+        </tr>
+        <tr>
+          <td>ROUTE_NUMBER</td>
+          <td>State route number (if applicable)</td>
+          <td>Alphanumeric</td>
+        </tr>
+        <tr>
+          <td>ROUTE_SUFFIX</td>
+          <td>Route direction/type (NB, SB, ALT, etc.)</td>
+          <td>Character</td>
+        </tr>
+        <tr>
+          <td>MILEPOINT</td>
+          <td>Linear reference milepoint on route</td>
+          <td>Decimal</td>
+        </tr>
+        <tr>
+          <td>COUNTY_CODE</td>
+          <td>FIPS county code</td>
+          <td>Numeric (3 digits)</td>
+        </tr>
+        <tr>
+          <td>CITY_CODE</td>
+          <td>City/town code</td>
+          <td>Numeric</td>
+        </tr>
+        <tr>
+          <td>INTERSECTION_ID</td>
+          <td>Intersection identifier (if at intersection)</td>
+          <td>Alphanumeric</td>
+        </tr>
+      </table>
+
+      <div class="warning-box">
+        <strong>Data Quality Alert:</strong> GPS coordinates may have accuracy issues, especially for crashes reported from memory rather than at the scene. Always verify location using multiple fields when possible.
+      </div>
+    </section>
+
+    <section class="section" id="severity">
+      <h2>4. Severity Classification (KABCO Scale)</h2>
+      <p>Virginia uses the KABCO injury severity scale, which is the national standard for crash reporting.</p>
+
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Severity Level</th>
+          <th>Definition</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">K</span></td>
+          <td>Fatal</td>
+          <td>Death within 30 days of the crash resulting from injuries sustained in the crash</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">A</span></td>
+          <td>Suspected Serious Injury</td>
+          <td>Incapacitating injury preventing normal activities (broken bones, severe lacerations)</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">B</span></td>
+          <td>Suspected Minor Injury</td>
+          <td>Non-incapacitating, evident injury (bruises, minor cuts, complaint of pain)</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">C</span></td>
+          <td>Possible Injury</td>
+          <td>No visible injury but complaint of pain, momentary unconsciousness, or limping</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">O</span></td>
+          <td>No Apparent Injury</td>
+          <td>Property damage only, no injuries reported</td>
+        </tr>
+      </table>
+
+      <h3>Equivalent Property Damage Only (EPDO) Weights</h3>
+      <p>EPDO weighting allows comparison of crash severity across locations:</p>
+      <table class="code-table">
+        <tr>
+          <th>Severity</th>
+          <th>Typical EPDO Weight</th>
+          <th>Virginia HSIP Weight</th>
+        </tr>
+        <tr>
+          <td>Fatal (K)</td>
+          <td>500</td>
+          <td>1,000</td>
+        </tr>
+        <tr>
+          <td>Serious Injury (A)</td>
+          <td>100</td>
+          <td>100</td>
+        </tr>
+        <tr>
+          <td>Minor Injury (B)</td>
+          <td>10</td>
+          <td>10</td>
+        </tr>
+        <tr>
+          <td>Possible Injury (C)</td>
+          <td>5</td>
+          <td>5</td>
+        </tr>
+        <tr>
+          <td>PDO (O)</td>
+          <td>1</td>
+          <td>1</td>
+        </tr>
+      </table>
+    </section>
+
+    <section class="section" id="crash-type">
+      <h2>5. Crash Type / Manner of Collision Codes</h2>
+      <p>The manner of collision describes how vehicles or road users collided.</p>
+
+      <h3>Single Vehicle Crash Types</h3>
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">01</span></td>
+          <td>Ran Off Road - Right</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">02</span></td>
+          <td>Ran Off Road - Left</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">03</span></td>
+          <td>Ran Off Road - Straight</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">04</span></td>
+          <td>Hit Fixed Object</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">05</span></td>
+          <td>Overturn/Rollover</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">06</span></td>
+          <td>Hit Pedestrian</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">07</span></td>
+          <td>Hit Bicycle</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">08</span></td>
+          <td>Hit Animal</td>
+        </tr>
+      </table>
+
+      <h3>Multi-Vehicle Crash Types</h3>
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Description</th>
+          <th>Typical Cause</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">10</span></td>
+          <td>Rear End</td>
+          <td>Following too closely, distraction</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">11</span></td>
+          <td>Sideswipe - Same Direction</td>
+          <td>Improper lane change</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">12</span></td>
+          <td>Sideswipe - Opposite Direction</td>
+          <td>Crossing centerline</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">13</span></td>
+          <td>Head On</td>
+          <td>Wrong-way driving, crossing centerline</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">14</span></td>
+          <td>Angle</td>
+          <td>Failure to yield, red light running</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">15</span></td>
+          <td>Backing</td>
+          <td>Parking lot/driveway maneuvers</td>
+        </tr>
+      </table>
+
+      <div class="success-box">
+        <strong>Analysis Tip:</strong> Angle crashes at signalized intersections often indicate signal timing issues or sight distance problems. Rear-end crashes may suggest inadequate signal visibility or timing.
+      </div>
+    </section>
+
+    <section class="section" id="contributing">
+      <h2>6. Contributing Factor Codes</h2>
+      <p>Contributing factors identify the driver behaviors, vehicle conditions, or environmental circumstances that led to the crash.</p>
+
+      <h3>Driver Behavior Factors</h3>
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Factor</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D01</span></td>
+          <td>Failed to Yield Right of Way</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D02</span></td>
+          <td>Disregarded Traffic Signal</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D03</span></td>
+          <td>Disregarded Stop Sign</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D04</span></td>
+          <td>Exceeded Speed Limit</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D05</span></td>
+          <td>Driving Too Fast for Conditions</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D06</span></td>
+          <td>Following Too Closely</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D07</span></td>
+          <td>Improper Lane Change</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D08</span></td>
+          <td>Improper Turn</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D09</span></td>
+          <td>Driver Inattention/Distraction</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D10</span></td>
+          <td>Alcohol Involvement</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D11</span></td>
+          <td>Drug Involvement</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">D12</span></td>
+          <td>Fatigued/Asleep</td>
+        </tr>
+      </table>
+
+      <h3>Road/Environmental Factors</h3>
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Factor</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">R01</span></td>
+          <td>View Obstructed</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">R02</span></td>
+          <td>Road Surface Condition</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">R03</span></td>
+          <td>Road Defect</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">R04</span></td>
+          <td>Work Zone</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">R05</span></td>
+          <td>Inadequate Signing/Marking</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">R06</span></td>
+          <td>Animal in Roadway</td>
+        </tr>
+      </table>
+    </section>
+
+    <section class="section" id="vehicle">
+      <h2>7. Vehicle Data Fields</h2>
+      <p>Each vehicle involved in a crash has a separate record with the following key fields:</p>
+
+      <table class="field-table">
+        <tr>
+          <th>Field Name</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td>VEHICLE_NUMBER</td>
+          <td>Sequential vehicle number in crash (1, 2, 3...)</td>
+        </tr>
+        <tr>
+          <td>VEHICLE_TYPE</td>
+          <td>Type of vehicle (passenger car, truck, motorcycle, etc.)</td>
+        </tr>
+        <tr>
+          <td>VEHICLE_YEAR</td>
+          <td>Model year of vehicle</td>
+        </tr>
+        <tr>
+          <td>VEHICLE_MAKE</td>
+          <td>Vehicle manufacturer</td>
+        </tr>
+        <tr>
+          <td>TRAVEL_DIRECTION</td>
+          <td>Direction of travel (N, S, E, W)</td>
+        </tr>
+        <tr>
+          <td>VEHICLE_MANEUVER</td>
+          <td>Action at time of crash (going straight, turning, etc.)</td>
+        </tr>
+        <tr>
+          <td>POINT_OF_IMPACT</td>
+          <td>Location of initial impact on vehicle</td>
+        </tr>
+        <tr>
+          <td>EXTENT_OF_DAMAGE</td>
+          <td>Damage severity (minor, functional, disabling)</td>
+        </tr>
+      </table>
+
+      <h3>Vehicle Type Codes</h3>
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Vehicle Type</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">01</span></td>
+          <td>Passenger Car</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">02</span></td>
+          <td>Light Truck/Van/SUV</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">03</span></td>
+          <td>Large Truck (>10,000 lbs)</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">04</span></td>
+          <td>Motorcycle</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">05</span></td>
+          <td>Bus</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">06</span></td>
+          <td>Bicycle</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">07</span></td>
+          <td>Pedestrian</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">08</span></td>
+          <td>Moped/Scooter</td>
+        </tr>
+      </table>
+    </section>
+
+    <section class="section" id="person">
+      <h2>8. Person Data Fields</h2>
+      <p>Each person involved in a crash has a separate record:</p>
+
+      <table class="field-table">
+        <tr>
+          <th>Field Name</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td>PERSON_TYPE</td>
+          <td>Driver, passenger, pedestrian, bicyclist, etc.</td>
+        </tr>
+        <tr>
+          <td>INJURY_SEVERITY</td>
+          <td>Individual's injury level (KABCO)</td>
+        </tr>
+        <tr>
+          <td>AGE</td>
+          <td>Age at time of crash</td>
+        </tr>
+        <tr>
+          <td>GENDER</td>
+          <td>Male/Female</td>
+        </tr>
+        <tr>
+          <td>SAFETY_EQUIPMENT</td>
+          <td>Restraint usage (belt, child seat, helmet)</td>
+        </tr>
+        <tr>
+          <td>EJECTION</td>
+          <td>Whether person was ejected from vehicle</td>
+        </tr>
+        <tr>
+          <td>SEATING_POSITION</td>
+          <td>Location in vehicle</td>
+        </tr>
+        <tr>
+          <td>ALCOHOL_TEST_RESULT</td>
+          <td>BAC level if tested</td>
+        </tr>
+      </table>
+    </section>
+
+    <section class="section" id="road">
+      <h2>9. Road Characteristic Fields</h2>
+
+      <h3>Roadway Type</h3>
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">1</span></td>
+          <td>Interstate</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">2</span></td>
+          <td>US Route</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">3</span></td>
+          <td>State Route</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">4</span></td>
+          <td>County Road</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">5</span></td>
+          <td>City Street</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">6</span></td>
+          <td>Private Road</td>
+        </tr>
+      </table>
+
+      <h3>Traffic Control</h3>
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Control Type</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">01</span></td>
+          <td>No Control</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">02</span></td>
+          <td>Traffic Signal</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">03</span></td>
+          <td>Stop Sign</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">04</span></td>
+          <td>Yield Sign</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">05</span></td>
+          <td>Flashing Signal</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">06</span></td>
+          <td>Roundabout</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">07</span></td>
+          <td>Railroad Crossing</td>
+        </tr>
+      </table>
+
+      <h3>Relation to Junction</h3>
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Location</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">01</span></td>
+          <td>Non-Junction (Midblock)</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">02</span></td>
+          <td>Intersection</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">03</span></td>
+          <td>Intersection-Related</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">04</span></td>
+          <td>Driveway Access</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">05</span></td>
+          <td>Entrance/Exit Ramp</td>
+        </tr>
+      </table>
+    </section>
+
+    <section class="section" id="environment">
+      <h2>10. Environmental Factors</h2>
+
+      <h3>Weather Conditions</h3>
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Condition</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">01</span></td>
+          <td>Clear</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">02</span></td>
+          <td>Cloudy</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">03</span></td>
+          <td>Rain</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">04</span></td>
+          <td>Snow</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">05</span></td>
+          <td>Fog/Smoke</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">06</span></td>
+          <td>Sleet/Hail</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">07</span></td>
+          <td>Severe Crosswinds</td>
+        </tr>
+      </table>
+
+      <h3>Light Conditions</h3>
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Condition</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">1</span></td>
+          <td>Daylight</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">2</span></td>
+          <td>Dusk</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">3</span></td>
+          <td>Dawn</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">4</span></td>
+          <td>Dark - Lighted</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">5</span></td>
+          <td>Dark - Not Lighted</td>
+        </tr>
+      </table>
+
+      <h3>Road Surface Condition</h3>
+      <table class="code-table">
+        <tr>
+          <th>Code</th>
+          <th>Condition</th>
+        </tr>
+        <tr>
+          <td><span class="code-badge">1</span></td>
+          <td>Dry</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">2</span></td>
+          <td>Wet</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">3</span></td>
+          <td>Snow/Slush</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">4</span></td>
+          <td>Ice</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">5</span></td>
+          <td>Sand/Mud/Dirt</td>
+        </tr>
+        <tr>
+          <td><span class="code-badge">6</span></td>
+          <td>Water (Standing/Moving)</td>
+        </tr>
+      </table>
+    </section>
+
+    <section class="section" id="analysis">
+      <h2>11. Analysis Best Practices</h2>
+
+      <h3>Data Preparation</h3>
+      <ul style="margin-left: 1.5rem;">
+        <li>Always verify crash counts against official TREDS reports</li>
+        <li>Exclude crashes coded as "Non-Reportable" or "Supplemental"</li>
+        <li>Use consistent study periods (typically 3-5 years of data)</li>
+        <li>Account for year-to-year AADT changes when calculating rates</li>
+      </ul>
+
+      <h3>Common Analysis Types</h3>
+      <ul style="margin-left: 1.5rem;">
+        <li><strong>Crash Rate Analysis:</strong> Crashes per million vehicle miles traveled (MVMT)</li>
+        <li><strong>Intersection Analysis:</strong> Crashes per million entering vehicles (MEV)</li>
+        <li><strong>Pattern Analysis:</strong> Identify predominant crash types and contributing factors</li>
+        <li><strong>Temporal Analysis:</strong> Time-of-day and seasonal patterns</li>
+        <li><strong>Severity Analysis:</strong> EPDO scores and fatal/injury proportions</li>
+      </ul>
+
+      <div class="tip-box">
+        <strong>Formula Reference:</strong><br>
+        Crash Rate (per MVMT) = (Crashes × 1,000,000) / (AADT × 365 × Years × Length in miles)<br><br>
+        Intersection Rate (per MEV) = (Crashes × 1,000,000) / (Entering Vehicles × 365 × Years)
+      </div>
+    </section>
+
+    <section class="section" id="quality">
+      <h2>12. Data Quality Considerations</h2>
+
+      <div class="warning-box">
+        <strong>Known Data Limitations:</strong>
+        <ul style="margin-left: 1rem; margin-top: 0.5rem;">
+          <li>GPS coordinates may be inaccurate (verify with milepoint or intersection data)</li>
+          <li>Contributing factors are officer judgment and may not reflect true causation</li>
+          <li>Minor PDO crashes may be underreported</li>
+          <li>Severity can be upgraded if victims die within 30 days (data may change)</li>
+          <li>Historical data may use different coding systems</li>
+        </ul>
+      </div>
+
+      <h3>Quality Assurance Checks</h3>
+      <ul style="margin-left: 1.5rem;">
+        <li>Cross-reference GPS coordinates with described location</li>
+        <li>Verify crash counts match official summaries</li>
+        <li>Check for duplicate crash records</li>
+        <li>Validate severity against person-level injury data</li>
+        <li>Confirm roadway characteristics match known conditions</li>
+      </ul>
+    </section>
+
+    <footer class="footer">
+      <p><strong>CRASH LENS</strong> - Professional Crash Analysis Tools for Virginia Transportation Agencies</p>
+      <p>Visit <a href="https://ecomhub200.github.io/henrico_crash_tool/">crashlens.com</a> for more resources</p>
+      <p style="margin-top: 1rem;">&copy; 2024 CRASH LENS. This guide is provided for educational purposes.</p>
+    </footer>
+  </div>
+
+  <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+</body>
+</html>

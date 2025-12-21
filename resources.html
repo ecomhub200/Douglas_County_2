@@ -826,60 +826,173 @@
   <!-- Download Modal -->
   <div class="download-modal" id="downloadModal">
     <div class="download-modal-content">
-      <h3>Get Your Free Download</h3>
-      <p>Enter your email to receive the download link and get occasional traffic safety tips.</p>
-      <input type="email" id="downloadEmail" placeholder="your@email.com" required>
-      <input type="text" id="downloadName" placeholder="Your name (optional)">
-      <div class="download-modal-actions">
-        <button class="btn btn-outline-light" onclick="closeDownloadModal()">Cancel</button>
-        <button class="btn btn-gradient" onclick="submitDownload()">Send Download</button>
+      <!-- Download Form -->
+      <div id="downloadForm">
+        <h3>Get Your Free Download</h3>
+        <p><strong id="modalResourceName">Resource</strong></p>
+        <p style="font-size: 0.875rem; margin-top: 0.5rem;">Enter your email to receive the download link and get occasional traffic safety tips.</p>
+        <input type="email" id="downloadEmail" placeholder="your@email.com" required>
+        <input type="text" id="downloadName" placeholder="Your name (optional)">
+        <div class="download-modal-actions">
+          <button class="btn btn-outline-light" onclick="closeDownloadModal()">Cancel</button>
+          <button class="btn btn-gradient" onclick="submitDownload()">Get Download</button>
+        </div>
+        <p style="font-size: 0.7rem; color: var(--gray); margin-top: 1rem;">We respect your privacy. Unsubscribe anytime.</p>
       </div>
-      <p style="font-size: 0.7rem; color: var(--gray); margin-top: 1rem;">We respect your privacy. Unsubscribe anytime.</p>
+
+      <!-- Success Message -->
+      <div id="downloadSuccess" style="display: none;">
+        <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #059669, #10b981); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <h3 style="color: #059669;">Success!</h3>
+        <p style="margin-bottom: 0.5rem;">Your download is ready:</p>
+        <p style="font-weight: 600; margin-bottom: 1rem;" id="successResourceTitle">Resource Title</p>
+        <p style="font-size: 0.875rem; color: var(--text-dark); margin-bottom: 1.5rem;">We've also sent a copy to your email with the download link.</p>
+        <a href="#" id="downloadLink" target="_blank" class="btn btn-gradient" style="display: block; text-decoration: none; margin-bottom: 0.75rem;">
+          Open Resource
+        </a>
+        <button class="btn btn-outline-light" onclick="closeDownloadModal()" style="width: 100%;">Close</button>
+        <p style="font-size: 0.75rem; color: var(--gray); margin-top: 1rem;">Tip: Use "Print / Save PDF" in your browser to save a copy</p>
+      </div>
     </div>
   </div>
 
   <script>
     let currentDownload = '';
+    let isSubmitting = false;
+
+    // Download resource information
+    const downloadResources = {
+      'hsip-checklist': {
+        title: 'HSIP Application Checklist',
+        url: 'data/downloads/hsip-application-checklist.html',
+        description: 'Complete guide for HSIP grant applications'
+      },
+      'va-field-guide': {
+        title: 'Virginia Crash Data Field Guide',
+        url: 'data/downloads/virginia-crash-field-guide.html',
+        description: 'Comprehensive TREDS data field reference'
+      },
+      'report-template': {
+        title: 'Crash Analysis Report Template',
+        url: 'data/downloads/crash-analysis-report-template.html',
+        description: 'Professional report template for crash analysis'
+      },
+      'warrant-mistakes': {
+        title: '5 MUTCD Warrant Mistakes to Avoid',
+        url: 'data/downloads/mutcd-warrant-mistakes.html',
+        description: 'Guide to common signal warrant study errors'
+      }
+    };
 
     function showDownloadForm(resource) {
       currentDownload = resource;
       document.getElementById('downloadModal').classList.add('visible');
       document.getElementById('downloadEmail').focus();
+
+      // Update modal title with resource name
+      const resourceInfo = downloadResources[resource];
+      if (resourceInfo) {
+        document.getElementById('modalResourceName').textContent = resourceInfo.title;
+      }
     }
 
     function closeDownloadModal() {
       document.getElementById('downloadModal').classList.remove('visible');
       document.getElementById('downloadEmail').value = '';
       document.getElementById('downloadName').value = '';
+      document.getElementById('downloadSuccess').style.display = 'none';
+      document.getElementById('downloadForm').style.display = 'block';
+      isSubmitting = false;
     }
 
-    function submitDownload() {
+    async function submitDownload() {
+      if (isSubmitting) return;
+
       const email = document.getElementById('downloadEmail').value;
-      if (!email || !email.includes('@')) {
+      const name = document.getElementById('downloadName').value || 'Traffic Professional';
+
+      if (!email || !email.includes('@') || !email.includes('.')) {
         alert('Please enter a valid email address');
         return;
       }
 
-      // In production, this would send to your backend
-      // For now, show success message and provide download links
-      const downloads = {
-        'hsip-checklist': 'data/downloads/hsip-application-checklist.pdf',
-        'va-field-guide': 'data/downloads/virginia-crash-field-guide.pdf',
-        'report-template': 'data/downloads/crash-analysis-report-template.docx',
-        'warrant-mistakes': 'data/downloads/mutcd-warrant-mistakes.pdf'
+      const resourceInfo = downloadResources[currentDownload];
+      if (!resourceInfo) {
+        alert('Resource not found. Please try again.');
+        return;
+      }
+
+      isSubmitting = true;
+      const submitBtn = document.querySelector('#downloadForm .btn-gradient');
+      submitBtn.textContent = 'Sending...';
+      submitBtn.disabled = true;
+
+      // Get the full URL for the resource
+      const baseUrl = window.location.origin + window.location.pathname.replace('resources.html', '');
+      const downloadUrl = baseUrl + resourceInfo.url;
+
+      // Send to Formspree to capture lead and send email
+      try {
+        const response = await fetch('https://formspree.io/f/mwveovvd', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            email: email,
+            name: name,
+            resource: resourceInfo.title,
+            downloadUrl: downloadUrl,
+            _subject: `Your Free Download: ${resourceInfo.title}`,
+            message: `Hi ${name},\n\nThank you for downloading "${resourceInfo.title}" from CRASH LENS!\n\nAccess your resource here:\n${downloadUrl}\n\nYou can view this guide in your browser and use the "Print / Save PDF" button to save a copy.\n\nBest regards,\nThe CRASH LENS Team\n\n---\nVisit us at: https://ecomhub200.github.io/henrico_crash_tool/\nQuestions? Reply to this email.`
+          })
+        });
+
+        // Show success regardless of Formspree response (to ensure good UX)
+        showDownloadSuccess(resourceInfo, downloadUrl);
+
+      } catch (error) {
+        console.error('Email submission error:', error);
+        // Still show success and provide download - don't block user experience
+        showDownloadSuccess(resourceInfo, downloadUrl);
+      }
+    }
+
+    function showDownloadSuccess(resourceInfo, downloadUrl) {
+      // Hide form, show success message with download link
+      document.getElementById('downloadForm').style.display = 'none';
+      document.getElementById('downloadSuccess').style.display = 'block';
+      document.getElementById('successResourceTitle').textContent = resourceInfo.title;
+      document.getElementById('downloadLink').href = resourceInfo.url;
+      document.getElementById('downloadLink').onclick = function() {
+        // Track download
+        console.log('Resource downloaded:', resourceInfo.title);
       };
+    }
 
-      // Simulate success
-      alert('Thank you! Check your email for the download link.\n\nNote: Resources will be available soon. Contact support@crashlens.com for immediate access.');
+    function openResource() {
+      const resourceInfo = downloadResources[currentDownload];
+      if (resourceInfo) {
+        window.open(resourceInfo.url, '_blank');
+      }
       closeDownloadModal();
-
-      // Log for analytics (in production, send to your backend)
-      console.log('Download requested:', currentDownload, 'Email:', email);
     }
 
     // Close modal when clicking outside
     document.getElementById('downloadModal').addEventListener('click', function(e) {
       if (e.target === this) {
+        closeDownloadModal();
+      }
+    });
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
         closeDownloadModal();
       }
     });
