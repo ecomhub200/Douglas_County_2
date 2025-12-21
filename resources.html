@@ -35,6 +35,174 @@
       margin: 0 auto;
     }
 
+    /* Downloads / Lead Magnets Section */
+    .downloads-section {
+      padding: 4rem 0;
+      background: linear-gradient(135deg, rgba(30, 64, 175, 0.1), rgba(124, 58, 237, 0.1));
+    }
+
+    .downloads-section h2 {
+      text-align: center;
+      color: var(--white);
+      margin-bottom: 0.5rem;
+    }
+
+    .downloads-section .subtitle {
+      text-align: center;
+      color: var(--text-dark);
+      margin-bottom: 2rem;
+    }
+
+    .downloads-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .download-card {
+      background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .download-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(30, 64, 175, 0.5);
+    }
+
+    .download-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+
+    .download-icon svg {
+      width: 32px;
+      height: 32px;
+      color: white;
+    }
+
+    .download-icon.pdf {
+      background: linear-gradient(135deg, #dc2626, #ef4444);
+    }
+
+    .download-icon.guide {
+      background: linear-gradient(135deg, #1e40af, #3b82f6);
+    }
+
+    .download-icon.template {
+      background: linear-gradient(135deg, #059669, #10b981);
+    }
+
+    .download-icon.checklist {
+      background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+    }
+
+    .download-card h3 {
+      color: var(--white);
+      font-size: 1.125rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .download-card p {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+
+    .download-meta {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .download-meta span {
+      font-size: 0.75rem;
+      color: var(--gray);
+      padding: 0.25rem 0.5rem;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+    }
+
+    .download-btn {
+      width: 100%;
+    }
+
+    /* Download Modal */
+    .download-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .download-modal.visible {
+      display: flex;
+    }
+
+    .download-modal-content {
+      background: var(--bg-dark-card);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .download-modal-content h3 {
+      color: var(--white);
+      margin-bottom: 0.5rem;
+    }
+
+    .download-modal-content p {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .download-modal-content input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius);
+      background: var(--bg-dark-secondary);
+      color: var(--white);
+      font-size: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .download-modal-content input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .download-modal-actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .download-modal-actions .btn {
+      flex: 1;
+    }
+
     .resources-section {
       padding: 4rem 0;
     }
@@ -332,6 +500,82 @@
     </div>
   </section>
 
+  <!-- Lead Magnets / Downloads -->
+  <section class="downloads-section">
+    <div class="container">
+      <h2>Free Resources</h2>
+      <p class="subtitle">Download guides and templates to improve your traffic safety analysis</p>
+      <div class="downloads-grid">
+        <div class="download-card">
+          <div class="download-icon pdf">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+              <path d="M14 2v6h6"/>
+              <path d="M10 13v4"/>
+              <path d="M14 13v4"/>
+            </svg>
+          </div>
+          <h3>HSIP Application Checklist</h3>
+          <p>Step-by-step checklist for preparing winning HSIP grant applications with crash data requirements.</p>
+          <div class="download-meta">
+            <span>PDF</span>
+            <span>8 pages</span>
+          </div>
+          <button class="btn btn-gradient download-btn" onclick="showDownloadForm('hsip-checklist')">Download Free</button>
+        </div>
+
+        <div class="download-card">
+          <div class="download-icon guide">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+            </svg>
+          </div>
+          <h3>Virginia Crash Data Field Guide</h3>
+          <p>Comprehensive guide to Virginia TREDS crash data fields, codes, and best practices for analysis.</p>
+          <div class="download-meta">
+            <span>PDF</span>
+            <span>24 pages</span>
+          </div>
+          <button class="btn btn-gradient download-btn" onclick="showDownloadForm('va-field-guide')">Download Free</button>
+        </div>
+
+        <div class="download-card">
+          <div class="download-icon template">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M9 3v18"/>
+              <path d="M3 9h18"/>
+            </svg>
+          </div>
+          <h3>Crash Analysis Report Template</h3>
+          <p>Professional Word template for intersection and corridor crash analysis reports used by Virginia agencies.</p>
+          <div class="download-meta">
+            <span>DOCX</span>
+            <span>Template</span>
+          </div>
+          <button class="btn btn-gradient download-btn" onclick="showDownloadForm('report-template')">Download Free</button>
+        </div>
+
+        <div class="download-card">
+          <div class="download-icon checklist">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4"/>
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+            </svg>
+          </div>
+          <h3>5 MUTCD Warrant Mistakes to Avoid</h3>
+          <p>Common errors traffic engineers make when conducting signal warrant studies, with corrective guidance.</p>
+          <div class="download-meta">
+            <span>PDF</span>
+            <span>12 pages</span>
+          </div>
+          <button class="btn btn-gradient download-btn" onclick="showDownloadForm('warrant-mistakes')">Download Free</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Documentation -->
   <section class="resources-section">
     <div class="container">
@@ -579,5 +823,66 @@
       </div>
     </div>
   </footer>
+  <!-- Download Modal -->
+  <div class="download-modal" id="downloadModal">
+    <div class="download-modal-content">
+      <h3>Get Your Free Download</h3>
+      <p>Enter your email to receive the download link and get occasional traffic safety tips.</p>
+      <input type="email" id="downloadEmail" placeholder="your@email.com" required>
+      <input type="text" id="downloadName" placeholder="Your name (optional)">
+      <div class="download-modal-actions">
+        <button class="btn btn-outline-light" onclick="closeDownloadModal()">Cancel</button>
+        <button class="btn btn-gradient" onclick="submitDownload()">Send Download</button>
+      </div>
+      <p style="font-size: 0.7rem; color: var(--gray); margin-top: 1rem;">We respect your privacy. Unsubscribe anytime.</p>
+    </div>
+  </div>
+
+  <script>
+    let currentDownload = '';
+
+    function showDownloadForm(resource) {
+      currentDownload = resource;
+      document.getElementById('downloadModal').classList.add('visible');
+      document.getElementById('downloadEmail').focus();
+    }
+
+    function closeDownloadModal() {
+      document.getElementById('downloadModal').classList.remove('visible');
+      document.getElementById('downloadEmail').value = '';
+      document.getElementById('downloadName').value = '';
+    }
+
+    function submitDownload() {
+      const email = document.getElementById('downloadEmail').value;
+      if (!email || !email.includes('@')) {
+        alert('Please enter a valid email address');
+        return;
+      }
+
+      // In production, this would send to your backend
+      // For now, show success message and provide download links
+      const downloads = {
+        'hsip-checklist': 'data/downloads/hsip-application-checklist.pdf',
+        'va-field-guide': 'data/downloads/virginia-crash-field-guide.pdf',
+        'report-template': 'data/downloads/crash-analysis-report-template.docx',
+        'warrant-mistakes': 'data/downloads/mutcd-warrant-mistakes.pdf'
+      };
+
+      // Simulate success
+      alert('Thank you! Check your email for the download link.\n\nNote: Resources will be available soon. Contact support@crashlens.com for immediate access.');
+      closeDownloadModal();
+
+      // Log for analytics (in production, send to your backend)
+      console.log('Download requested:', currentDownload, 'Email:', email);
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('downloadModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeDownloadModal();
+      }
+    });
+  </script>
 </body>
 </html>

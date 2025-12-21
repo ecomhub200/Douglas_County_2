@@ -90,6 +90,119 @@
       font-weight: 600;
     }
 
+    .trust-badges {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-top: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .trust-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-dark);
+      font-size: 0.875rem;
+    }
+
+    .trust-badge svg {
+      width: 20px;
+      height: 20px;
+      color: var(--success);
+    }
+
+    /* Feature Comparison Table */
+    .comparison-section {
+      padding: 4rem 0;
+      background: var(--bg-dark-secondary);
+    }
+
+    .comparison-section h2 {
+      text-align: center;
+      color: var(--white);
+      margin-bottom: 0.5rem;
+    }
+
+    .comparison-section .subtitle {
+      text-align: center;
+      color: var(--text-dark);
+      margin-bottom: 2rem;
+    }
+
+    .comparison-table-wrapper {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      overflow-x: auto;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg-dark-card);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 1rem;
+      text-align: center;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .comparison-table th {
+      background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+      color: var(--white);
+      font-weight: 600;
+    }
+
+    .comparison-table th:first-child,
+    .comparison-table td:first-child {
+      text-align: left;
+      padding-left: 1.5rem;
+    }
+
+    .comparison-table td {
+      color: var(--text-dark);
+    }
+
+    .comparison-table tr:hover {
+      background: rgba(30, 64, 175, 0.1);
+    }
+
+    .comparison-table .feature-name {
+      color: var(--white);
+      font-weight: 500;
+    }
+
+    .comparison-table .check {
+      color: var(--success);
+    }
+
+    .comparison-table .dash {
+      color: var(--gray);
+    }
+
+    .comparison-table .highlight-col {
+      background: rgba(30, 64, 175, 0.15);
+    }
+
+    .plan-header-cell {
+      min-width: 120px;
+    }
+
+    .plan-header-cell .plan-name {
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .plan-header-cell .plan-price {
+      font-size: 0.75rem;
+      opacity: 0.8;
+    }
+
     .pricing-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -413,7 +526,31 @@
         <span class="active">Monthly</span>
         <div class="toggle-switch" id="billingToggle"></div>
         <span>Annual</span>
-        <span class="save-badge">Save 20%</span>
+        <span class="save-badge">Save 20% ($360/yr)</span>
+      </div>
+
+      <!-- Trust Badges -->
+      <div class="trust-badges">
+        <div class="trust-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <span>30-Day Money-Back Guarantee</span>
+        </div>
+        <div class="trust-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M8 12l2 2 4-4"/>
+          </svg>
+          <span>Cancel Anytime</span>
+        </div>
+        <div class="trust-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0110 0v4"/>
+          </svg>
+          <span>Secure Payment</span>
+        </div>
       </div>
     </div>
   </section>
@@ -547,6 +684,125 @@
         </li>
       </ul>
       <a href="./contact-sales.html" class="plan-btn plan-btn-outline">Contact Sales</a>
+    </div>
+  </section>
+
+  <!-- Feature Comparison Table -->
+  <section class="comparison-section">
+    <div class="container">
+      <h2>Compare All Features</h2>
+      <p class="subtitle">See exactly what's included in each plan</p>
+      <div class="comparison-table-wrapper">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th class="plan-header-cell">
+                <div class="plan-name">Free Trial</div>
+                <div class="plan-price">$0 / 14 days</div>
+              </th>
+              <th class="plan-header-cell highlight-col">
+                <div class="plan-name">Individual</div>
+                <div class="plan-price">$150/mo</div>
+              </th>
+              <th class="plan-header-cell">
+                <div class="plan-name">Team</div>
+                <div class="plan-price">$500/mo</div>
+              </th>
+              <th class="plan-header-cell">
+                <div class="plan-name">Agency</div>
+                <div class="plan-price">Custom</div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="feature-name">Crash Data Analysis</td>
+              <td><span class="check">&#10003;</span></td>
+              <td class="highlight-col"><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+            </tr>
+            <tr>
+              <td class="feature-name">Interactive Mapping</td>
+              <td><span class="check">&#10003;</span></td>
+              <td class="highlight-col"><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+            </tr>
+            <tr>
+              <td class="feature-name">Signal Warrant Analysis</td>
+              <td><span class="check">&#10003;</span></td>
+              <td class="highlight-col"><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+            </tr>
+            <tr>
+              <td class="feature-name">PDF/Word Reports</td>
+              <td><span class="check">&#10003;</span></td>
+              <td class="highlight-col"><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+            </tr>
+            <tr>
+              <td class="feature-name">AI Queries Included</td>
+              <td><span class="dash">BYOK only</span></td>
+              <td class="highlight-col">100/mo</td>
+              <td>500/mo</td>
+              <td>1000+/mo</td>
+            </tr>
+            <tr>
+              <td class="feature-name">Bring Your Own API Key</td>
+              <td><span class="check">&#10003;</span></td>
+              <td class="highlight-col"><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+            </tr>
+            <tr>
+              <td class="feature-name">User Seats</td>
+              <td>1</td>
+              <td class="highlight-col">1</td>
+              <td>Up to 5</td>
+              <td>Unlimited</td>
+            </tr>
+            <tr>
+              <td class="feature-name">Team Management</td>
+              <td><span class="dash">&#8212;</span></td>
+              <td class="highlight-col"><span class="dash">&#8212;</span></td>
+              <td><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+            </tr>
+            <tr>
+              <td class="feature-name">Shared Workspaces</td>
+              <td><span class="dash">&#8212;</span></td>
+              <td class="highlight-col"><span class="dash">&#8212;</span></td>
+              <td><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+            </tr>
+            <tr>
+              <td class="feature-name">Priority Support</td>
+              <td><span class="dash">&#8212;</span></td>
+              <td class="highlight-col"><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+              <td><span class="check">&#10003;</span></td>
+            </tr>
+            <tr>
+              <td class="feature-name">Dedicated Account Manager</td>
+              <td><span class="dash">&#8212;</span></td>
+              <td class="highlight-col"><span class="dash">&#8212;</span></td>
+              <td><span class="dash">&#8212;</span></td>
+              <td><span class="check">&#10003;</span></td>
+            </tr>
+            <tr>
+              <td class="feature-name">Custom Integrations</td>
+              <td><span class="dash">&#8212;</span></td>
+              <td class="highlight-col"><span class="dash">&#8212;</span></td>
+              <td><span class="dash">&#8212;</span></td>
+              <td><span class="check">&#10003;</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 
