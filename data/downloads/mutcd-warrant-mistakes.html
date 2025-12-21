@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>5 MUTCD Warrant Mistakes to Avoid - CRASH LENS</title>
+  <style>
+    :root {
+      --primary: #7c3aed;
+      --primary-light: #8b5cf6;
+      --dark: #0f172a;
+      --gray: #64748b;
+      --light: #f8fafc;
+      --border: #e2e8f0;
+      --danger: #dc2626;
+      --success: #059669;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      line-height: 1.7;
+      color: var(--dark);
+      background: var(--light);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 1.1rem;
+    }
+
+    .brand {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      margin-top: 1rem;
+    }
+
+    .intro {
+      background: white;
+      padding: 2rem;
+      margin: 2rem 0;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      border-left: 4px solid var(--primary);
+    }
+
+    .intro p {
+      font-size: 1.05rem;
+    }
+
+    .mistake-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin: 2rem 0;
+      overflow: hidden;
+    }
+
+    .mistake-header {
+      background: linear-gradient(135deg, var(--danger) 0%, #ef4444 100%);
+      color: white;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .mistake-number {
+      background: rgba(255,255,255,0.2);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+
+    .mistake-header h2 {
+      font-size: 1.25rem;
+      margin: 0;
+    }
+
+    .mistake-content {
+      padding: 1.5rem;
+    }
+
+    .mistake-content h3 {
+      color: var(--dark);
+      font-size: 1rem;
+      margin: 1.25rem 0 0.5rem;
+    }
+
+    .mistake-content h3:first-child {
+      margin-top: 0;
+    }
+
+    .mistake-content p {
+      margin-bottom: 0.75rem;
+    }
+
+    .wrong-box {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-left: 4px solid var(--danger);
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .wrong-box strong {
+      color: var(--danger);
+    }
+
+    .right-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-left: 4px solid var(--success);
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .right-box strong {
+      color: var(--success);
+    }
+
+    .tip-box {
+      background: #faf5ff;
+      border: 1px solid #e9d5ff;
+      border-left: 4px solid var(--primary);
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .tip-box strong {
+      color: var(--primary);
+    }
+
+    .example-box {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    .example-box code {
+      background: #e2e8f0;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      font-size: 0.85rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 0.6rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--primary);
+      color: white;
+    }
+
+    tr:nth-child(even) {
+      background: var(--light);
+    }
+
+    .checklist {
+      list-style: none;
+      margin: 1rem 0;
+    }
+
+    .checklist li {
+      padding: 0.5rem 0;
+      padding-left: 2rem;
+      position: relative;
+    }
+
+    .checklist li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: var(--success);
+      font-weight: bold;
+    }
+
+    .summary-section {
+      background: white;
+      padding: 2rem;
+      margin: 2rem 0;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .summary-section h2 {
+      color: var(--primary);
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--gray);
+      font-size: 0.875rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    .print-btn {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      box-shadow: 0 4px 12px rgba(124,58,237,0.3);
+    }
+
+    .print-btn:hover {
+      background: var(--primary-light);
+    }
+
+    @media print {
+      .print-btn {
+        display: none;
+      }
+
+      body {
+        background: white;
+      }
+
+      .container {
+        padding: 0;
+      }
+
+      .mistake-card {
+        box-shadow: none;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        border: 1px solid var(--border);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>5 MUTCD Warrant Mistakes to Avoid</h1>
+    <p>Common Errors Traffic Engineers Make in Signal Warrant Studies</p>
+    <div class="brand">Provided by CRASH LENS - Professional Crash Analysis Tools</div>
+  </header>
+
+  <div class="container">
+    <div class="intro">
+      <p>
+        Signal warrant studies are critical for determining whether traffic signal installation is justified.
+        The Manual on Uniform Traffic Control Devices (MUTCD) provides eight warrants, but many engineers make
+        common mistakes that can lead to incorrect conclusions. This guide identifies the five most frequent
+        errors and provides guidance to avoid them.
+      </p>
+    </div>
+
+    <!-- Mistake 1 -->
+    <div class="mistake-card">
+      <div class="mistake-header">
+        <div class="mistake-number">1</div>
+        <h2>Using Peak Hour Data for Eight-Hour Warrants</h2>
+      </div>
+      <div class="mistake-content">
+        <h3>The Problem</h3>
+        <p>
+          One of the most common mistakes is applying peak-hour traffic volumes to warrants that require eight hours of data.
+          Warrant 1 (Eight-Hour Vehicular Volume), Warrant 2 (Four-Hour Vehicular Volume), and several others have specific
+          hourly requirements that cannot be satisfied with estimated or extrapolated peak-hour data.
+        </p>
+
+        <div class="wrong-box">
+          <strong>Common Error:</strong> "We collected AM and PM peak hour counts and multiplied by factors to estimate the other hours."
+        </div>
+
+        <h3>Why This Matters</h3>
+        <p>
+          Traffic patterns vary significantly throughout the day. A location that appears to meet warrant thresholds during
+          peak hours may not sustain those volumes for the required eight hours. Using factored data can result in:
+        </p>
+        <ul style="margin-left: 1.5rem;">
+          <li>Installing signals at locations that don't truly need them</li>
+          <li>Legal liability if crashes occur at unjustified signals</li>
+          <li>Increased delays at locations that would operate better unsignalized</li>
+        </ul>
+
+        <div class="right-box">
+          <strong>Correct Approach:</strong> Collect actual traffic counts for the full periods required by each warrant.
+          For Warrant 1, you need 8 hours of data. For Warrant 2, you need 4 hours. Use automatic traffic recorders
+          or multiple manual counting periods to obtain complete data.
+        </div>
+
+        <div class="tip-box">
+          <strong>Pro Tip:</strong> Consider using video recording with post-processing to capture full-day volumes
+          more cost-effectively than manual counts.
+        </div>
+      </div>
+    </div>
+
+    <!-- Mistake 2 -->
+    <div class="mistake-card">
+      <div class="mistake-header">
+        <div class="mistake-number">2</div>
+        <h2>Misapplying the 70% Volume Reduction</h2>
+      </div>
+      <div class="mistake-content">
+        <h3>The Problem</h3>
+        <p>
+          The MUTCD allows a 70% reduction in volume thresholds under specific conditions, but this reduction is
+          frequently misapplied. Engineers either apply it when conditions don't qualify, or fail to verify
+          that the minor street actually meets the criteria.
+        </p>
+
+        <h3>When 70% Reduction Applies</h3>
+        <p>The reduced thresholds may be used ONLY when:</p>
+        <table>
+          <tr>
+            <th>Condition</th>
+            <th>Requirement</th>
+          </tr>
+          <tr>
+            <td>Speed Limit</td>
+            <td>Major street posted speed > 40 mph OR 85th percentile > 40 mph</td>
+          </tr>
+          <tr>
+            <td>Population</td>
+            <td>Community population < 10,000</td>
+          </tr>
+        </table>
+
+        <div class="wrong-box">
+          <strong>Common Errors:</strong>
+          <ul style="margin-left: 1rem; margin-top: 0.5rem;">
+            <li>Applying reduction without verifying posted speed limits</li>
+            <li>Using reduction in areas with population > 10,000</li>
+            <li>Applying reduction when major road speed is 35 mph</li>
+            <li>Using 85th percentile speed without an actual speed study</li>
+          </ul>
+        </div>
+
+        <div class="right-box">
+          <strong>Correct Approach:</strong> Document the qualifying condition in your warrant study.
+          Include the posted speed limit sign or speed study results, and reference the community population
+          from the latest census data.
+        </div>
+
+        <div class="example-box">
+          <strong>Example Documentation:</strong><br>
+          "The 70% volume reduction is applied per MUTCD Section 4C.01 Condition A. The major street (US Route 15)
+          has a posted speed limit of 45 mph, as documented in the attached photograph of the speed limit sign
+          at milepost 12.4."
+        </div>
+      </div>
+    </div>
+
+    <!-- Mistake 3 -->
+    <div class="mistake-card">
+      <div class="mistake-header">
+        <div class="mistake-number">3</div>
+        <h2>Incorrect Crash Warrant Application (Warrant 7)</h2>
+      </div>
+      <div class="mistake-content">
+        <h3>The Problem</h3>
+        <p>
+          Warrant 7 (Crash Experience) requires meeting all three of its conditions, but engineers often cite
+          total crash counts without verifying whether crashes are of types correctable by a traffic signal.
+        </p>
+
+        <h3>Warrant 7 Requirements (ALL must be met)</h3>
+        <table>
+          <tr>
+            <th>Condition</th>
+            <th>Requirement</th>
+          </tr>
+          <tr>
+            <td>A. Adequate trial</td>
+            <td>Less restrictive alternatives tried for at least 12 months</td>
+          </tr>
+          <tr>
+            <td>B. Crash frequency</td>
+            <td>5+ crashes of correctable types in 12-month period</td>
+          </tr>
+          <tr>
+            <td>C. Volume threshold</td>
+            <td>Warrant 1 or 2 volume thresholds met at 80% level</td>
+          </tr>
+        </table>
+
+        <div class="wrong-box">
+          <strong>Common Errors:</strong>
+          <ul style="margin-left: 1rem; margin-top: 0.5rem;">
+            <li>Including rear-end crashes (typically not correctable by signals)</li>
+            <li>Including animal strikes or single-vehicle crashes</li>
+            <li>Not documenting the "adequate trial" of alternatives</li>
+            <li>Forgetting the 80% volume requirement in Condition C</li>
+          </ul>
+        </div>
+
+        <h3>Crash Types Correctable by Traffic Signals</h3>
+        <ul style="margin-left: 1.5rem;">
+          <li>Right-angle crashes</li>
+          <li>Left-turn opposing through crashes</li>
+          <li>Pedestrian crashes at the intersection approach</li>
+        </ul>
+
+        <h3>Crash Types NOT Correctable by Traffic Signals</h3>
+        <ul style="margin-left: 1.5rem;">
+          <li>Rear-end crashes (may actually increase with signals)</li>
+          <li>Sideswipe same-direction crashes</li>
+          <li>Single-vehicle crashes</li>
+          <li>Crashes occurring away from the intersection</li>
+        </ul>
+
+        <div class="right-box">
+          <strong>Correct Approach:</strong> Review each crash report individually to determine crash type and
+          whether a traffic signal could have prevented it. Document your analysis with a table showing
+          each crash, its type, and whether it's signal-correctable.
+        </div>
+      </div>
+    </div>
+
+    <!-- Mistake 4 -->
+    <div class="mistake-card">
+      <div class="mistake-header">
+        <div class="mistake-number">4</div>
+        <h2>Ignoring the "SHALL" vs "SHOULD" Language</h2>
+      </div>
+      <div class="mistake-content">
+        <h3>The Problem</h3>
+        <p>
+          The MUTCD uses specific language to indicate mandatory requirements versus recommendations.
+          Many engineers treat "SHOULD" statements as requirements or ignore "SHALL" statements entirely.
+          Understanding this distinction is critical for compliance and liability.
+        </p>
+
+        <h3>MUTCD Language Meanings</h3>
+        <table>
+          <tr>
+            <th>Term</th>
+            <th>Meaning</th>
+            <th>Compliance</th>
+          </tr>
+          <tr>
+            <td><strong>SHALL</strong></td>
+            <td>Mandatory requirement</td>
+            <td>Required</td>
+          </tr>
+          <tr>
+            <td><strong>SHOULD</strong></td>
+            <td>Advisory/recommended</td>
+            <td>Recommended but not required</td>
+          </tr>
+          <tr>
+            <td><strong>MAY</strong></td>
+            <td>Permissive/optional</td>
+            <td>Allowed if conditions met</td>
+          </tr>
+        </table>
+
+        <div class="wrong-box">
+          <strong>Common Errors:</strong>
+          <ul style="margin-left: 1rem; margin-top: 0.5rem;">
+            <li>Installing signals without meeting any warrant (violates "SHALL" requirement)</li>
+            <li>Treating "SHOULD perform engineering study" as optional</li>
+            <li>Ignoring required engineering judgment documentation</li>
+          </ul>
+        </div>
+
+        <h3>Critical "SHALL" Requirements</h3>
+        <p>These are mandatory and cannot be waived:</p>
+        <ul class="checklist">
+          <li>An engineering study of traffic conditions SHALL be performed</li>
+          <li>At least one warrant SHALL be met before installation</li>
+          <li>Signal not justified based solely on warrant satisfaction (SHALL use engineering judgment)</li>
+          <li>Pedestrian signal heads SHALL be provided when pedestrian signals are installed</li>
+        </ul>
+
+        <div class="right-box">
+          <strong>Correct Approach:</strong> When reviewing MUTCD requirements, highlight all "SHALL" statements
+          and ensure your study addresses each one. Document engineering judgment for "SHOULD" provisions
+          that are not followed.
+        </div>
+      </div>
+    </div>
+
+    <!-- Mistake 5 -->
+    <div class="mistake-card">
+      <div class="mistake-header">
+        <div class="mistake-number">5</div>
+        <h2>Failing to Consider Signal System Impacts</h2>
+      </div>
+      <div class="mistake-content">
+        <h3>The Problem</h3>
+        <p>
+          Warrant studies often focus narrowly on the subject intersection without considering the broader
+          signal system context. Installing a new signal can create coordination challenges, increase
+          system-wide delay, and generate new safety issues at adjacent intersections.
+        </p>
+
+        <div class="wrong-box">
+          <strong>Common Errors:</strong>
+          <ul style="margin-left: 1rem; margin-top: 0.5rem;">
+            <li>Not evaluating adjacent signal spacing</li>
+            <li>Ignoring coordination requirements with nearby signals</li>
+            <li>Failing to assess queue spillback potential</li>
+            <li>Not considering progressive signal timing impacts</li>
+          </ul>
+        </div>
+
+        <h3>System Considerations</h3>
+        <table>
+          <tr>
+            <th>Factor</th>
+            <th>Minimum Consideration</th>
+          </tr>
+          <tr>
+            <td>Signal Spacing</td>
+            <td>Generally 1/4 mile minimum for coordination; closer signals may require special timing</td>
+          </tr>
+          <tr>
+            <td>Coordination</td>
+            <td>Will the new signal fit into existing timing plans?</td>
+          </tr>
+          <tr>
+            <td>Queue Storage</td>
+            <td>Is there adequate storage between signals?</td>
+          </tr>
+          <tr>
+            <td>Turn Lane Warrants</td>
+            <td>Are auxiliary lanes needed to accommodate signal operations?</td>
+          </tr>
+        </table>
+
+        <div class="right-box">
+          <strong>Correct Approach:</strong> Include a system-level analysis in your warrant study.
+          Document adjacent signals, their cycle lengths, and how the proposed signal would integrate.
+          Consider alternatives like roundabouts that may provide better corridor operations.
+        </div>
+
+        <div class="tip-box">
+          <strong>Pro Tip:</strong> Use simulation software (Synchro, VISSIM) to model the proposed
+          signal within the corridor and compare system performance with and without the new signal.
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Section -->
+    <section class="summary-section">
+      <h2>Summary Checklist</h2>
+      <p>Before submitting your signal warrant study, verify:</p>
+
+      <ul class="checklist">
+        <li>Actual traffic counts collected for required time periods (not factored from peak hours)</li>
+        <li>70% reduction applied only when qualifying conditions are documented</li>
+        <li>Crash warrant includes only signal-correctable crash types</li>
+        <li>All "SHALL" requirements are addressed in the study</li>
+        <li>System-level impacts have been evaluated</li>
+        <li>Engineering judgment is documented for the final recommendation</li>
+        <li>Data collection methods and dates are documented</li>
+        <li>Source data is retained for future reference</li>
+      </ul>
+
+      <h3 style="margin-top: 1.5rem;">Key MUTCD References</h3>
+      <table>
+        <tr>
+          <th>Warrant</th>
+          <th>MUTCD Section</th>
+          <th>Key Requirement</th>
+        </tr>
+        <tr>
+          <td>General</td>
+          <td>4C.01</td>
+          <td>Engineering study required; at least one warrant must be met</td>
+        </tr>
+        <tr>
+          <td>Warrant 1</td>
+          <td>4C.02</td>
+          <td>Eight-hour vehicular volume (actual 8-hour counts)</td>
+        </tr>
+        <tr>
+          <td>Warrant 2</td>
+          <td>4C.03</td>
+          <td>Four-hour vehicular volume</td>
+        </tr>
+        <tr>
+          <td>Warrant 3</td>
+          <td>4C.04</td>
+          <td>Peak hour volume</td>
+        </tr>
+        <tr>
+          <td>Warrant 4</td>
+          <td>4C.05</td>
+          <td>Pedestrian volume</td>
+        </tr>
+        <tr>
+          <td>Warrant 5</td>
+          <td>4C.06</td>
+          <td>School crossing</td>
+        </tr>
+        <tr>
+          <td>Warrant 6</td>
+          <td>4C.07</td>
+          <td>Coordinated signal system</td>
+        </tr>
+        <tr>
+          <td>Warrant 7</td>
+          <td>4C.08</td>
+          <td>Crash experience (all 3 conditions required)</td>
+        </tr>
+        <tr>
+          <td>Warrant 8</td>
+          <td>4C.09</td>
+          <td>Roadway network</td>
+        </tr>
+      </table>
+    </section>
+
+    <!-- Additional Resources -->
+    <section class="summary-section">
+      <h2>Additional Resources</h2>
+      <ul style="margin-left: 1.5rem;">
+        <li><a href="https://mutcd.fhwa.dot.gov/">MUTCD Online Edition (FHWA)</a></li>
+        <li><a href="https://www.cmfclearinghouse.org/">CMF Clearinghouse - Signal CMFs</a></li>
+        <li><a href="https://safety.fhwa.dot.gov/intersection/signal/">FHWA Signalized Intersection Safety</a></li>
+        <li><a href="https://www.virginiadot.org/">VDOT Traffic Engineering Division</a></li>
+      </ul>
+    </section>
+
+    <footer class="footer">
+      <p><strong>CRASH LENS</strong> - Professional Crash Analysis Tools for Virginia Transportation Agencies</p>
+      <p>Visit <a href="https://ecomhub200.github.io/henrico_crash_tool/">crashlens.com</a> for more resources</p>
+      <p style="margin-top: 1rem;">&copy; 2024 CRASH LENS. This guide is provided for educational purposes.</p>
+    </footer>
+  </div>
+
+  <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+</body>
+</html>

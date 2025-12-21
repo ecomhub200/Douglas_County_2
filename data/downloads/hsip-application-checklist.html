@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HSIP Application Checklist - CRASH LENS</title>
+  <style>
+    :root {
+      --primary: #1e40af;
+      --primary-light: #3b82f6;
+      --dark: #0f172a;
+      --gray: #64748b;
+      --light: #f8fafc;
+      --border: #e2e8f0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      line-height: 1.6;
+      color: var(--dark);
+      background: var(--light);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 1.1rem;
+    }
+
+    .brand {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      margin-top: 1rem;
+    }
+
+    .section {
+      margin: 2rem 0;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .section h2 {
+      color: var(--primary);
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .section h3 {
+      color: var(--dark);
+      font-size: 1rem;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    .checklist {
+      list-style: none;
+    }
+
+    .checklist li {
+      padding: 0.75rem 0;
+      padding-left: 2rem;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .checklist li:last-child {
+      border-bottom: none;
+    }
+
+    .checklist li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0.85rem;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--primary);
+      border-radius: 3px;
+    }
+
+    .checklist li strong {
+      display: block;
+      color: var(--dark);
+      margin-bottom: 0.25rem;
+    }
+
+    .checklist li span {
+      font-size: 0.875rem;
+      color: var(--gray);
+    }
+
+    .tip-box {
+      background: #eff6ff;
+      border-left: 4px solid var(--primary);
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .tip-box strong {
+      color: var(--primary);
+    }
+
+    .warning-box {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .warning-box strong {
+      color: #92400e;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+
+    th, td {
+      padding: 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) {
+      background: var(--light);
+    }
+
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--gray);
+      font-size: 0.875rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    .print-btn {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      box-shadow: 0 4px 12px rgba(30,64,175,0.3);
+    }
+
+    .print-btn:hover {
+      background: var(--primary-light);
+    }
+
+    @media print {
+      .print-btn {
+        display: none;
+      }
+
+      body {
+        background: white;
+      }
+
+      .container {
+        padding: 0;
+      }
+
+      .section {
+        box-shadow: none;
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>HSIP Application Checklist</h1>
+    <p>Complete Guide for Highway Safety Improvement Program Grant Applications</p>
+    <div class="brand">Provided by CRASH LENS - Professional Crash Analysis Tools</div>
+  </header>
+
+  <div class="container">
+    <section class="section">
+      <h2>Introduction</h2>
+      <p>The Highway Safety Improvement Program (HSIP) is a core Federal-aid program designed to achieve significant reductions in traffic fatalities and serious injuries on all public roads. This checklist will guide you through preparing a competitive HSIP application with proper crash data documentation.</p>
+
+      <div class="tip-box">
+        <strong>Pro Tip:</strong> Start your application preparation at least 3 months before the deadline to allow adequate time for crash data analysis and stakeholder coordination.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Phase 1: Project Identification & Eligibility</h2>
+      <ul class="checklist">
+        <li>
+          <strong>Verify road ownership and functional classification</strong>
+          <span>Confirm the project location is on a public road eligible for HSIP funding. Check VDOT's road inventory system.</span>
+        </li>
+        <li>
+          <strong>Document crash history (minimum 3-5 years)</strong>
+          <span>Obtain official crash records from Virginia DMV or TREDS database. Include all reportable crashes.</span>
+        </li>
+        <li>
+          <strong>Calculate crash rates and compare to statewide averages</strong>
+          <span>Use AADT data to calculate crashes per million vehicle miles traveled (MVMT) or per million entering vehicles (MEV).</span>
+        </li>
+        <li>
+          <strong>Identify crash patterns and contributing factors</strong>
+          <span>Analyze crash types (angle, rear-end, head-on), severity levels, and common contributing factors.</span>
+        </li>
+        <li>
+          <strong>Confirm project aligns with Virginia SHSP emphasis areas</strong>
+          <span>Reference Virginia's Strategic Highway Safety Plan for priority emphasis areas and proven countermeasures.</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Phase 2: Crash Data Analysis Requirements</h2>
+      <ul class="checklist">
+        <li>
+          <strong>Compile crash data summary table</strong>
+          <span>Include year-by-year breakdown of total crashes, injuries, and fatalities for the study period.</span>
+        </li>
+        <li>
+          <strong>Create collision diagram</strong>
+          <span>Show crash locations, types, and movements on a scaled diagram of the project area.</span>
+        </li>
+        <li>
+          <strong>Document crash severity distribution</strong>
+          <span>Use KABCO scale: K (Fatal), A (Incapacitating), B (Non-incapacitating), C (Possible injury), O (Property damage only).</span>
+        </li>
+        <li>
+          <strong>Analyze temporal patterns</strong>
+          <span>Identify peak crash times, day-of-week patterns, and seasonal variations.</span>
+        </li>
+        <li>
+          <strong>Calculate equivalent property damage only (EPDO) score</strong>
+          <span>Weight crashes by severity to demonstrate comprehensive safety impact.</span>
+        </li>
+      </ul>
+
+      <h3>Required Crash Data Elements</h3>
+      <table>
+        <tr>
+          <th>Data Element</th>
+          <th>Source</th>
+          <th>Use in Application</th>
+        </tr>
+        <tr>
+          <td>Total crash count</td>
+          <td>Virginia TREDS</td>
+          <td>Establish safety need</td>
+        </tr>
+        <tr>
+          <td>Crash severity (KABCO)</td>
+          <td>Police crash reports</td>
+          <td>Calculate B/C ratio</td>
+        </tr>
+        <tr>
+          <td>Crash type/manner</td>
+          <td>Virginia TREDS</td>
+          <td>Select countermeasures</td>
+        </tr>
+        <tr>
+          <td>Contributing factors</td>
+          <td>Police crash reports</td>
+          <td>Justify improvements</td>
+        </tr>
+        <tr>
+          <td>Road conditions</td>
+          <td>VDOT records</td>
+          <td>Engineering analysis</td>
+        </tr>
+        <tr>
+          <td>AADT volumes</td>
+          <td>VDOT traffic data</td>
+          <td>Calculate crash rates</td>
+        </tr>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Phase 3: Countermeasure Selection</h2>
+      <ul class="checklist">
+        <li>
+          <strong>Select FHWA Proven Safety Countermeasures when applicable</strong>
+          <span>Applications using proven countermeasures receive priority consideration and streamlined review.</span>
+        </li>
+        <li>
+          <strong>Document expected Crash Reduction Factor (CRF)</strong>
+          <span>Use CMF Clearinghouse values or Virginia-specific CRFs where available.</span>
+        </li>
+        <li>
+          <strong>Ensure countermeasures address identified crash patterns</strong>
+          <span>Match proposed improvements to documented crash types and contributing factors.</span>
+        </li>
+        <li>
+          <strong>Consider systemic safety approach for widespread patterns</strong>
+          <span>Systemic projects addressing multiple locations may be more competitive than single-site projects.</span>
+        </li>
+      </ul>
+
+      <div class="tip-box">
+        <strong>FHWA Proven Safety Countermeasures (2023):</strong> Roundabouts, Road Diets, Pedestrian Hybrid Beacons, Leading Pedestrian Intervals, Backplates with Retroreflective Borders, Rumble Strips, Safety Edge, Enhanced Delineation for Curves.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Phase 4: Benefit-Cost Analysis</h2>
+      <ul class="checklist">
+        <li>
+          <strong>Calculate expected crash reduction benefits</strong>
+          <span>Apply CRF to current crash experience to estimate annual crashes prevented.</span>
+        </li>
+        <li>
+          <strong>Apply VDOT crash cost values</strong>
+          <span>Use current Virginia-approved crash cost values for each severity level.</span>
+        </li>
+        <li>
+          <strong>Estimate project costs (construction + maintenance)</strong>
+          <span>Include engineering, right-of-way, construction, and 20-year maintenance costs.</span>
+        </li>
+        <li>
+          <strong>Calculate Benefit-Cost ratio</strong>
+          <span>Target B/C ratio of 1.5 or higher for competitive applications.</span>
+        </li>
+        <li>
+          <strong>Document assumptions and methodology</strong>
+          <span>Clearly explain how benefits and costs were calculated for reviewer verification.</span>
+        </li>
+      </ul>
+
+      <h3>Virginia Crash Cost Values (2024)</h3>
+      <table>
+        <tr>
+          <th>Crash Severity</th>
+          <th>Cost per Crash</th>
+        </tr>
+        <tr>
+          <td>Fatal (K)</td>
+          <td>$12,896,000</td>
+        </tr>
+        <tr>
+          <td>Incapacitating Injury (A)</td>
+          <td>$569,000</td>
+        </tr>
+        <tr>
+          <td>Non-Incapacitating Injury (B)</td>
+          <td>$150,000</td>
+        </tr>
+        <tr>
+          <td>Possible Injury (C)</td>
+          <td>$78,000</td>
+        </tr>
+        <tr>
+          <td>Property Damage Only (O)</td>
+          <td>$12,700</td>
+        </tr>
+      </table>
+
+      <div class="warning-box">
+        <strong>Important:</strong> Verify current crash cost values with VDOT before submission. Values are updated periodically based on NHTSA guidelines.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Phase 5: Application Documentation</h2>
+      <ul class="checklist">
+        <li>
+          <strong>Complete HSIP application form</strong>
+          <span>Download current version from VDOT's Local Assistance Division website.</span>
+        </li>
+        <li>
+          <strong>Attach crash data summary and analysis</strong>
+          <span>Include tables, charts, and collision diagrams supporting the safety need.</span>
+        </li>
+        <li>
+          <strong>Include location maps and aerial photographs</strong>
+          <span>Clearly show project limits, crash locations, and proposed improvement areas.</span>
+        </li>
+        <li>
+          <strong>Provide preliminary cost estimate</strong>
+          <span>Break down costs by major work items with reasonable unit prices.</span>
+        </li>
+        <li>
+          <strong>Document local match commitment</strong>
+          <span>HSIP typically requires 10% local match. Include resolution or commitment letter.</span>
+        </li>
+        <li>
+          <strong>Obtain stakeholder support letters</strong>
+          <span>Letters from local government, law enforcement, or community groups strengthen applications.</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Phase 6: Pre-Submission Review</h2>
+      <ul class="checklist">
+        <li>
+          <strong>Verify all required sections are complete</strong>
+          <span>Use VDOT's application checklist to confirm no sections are missing.</span>
+        </li>
+        <li>
+          <strong>Review crash data accuracy</strong>
+          <span>Double-check crash counts, dates, and severity classifications against source data.</span>
+        </li>
+        <li>
+          <strong>Confirm B/C calculation methodology</strong>
+          <span>Ensure calculations follow VDOT guidelines and are clearly documented.</span>
+        </li>
+        <li>
+          <strong>Obtain required signatures</strong>
+          <span>Ensure all authorization signatures are in place before submission.</span>
+        </li>
+        <li>
+          <strong>Submit by deadline with confirmation receipt</strong>
+          <span>Electronic submissions preferred. Request confirmation of receipt.</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Common Application Mistakes to Avoid</h2>
+      <ul class="checklist">
+        <li>
+          <strong>Insufficient crash history</strong>
+          <span>Using less than 3 years of data or failing to include all reportable crashes.</span>
+        </li>
+        <li>
+          <strong>Mismatched countermeasures</strong>
+          <span>Proposing improvements that don't address the documented crash patterns.</span>
+        </li>
+        <li>
+          <strong>Incomplete benefit-cost analysis</strong>
+          <span>Missing maintenance costs, using outdated crash values, or unclear methodology.</span>
+        </li>
+        <li>
+          <strong>Poor quality maps and diagrams</strong>
+          <span>Illegible collision diagrams or maps that don't clearly show project limits.</span>
+        </li>
+        <li>
+          <strong>Missing local match documentation</strong>
+          <span>Failing to provide evidence of committed local funding share.</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Resources & References</h2>
+      <ul style="list-style: disc; margin-left: 1.5rem;">
+        <li><a href="https://safety.fhwa.dot.gov/hsip/">FHWA HSIP Program Information</a></li>
+        <li><a href="https://www.cmfclearinghouse.org/">CMF Clearinghouse</a></li>
+        <li><a href="https://safety.fhwa.dot.gov/provencountermeasures/">FHWA Proven Safety Countermeasures</a></li>
+        <li><a href="https://www.virginiadot.org/">VDOT Local Assistance Division</a></li>
+        <li><a href="https://www.dmv.virginia.gov/safety/">Virginia DMV Highway Safety</a></li>
+      </ul>
+    </section>
+
+    <footer class="footer">
+      <p><strong>CRASH LENS</strong> - Professional Crash Analysis Tools for Virginia Transportation Agencies</p>
+      <p>Visit <a href="https://ecomhub200.github.io/henrico_crash_tool/">crashlens.com</a> for more resources</p>
+      <p style="margin-top: 1rem;">&copy; 2024 CRASH LENS. This guide is provided for educational purposes.</p>
+    </footer>
+  </div>
+
+  <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+</body>
+</html>
