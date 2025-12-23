@@ -113,7 +113,9 @@ def load_mutcd_sections():
                         'part_title': part_title,
                         'virginia_specific': virginia_specific,
                         'keywords': ','.join(chapter_keywords[:10]),  # Limit keywords
-                        'content_types': ','.join([k for k in ['standard', 'guidance', 'option', 'support'] if content.get(k)])
+                        'content_types': ','.join([k for k in ['standard', 'guidance', 'option', 'support'] if content.get(k)]),
+                        # Include actual content (truncated to fit Pinecone metadata limits)
+                        'content_text': full_text[:30000] if len(full_text) <= 30000 else full_text[:30000] + '...[truncated]'
                     }
                 })
 
