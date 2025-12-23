@@ -23,8 +23,8 @@ except ImportError:
     exit(1)
 
 # Configuration - Set via environment variables or edit here
-PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY", "pcsk_76S9b4_CBZkKtC7JyP49dKcfihA4fCnBG4c8VWV1gWP6M63XcdshuMu5ziEStrbMmfhFbG")
-PINECONE_INDEX_HOST = os.environ.get("PINECONE_HOST", "https://va-mutcd-vc37pmh.svc.aped-4627-b74a.pinecone.io")
+PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY", "pcsk_2nM7Kz_N4J6XTqVyPS1XwHdR6NbzhB6HPGKpxTsWzw75otHQygEzRbdTfKYvPUhBYRCNW4")
+PINECONE_INDEX_HOST = os.environ.get("PINECONE_HOST", "https://va-mutcd-h0lxejj.svc.aped-4627-b74a.pinecone.io")
 INDEX_NAME = "va-mutcd"
 EMBEDDING_MODEL = "llama-text-embed-v2"  # Pinecone's built-in model
 
