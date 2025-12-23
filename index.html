@@ -122,10 +122,10 @@
     .app-preview-content {
       background: var(--bg-dark-secondary);
       border-radius: var(--radius);
-      height: 300px;
+      height: 350px;
       display: flex;
-      align-items: center;
-      justify-content: center;
+      align-items: flex-start;
+      justify-content: flex-start;
       color: var(--gray);
       overflow: hidden;
       position: relative;
@@ -134,7 +134,8 @@
     .hero-screenshot {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
+      object-position: top left;
       border-radius: var(--radius);
     }
 
@@ -837,18 +838,20 @@
     }
 
     .case-study-image {
-      height: 180px;
+      height: 200px;
       background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
       display: flex;
-      align-items: center;
-      justify-content: center;
+      align-items: flex-start;
+      justify-content: flex-start;
       overflow: hidden;
     }
 
     .case-study-image img {
       width: 100%;
-      height: 100%;
+      height: auto;
+      min-height: 100%;
       object-fit: cover;
+      object-position: top left;
     }
 
     .case-study-image-placeholder {
