@@ -114,3 +114,166 @@ henrico_crash_tool/
    - Testing performed
    - Screenshots if UI changes
 5. Provide the PR link to the user
+
+---
+
+## Technical Architecture Deep Dive
+
+### State Management
+
+The application uses **global state objects** to manage data across tabs. Understanding these is CRITICAL:
+
+| State Object | Purpose | Key Properties |
+|--------------|---------|----------------|
+| `crashState` | Primary crash data storage | `sampleRows[]`, `aggregates`, `totalRows`, `loaded` |
+| `cmfState` | CMF/Countermeasures tab | `selectedLocation`, `locationCrashes[]`, `filteredCrashes[]`, `crashProfile` |
+| `warrantsState` | Warrants tab | `selectedLocation`, `locationCrashes[]`, `filteredCrashes[]`, `crashProfile` |
+| `grantState` | Grants tab | `allRankedLocations[]`, `loaded` |
+| `baState` | Before/After Study | `locationCrashes[]`, `locationStats` |
+| `safetyState` | Safety Focus tab | `data[category].crashes[]` |
+| `selectionState` | Cross-tab location selection | `location`, `crashes[]`, `crashProfile`, `fromTab` |
+| `aiState` | AI Assistant | `conversationHistory[]`, `attachments[]` |
+
+### Data Flow Hierarchy
+
+```
+crashState.sampleRows (raw CSV data)
+    │
+    ├─► crashState.aggregates (pre-computed statistics)
+    │       └─► Main AI Tab (county-wide analysis)
+    │       └─► Dashboard, Analysis tabs
+    │
+    ├─► cmfState.locationCrashes (location-filtered)
+    │       └─► cmfState.filteredCrashes (+ date-filtered)
+    │               └─► CMF Tab & CMF AI Assistant
+    │
+    ├─► warrantsState.locationCrashes (location-filtered)
+    │       └─► warrantsState.filteredCrashes (+ date-filtered)
+    │               └─► Warrants Tab
+    │
+    └─► selectionState.crashes (user selection)
+            └─► Cross-tab navigation (Map → CMF, Map → Grants, etc.)
+```
+
+### ⚠️ CRITICAL: Function Naming Conventions
+
+**NEVER create duplicate function names.** JavaScript function hoisting causes later definitions to overwrite earlier ones silently.
+
+Current crash profile functions (each serves a different purpose):
+
+| Function | Returns | Used By |
+|----------|---------|---------|
+| `buildCountyWideCrashProfile()` | Aggregate stats for ALL crashes | Main AI Tab (county-wide) |
+| `buildCMFCrashProfile()` | Location + date filtered profile | CMF Tab |
+| `buildLocationCrashProfile(crashes)` | Simple profile `{total, K, A, B, C, O, epdo}` | AI context functions |
+| `buildDetailedLocationProfile(crashes)` | Detailed profile with `{severityDist, collisionTypes, weatherDist...}` | Map jump functions |
+
+### Data Consistency Rules
+
+When working on features that display or analyze crash data:
+
+1. **Identify the data scope** - Is it county-wide, location-specific, or date-filtered?
+2. **Use the appropriate state** - Don't mix `crashState.aggregates` with `cmfState.filteredCrashes`
+3. **Check for existing patterns** - Other tabs doing similar things? Follow their pattern
+4. **Update related indicators** - If you change data context, update UI indicators
+
+### Tab-Specific Data Sources
+
+| Tab | Data Source | Filtering Applied |
+|-----|-------------|-------------------|
+| Dashboard | `crashState.aggregates` | None |
+| Analysis | `crashState.aggregates` | None |
+| Map | `crashState.sampleRows` | Year, Route, Severity filters |
+| Hotspots | `crashState.aggregates.byRoute` | None |
+| CMF/Countermeasures | `cmfState.filteredCrashes` | Location + Date |
+| Warrants | `warrantsState.filteredCrashes` | Location + Date |
+| Grants | `grantState.allRankedLocations` | Optional Date |
+| Before/After | `baState.locationCrashes` | Location |
+| Safety Focus | `safetyState.data[category]` | Category + Date |
+| **AI Assistant** | **Context-aware** | Location if selected, else county-wide |
+
+### AI Tab Context Awareness
+
+The AI tab now uses `getAIAnalysisContext()` which checks (in priority order):
+1. `cmfState.selectedLocation` - CMF tab selection
+2. `selectionState.location` - Cross-tab selection (from map, hotspots)
+3. `warrantsState.selectedLocation` - Warrants tab selection
+4. Falls back to county-wide `crashState.aggregates`
+
+### Common Pitfalls to Avoid
+
+1. **Duplicate Function Names**
+   - JavaScript silently overwrites functions with same name
+   - Always search for existing functions before creating new ones
+   - Use descriptive, unique names
+
+2. **Mixing Data Scopes**
+   - Don't show location-specific counts with county-wide analysis
+   - Ensure crash counts match across related UI elements
+
+3. **Forgetting Date Filters**
+   - Many tabs support date filtering
+   - New features should respect existing date filter state
+
+4. **State Synchronization**
+   - When location changes in one tab, related tabs may need updates
+   - Use `updateAIContextIndicator()` pattern for cross-tab awareness
+
+5. **Aggregate vs Sample Rows**
+   - `crashState.aggregates` - fast, pre-computed, but limited detail
+   - `crashState.sampleRows` - full data, but slower to process
+   - Choose based on what information you need
+
+### Testing Checklist
+
+Before submitting changes:
+
+- [ ] Verify crash counts match across related views
+- [ ] Test with location selected AND without
+- [ ] Test with date filter applied AND without
+- [ ] Check all tabs that might share the affected state
+- [ ] Verify no duplicate function names introduced
+- [ ] Console log shows expected data flow
+- [ ] UI indicators reflect actual data being used
+
+### Debugging Tips
+
+```javascript
+// Log current AI context
+console.log('[AI Context]', getAIAnalysisContext());
+
+// Log CMF state
+console.log('[CMF State]', cmfState.selectedLocation, cmfState.filteredCrashes.length);
+
+// Log selection state
+console.log('[Selection]', selectionState.location, selectionState.crashes?.length);
+
+// Verify crash counts match
+console.log('[Counts]', {
+    aggregate: crashState.aggregates.byRoute['ROUTE_NAME']?.total,
+    sampleRows: crashState.sampleRows.filter(r => r[COL.ROUTE] === 'ROUTE_NAME').length,
+    cmfFiltered: cmfState.filteredCrashes.length
+});
+```
+
+### Column Reference (COL object)
+
+Key column indices used throughout the codebase:
+- `COL.ROUTE` - Road/route name
+- `COL.NODE` - Intersection node ID
+- `COL.SEVERITY` - K/A/B/C/O severity
+- `COL.COLLISION` - Collision type
+- `COL.PED` - Pedestrian involved flag
+- `COL.BIKE` - Bicycle involved flag
+- `COL.WEATHER` - Weather conditions
+- `COL.LIGHT` - Light conditions
+- `COL.DATE` - Crash date
+
+### EPDO Calculation
+
+Equivalent Property Damage Only (EPDO) weights:
+```javascript
+const EPDO_WEIGHTS = { K: 1500, A: 240, B: 12, C: 6, O: 1 };
+```
+
+Always use `calcEPDO(severityObject)` for consistent calculations.
