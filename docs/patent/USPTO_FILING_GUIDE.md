@@ -101,18 +101,20 @@
 
 **Inventor 1 Information:**
 ```
-Name: [YOUR FULL LEGAL NAME]
-Residence: [CITY, STATE, COUNTRY]
-Mailing Address: [COMPLETE ADDRESS]
-Citizenship: [COUNTRY]
+Name: Murad Al Qurishee
+Residence: Henrico County, Richmond, VA, USA
+Mailing Address: 4821 Garden Spring Ln APT#206, Richmond, Virginia 23059
+Citizenship: U.S. Permanent Resident
+Email: muradalqurishee@gmail.com
 ```
 
 **Inventor 2 Information:**
 ```
 Name: Atiqur Rahman Mallick
-Residence: [CITY, STATE, COUNTRY]
-Mailing Address: [COMPLETE ADDRESS]
-Citizenship: [COUNTRY]
+Residence: Henrico County, Richmond, VA, USA
+Mailing Address: 2612 W Heiman St, Apt D35, Nashville, TN 37208
+Citizenship: Non-Immigrant Student
+Email: atiquee1@gmail.com
 ```
 
 **Title of Invention:**

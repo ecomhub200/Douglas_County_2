@@ -16,21 +16,21 @@
 
 | Field | Value |
 |-------|-------|
-| **Full Legal Name** | [YOUR FULL LEGAL NAME] |
-| **Citizenship** | [YOUR CITIZENSHIP] |
-| **Residence** | [CITY, STATE, COUNTRY] |
-| **Mailing Address** | [COMPLETE MAILING ADDRESS] |
-| **Email** | [EMAIL ADDRESS] |
+| **Full Legal Name** | Murad Al Qurishee |
+| **Citizenship** | U.S. Permanent Resident |
+| **Residence** | Henrico County, Richmond, VA, USA |
+| **Mailing Address** | 4821 Garden Spring Ln APT#206, Richmond, Virginia 23059 |
+| **Email** | muradalqurishee@gmail.com |
 
 ### INVENTOR 2
 
 | Field | Value |
 |-------|-------|
 | **Full Legal Name** | Atiqur Rahman Mallick |
-| **Citizenship** | [CITIZENSHIP] |
-| **Residence** | [CITY, STATE, COUNTRY] |
-| **Mailing Address** | [COMPLETE MAILING ADDRESS] |
-| **Email** | [EMAIL ADDRESS] |
+| **Citizenship** | Non-Immigrant Student |
+| **Residence** | Henrico County, Richmond, VA, USA |
+| **Mailing Address** | 2612 W Heiman St, Apt D35, Nashville, TN 37208 |
+| **Email** | atiquee1@gmail.com |
 
 ---
 
@@ -496,31 +496,27 @@ A computer-implemented traffic safety analysis system and method for automated c
 
 ### INVENTOR 1
 
-**Full Legal Name**: ________________________________
+**Full Legal Name**: Murad Al Qurishee
 
-**Residence (City, State, Country)**: ________________________________
+**Residence (City, State, Country)**: Henrico County, Richmond, VA, USA
 
-**Mailing Address**: ________________________________
+**Mailing Address**: 4821 Garden Spring Ln APT#206, Richmond, Virginia 23059
 
-**Citizenship**: ________________________________
+**Citizenship**: U.S. Permanent Resident
 
-**Email Address**: ________________________________
-
-**Phone Number**: ________________________________
+**Email Address**: muradalqurishee@gmail.com
 
 ### INVENTOR 2
 
 **Full Legal Name**: Atiqur Rahman Mallick
 
-**Residence (City, State, Country)**: ________________________________
+**Residence (City, State, Country)**: Henrico County, Richmond, VA, USA
 
-**Mailing Address**: ________________________________
+**Mailing Address**: 2612 W Heiman St, Apt D35, Nashville, TN 37208
 
-**Citizenship**: ________________________________
+**Citizenship**: Non-Immigrant Student
 
-**Email Address**: ________________________________
-
-**Phone Number**: ________________________________
+**Email Address**: atiquee1@gmail.com
 
 ---
 
@@ -530,16 +526,16 @@ I/We hereby declare that all statements made herein of my/our own knowledge are 
 
 ### INVENTOR 1
 
-**Signature**: ________________________________
+**Signature**: /s/ Murad Al Qurishee
 
-**Date**: ________________________________
+**Date**: December 24, 2025
 
-**Printed Name**: ________________________________
+**Printed Name**: Murad Al Qurishee
 
 ### INVENTOR 2
 
-**Signature**: ________________________________
+**Signature**: /s/ Atiqur Rahman Mallick
 
-**Date**: ________________________________
+**Date**: December 24, 2025
 
 **Printed Name**: Atiqur Rahman Mallick

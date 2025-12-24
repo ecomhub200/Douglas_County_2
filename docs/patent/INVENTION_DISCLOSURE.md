@@ -9,10 +9,10 @@
 | Field | Value |
 |-------|-------|
 | **Invention Title** | CRASH LENS: System and Method for AI-Powered Traffic Safety Analysis with Automated Countermeasure Recommendation |
-| **Inventor 1** | [YOUR FULL LEGAL NAME] |
+| **Inventor 1** | Murad Al Qurishee |
 | **Inventor 2** | Atiqur Rahman Mallick |
-| **Date of Conception** | [DATE YOU FIRST CONCEIVED THE INVENTION] |
-| **Date of First Reduction to Practice** | [DATE FIRST WORKING VERSION WAS CREATED] |
+| **Date of Conception** | September 20, 2025 |
+| **Date of First Reduction to Practice** | November 24, 2025 |
 | **Date of First Public Disclosure** | November 28, 2025 |
 | **Filing Deadline** | November 28, 2026 |
 
@@ -512,7 +512,7 @@ We, the undersigned, declare that:
 
 **Signature**: _________________________
 
-**Printed Name**: _________________________
+**Printed Name**: Murad Al Qurishee
 
 **Date**: _________________________
 
@@ -523,22 +523,6 @@ We, the undersigned, declare that:
 **Printed Name**: Atiqur Rahman Mallick
 
 **Date**: _________________________
-
----
-
-## 8. WITNESSES
-
-*(For additional protection, have two witnesses sign who understand the invention)*
-
-**Witness 1**:
-- Signature: _________________________
-- Printed Name: _________________________
-- Date: _________________________
-
-**Witness 2**:
-- Signature: _________________________
-- Printed Name: _________________________
-- Date: _________________________
 
 ---
 
