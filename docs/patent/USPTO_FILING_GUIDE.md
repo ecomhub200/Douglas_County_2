@@ -110,7 +110,7 @@ Email: muradalqurishee@gmail.com
 
 **Inventor 2 Information:**
 ```
-Name: Atiqur Rahman Mallick
+Name: Md Atiqur Rahman Mallick
 Residence: Henrico County, Richmond, VA, USA
 Mailing Address: 2612 W Heiman St, Apt D35, Nashville, TN 37208
 Citizenship: Non-Immigrant Student

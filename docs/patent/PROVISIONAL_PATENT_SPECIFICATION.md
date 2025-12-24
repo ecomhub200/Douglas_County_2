@@ -26,7 +26,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Full Legal Name** | Atiqur Rahman Mallick |
+| **Full Legal Name** | Md Atiqur Rahman Mallick |
 | **Citizenship** | Non-Immigrant Student |
 | **Residence** | Henrico County, Richmond, VA, USA |
 | **Mailing Address** | 2612 W Heiman St, Apt D35, Nashville, TN 37208 |
@@ -508,7 +508,7 @@ A computer-implemented traffic safety analysis system and method for automated c
 
 ### INVENTOR 2
 
-**Full Legal Name**: Atiqur Rahman Mallick
+**Full Legal Name**: Md Atiqur Rahman Mallick
 
 **Residence (City, State, Country)**: Henrico County, Richmond, VA, USA
 
@@ -534,8 +534,8 @@ I/We hereby declare that all statements made herein of my/our own knowledge are 
 
 ### INVENTOR 2
 
-**Signature**: /s/ Atiqur Rahman Mallick
+**Signature**: /s/ Md Atiqur Rahman Mallick
 
 **Date**: December 24, 2025
 
-**Printed Name**: Atiqur Rahman Mallick
+**Printed Name**: Md Atiqur Rahman Mallick
