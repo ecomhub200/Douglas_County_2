@@ -99,9 +99,17 @@
 
 ### 3.2 Complete Cover Sheet
 
-**Inventor Information:**
+**Inventor 1 Information:**
 ```
 Name: [YOUR FULL LEGAL NAME]
+Residence: [CITY, STATE, COUNTRY]
+Mailing Address: [COMPLETE ADDRESS]
+Citizenship: [COUNTRY]
+```
+
+**Inventor 2 Information:**
+```
+Name: Atiqur Rahman Mallick
 Residence: [CITY, STATE, COUNTRY]
 Mailing Address: [COMPLETE ADDRESS]
 Citizenship: [COUNTRY]

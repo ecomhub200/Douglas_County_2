@@ -10,12 +10,27 @@
 |-------|-------|
 | **Application Type** | Provisional Patent Application |
 | **Applicant Type** | Micro Entity |
-| **Inventor** | [YOUR FULL LEGAL NAME] |
+| **Filing Fee** | $190 (Micro Entity) |
+
+### INVENTOR 1
+
+| Field | Value |
+|-------|-------|
+| **Full Legal Name** | [YOUR FULL LEGAL NAME] |
 | **Citizenship** | [YOUR CITIZENSHIP] |
 | **Residence** | [CITY, STATE, COUNTRY] |
 | **Mailing Address** | [COMPLETE MAILING ADDRESS] |
 | **Email** | [EMAIL ADDRESS] |
-| **Filing Fee** | $190 (Micro Entity) |
+
+### INVENTOR 2
+
+| Field | Value |
+|-------|-------|
+| **Full Legal Name** | Atiqur Rahman Mallick |
+| **Citizenship** | [CITIZENSHIP] |
+| **Residence** | [CITY, STATE, COUNTRY] |
+| **Mailing Address** | [COMPLETE MAILING ADDRESS] |
+| **Email** | [EMAIL ADDRESS] |
 
 ---
 
@@ -479,7 +494,23 @@ A computer-implemented traffic safety analysis system and method for automated c
 
 ## INVENTOR INFORMATION
 
+### INVENTOR 1
+
 **Full Legal Name**: ________________________________
+
+**Residence (City, State, Country)**: ________________________________
+
+**Mailing Address**: ________________________________
+
+**Citizenship**: ________________________________
+
+**Email Address**: ________________________________
+
+**Phone Number**: ________________________________
+
+### INVENTOR 2
+
+**Full Legal Name**: Atiqur Rahman Mallick
 
 **Residence (City, State, Country)**: ________________________________
 
@@ -493,12 +524,22 @@ A computer-implemented traffic safety analysis system and method for automated c
 
 ---
 
-## SIGNATURE
+## SIGNATURES
 
-I hereby declare that all statements made herein of my own knowledge are true and that all statements made on information and belief are believed to be true; and further that these statements were made with the knowledge that willful false statements and the like so made are punishable by fine or imprisonment, or both, under Section 1001 of Title 18 of the United States Code and that such willful false statements may jeopardize the validity of the application or any patent issued thereon.
+I/We hereby declare that all statements made herein of my/our own knowledge are true and that all statements made on information and belief are believed to be true; and further that these statements were made with the knowledge that willful false statements and the like so made are punishable by fine or imprisonment, or both, under Section 1001 of Title 18 of the United States Code and that such willful false statements may jeopardize the validity of the application or any patent issued thereon.
+
+### INVENTOR 1
 
 **Signature**: ________________________________
 
 **Date**: ________________________________
 
 **Printed Name**: ________________________________
+
+### INVENTOR 2
+
+**Signature**: ________________________________
+
+**Date**: ________________________________
+
+**Printed Name**: Atiqur Rahman Mallick

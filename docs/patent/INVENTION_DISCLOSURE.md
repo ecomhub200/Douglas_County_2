@@ -9,7 +9,8 @@
 | Field | Value |
 |-------|-------|
 | **Invention Title** | CRASH LENS: System and Method for AI-Powered Traffic Safety Analysis with Automated Countermeasure Recommendation |
-| **Inventor** | [YOUR FULL LEGAL NAME] |
+| **Inventor 1** | [YOUR FULL LEGAL NAME] |
+| **Inventor 2** | Atiqur Rahman Mallick |
 | **Date of Conception** | [DATE YOU FIRST CONCEIVED THE INVENTION] |
 | **Date of First Reduction to Practice** | [DATE FIRST WORKING VERSION WAS CREATED] |
 | **Date of First Public Disclosure** | November 28, 2025 |
@@ -497,19 +498,29 @@ EMPIRICAL BAYES METHOD:
 
 ---
 
-## 7. INVENTOR DECLARATION
+## 7. INVENTOR DECLARATIONS
 
-I, the undersigned, declare that:
+We, the undersigned, declare that:
 
-1. I am the sole inventor of the invention described herein
-2. The invention was conceived and reduced to practice by me
-3. I am not aware of any prior art that anticipates or renders obvious the claimed invention
+1. We are the joint inventors of the invention described herein
+2. The invention was conceived and reduced to practice by us
+3. We are not aware of any prior art that anticipates or renders obvious the claimed invention
 4. The first public disclosure occurred on November 28, 2025
-5. I understand that filing a provisional patent application will establish a priority date
+5. We understand that filing a provisional patent application will establish a priority date
+
+### INVENTOR 1
 
 **Signature**: _________________________
 
 **Printed Name**: _________________________
+
+**Date**: _________________________
+
+### INVENTOR 2
+
+**Signature**: _________________________
+
+**Printed Name**: Atiqur Rahman Mallick
 
 **Date**: _________________________
 
