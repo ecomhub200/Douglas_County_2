@@ -28,7 +28,7 @@
 |-------|-------|
 | **Full Legal Name** | Md Atiqur Rahman Mallick |
 | **Citizenship** | Non-Immigrant Student |
-| **Residence** | Henrico County, Richmond, VA, USA |
+| **Residence** | Nashville, Tennessee, USA |
 | **Mailing Address** | 2612 W Heiman St, Apt D35, Nashville, TN 37208 |
 | **Email** | atiquee1@gmail.com |
 
@@ -510,7 +510,7 @@ A computer-implemented traffic safety analysis system and method for automated c
 
 **Full Legal Name**: Md Atiqur Rahman Mallick
 
-**Residence (City, State, Country)**: Henrico County, Richmond, VA, USA
+**Residence (City, State, Country)**: Nashville, Tennessee, USA
 
 **Mailing Address**: 2612 W Heiman St, Apt D35, Nashville, TN 37208
 
