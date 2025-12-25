@@ -361,35 +361,82 @@ def filter_jurisdiction(df, jurisdiction_config):
     fips = jurisdiction_config.get('fips', '')
     name = jurisdiction_config.get('name', 'Unknown')
 
+    # Log available columns for debugging
+    logger.info(f"Available columns in data: {list(df.columns)[:20]}...")  # First 20
+
     # Try multiple filter approaches
     mask = pd.Series([False] * len(df))
+    found_columns = []
 
     # Check various possible column names for jurisdiction code
     if juris_code:
-        juris_columns = ['Juris_Code', 'JURIS_CODE', 'juris_code', 'Juris Code']
+        juris_columns = [
+            'Juris_Code', 'JURIS_CODE', 'juris_code', 'Juris Code',
+            'JURISCODE', 'JurisCode', 'Jurisdiction_Code', 'JURISDICTION_CODE'
+        ]
         for col in juris_columns:
             if col in df.columns:
+                found_columns.append(f"juris_code:{col}")
+                # Try both numeric and string comparison
                 mask |= df[col].astype(str).str.strip() == str(juris_code)
+                mask |= df[col].astype(str).str.strip() == str(int(juris_code)) if juris_code.isdigit() else False
                 break
+        # Also try case-insensitive column search
+        if not any('juris_code' in c for c in found_columns):
+            for col in df.columns:
+                if 'juris' in col.lower() and 'code' in col.lower():
+                    found_columns.append(f"juris_code:{col}")
+                    mask |= df[col].astype(str).str.strip() == str(juris_code)
+                    break
 
     # Check Physical Juris Name
     if name_patterns:
-        name_columns = ['Physical_Juris_Name', 'PHYSICAL_JURIS_NAME', 'Physical Juris Name', 'PHYSICAL_JURIS']
+        name_columns = [
+            'Physical_Juris_Name', 'PHYSICAL_JURIS_NAME', 'Physical Juris Name',
+            'PHYSICAL_JURIS', 'PhysicalJurisName', 'PHYSICALJURISNAME',
+            'Physical_Jurisdiction', 'PHYSICAL_JURISDICTION', 'Jurisdiction_Name'
+        ]
         for col in name_columns:
             if col in df.columns:
+                found_columns.append(f"name:{col}")
                 for pattern in name_patterns:
                     mask |= df[col].astype(str).str.upper().str.contains(pattern.upper(), na=False)
                 break
+        # Also try case-insensitive column search
+        if not any('name:' in c for c in found_columns):
+            for col in df.columns:
+                if 'juris' in col.lower() and 'name' in col.lower():
+                    found_columns.append(f"name:{col}")
+                    for pattern in name_patterns:
+                        mask |= df[col].astype(str).str.upper().str.contains(pattern.upper(), na=False)
+                    break
 
     # Check FIPS code
     if fips:
-        fips_columns = ['COUNTYFP', 'FIPS', 'County_FIPS', 'countyfp']
+        fips_columns = [
+            'COUNTYFP', 'FIPS', 'County_FIPS', 'countyfp',
+            'COUNTY_FIPS', 'CountyFIPS', 'FIPS_Code', 'FIPSCode'
+        ]
         for col in fips_columns:
             if col in df.columns:
+                found_columns.append(f"fips:{col}")
                 mask |= df[col].astype(str).str.strip() == fips
+                mask |= df[col].astype(str).str.strip().str.zfill(3) == fips.zfill(3)
                 break
 
+    logger.info(f"Filter columns found: {found_columns}")
+    logger.info(f"Filter criteria - juris_code: {juris_code}, fips: {fips}, patterns: {name_patterns}")
+
     df_filtered = df[mask].copy().reset_index(drop=True)
+
+    # If no records found, log sample values from relevant columns
+    if len(df_filtered) == 0 and len(df) > 0:
+        logger.warning("No records matched! Sample values from potential jurisdiction columns:")
+        for col in df.columns:
+            col_lower = col.lower()
+            if any(kw in col_lower for kw in ['juris', 'county', 'fips', 'physical']):
+                sample_vals = df[col].dropna().astype(str).unique()[:5]
+                logger.warning(f"  {col}: {list(sample_vals)}")
 
     logger.info(f"Filtered from {original_count} to {len(df_filtered)} {name} records")
 
@@ -690,29 +737,52 @@ def main():
     os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
 
     df = None
+    df_filtered = None
+    used_fallback = False
 
     # Try primary API first
     try:
         df = download_from_arcgis(config, jurisdiction_config)
+
+        # Filter by jurisdiction immediately to check if data is available
+        logger.info("Filtering API data by jurisdiction...")
+        df_filtered = filter_jurisdiction(df, jurisdiction_config)
+
+        if df_filtered.empty:
+            logger.warning(f"API data has no records for {jurisdiction_config.get('name', jurisdiction_id)}")
+            logger.info("API endpoint may not contain data for this jurisdiction. Trying fallback...")
+            df = None  # Reset to trigger fallback
+
     except Exception as e:
         logger.error(f"Primary API failed: {e}")
         logger.info("Falling back to CSV download...")
 
-    # Try fallback if primary failed
-    if df is None or df.empty:
+    # Try fallback if primary failed or returned no records for jurisdiction
+    if df is None or (df_filtered is not None and df_filtered.empty):
         try:
+            logger.info("=" * 40)
+            logger.info("Attempting fallback CSV download (full statewide data)...")
             df = download_from_fallback(config)
+            used_fallback = True
+
+            # Filter fallback data by jurisdiction
+            logger.info("Filtering fallback data by jurisdiction...")
+            df_filtered = filter_jurisdiction(df, jurisdiction_config)
+
         except Exception as e:
             logger.error(f"Fallback download also failed: {e}")
             sys.exit(1)
 
-    # Filter by jurisdiction
-    logger.info("Filtering by jurisdiction...")
-    df = filter_jurisdiction(df, jurisdiction_config)
+    # Use the filtered dataframe
+    df = df_filtered
 
-    if df.empty:
+    if df is None or df.empty:
         logger.error(f"No {jurisdiction_config.get('name', jurisdiction_id)} records found after filtering!")
+        logger.error("Neither API nor fallback CSV contained data for this jurisdiction.")
         sys.exit(1)
+
+    if used_fallback:
+        logger.info(f"Successfully retrieved {len(df)} records using fallback CSV source")
 
     # Filter by road system
     logger.info("Applying road type filter...")
