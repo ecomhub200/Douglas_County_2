@@ -738,39 +738,39 @@ def main():
 
     df = None
     df_filtered = None
-    used_fallback = False
+    used_api_fallback = False
 
-    # Try primary API first
+    # Try CSV download first (primary source - has complete statewide data)
     try:
-        df = download_from_arcgis(config, jurisdiction_config)
+        logger.info("Downloading from Virginia Roads CSV (primary source)...")
+        df = download_from_fallback(config)
 
-        # Filter by jurisdiction immediately to check if data is available
-        logger.info("Filtering API data by jurisdiction...")
+        # Filter by jurisdiction
+        logger.info("Filtering by jurisdiction...")
         df_filtered = filter_jurisdiction(df, jurisdiction_config)
 
         if df_filtered.empty:
-            logger.warning(f"API data has no records for {jurisdiction_config.get('name', jurisdiction_id)}")
-            logger.info("API endpoint may not contain data for this jurisdiction. Trying fallback...")
-            df = None  # Reset to trigger fallback
+            logger.warning(f"CSV data has no records for {jurisdiction_config.get('name', jurisdiction_id)}")
+            df = None  # Reset to trigger API fallback
 
     except Exception as e:
-        logger.error(f"Primary API failed: {e}")
-        logger.info("Falling back to CSV download...")
+        logger.error(f"CSV download failed: {e}")
+        logger.info("Falling back to ArcGIS API...")
 
-    # Try fallback if primary failed or returned no records for jurisdiction
+    # Try ArcGIS API as fallback if CSV failed or returned no records
     if df is None or (df_filtered is not None and df_filtered.empty):
         try:
             logger.info("=" * 40)
-            logger.info("Attempting fallback CSV download (full statewide data)...")
-            df = download_from_fallback(config)
-            used_fallback = True
+            logger.info("Attempting ArcGIS API fallback...")
+            df = download_from_arcgis(config, jurisdiction_config)
+            used_api_fallback = True
 
-            # Filter fallback data by jurisdiction
-            logger.info("Filtering fallback data by jurisdiction...")
+            # Filter by jurisdiction
+            logger.info("Filtering API data by jurisdiction...")
             df_filtered = filter_jurisdiction(df, jurisdiction_config)
 
         except Exception as e:
-            logger.error(f"Fallback download also failed: {e}")
+            logger.error(f"ArcGIS API fallback also failed: {e}")
             sys.exit(1)
 
     # Use the filtered dataframe
@@ -778,11 +778,13 @@ def main():
 
     if df is None or df.empty:
         logger.error(f"No {jurisdiction_config.get('name', jurisdiction_id)} records found after filtering!")
-        logger.error("Neither API nor fallback CSV contained data for this jurisdiction.")
+        logger.error("Neither CSV nor API contained data for this jurisdiction.")
         sys.exit(1)
 
-    if used_fallback:
-        logger.info(f"Successfully retrieved {len(df)} records using fallback CSV source")
+    if used_api_fallback:
+        logger.info(f"Successfully retrieved {len(df)} records using ArcGIS API fallback")
+    else:
+        logger.info(f"Successfully retrieved {len(df)} records from CSV source")
 
     # Filter by road system
     logger.info("Applying road type filter...")
