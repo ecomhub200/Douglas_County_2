@@ -9,11 +9,14 @@ import logging
 import os
 import re
 import sys
+import time
 import zipfile
 from datetime import datetime, timedelta
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Configure logging
 logging.basicConfig(
@@ -63,6 +66,51 @@ OUTPUT_FILE = os.path.join(OUTPUT_DIR, "grants.csv")
 
 # Number of days to look back for extracts if today's isn't available
 MAX_LOOKBACK_DAYS = 7
+
+# Retry settings
+MAX_RETRIES = 4
+RETRY_BACKOFF_FACTOR = 2  # 2s, 4s, 8s, 16s
+
+
+def create_session_with_retries():
+    """Create a requests session with retry logic."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=MAX_RETRIES,
+        backoff_factor=RETRY_BACKOFF_FACTOR,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["HEAD", "GET", "OPTIONS"]
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
+def make_request_with_retry(url, timeout=300, max_manual_retries=3):
+    """
+    Make HTTP request with manual retry logic for network errors.
+    Uses exponential backoff: 2s, 4s, 8s, 16s
+    """
+    session = create_session_with_retries()
+    last_exception = None
+
+    for attempt in range(max_manual_retries):
+        try:
+            response = session.get(url, timeout=timeout)
+            return response
+        except requests.exceptions.Timeout as e:
+            last_exception = e
+            wait_time = RETRY_BACKOFF_FACTOR ** (attempt + 1)
+            logger.warning(f"Request timeout (attempt {attempt + 1}/{max_manual_retries}). Retrying in {wait_time}s...")
+            time.sleep(wait_time)
+        except requests.exceptions.ConnectionError as e:
+            last_exception = e
+            wait_time = RETRY_BACKOFF_FACTOR ** (attempt + 1)
+            logger.warning(f"Connection error (attempt {attempt + 1}/{max_manual_retries}). Retrying in {wait_time}s...")
+            time.sleep(wait_time)
+
+    raise last_exception or Exception("Request failed after all retries")
 
 # Virginia Static Grants - always included as baseline
 VIRGINIA_STATIC_GRANTS = [
@@ -247,7 +295,7 @@ def download_grants_extract(max_attempts: int = MAX_LOOKBACK_DAYS) -> pd.DataFra
         logger.info(f"Attempting to download: {url}")
 
         try:
-            response = requests.get(url, timeout=300)
+            response = make_request_with_retry(url, timeout=300)
 
             if response.status_code == 200:
                 logger.info(f"Successfully downloaded extract for {target_date.strftime('%Y-%m-%d')}")

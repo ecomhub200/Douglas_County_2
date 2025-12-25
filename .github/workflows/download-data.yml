@@ -2,6 +2,9 @@ name: Download Traffic Data
 
 on:
   schedule:
+    # Crash data: First Monday of each month at 11:00 UTC (6:00 AM ET)
+    - cron: '0 11 1-7 * 1'
+    # Grants data: Every Monday at 11:00 UTC (6:00 AM ET)
     - cron: '0 11 * * 1'
   workflow_dispatch:
     inputs:
@@ -147,13 +150,32 @@ on:
           - waynesboro
           - williamsburg
           - winchester
+      download_type:
+        description: 'What to download'
+        required: false
+        default: 'both'
+        type: choice
+        options:
+          - 'both'
+          - 'crash_only'
+          - 'grants_only'
 
 permissions:
   contents: write
 
+env:
+  NOTIFICATION_EMAIL: ecomhub200@gmail.com
+
 jobs:
-  download-data:
+  download-crash-data:
     runs-on: ubuntu-latest
+    # Run crash download on first Monday of month OR manual trigger (not grants_only)
+    if: |
+      github.event_name == 'workflow_dispatch' && github.event.inputs.download_type != 'grants_only' ||
+      github.event_name == 'schedule' && github.event.schedule == '0 11 1-7 * 1'
+    outputs:
+      crash_status: ${{ steps.crash-download.outcome }}
+      crash_records: ${{ steps.crash-stats.outputs.records }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -191,11 +213,22 @@ jobs:
             fi
           fi
 
+      - name: API Health Check
+        id: health-check
+        run: |
+          echo "=========================================="
+          echo "Running API Health Check"
+          echo "=========================================="
+          python download_crash_data.py --health-check
+          echo "health_status=success" >> $GITHUB_OUTPUT
+
       - name: Download crash data (all 3 road type filters)
+        id: crash-download
         run: |
           JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
           echo "=========================================="
           echo "Downloading data for: $JURISDICTION"
+          echo "Download started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
 
           # Download County/City Roads Only
@@ -215,19 +248,159 @@ jobs:
           cp "data/${JURISDICTION}_county_roads.csv" "data/crashes.csv"
 
           echo "=========================================="
-          echo "Download complete!"
-          echo "Generated files:"
-          ls -la data/*.csv
+          echo "Download complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
 
-      - name: Download grants data
-        continue-on-error: true
-        run: python download_grants_data.py
+      - name: Generate download statistics
+        id: crash-stats
+        run: |
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+          echo "=========================================="
+          echo "Download Statistics"
+          echo "=========================================="
 
-      - name: Commit and push changes
+          # Count records in each file
+          COUNTY_RECORDS=$(wc -l < "data/${JURISDICTION}_county_roads.csv" | tr -d ' ')
+          NO_INTERSTATE_RECORDS=$(wc -l < "data/${JURISDICTION}_no_interstate.csv" | tr -d ' ')
+          ALL_ROADS_RECORDS=$(wc -l < "data/${JURISDICTION}_all_roads.csv" | tr -d ' ')
+
+          echo "County/City Roads Only: $((COUNTY_RECORDS - 1)) records"
+          echo "All Roads (No Interstate): $((NO_INTERSTATE_RECORDS - 1)) records"
+          echo "All Roads (Including Interstate): $((ALL_ROADS_RECORDS - 1)) records"
+
+          # File sizes
+          echo ""
+          echo "File sizes:"
+          ls -lh data/*.csv
+
+          # Output for notifications
+          echo "records=$((COUNTY_RECORDS - 1))" >> $GITHUB_OUTPUT
+
+          echo "=========================================="
+
+      - name: Commit and push crash data changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add data/
-          git diff --staged --quiet || git commit -m "Auto-update: Traffic data - $(date +'%Y-%m-%d')"
+          git diff --staged --quiet || git commit -m "Auto-update: Crash data - $(date +'%Y-%m-%d')"
           git push || echo "No changes to push"
+
+  download-grants-data:
+    runs-on: ubuntu-latest
+    # Run grants download every Monday OR manual trigger (not crash_only)
+    if: |
+      github.event_name == 'workflow_dispatch' && github.event.inputs.download_type != 'crash_only' ||
+      github.event_name == 'schedule' && github.event.schedule == '0 11 * * 1'
+    outputs:
+      grants_status: ${{ steps.grants-download.outcome }}
+      grants_count: ${{ steps.grants-stats.outputs.count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download grants data
+        id: grants-download
+        run: |
+          echo "=========================================="
+          echo "Downloading Grants Data"
+          echo "Download started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+          python download_grants_data.py
+          echo "=========================================="
+          echo "Download complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+      - name: Generate grants statistics
+        id: grants-stats
+        run: |
+          if [ -f "data/grants.csv" ]; then
+            GRANTS_COUNT=$(wc -l < "data/grants.csv" | tr -d ' ')
+            echo "Total grants: $((GRANTS_COUNT - 1))"
+            echo "count=$((GRANTS_COUNT - 1))" >> $GITHUB_OUTPUT
+          else
+            echo "No grants file found"
+            echo "count=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push grants data changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/
+          git diff --staged --quiet || git commit -m "Auto-update: Grants data - $(date +'%Y-%m-%d')"
+          git push || echo "No changes to push"
+
+  notify-on-failure:
+    runs-on: ubuntu-latest
+    needs: [download-crash-data, download-grants-data]
+    if: failure()
+    steps:
+      - name: Send failure notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "⚠️ CRASH LENS Data Download Failed - ${{ github.repository }}"
+          to: ${{ env.NOTIFICATION_EMAIL }}
+          from: "CRASH LENS Bot <noreply@crashlens.local>"
+          body: |
+            The automated data download workflow has failed.
+
+            Repository: ${{ github.repository }}
+            Workflow: ${{ github.workflow }}
+            Run ID: ${{ github.run_id }}
+            Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Trigger: ${{ github.event_name }}
+            Time: ${{ github.event.head_commit.timestamp || 'Scheduled run' }}
+
+            Please check the workflow logs for details.
+
+            --
+            CRASH LENS Automated Notification
+
+  notify-on-success:
+    runs-on: ubuntu-latest
+    needs: [download-crash-data, download-grants-data]
+    if: success() && github.event_name == 'schedule'
+    steps:
+      - name: Send success notification (monthly only)
+        if: github.event.schedule == '0 11 1-7 * 1'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "✅ CRASH LENS Monthly Data Update Complete"
+          to: ${{ env.NOTIFICATION_EMAIL }}
+          from: "CRASH LENS Bot <noreply@crashlens.local>"
+          body: |
+            The monthly crash data download has completed successfully.
+
+            Repository: ${{ github.repository }}
+            Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Crash Records Downloaded: ${{ needs.download-crash-data.outputs.crash_records || 'N/A' }}
+            Grants Updated: ${{ needs.download-grants-data.outputs.grants_count || 'N/A' }}
+
+            Data Source: Virginia Roads (VDOT)
+            Dataset ID: 1a96a2f31b4f4d77991471b6cabb38ba
+
+            --
+            CRASH LENS Automated Notification

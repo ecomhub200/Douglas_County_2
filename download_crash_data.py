@@ -15,10 +15,13 @@ import json
 import logging
 import os
 import sys
+import time
 from datetime import datetime
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Configure logging
 logging.basicConfig(
@@ -38,6 +41,82 @@ OUTPUT_DIR = os.path.join(SCRIPT_DIR, "data")
 
 # Pagination settings
 RECORDS_PER_REQUEST = 2000
+
+# Retry settings
+MAX_RETRIES = 4
+RETRY_BACKOFF_FACTOR = 2  # 2s, 4s, 8s, 16s
+
+
+def create_session_with_retries():
+    """Create a requests session with retry logic."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=MAX_RETRIES,
+        backoff_factor=RETRY_BACKOFF_FACTOR,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["HEAD", "GET", "OPTIONS"]
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
+def make_request_with_retry(url, params=None, timeout=60, max_manual_retries=3):
+    """
+    Make HTTP request with manual retry logic for network errors.
+    Uses exponential backoff: 2s, 4s, 8s, 16s
+    """
+    session = create_session_with_retries()
+    last_exception = None
+
+    for attempt in range(max_manual_retries):
+        try:
+            response = session.get(url, params=params, timeout=timeout)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.Timeout as e:
+            last_exception = e
+            wait_time = RETRY_BACKOFF_FACTOR ** (attempt + 1)
+            logger.warning(f"Request timeout (attempt {attempt + 1}/{max_manual_retries}). Retrying in {wait_time}s...")
+            time.sleep(wait_time)
+        except requests.exceptions.ConnectionError as e:
+            last_exception = e
+            wait_time = RETRY_BACKOFF_FACTOR ** (attempt + 1)
+            logger.warning(f"Connection error (attempt {attempt + 1}/{max_manual_retries}). Retrying in {wait_time}s...")
+            time.sleep(wait_time)
+        except requests.exceptions.HTTPError as e:
+            # Don't retry on 4xx errors (except 429 which is handled by Retry strategy)
+            if e.response is not None and 400 <= e.response.status_code < 500 and e.response.status_code != 429:
+                raise
+            last_exception = e
+            wait_time = RETRY_BACKOFF_FACTOR ** (attempt + 1)
+            logger.warning(f"HTTP error (attempt {attempt + 1}/{max_manual_retries}). Retrying in {wait_time}s...")
+            time.sleep(wait_time)
+
+    raise last_exception or Exception("Request failed after all retries")
+
+
+def health_check_api(api_url):
+    """
+    Perform a health check on the API endpoint.
+    Returns True if API is accessible, False otherwise.
+    """
+    try:
+        params = {'where': '1=1', 'returnCountOnly': 'true', 'f': 'json'}
+        response = make_request_with_retry(api_url, params=params, timeout=30, max_manual_retries=2)
+        data = response.json()
+
+        if 'error' in data:
+            logger.error(f"API health check failed: {data['error']}")
+            return False
+
+        count = data.get('count', 0)
+        logger.info(f"API health check passed. Total records available: {count:,}")
+        return True
+    except Exception as e:
+        logger.error(f"API health check failed: {e}")
+        return False
 
 
 def load_config():
@@ -102,15 +181,14 @@ def list_jurisdictions(config):
 
 
 def get_arcgis_record_count(api_url, where_clause):
-    """Get total record count from ArcGIS API."""
+    """Get total record count from ArcGIS API with retry logic."""
     params = {
         'where': where_clause,
         'returnCountOnly': 'true',
         'f': 'json'
     }
 
-    response = requests.get(api_url, params=params, timeout=60)
-    response.raise_for_status()
+    response = make_request_with_retry(api_url, params=params, timeout=60)
     data = response.json()
 
     if 'error' in data:
@@ -120,7 +198,7 @@ def get_arcgis_record_count(api_url, where_clause):
 
 
 def download_arcgis_page(api_url, where_clause, offset):
-    """Download a page of records from ArcGIS API."""
+    """Download a page of records from ArcGIS API with retry logic."""
     params = {
         'where': where_clause,
         'outFields': '*',
@@ -131,8 +209,7 @@ def download_arcgis_page(api_url, where_clause, offset):
         'f': 'json'
     }
 
-    response = requests.get(api_url, params=params, timeout=120)
-    response.raise_for_status()
+    response = make_request_with_retry(api_url, params=params, timeout=120)
     data = response.json()
 
     if 'error' in data:
@@ -150,13 +227,46 @@ def download_arcgis_page(api_url, where_clause, offset):
     return records
 
 
+def find_working_api_url(config):
+    """
+    Try to find a working API URL from configured options.
+    Returns the first URL that passes health check.
+    """
+    data_source = config.get('dataSource', {})
+    primary_url = data_source.get('apiUrl')
+    alternative_urls = data_source.get('apiUrlAlternatives', [])
+
+    # Build list of URLs to try
+    urls_to_try = []
+    if primary_url:
+        urls_to_try.append(primary_url)
+    urls_to_try.extend(alternative_urls)
+
+    # Default fallback
+    if not urls_to_try:
+        urls_to_try.append("https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_Basic_Updated/FeatureServer/0/query")
+
+    for url in urls_to_try:
+        logger.info(f"Testing API endpoint: {url}")
+        if health_check_api(url):
+            logger.info(f"Using API endpoint: {url}")
+            return url
+        else:
+            logger.warning(f"API endpoint not available: {url}")
+
+    logger.error("No working API endpoint found!")
+    return None
+
+
 def download_from_arcgis(config, jurisdiction_config):
     """
     Download crash data from ArcGIS REST API with pagination.
-    Filters for the specified jurisdiction.
+    Tries multiple API endpoints and filters for the specified jurisdiction.
     """
-    api_url = config.get('dataSource', {}).get('apiUrl',
-        "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_test/FeatureServer/0/query")
+    api_url = find_working_api_url(config)
+
+    if not api_url:
+        raise Exception("No working ArcGIS API endpoint available")
 
     juris_code = jurisdiction_config.get('jurisCode', '')
     name_patterns = jurisdiction_config.get('namePatterns', [])
@@ -226,14 +336,13 @@ def download_from_arcgis(config, jurisdiction_config):
 
 
 def download_from_fallback(config):
-    """Download crash data from fallback CSV URL."""
+    """Download crash data from fallback CSV URL with retry logic."""
     fallback_url = config.get('dataSource', {}).get('fallbackUrl',
-        "https://www.virginiaroads.org/api/download/v1/items/101101cecac34f28b38c0846e847bd0b/csv?layers=1")
+        "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0")
 
-    logger.info("Attempting download from fallback CSV URL...")
+    logger.info(f"Attempting download from fallback CSV URL: {fallback_url}")
 
-    response = requests.get(fallback_url, timeout=300)
-    response.raise_for_status()
+    response = make_request_with_retry(fallback_url, timeout=300, max_manual_retries=4)
 
     # Save temporarily and read as CSV
     import io
@@ -526,6 +635,12 @@ Examples:
         help='List all available jurisdictions and exit'
     )
 
+    parser.add_argument(
+        '--health-check',
+        action='store_true',
+        help='Run API health check and exit'
+    )
+
     return parser.parse_args()
 
 
@@ -540,6 +655,17 @@ def main():
     if args.list:
         list_jurisdictions(config)
         return 0
+
+    # Handle --health-check option
+    if args.health_check:
+        logger.info("Running API health check...")
+        working_url = find_working_api_url(config)
+        if working_url:
+            logger.info(f"Health check PASSED. Working endpoint: {working_url}")
+            return 0
+        else:
+            logger.error("Health check FAILED. No working API endpoint found.")
+            return 1
 
     # Get jurisdiction
     jurisdiction_id = args.jurisdiction or config.get('defaults', {}).get('jurisdiction', 'henrico')

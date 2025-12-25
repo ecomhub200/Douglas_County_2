@@ -1363,7 +1363,13 @@
   "dataSource": {
     "name": "Virginia Roads",
     "url": "https://www.virginiaroads.org",
-    "apiUrl": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_test/FeatureServer/0/query",
-    "fallbackUrl": "https://www.virginiaroads.org/api/download/v1/items/101101cecac34f28b38c0846e847bd0b/csv?layers=1"
+    "apiUrl": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_Basic_Updated/FeatureServer/0/query",
+    "apiUrlAlternatives": [
+      "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/Crash_Data_Updated/FeatureServer/0/query",
+      "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData/FeatureServer/0/query",
+      "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_test/FeatureServer/0/query"
+    ],
+    "fallbackUrl": "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0",
+    "datasetId": "1a96a2f31b4f4d77991471b6cabb38ba"
   }
 }
