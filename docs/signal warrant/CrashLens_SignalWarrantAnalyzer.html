@@ -1,0 +1,2307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crash Lens - Signal Warrant Analyzer | MUTCD 11th Edition</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.2.2/docx.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1e3a5f;
+      --primary-light: #2d5a8a;
+      --accent: #e67e22;
+      --accent-light: #f39c12;
+      --success: #27ae60;
+      --success-bg: #d4edda;
+      --warning: #f39c12;
+      --warning-bg: #fff3cd;
+      --danger: #c0392b;
+      --danger-bg: #f8d7da;
+      --gray-50: #f8fafc;
+      --gray-100: #f1f5f9;
+      --gray-200: #e2e8f0;
+      --gray-300: #cbd5e1;
+      --gray-400: #94a3b8;
+      --gray-500: #64748b;
+      --gray-600: #475569;
+      --gray-700: #334155;
+      --gray-800: #1e293b;
+      --radius: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, var(--gray-100) 0%, var(--gray-200) 100%);
+      min-height: 100vh;
+      color: var(--gray-800);
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    
+    /* Header */
+    header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 32px 24px;
+      margin-bottom: 24px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    
+    header h1 .icon {
+      font-size: 2.5rem;
+    }
+    
+    header p {
+      opacity: 0.9;
+      font-size: 1.05rem;
+    }
+    
+    .mutcd-badge {
+      display: inline-block;
+      background: var(--accent);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-top: 12px;
+    }
+    
+    /* Cards */
+    .card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--gray-200);
+    }
+    
+    .card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--gray-100);
+    }
+    
+    .card h2 .card-icon {
+      font-size: 1.3rem;
+    }
+    
+    /* Form Elements */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .form-group label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--gray-600);
+      margin-bottom: 6px;
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      padding: 10px 12px;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius);
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+    }
+    
+    .form-group input[type="number"] {
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    
+    .checkbox-group input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+    }
+    
+    .checkbox-group label {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--gray-700);
+    }
+    
+    /* Buttons */
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: var(--primary-light);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow);
+    }
+    
+    .btn-accent {
+      background: var(--accent);
+      color: white;
+    }
+    
+    .btn-accent:hover {
+      background: var(--accent-light);
+    }
+    
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+    
+    .btn-success:hover {
+      background: #219a52;
+    }
+    
+    .btn-outline {
+      background: transparent;
+      border: 2px solid var(--primary);
+      color: var(--primary);
+    }
+    
+    .btn-outline:hover {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .btn-sm {
+      padding: 8px 16px;
+      font-size: 0.85rem;
+    }
+    
+    /* Upload Zone */
+    .upload-zone {
+      border: 2px dashed var(--gray-300);
+      border-radius: var(--radius);
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--gray-50);
+    }
+    
+    .upload-zone:hover,
+    .upload-zone.dragover {
+      border-color: var(--primary);
+      background: rgba(30, 58, 95, 0.05);
+    }
+    
+    .upload-zone .upload-icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+    }
+    
+    .upload-zone p {
+      color: var(--gray-600);
+      margin-bottom: 8px;
+    }
+    
+    .upload-zone .vendors {
+      font-size: 0.85rem;
+      color: var(--gray-500);
+    }
+    
+    /* File List */
+    .file-list {
+      margin-top: 16px;
+    }
+    
+    .file-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--gray-50);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+      border: 1px solid var(--gray-200);
+    }
+    
+    .file-item .file-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .file-item .file-icon {
+      font-size: 1.5rem;
+    }
+    
+    .file-item .file-name {
+      font-weight: 500;
+      color: var(--gray-700);
+    }
+    
+    .file-item .file-size {
+      font-size: 0.85rem;
+      color: var(--gray-500);
+    }
+    
+    .file-item .file-status {
+      font-size: 0.85rem;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+    
+    .file-item .file-status.pending {
+      background: var(--warning-bg);
+      color: #856404;
+    }
+    
+    .file-item .file-status.processing {
+      background: #cce5ff;
+      color: #004085;
+    }
+    
+    .file-item .file-status.complete {
+      background: var(--success-bg);
+      color: #155724;
+    }
+    
+    .file-item .file-status.error {
+      background: var(--danger-bg);
+      color: #721c24;
+    }
+    
+    .file-item .remove-btn {
+      background: none;
+      border: none;
+      color: var(--gray-400);
+      cursor: pointer;
+      font-size: 1.2rem;
+      padding: 4px;
+    }
+    
+    .file-item .remove-btn:hover {
+      color: var(--danger);
+    }
+    
+    /* Results Section */
+    .results-section {
+      display: none;
+    }
+    
+    .results-section.visible {
+      display: block;
+    }
+    
+    .result-banner {
+      padding: 24px;
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    
+    .result-banner.warranted {
+      background: linear-gradient(135deg, var(--success-bg) 0%, #c3e6cb 100%);
+      border: 2px solid var(--success);
+    }
+    
+    .result-banner.not-warranted {
+      background: linear-gradient(135deg, var(--warning-bg) 0%, #ffeeba 100%);
+      border: 2px solid var(--warning);
+    }
+    
+    .result-banner .result-icon {
+      font-size: 3rem;
+    }
+    
+    .result-banner .result-text h3 {
+      font-size: 1.5rem;
+      margin-bottom: 4px;
+    }
+    
+    .result-banner .result-text p {
+      color: var(--gray-600);
+    }
+    
+    /* Warrant Cards */
+    .warrant-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    
+    .warrant-card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 20px;
+      border: 2px solid var(--gray-200);
+      transition: all 0.2s;
+    }
+    
+    .warrant-card.met {
+      border-color: var(--success);
+      background: linear-gradient(135deg, white 0%, var(--success-bg) 100%);
+    }
+    
+    .warrant-card.not-met {
+      border-color: var(--gray-300);
+    }
+    
+    .warrant-card .warrant-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    
+    .warrant-card .warrant-title {
+      font-weight: 600;
+      color: var(--gray-800);
+    }
+    
+    .warrant-card .warrant-status {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    
+    .warrant-card .warrant-status.met {
+      background: var(--success);
+      color: white;
+    }
+    
+    .warrant-card .warrant-status.not-met {
+      background: var(--gray-300);
+      color: var(--gray-600);
+    }
+    
+    .warrant-card .warrant-details {
+      font-size: 0.9rem;
+      color: var(--gray-600);
+    }
+    
+    .warrant-card .warrant-details strong {
+      color: var(--gray-700);
+    }
+    
+    /* Data Table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin-top: 16px;
+    }
+    
+    .data-table th,
+    .data-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    
+    .data-table th {
+      background: var(--gray-100);
+      font-weight: 600;
+      color: var(--gray-700);
+      position: sticky;
+      top: 0;
+    }
+    
+    .data-table tr:hover {
+      background: var(--gray-50);
+    }
+    
+    .data-table .met-cell {
+      background: var(--success-bg);
+      color: #155724;
+      font-weight: 500;
+    }
+    
+    .data-table .not-met-cell {
+      background: var(--gray-100);
+      color: var(--gray-500);
+    }
+    
+    .data-table .numeric {
+      font-family: 'IBM Plex Mono', monospace;
+      text-align: right;
+    }
+    
+    /* Collapsible */
+    .collapsible {
+      margin-top: 16px;
+    }
+    
+    .collapsible-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--gray-100);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-weight: 500;
+      color: var(--gray-700);
+    }
+    
+    .collapsible-header:hover {
+      background: var(--gray-200);
+    }
+    
+    .collapsible-content {
+      display: none;
+      padding: 16px;
+      border: 1px solid var(--gray-200);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .collapsible-content.open {
+      display: block;
+    }
+    
+    /* Progress Bar */
+    .progress-container {
+      margin: 20px 0;
+    }
+    
+    .progress-bar {
+      height: 8px;
+      background: var(--gray-200);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+    
+    .progress-text {
+      font-size: 0.85rem;
+      color: var(--gray-600);
+      margin-top: 8px;
+      text-align: center;
+    }
+    
+    /* Alert */
+    .alert {
+      padding: 16px;
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    
+    .alert-warning {
+      background: var(--warning-bg);
+      border: 1px solid #ffc107;
+      color: #856404;
+    }
+    
+    .alert-info {
+      background: #cce5ff;
+      border: 1px solid #b8daff;
+      color: #004085;
+    }
+    
+    .alert-icon {
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+    
+    /* Tabs */
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid var(--gray-200);
+      margin-bottom: 16px;
+    }
+    
+    .tab {
+      padding: 12px 20px;
+      background: none;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--gray-500);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+    
+    .tab:hover {
+      color: var(--gray-700);
+    }
+    
+    .tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    /* Action Bar */
+    .action-bar {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      padding: 24px;
+      background: var(--gray-100);
+      border-radius: var(--radius);
+      margin: 24px 0;
+    }
+    
+    /* Disclaimer */
+    .disclaimer {
+      background: linear-gradient(135deg, var(--warning-bg) 0%, #ffeeba 100%);
+      border: 1px solid #ffc107;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-top: 24px;
+    }
+    
+    .disclaimer p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #856404;
+    }
+    
+    .disclaimer strong {
+      color: #664d03;
+    }
+    
+    /* Loading Spinner */
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Hidden */
+    .hidden {
+      display: none !important;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .container {
+        padding: 16px;
+      }
+      
+      header h1 {
+        font-size: 1.5rem;
+      }
+      
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .action-bar {
+        flex-direction: column;
+      }
+      
+      .warrant-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    /* RT Method Toggle */
+    .rt-options {
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--gray-50);
+      border-radius: var(--radius);
+      border: 1px solid var(--gray-200);
+    }
+    
+    .rt-options h4 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--gray-700);
+      margin-bottom: 12px;
+    }
+    
+    /* Gap Analysis Bar */
+    .gap-bar {
+      height: 24px;
+      background: var(--gray-200);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+      margin: 4px 0;
+    }
+    
+    .gap-fill {
+      height: 100%;
+      transition: width 0.3s;
+    }
+    
+    .gap-fill.low { background: var(--danger); }
+    .gap-fill.medium { background: var(--warning); }
+    .gap-fill.high { background: var(--success); }
+    
+    .gap-threshold {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--gray-800);
+      left: 100%;
+    }
+    
+    .gap-label {
+      font-size: 0.75rem;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--gray-600);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1><span class="icon">🚦</span> Crash Lens Signal Warrant Analyzer</h1>
+      <p>Automated MUTCD signal warrant evaluation with AI-powered data extraction</p>
+      <span class="mutcd-badge">MUTCD 11th Edition (December 2023)</span>
+    </header>
+    
+    <!-- API Configuration -->
+    <div class="card" id="api-config-card">
+      <h2><span class="card-icon">🔑</span> AI Configuration</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="ai-provider">AI Provider</label>
+          <select id="ai-provider">
+            <option value="anthropic">Claude (Anthropic)</option>
+            <option value="openai">GPT-4 (OpenAI)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="api-key">API Key</label>
+          <input type="password" id="api-key" placeholder="Enter your API key">
+        </div>
+        <div class="form-group" style="justify-content: flex-end;">
+          <button class="btn btn-outline btn-sm" onclick="testAPIConnection()">
+            Test Connection
+          </button>
+        </div>
+      </div>
+      <div id="api-status" class="alert hidden" style="margin-top: 16px;"></div>
+    </div>
+    
+    <!-- Intersection Configuration -->
+    <div class="card">
+      <h2><span class="card-icon">📍</span> Intersection Details</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="intersection-name">Intersection Name</label>
+          <input type="text" id="intersection-name" placeholder="e.g., Broad St & Staples Mill Rd">
+        </div>
+        <div class="form-group">
+          <label for="major-street">Major Street</label>
+          <input type="text" id="major-street" placeholder="e.g., Broad St">
+        </div>
+        <div class="form-group">
+          <label for="minor-street">Minor Street</label>
+          <input type="text" id="minor-street" placeholder="e.g., Staples Mill Rd">
+        </div>
+        <div class="form-group">
+          <label for="major-lanes">Major Street Lanes (per approach)</label>
+          <select id="major-lanes">
+            <option value="1">1 Lane</option>
+            <option value="2" selected>2 or More Lanes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="minor-lanes">Minor Street Lanes (per approach)</label>
+          <select id="minor-lanes">
+            <option value="1" selected>1 Lane</option>
+            <option value="2">2 or More Lanes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="speed-limit">Major Street Speed Limit (mph)</label>
+          <input type="number" id="speed-limit" value="35" min="15" max="70">
+        </div>
+        <div class="form-group">
+          <label for="intersection-legs">Intersection Type</label>
+          <select id="intersection-legs">
+            <option value="4" selected>4-Leg Intersection</option>
+            <option value="3">3-Leg (T-Intersection)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="community-pop">Community Population</label>
+          <input type="number" id="community-pop" value="50000" min="0">
+        </div>
+      </div>
+      
+      <div class="checkbox-group" style="margin-top: 16px;">
+        <input type="checkbox" id="apply-70pct">
+        <label for="apply-70pct">Apply 70% reduction factor (auto-calculated based on speed > 40 mph or population < 10,000)</label>
+      </div>
+    </div>
+    
+    <!-- Count Configuration -->
+    <div class="card">
+      <h2><span class="card-icon">⏱️</span> Count Configuration</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="count-duration">Count Duration</label>
+          <select id="count-duration">
+            <option value="12hr">12-Hour Count (6 AM - 6 PM)</option>
+            <option value="24hr">24-Hour Count</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="major-direction">Major Street Direction</label>
+          <select id="major-direction">
+            <option value="EW" selected>East-West (EB/WB)</option>
+            <option value="NS">North-South (NB/SB)</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="rt-options">
+        <h4>Right-Turn Reduction Method</h4>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="rt-method">Reduction Method</label>
+            <select id="rt-method" onchange="toggleRTOptions()">
+              <option value="fixed" selected>Fixed Percentage</option>
+              <option value="pagones">Pagones Theorem</option>
+              <option value="none">No Reduction</option>
+            </select>
+          </div>
+          <div class="form-group" id="fixed-rt-group">
+            <label for="fixed-rt-percent">Fixed Reduction %</label>
+            <input type="number" id="fixed-rt-percent" value="30" min="0" max="100">
+          </div>
+          <div class="form-group hidden" id="pagones-rt-group">
+            <label for="pagones-config">Minor Street RT Configuration</label>
+            <select id="pagones-config">
+              <option value="sharedLane">Shared Lane (up to 30% reduction)</option>
+              <option value="exclusiveRTLane">Exclusive RT Lane (up to 75%)</option>
+              <option value="channelizedRT">Channelized RT (up to 100%)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- File Upload -->
+    <div class="card">
+      <h2><span class="card-icon">📁</span> Upload Count Data</h2>
+      <div class="upload-zone" id="upload-zone" 
+           ondrop="handleDrop(event)" 
+           ondragover="handleDragOver(event)" 
+           ondragleave="handleDragLeave(event)"
+           onclick="document.getElementById('file-input').click()">
+        <div class="upload-icon">📤</div>
+        <p><strong>Drag & drop Excel files here</strong> or click to browse</p>
+        <p class="vendors">Supports: Quality Counts, Miovision, All Traffic Data, Rekor, Jamar, and other TMC formats</p>
+        <input type="file" id="file-input" multiple accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)" style="display: none;">
+      </div>
+      
+      <div class="file-list" id="file-list"></div>
+    </div>
+    
+    <!-- Process Button -->
+    <div class="action-bar">
+      <button class="btn btn-primary btn-lg" id="process-btn" onclick="processFiles()" disabled>
+        <span id="process-btn-text">🔍 Extract & Analyze Data</span>
+        <span id="process-spinner" class="spinner hidden"></span>
+      </button>
+    </div>
+    
+    <!-- Progress -->
+    <div class="progress-container hidden" id="progress-container">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+      </div>
+      <p class="progress-text" id="progress-text">Initializing...</p>
+    </div>
+    
+    <!-- Results Section -->
+    <div class="results-section" id="results-section">
+      <!-- Overall Result Banner -->
+      <div class="result-banner" id="result-banner">
+        <div class="result-icon" id="result-icon">🚦</div>
+        <div class="result-text">
+          <h3 id="result-title">Analysis Complete</h3>
+          <p id="result-subtitle">Review the warrant evaluation below</p>
+        </div>
+      </div>
+      
+      <!-- Warrant Summary Cards -->
+      <div class="warrant-grid" id="warrant-grid">
+        <!-- Populated by JavaScript -->
+      </div>
+      
+      <!-- Detailed Results Tabs -->
+      <div class="card">
+        <h2><span class="card-icon">📊</span> Detailed Analysis</h2>
+        
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('summary')">Summary</button>
+          <button class="tab" onclick="switchTab('warrant1')">Warrant 1</button>
+          <button class="tab" onclick="switchTab('warrant2')">Warrant 2</button>
+          <button class="tab" onclick="switchTab('warrant3')">Warrant 3</button>
+          <button class="tab" onclick="switchTab('hourly')">Hourly Data</button>
+        </div>
+        
+        <div class="tab-content active" id="tab-summary">
+          <div id="summary-content"></div>
+        </div>
+        
+        <div class="tab-content" id="tab-warrant1">
+          <div id="warrant1-content"></div>
+        </div>
+        
+        <div class="tab-content" id="tab-warrant2">
+          <div id="warrant2-content"></div>
+        </div>
+        
+        <div class="tab-content" id="tab-warrant3">
+          <div id="warrant3-content"></div>
+        </div>
+        
+        <div class="tab-content" id="tab-hourly">
+          <div id="hourly-content"></div>
+        </div>
+      </div>
+      
+      <!-- Generate Memo Button -->
+      <div class="action-bar">
+        <button class="btn btn-success" onclick="generateMemo()">
+          📄 Generate Official Memo (Word)
+        </button>
+        <button class="btn btn-outline" onclick="exportCSV()">
+          📊 Export Data (CSV)
+        </button>
+      </div>
+    </div>
+    
+    <!-- Disclaimer -->
+    <div class="disclaimer">
+      <p>
+        <strong>⚠️ Disclaimer:</strong> This tool is for screening purposes only and does not constitute 
+        professional engineering advice. Per MUTCD 11th Edition Section 4C.01: "The satisfaction of a traffic 
+        signal warrant or warrants shall not in itself require the installation of a traffic control signal." 
+        Final warrant determinations require review by a licensed Professional Engineer and field verification 
+        of all data inputs.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // GLOBAL STATE
+    // ==========================================
+    let uploadedFiles = [];
+    let extractedData = [];
+    let analysisResults = null;
+    
+    // ==========================================
+    // MUTCD 11TH EDITION THRESHOLDS
+    // ==========================================
+    
+    // Table 4C-1: Warrant 1, Eight-Hour Vehicular Volume
+    const WARRANT1_THRESHOLDS = {
+      conditionA: {
+        '1x1': { p100: { major: 500, minor: 150 }, p80: { major: 400, minor: 120 }, p70: { major: 350, minor: 105 }, p56: { major: 280, minor: 84 } },
+        '2x1': { p100: { major: 600, minor: 150 }, p80: { major: 480, minor: 120 }, p70: { major: 420, minor: 105 }, p56: { major: 336, minor: 84 } },
+        '2x2': { p100: { major: 600, minor: 200 }, p80: { major: 480, minor: 160 }, p70: { major: 420, minor: 140 }, p56: { major: 336, minor: 112 } },
+        '1x2': { p100: { major: 500, minor: 200 }, p80: { major: 400, minor: 160 }, p70: { major: 350, minor: 140 }, p56: { major: 280, minor: 112 } }
+      },
+      conditionB: {
+        '1x1': { p100: { major: 750, minor: 75 }, p80: { major: 600, minor: 60 }, p70: { major: 525, minor: 53 }, p56: { major: 420, minor: 42 } },
+        '2x1': { p100: { major: 900, minor: 75 }, p80: { major: 720, minor: 60 }, p70: { major: 630, minor: 53 }, p56: { major: 504, minor: 42 } },
+        '2x2': { p100: { major: 900, minor: 100 }, p80: { major: 720, minor: 80 }, p70: { major: 630, minor: 70 }, p56: { major: 504, minor: 56 } },
+        '1x2': { p100: { major: 750, minor: 100 }, p80: { major: 600, minor: 80 }, p70: { major: 525, minor: 70 }, p56: { major: 420, minor: 56 } }
+      }
+    };
+    
+    // Figures 4C-1 and 4C-2: Warrant 2, Four-Hour Vehicular Volume
+    const WARRANT2_CURVES = {
+      standard: {
+        '1x1': [{ major: 400, minor: 80 }, { major: 600, minor: 70 }, { major: 800, minor: 56 }, { major: 1000, minor: 47 }, { major: 1200, minor: 40 }],
+        '2x1': [{ major: 400, minor: 80 }, { major: 600, minor: 80 }, { major: 800, minor: 70 }, { major: 1000, minor: 58 }, { major: 1200, minor: 50 }, { major: 1400, minor: 50 }],
+        '2x2': [{ major: 400, minor: 115 }, { major: 600, minor: 115 }, { major: 800, minor: 100 }, { major: 1000, minor: 83 }, { major: 1200, minor: 70 }, { major: 1400, minor: 60 }],
+        '1x2': [{ major: 400, minor: 115 }, { major: 600, minor: 100 }, { major: 800, minor: 80 }, { major: 1000, minor: 65 }, { major: 1200, minor: 55 }]
+      },
+      reduced: {
+        '1x1': [{ major: 280, minor: 60 }, { major: 420, minor: 49 }, { major: 560, minor: 39 }, { major: 700, minor: 33 }, { major: 840, minor: 28 }],
+        '2x1': [{ major: 280, minor: 60 }, { major: 420, minor: 56 }, { major: 560, minor: 49 }, { major: 700, minor: 41 }, { major: 840, minor: 35 }],
+        '2x2': [{ major: 280, minor: 80 }, { major: 420, minor: 80 }, { major: 560, minor: 70 }, { major: 700, minor: 58 }, { major: 840, minor: 49 }],
+        '1x2': [{ major: 280, minor: 80 }, { major: 420, minor: 70 }, { major: 560, minor: 56 }, { major: 700, minor: 46 }, { major: 840, minor: 39 }]
+      }
+    };
+    
+    // Figures 4C-3 and 4C-4: Warrant 3, Peak Hour
+    const WARRANT3_CURVES = {
+      standard: {
+        '1x1': [{ major: 400, minor: 135 }, { major: 600, minor: 115 }, { major: 800, minor: 100 }, { major: 1000, minor: 100 }, { major: 1200, minor: 100 }],
+        '2x1': [{ major: 500, minor: 135 }, { major: 700, minor: 115 }, { major: 900, minor: 100 }, { major: 1100, minor: 100 }, { major: 1300, minor: 100 }],
+        '2x2': [{ major: 600, minor: 190 }, { major: 800, minor: 165 }, { major: 1000, minor: 150 }, { major: 1200, minor: 150 }, { major: 1400, minor: 150 }],
+        '1x2': [{ major: 500, minor: 175 }, { major: 700, minor: 150 }, { major: 900, minor: 150 }, { major: 1100, minor: 150 }]
+      },
+      reduced: {
+        '1x1': [{ major: 280, minor: 95 }, { major: 420, minor: 80 }, { major: 560, minor: 75 }, { major: 700, minor: 75 }, { major: 840, minor: 75 }],
+        '2x1': [{ major: 350, minor: 95 }, { major: 490, minor: 80 }, { major: 630, minor: 75 }, { major: 770, minor: 75 }, { major: 910, minor: 75 }],
+        '2x2': [{ major: 420, minor: 133 }, { major: 560, minor: 115 }, { major: 700, minor: 100 }, { major: 840, minor: 100 }, { major: 980, minor: 100 }],
+        '1x2': [{ major: 350, minor: 122 }, { major: 490, minor: 105 }, { major: 630, minor: 100 }, { major: 770, minor: 100 }]
+      }
+    };
+    
+    // Pagones Theorem factors
+    const PAGONES_FACTORS = {
+      minorStreet: {
+        sharedLane: 0.30,
+        exclusiveRTLane: 0.75,
+        channelizedRT: 1.00
+      },
+      mainlineCongestion: [
+        { maxVolPerLane: 199, factor: 0.00 },
+        { maxVolPerLane: 299, factor: 0.10 },
+        { maxVolPerLane: 399, factor: 0.20 },
+        { maxVolPerLane: 499, factor: 0.30 },
+        { maxVolPerLane: 599, factor: 0.40 },
+        { maxVolPerLane: 699, factor: 0.50 },
+        { maxVolPerLane: 799, factor: 0.60 },
+        { maxVolPerLane: Infinity, factor: 0.70 }
+      ]
+    };
+    
+    // ==========================================
+    // UI FUNCTIONS
+    // ==========================================
+    
+    function toggleRTOptions() {
+      const method = document.getElementById('rt-method').value;
+      document.getElementById('fixed-rt-group').classList.toggle('hidden', method !== 'fixed');
+      document.getElementById('pagones-rt-group').classList.toggle('hidden', method !== 'pagones');
+    }
+    
+    function updateProcessButton() {
+      const hasFiles = uploadedFiles.length > 0;
+      const hasApiKey = document.getElementById('api-key').value.trim().length > 0;
+      document.getElementById('process-btn').disabled = !(hasFiles && hasApiKey);
+    }
+    
+    function update70PercentCheckbox() {
+      const speed = parseInt(document.getElementById('speed-limit').value) || 0;
+      const pop = parseInt(document.getElementById('community-pop').value) || 0;
+      const shouldApply = speed > 40 || pop < 10000;
+      document.getElementById('apply-70pct').checked = shouldApply;
+    }
+    
+    // Event listeners for auto-update
+    document.getElementById('speed-limit').addEventListener('change', update70PercentCheckbox);
+    document.getElementById('community-pop').addEventListener('change', update70PercentCheckbox);
+    document.getElementById('api-key').addEventListener('input', updateProcessButton);
+    
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      document.querySelector(`.tab[onclick*="${tabName}"]`).classList.add('active');
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+    }
+    
+    // ==========================================
+    // FILE HANDLING
+    // ==========================================
+    
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('upload-zone').classList.add('dragover');
+    }
+    
+    function handleDragLeave(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('upload-zone').classList.remove('dragover');
+    }
+    
+    function handleDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      document.getElementById('upload-zone').classList.remove('dragover');
+      
+      const files = Array.from(e.dataTransfer.files);
+      addFiles(files);
+    }
+    
+    function handleFileSelect(e) {
+      const files = Array.from(e.target.files);
+      addFiles(files);
+      e.target.value = '';
+    }
+    
+    function addFiles(files) {
+      const validExtensions = ['.xlsx', '.xls', '.csv'];
+      
+      files.forEach(file => {
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
+        if (validExtensions.includes(ext)) {
+          if (!uploadedFiles.find(f => f.name === file.name)) {
+            uploadedFiles.push({
+              file: file,
+              name: file.name,
+              size: file.size,
+              status: 'pending',
+              data: null
+            });
+          }
+        }
+      });
+      
+      renderFileList();
+      updateProcessButton();
+    }
+    
+    function removeFile(index) {
+      uploadedFiles.splice(index, 1);
+      renderFileList();
+      updateProcessButton();
+    }
+    
+    function renderFileList() {
+      const container = document.getElementById('file-list');
+      
+      if (uploadedFiles.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+      
+      container.innerHTML = uploadedFiles.map((f, i) => `
+        <div class="file-item">
+          <div class="file-info">
+            <span class="file-icon">📊</span>
+            <div>
+              <div class="file-name">${f.name}</div>
+              <div class="file-size">${formatFileSize(f.size)}</div>
+            </div>
+          </div>
+          <span class="file-status ${f.status}">${getStatusText(f.status)}</span>
+          <button class="remove-btn" onclick="removeFile(${i})" ${f.status === 'processing' ? 'disabled' : ''}>✕</button>
+        </div>
+      `).join('');
+    }
+    
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+    
+    function getStatusText(status) {
+      const texts = {
+        pending: 'Pending',
+        processing: 'Processing...',
+        complete: 'Extracted',
+        error: 'Error'
+      };
+      return texts[status] || status;
+    }
+    
+    // ==========================================
+    // API CONNECTION TEST
+    // ==========================================
+    
+    async function testAPIConnection() {
+      const provider = document.getElementById('ai-provider').value;
+      const apiKey = document.getElementById('api-key').value.trim();
+      const statusDiv = document.getElementById('api-status');
+      
+      if (!apiKey) {
+        statusDiv.className = 'alert alert-warning';
+        statusDiv.innerHTML = '<span class="alert-icon">⚠️</span> Please enter an API key';
+        statusDiv.classList.remove('hidden');
+        return;
+      }
+      
+      statusDiv.className = 'alert alert-info';
+      statusDiv.innerHTML = '<span class="alert-icon">⏳</span> Testing connection...';
+      statusDiv.classList.remove('hidden');
+      
+      try {
+        if (provider === 'anthropic') {
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 10,
+              messages: [{ role: 'user', content: 'Hello' }]
+            })
+          });
+          
+          if (response.ok) {
+            statusDiv.className = 'alert';
+            statusDiv.style.background = 'var(--success-bg)';
+            statusDiv.style.border = '1px solid var(--success)';
+            statusDiv.style.color = '#155724';
+            statusDiv.innerHTML = '<span class="alert-icon">✅</span> Connection successful! Claude API is ready.';
+          } else {
+            throw new Error(`API returned ${response.status}`);
+          }
+        } else {
+          // OpenAI test
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4',
+              max_tokens: 10,
+              messages: [{ role: 'user', content: 'Hello' }]
+            })
+          });
+          
+          if (response.ok) {
+            statusDiv.className = 'alert';
+            statusDiv.style.background = 'var(--success-bg)';
+            statusDiv.style.border = '1px solid var(--success)';
+            statusDiv.style.color = '#155724';
+            statusDiv.innerHTML = '<span class="alert-icon">✅</span> Connection successful! OpenAI API is ready.';
+          } else {
+            throw new Error(`API returned ${response.status}`);
+          }
+        }
+      } catch (error) {
+        statusDiv.className = 'alert';
+        statusDiv.style.background = 'var(--danger-bg)';
+        statusDiv.style.border = '1px solid var(--danger)';
+        statusDiv.style.color = '#721c24';
+        statusDiv.innerHTML = `<span class="alert-icon">❌</span> Connection failed: ${error.message}`;
+      }
+    }
+    
+    // ==========================================
+    // DATA EXTRACTION
+    // ==========================================
+    
+    async function processFiles() {
+      const apiKey = document.getElementById('api-key').value.trim();
+      const provider = document.getElementById('ai-provider').value;
+      
+      if (!apiKey || uploadedFiles.length === 0) return;
+      
+      // Show progress
+      document.getElementById('progress-container').classList.remove('hidden');
+      document.getElementById('process-btn').disabled = true;
+      document.getElementById('process-btn-text').classList.add('hidden');
+      document.getElementById('process-spinner').classList.remove('hidden');
+      
+      extractedData = [];
+      
+      for (let i = 0; i < uploadedFiles.length; i++) {
+        const fileObj = uploadedFiles[i];
+        const progress = ((i + 0.5) / uploadedFiles.length) * 70;
+        updateProgress(progress, `Extracting data from ${fileObj.name}...`);
+        
+        fileObj.status = 'processing';
+        renderFileList();
+        
+        try {
+          // Read file as text/array buffer
+          const fileContent = await readFileAsText(fileObj.file);
+          
+          // Send to AI for extraction
+          const extracted = await extractWithAI(fileContent, fileObj.name, apiKey, provider);
+          
+          if (extracted) {
+            fileObj.status = 'complete';
+            fileObj.data = extracted;
+            extractedData.push({
+              ...extracted,
+              sourceFile: fileObj.name
+            });
+          } else {
+            fileObj.status = 'error';
+          }
+        } catch (error) {
+          console.error('Extraction error:', error);
+          fileObj.status = 'error';
+        }
+        
+        renderFileList();
+      }
+      
+      // Run warrant analysis
+      updateProgress(80, 'Running warrant analysis...');
+      await runWarrantAnalysis();
+      
+      updateProgress(100, 'Analysis complete!');
+      
+      // Reset UI
+      setTimeout(() => {
+        document.getElementById('progress-container').classList.add('hidden');
+        document.getElementById('process-btn').disabled = false;
+        document.getElementById('process-btn-text').classList.remove('hidden');
+        document.getElementById('process-spinner').classList.add('hidden');
+        
+        // Show results
+        document.getElementById('results-section').classList.add('visible');
+        document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+      }, 500);
+    }
+    
+    function readFileAsText(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        if (file.name.endsWith('.csv')) {
+          reader.onload = e => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsText(file);
+        } else {
+          // Excel file - use XLSX library
+          reader.onload = e => {
+            try {
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, { type: 'array' });
+              
+              // Convert all sheets to text
+              let fullText = '';
+              workbook.SheetNames.forEach(sheetName => {
+                fullText += `\n=== Sheet: ${sheetName} ===\n`;
+                const sheet = workbook.Sheets[sheetName];
+                fullText += XLSX.utils.sheet_to_csv(sheet);
+              });
+              
+              resolve(fullText);
+            } catch (err) {
+              reject(err);
+            }
+          };
+          reader.onerror = reject;
+          reader.readAsArrayBuffer(file);
+        }
+      });
+    }
+    
+    async function extractWithAI(fileContent, fileName, apiKey, provider) {
+      const systemPrompt = `You are a traffic data analyst. Extract turning movement count (TMC) data from the provided traffic count file.
+
+YOUR RESPONSIBILITIES:
+1. DETECT the vendor format (Quality Counts, Miovision, All Traffic Data, Rekor, Jamar, etc.)
+2. EXTRACT all traffic volumes by direction and movement (Left, Through, Right)
+3. AGGREGATE to hourly totals if data is in 15-minute intervals
+4. CALCULATE approach totals for each hour
+5. IDENTIFY the peak hour (highest total entering volume)
+
+EXTRACT THIS EXACT JSON STRUCTURE:
+{
+  "intersection": "Street1 & Street2",
+  "date": "YYYY-MM-DD",
+  "vendor": "detected vendor name",
+  "dataQuality": {
+    "hoursExtracted": number,
+    "missingHours": [],
+    "warnings": []
+  },
+  "peakHour": {
+    "hour": 17,
+    "totalEntering": number,
+    "phf": number or null
+  },
+  "hourlyVolumes": {
+    "6": {
+      "NB": { "left": X, "thru": X, "right": X, "total": X },
+      "SB": { "left": X, "thru": X, "right": X, "total": X },
+      "EB": { "left": X, "thru": X, "right": X, "total": X },
+      "WB": { "left": X, "thru": X, "right": X, "total": X }
+    }
+  }
+}
+
+RULES:
+- Extract ALL hours present in the data
+- total = left + thru + right for each approach
+- Use null for missing values, 0 for actual zero counts
+- Peak hour = hour with highest sum of all approach totals
+- Return ONLY valid JSON, no explanations`;
+
+      try {
+        let response;
+        
+        if (provider === 'anthropic') {
+          response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 8000,
+              system: systemPrompt,
+              messages: [{ 
+                role: 'user', 
+                content: `Extract TMC data from this file (${fileName}):\n\n${fileContent.substring(0, 50000)}` 
+              }]
+            })
+          });
+          
+          const result = await response.json();
+          const text = result.content[0].text;
+          
+          // Parse JSON from response
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+          }
+        } else {
+          response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4',
+              max_tokens: 8000,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: `Extract TMC data from this file (${fileName}):\n\n${fileContent.substring(0, 50000)}` }
+              ]
+            })
+          });
+          
+          const result = await response.json();
+          const text = result.choices[0].message.content;
+          
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+          }
+        }
+      } catch (error) {
+        console.error('AI extraction error:', error);
+      }
+      
+      return null;
+    }
+    
+    function updateProgress(percent, text) {
+      document.getElementById('progress-fill').style.width = percent + '%';
+      document.getElementById('progress-text').textContent = text;
+    }
+    
+    // ==========================================
+    // WARRANT ANALYSIS
+    // ==========================================
+    
+    async function runWarrantAnalysis() {
+      const config = getConfiguration();
+      
+      // Compute aggregates for each extracted day
+      extractedData.forEach(day => {
+        computeDayAggregates(day, config);
+      });
+      
+      // Evaluate warrants for each day
+      const results = {
+        config: config,
+        days: extractedData.length,
+        warrant1: { anyDayMet: false, dayResults: [] },
+        warrant2: { anyDayMet: false, dayResults: [] },
+        warrant3: { anyDayMet: false, dayResults: [] },
+        overallWarranted: false,
+        warrantsFound: []
+      };
+      
+      extractedData.forEach(day => {
+        const w1 = evaluateWarrant1(day, config);
+        const w2 = evaluateWarrant2(day, config);
+        const w3 = evaluateWarrant3(day, config);
+        
+        results.warrant1.dayResults.push({ date: day.date, ...w1 });
+        results.warrant2.dayResults.push({ date: day.date, ...w2 });
+        results.warrant3.dayResults.push({ date: day.date, ...w3 });
+        
+        if (w1.warranted) results.warrant1.anyDayMet = true;
+        if (w2.warranted) results.warrant2.anyDayMet = true;
+        if (w3.warranted) results.warrant3.anyDayMet = true;
+      });
+      
+      results.overallWarranted = results.warrant1.anyDayMet || results.warrant2.anyDayMet || results.warrant3.anyDayMet;
+      
+      if (results.warrant1.anyDayMet) results.warrantsFound.push('Warrant 1');
+      if (results.warrant2.anyDayMet) results.warrantsFound.push('Warrant 2');
+      if (results.warrant3.anyDayMet) results.warrantsFound.push('Warrant 3');
+      
+      analysisResults = results;
+      renderResults();
+    }
+    
+    function getConfiguration() {
+      const majorLanes = parseInt(document.getElementById('major-lanes').value);
+      const minorLanes = parseInt(document.getElementById('minor-lanes').value);
+      const laneConfig = `${majorLanes}x${minorLanes}`;
+      
+      return {
+        intersectionName: document.getElementById('intersection-name').value || 'Unnamed Intersection',
+        majorStreet: document.getElementById('major-street').value || 'Major Street',
+        minorStreet: document.getElementById('minor-street').value || 'Minor Street',
+        majorLanes: majorLanes,
+        minorLanes: minorLanes,
+        laneConfig: laneConfig,
+        speedLimit: parseInt(document.getElementById('speed-limit').value) || 35,
+        communityPop: parseInt(document.getElementById('community-pop').value) || 50000,
+        apply70Percent: document.getElementById('apply-70pct').checked,
+        intersectionLegs: parseInt(document.getElementById('intersection-legs').value),
+        countDuration: document.getElementById('count-duration').value,
+        majorDirection: document.getElementById('major-direction').value,
+        rtMethod: document.getElementById('rt-method').value,
+        fixedRTPercent: parseInt(document.getElementById('fixed-rt-percent').value) || 30,
+        pagonesConfig: document.getElementById('pagones-config').value
+      };
+    }
+    
+    function getAnalysisHours(countDuration) {
+      if (countDuration === '12hr') {
+        return Array.from({ length: 12 }, (_, i) => 6 + i); // 6-17
+      }
+      return Array.from({ length: 24 }, (_, i) => i); // 0-23
+    }
+    
+    function computeDayAggregates(day, config) {
+      day.computed = { hourlyAggregates: {} };
+      
+      const majorApproaches = config.majorDirection === 'EW' ? ['EB', 'WB'] : ['NB', 'SB'];
+      const minorApproaches = config.majorDirection === 'EW' ? ['NB', 'SB'] : ['EB', 'WB'];
+      
+      day.computed.majorApproaches = majorApproaches;
+      day.computed.minorApproaches = minorApproaches;
+      
+      const hours = getAnalysisHours(config.countDuration);
+      
+      hours.forEach(hour => {
+        const hourData = day.hourlyVolumes?.[hour] || day.hourlyVolumes?.[String(hour)];
+        if (!hourData) return;
+        
+        // Sum major street approaches
+        const majorTotal = (hourData[majorApproaches[0]]?.total || 0) + 
+                          (hourData[majorApproaches[1]]?.total || 0);
+        
+        // Get higher minor street approach
+        const minor1 = hourData[minorApproaches[0]]?.total || 0;
+        const minor2 = hourData[minorApproaches[1]]?.total || 0;
+        const highApproach = minor1 >= minor2 ? minorApproaches[0] : minorApproaches[1];
+        const highVolume = Math.max(minor1, minor2);
+        const rightTurn = hourData[highApproach]?.right || 0;
+        
+        // Apply RT reduction
+        let rtReduction = 0;
+        if (config.rtMethod === 'fixed' && config.fixedRTPercent > 0) {
+          rtReduction = Math.round(rightTurn * (config.fixedRTPercent / 100));
+        } else if (config.rtMethod === 'pagones') {
+          const fMinor = PAGONES_FACTORS.minorStreet[config.pagonesConfig];
+          const volPerLane = majorTotal / config.majorLanes;
+          const fMain = PAGONES_FACTORS.mainlineCongestion.find(r => volPerLane <= r.maxVolPerLane).factor;
+          const reductionFactor = Math.max(0, fMinor - fMain);
+          rtReduction = Math.round(rightTurn * reductionFactor);
+        }
+        
+        const adjustedVolume = Math.max(0, highVolume - rtReduction);
+        
+        day.computed.hourlyAggregates[hour] = {
+          majorTotal,
+          minorHighApproach: highApproach,
+          minorHighVolume: highVolume,
+          minorRightTurn: rightTurn,
+          rtReduction,
+          minorAdjusted: adjustedVolume
+        };
+      });
+    }
+    
+    // ==========================================
+    // WARRANT EVALUATION FUNCTIONS
+    // ==========================================
+    
+    function evaluateWarrant1(day, config) {
+      const hours = getAnalysisHours(config.countDuration);
+      const laneConfig = config.laneConfig;
+      
+      // Get threshold keys
+      const standardKey = config.apply70Percent ? 'p70' : 'p100';
+      const comboKey = config.apply70Percent ? 'p56' : 'p80';
+      
+      const standardA = WARRANT1_THRESHOLDS.conditionA[laneConfig][standardKey];
+      const standardB = WARRANT1_THRESHOLDS.conditionB[laneConfig][standardKey];
+      const comboA = WARRANT1_THRESHOLDS.conditionA[laneConfig][comboKey];
+      const comboB = WARRANT1_THRESHOLDS.conditionB[laneConfig][comboKey];
+      
+      let results = {
+        conditionA: { hoursMet: 0, details: [] },
+        conditionB: { hoursMet: 0, details: [] },
+        combinationA: { hoursMet: 0, details: [] },
+        combinationB: { hoursMet: 0, details: [] }
+      };
+      
+      hours.forEach(hour => {
+        const agg = day.computed.hourlyAggregates[hour];
+        if (!agg) return;
+        
+        const majorVol = agg.majorTotal;
+        const minorVol = agg.minorAdjusted;
+        
+        // Check Condition A (standard)
+        const meetsA = majorVol >= standardA.major && minorVol >= standardA.minor;
+        if (meetsA) results.conditionA.hoursMet++;
+        
+        // Check Condition B (standard)
+        const meetsB = majorVol >= standardB.major && minorVol >= standardB.minor;
+        if (meetsB) results.conditionB.hoursMet++;
+        
+        // Check Combination thresholds
+        const meetsCombA = majorVol >= comboA.major && minorVol >= comboA.minor;
+        const meetsCombB = majorVol >= comboB.major && minorVol >= comboB.minor;
+        if (meetsCombA) results.combinationA.hoursMet++;
+        if (meetsCombB) results.combinationB.hoursMet++;
+        
+        results.conditionA.details.push({ hour, majorVol, minorVol, met: meetsA, threshold: standardA });
+        results.conditionB.details.push({ hour, majorVol, minorVol, met: meetsB, threshold: standardB });
+      });
+      
+      // Warrant 1 satisfied if ANY path meets 8 hours
+      const conditionAMet = results.conditionA.hoursMet >= 8;
+      const conditionBMet = results.conditionB.hoursMet >= 8;
+      const combinationMet = results.combinationA.hoursMet >= 8 && results.combinationB.hoursMet >= 8;
+      
+      const warranted = conditionAMet || conditionBMet || combinationMet;
+      
+      return {
+        warranted,
+        conditionAMet,
+        conditionAHours: results.conditionA.hoursMet,
+        conditionBMet,
+        conditionBHours: results.conditionB.hoursMet,
+        combinationMet,
+        combinationAHours: results.combinationA.hoursMet,
+        combinationBHours: results.combinationB.hoursMet,
+        hoursAnalyzed: hours.length,
+        thresholds: { standardA, standardB, comboA, comboB },
+        details: results
+      };
+    }
+    
+    function interpolateThreshold(curve, majorVolume) {
+      if (majorVolume < curve[0].major) return Infinity;
+      if (majorVolume >= curve[curve.length - 1].major) return curve[curve.length - 1].minor;
+      
+      for (let i = 0; i < curve.length - 1; i++) {
+        if (majorVolume >= curve[i].major && majorVolume < curve[i + 1].major) {
+          const ratio = (majorVolume - curve[i].major) / (curve[i + 1].major - curve[i].major);
+          return Math.round(curve[i].minor - ratio * (curve[i].minor - curve[i + 1].minor));
+        }
+      }
+      return Infinity;
+    }
+    
+    function evaluateWarrant2(day, config) {
+      const hours = getAnalysisHours(config.countDuration);
+      const laneConfig = config.laneConfig;
+      const curveSet = config.apply70Percent ? 'reduced' : 'standard';
+      const curve = WARRANT2_CURVES[curveSet][laneConfig];
+      
+      let hoursMet = 0;
+      let details = [];
+      
+      hours.forEach(hour => {
+        const agg = day.computed.hourlyAggregates[hour];
+        if (!agg) return;
+        
+        const threshold = interpolateThreshold(curve, agg.majorTotal);
+        const met = agg.minorAdjusted >= threshold;
+        if (met) hoursMet++;
+        
+        details.push({
+          hour,
+          majorVol: agg.majorTotal,
+          minorVol: agg.minorAdjusted,
+          threshold,
+          met
+        });
+      });
+      
+      return {
+        warranted: hoursMet >= 4,
+        hoursMet,
+        hoursRequired: 4,
+        factorApplied: config.apply70Percent ? '70%' : '100%',
+        details
+      };
+    }
+    
+    function evaluateWarrant3(day, config) {
+      const laneConfig = config.laneConfig;
+      const curveSet = config.apply70Percent ? 'reduced' : 'standard';
+      const curve = WARRANT3_CURVES[curveSet][laneConfig];
+      
+      // Find peak hour from computed data
+      let peakHour = null;
+      let maxTotal = 0;
+      
+      Object.keys(day.computed.hourlyAggregates).forEach(hourStr => {
+        const hour = parseInt(hourStr);
+        const agg = day.computed.hourlyAggregates[hour];
+        const total = agg.majorTotal + agg.minorAdjusted;
+        if (total > maxTotal) {
+          maxTotal = total;
+          peakHour = hour;
+        }
+      });
+      
+      if (peakHour === null) {
+        return { warranted: false, reason: 'No data available' };
+      }
+      
+      const peakAgg = day.computed.hourlyAggregates[peakHour];
+      const threshold = interpolateThreshold(curve, peakAgg.majorTotal);
+      const warranted = peakAgg.minorAdjusted >= threshold;
+      
+      return {
+        warranted,
+        peakHour,
+        peakHourFormatted: `${String(peakHour).padStart(2, '0')}:00-${String(peakHour + 1).padStart(2, '0')}:00`,
+        majorVolume: peakAgg.majorTotal,
+        minorVolume: peakAgg.minorAdjusted,
+        threshold,
+        factorApplied: config.apply70Percent ? '70%' : '100%'
+      };
+    }
+    
+    // ==========================================
+    // RENDER RESULTS
+    // ==========================================
+    
+    function renderResults() {
+      const r = analysisResults;
+      
+      // Result Banner
+      const banner = document.getElementById('result-banner');
+      const icon = document.getElementById('result-icon');
+      const title = document.getElementById('result-title');
+      const subtitle = document.getElementById('result-subtitle');
+      
+      if (r.overallWarranted) {
+        banner.className = 'result-banner warranted';
+        icon.textContent = '✅';
+        title.textContent = 'SIGNAL IS WARRANTED';
+        subtitle.textContent = `Warrant(s) satisfied: ${r.warrantsFound.join(', ')} (${r.days} day(s) analyzed)`;
+      } else {
+        banner.className = 'result-banner not-warranted';
+        icon.textContent = '⚠️';
+        title.textContent = 'SIGNAL IS NOT WARRANTED';
+        subtitle.textContent = `No warrants satisfied based on ${r.days} day(s) of data`;
+      }
+      
+      // Warrant Cards
+      const grid = document.getElementById('warrant-grid');
+      grid.innerHTML = `
+        <div class="warrant-card ${r.warrant1.anyDayMet ? 'met' : 'not-met'}">
+          <div class="warrant-header">
+            <span class="warrant-title">Warrant 1: Eight-Hour Volume</span>
+            <span class="warrant-status ${r.warrant1.anyDayMet ? 'met' : 'not-met'}">
+              ${r.warrant1.anyDayMet ? 'MET' : 'NOT MET'}
+            </span>
+          </div>
+          <div class="warrant-details">
+            ${renderWarrant1Summary(r.warrant1)}
+          </div>
+        </div>
+        
+        <div class="warrant-card ${r.warrant2.anyDayMet ? 'met' : 'not-met'}">
+          <div class="warrant-header">
+            <span class="warrant-title">Warrant 2: Four-Hour Volume</span>
+            <span class="warrant-status ${r.warrant2.anyDayMet ? 'met' : 'not-met'}">
+              ${r.warrant2.anyDayMet ? 'MET' : 'NOT MET'}
+            </span>
+          </div>
+          <div class="warrant-details">
+            ${renderWarrant2Summary(r.warrant2)}
+          </div>
+        </div>
+        
+        <div class="warrant-card ${r.warrant3.anyDayMet ? 'met' : 'not-met'}">
+          <div class="warrant-header">
+            <span class="warrant-title">Warrant 3: Peak Hour</span>
+            <span class="warrant-status ${r.warrant3.anyDayMet ? 'met' : 'not-met'}">
+              ${r.warrant3.anyDayMet ? 'MET' : 'NOT MET'}
+            </span>
+          </div>
+          <div class="warrant-details">
+            ${renderWarrant3Summary(r.warrant3)}
+          </div>
+        </div>
+      `;
+      
+      // Tab content
+      renderSummaryTab();
+      renderWarrant1Tab();
+      renderWarrant2Tab();
+      renderWarrant3Tab();
+      renderHourlyTab();
+    }
+    
+    function renderWarrant1Summary(w1) {
+      const best = w1.dayResults[0];
+      if (!best) return 'No data';
+      
+      return `
+        <p><strong>Condition A:</strong> ${best.conditionAHours}/8 hours met</p>
+        <p><strong>Condition B:</strong> ${best.conditionBHours}/8 hours met</p>
+        <p><strong>Combination:</strong> A=${best.combinationAHours}/8, B=${best.combinationBHours}/8</p>
+      `;
+    }
+    
+    function renderWarrant2Summary(w2) {
+      const best = w2.dayResults[0];
+      if (!best) return 'No data';
+      
+      return `
+        <p><strong>Hours above curve:</strong> ${best.hoursMet}/4 required</p>
+        <p><strong>Factor applied:</strong> ${best.factorApplied}</p>
+      `;
+    }
+    
+    function renderWarrant3Summary(w3) {
+      const best = w3.dayResults[0];
+      if (!best) return 'No data';
+      
+      return `
+        <p><strong>Peak Hour:</strong> ${best.peakHourFormatted}</p>
+        <p><strong>Major Vol:</strong> ${best.majorVolume} vph</p>
+        <p><strong>Minor Vol:</strong> ${best.minorVolume} vph (threshold: ${best.threshold})</p>
+      `;
+    }
+    
+    function renderSummaryTab() {
+      const r = analysisResults;
+      const c = r.config;
+      
+      document.getElementById('summary-content').innerHTML = `
+        <h4>Configuration Summary</h4>
+        <table class="data-table">
+          <tr><td><strong>Intersection</strong></td><td>${c.intersectionName}</td></tr>
+          <tr><td><strong>Major Street</strong></td><td>${c.majorStreet} (${c.majorLanes} lane${c.majorLanes > 1 ? 's' : ''})</td></tr>
+          <tr><td><strong>Minor Street</strong></td><td>${c.minorStreet} (${c.minorLanes} lane${c.minorLanes > 1 ? 's' : ''})</td></tr>
+          <tr><td><strong>Lane Configuration</strong></td><td>${c.laneConfig}</td></tr>
+          <tr><td><strong>Speed Limit</strong></td><td>${c.speedLimit} mph</td></tr>
+          <tr><td><strong>70% Factor</strong></td><td>${c.apply70Percent ? 'Applied' : 'Not Applied'}</td></tr>
+          <tr><td><strong>RT Reduction</strong></td><td>${c.rtMethod === 'fixed' ? c.fixedRTPercent + '%' : c.rtMethod === 'pagones' ? 'Pagones Theorem' : 'None'}</td></tr>
+          <tr><td><strong>Count Duration</strong></td><td>${c.countDuration === '12hr' ? '12-Hour (6 AM - 6 PM)' : '24-Hour'}</td></tr>
+          <tr><td><strong>Days Analyzed</strong></td><td>${r.days}</td></tr>
+        </table>
+        
+        <h4 style="margin-top: 24px;">Overall Result</h4>
+        <p style="font-size: 1.1rem; padding: 16px; background: ${r.overallWarranted ? 'var(--success-bg)' : 'var(--warning-bg)'}; border-radius: var(--radius);">
+          <strong>${r.overallWarranted ? '✅ SIGNAL IS WARRANTED' : '⚠️ SIGNAL IS NOT WARRANTED'}</strong><br>
+          ${r.overallWarranted ? 'Satisfied: ' + r.warrantsFound.join(', ') : 'No warrants satisfied based on analyzed data.'}
+        </p>
+        
+        <p style="margin-top: 16px; font-size: 0.9rem; color: var(--gray-600);">
+          <em>Per MUTCD 11th Edition Section 4C.01: "The satisfaction of a traffic signal warrant or warrants 
+          shall not in itself require the installation of a traffic control signal."</em>
+        </p>
+      `;
+    }
+    
+    function renderWarrant1Tab() {
+      const r = analysisResults.warrant1;
+      const best = r.dayResults[0];
+      if (!best) {
+        document.getElementById('warrant1-content').innerHTML = '<p>No data available</p>';
+        return;
+      }
+      
+      let html = `
+        <h4>Warrant 1: Eight-Hour Vehicular Volume (Table 4C-1)</h4>
+        <p><strong>Status:</strong> ${r.anyDayMet ? '<span style="color: var(--success)">✅ SATISFIED</span>' : '<span style="color: var(--danger)">❌ NOT SATISFIED</span>'}</p>
+        
+        <h5 style="margin-top: 16px;">Thresholds Used (${analysisResults.config.apply70Percent ? '70%' : '100%'} factor)</h5>
+        <table class="data-table">
+          <tr>
+            <th>Condition</th>
+            <th class="numeric">Major Street</th>
+            <th class="numeric">Minor Street</th>
+          </tr>
+          <tr>
+            <td>Condition A</td>
+            <td class="numeric">${best.thresholds.standardA.major} vph</td>
+            <td class="numeric">${best.thresholds.standardA.minor} vph</td>
+          </tr>
+          <tr>
+            <td>Condition B</td>
+            <td class="numeric">${best.thresholds.standardB.major} vph</td>
+            <td class="numeric">${best.thresholds.standardB.minor} vph</td>
+          </tr>
+        </table>
+        
+        <h5 style="margin-top: 16px;">Results</h5>
+        <ul>
+          <li>Condition A alone: <strong>${best.conditionAHours}</strong> of 8 hours met ${best.conditionAMet ? '✅' : ''}</li>
+          <li>Condition B alone: <strong>${best.conditionBHours}</strong> of 8 hours met ${best.conditionBMet ? '✅' : ''}</li>
+          <li>Combination: A=${best.combinationAHours}/8, B=${best.combinationBHours}/8 ${best.combinationMet ? '✅' : ''}</li>
+        </ul>
+        
+        <div class="collapsible">
+          <div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle('open')">
+            <span>📊 Hour-by-Hour Details (Condition A)</span>
+            <span>▼</span>
+          </div>
+          <div class="collapsible-content">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Hour</th>
+                  <th class="numeric">Major Vol</th>
+                  <th class="numeric">Minor Vol</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${best.details.conditionA.details.map(d => `
+                  <tr>
+                    <td>${String(d.hour).padStart(2,'0')}:00</td>
+                    <td class="numeric">${d.majorVol}</td>
+                    <td class="numeric">${d.minorVol}</td>
+                    <td class="${d.met ? 'met-cell' : 'not-met-cell'}">${d.met ? '✓ Met' : '✗'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('warrant1-content').innerHTML = html;
+    }
+    
+    function renderWarrant2Tab() {
+      const r = analysisResults.warrant2;
+      const best = r.dayResults[0];
+      if (!best) {
+        document.getElementById('warrant2-content').innerHTML = '<p>No data available</p>';
+        return;
+      }
+      
+      let html = `
+        <h4>Warrant 2: Four-Hour Vehicular Volume (Figure 4C-${analysisResults.config.apply70Percent ? '2' : '1'})</h4>
+        <p><strong>Status:</strong> ${r.anyDayMet ? '<span style="color: var(--success)">✅ SATISFIED</span>' : '<span style="color: var(--danger)">❌ NOT SATISFIED</span>'}</p>
+        <p><strong>Hours above curve:</strong> ${best.hoursMet} of 4 required</p>
+        <p><strong>Factor applied:</strong> ${best.factorApplied}</p>
+        
+        <div class="collapsible" style="margin-top: 16px;">
+          <div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle('open')">
+            <span>📊 Hour-by-Hour Details</span>
+            <span>▼</span>
+          </div>
+          <div class="collapsible-content">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Hour</th>
+                  <th class="numeric">Major Vol</th>
+                  <th class="numeric">Minor Vol</th>
+                  <th class="numeric">Threshold</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${best.details.map(d => `
+                  <tr>
+                    <td>${String(d.hour).padStart(2,'0')}:00</td>
+                    <td class="numeric">${d.majorVol}</td>
+                    <td class="numeric">${d.minorVol}</td>
+                    <td class="numeric">${d.threshold === Infinity ? 'N/A' : d.threshold}</td>
+                    <td class="${d.met ? 'met-cell' : 'not-met-cell'}">${d.met ? '✓ Above' : '✗ Below'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('warrant2-content').innerHTML = html;
+    }
+    
+    function renderWarrant3Tab() {
+      const r = analysisResults.warrant3;
+      const best = r.dayResults[0];
+      if (!best) {
+        document.getElementById('warrant3-content').innerHTML = '<p>No data available</p>';
+        return;
+      }
+      
+      const pctOfThreshold = Math.round((best.minorVolume / best.threshold) * 100);
+      
+      let html = `
+        <h4>Warrant 3: Peak Hour (Figure 4C-${analysisResults.config.apply70Percent ? '4' : '3'})</h4>
+        <p><strong>Status:</strong> ${r.anyDayMet ? '<span style="color: var(--success)">✅ SATISFIED</span>' : '<span style="color: var(--danger)">❌ NOT SATISFIED</span>'}</p>
+        
+        <table class="data-table" style="margin-top: 16px;">
+          <tr><td><strong>Peak Hour</strong></td><td>${best.peakHourFormatted}</td></tr>
+          <tr><td><strong>Major Street Volume</strong></td><td>${best.majorVolume} vph</td></tr>
+          <tr><td><strong>Minor Street Volume</strong></td><td>${best.minorVolume} vph</td></tr>
+          <tr><td><strong>Threshold (from curve)</strong></td><td>${best.threshold} vph</td></tr>
+          <tr><td><strong>Factor Applied</strong></td><td>${best.factorApplied}</td></tr>
+        </table>
+        
+        <h5 style="margin-top: 16px;">Gap Analysis</h5>
+        <p>Minor street volume is <strong>${pctOfThreshold}%</strong> of threshold</p>
+        <div class="gap-bar">
+          <div class="gap-fill ${pctOfThreshold >= 100 ? 'high' : pctOfThreshold >= 80 ? 'medium' : 'low'}" 
+               style="width: ${Math.min(pctOfThreshold, 150)}%"></div>
+          <div class="gap-threshold" style="left: ${Math.min(100 / 1.5, 66.7)}%"></div>
+        </div>
+        <div class="gap-label">0% ━━━━━━━━━━━━━━━━ 100% threshold ━━━━━━━ 150%</div>
+      `;
+      
+      document.getElementById('warrant3-content').innerHTML = html;
+    }
+    
+    function renderHourlyTab() {
+      if (extractedData.length === 0) {
+        document.getElementById('hourly-content').innerHTML = '<p>No data available</p>';
+        return;
+      }
+      
+      const day = extractedData[0];
+      const config = analysisResults.config;
+      const hours = getAnalysisHours(config.countDuration);
+      
+      let html = `
+        <h4>Extracted Hourly Data - ${day.date || 'Unknown Date'}</h4>
+        <p><strong>Source:</strong> ${day.sourceFile || 'Unknown'} | <strong>Vendor:</strong> ${day.vendor || 'Unknown'}</p>
+        
+        <div style="overflow-x: auto;">
+          <table class="data-table" style="margin-top: 16px;">
+            <thead>
+              <tr>
+                <th>Hour</th>
+                <th class="numeric">NB Total</th>
+                <th class="numeric">SB Total</th>
+                <th class="numeric">EB Total</th>
+                <th class="numeric">WB Total</th>
+                <th class="numeric">Major Total</th>
+                <th class="numeric">Minor (High)</th>
+                <th class="numeric">RT Reduction</th>
+                <th class="numeric">Minor Adj.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${hours.map(hour => {
+                const hourData = day.hourlyVolumes?.[hour] || day.hourlyVolumes?.[String(hour)];
+                const agg = day.computed?.hourlyAggregates?.[hour];
+                
+                if (!hourData) return '';
+                
+                return `
+                  <tr>
+                    <td>${String(hour).padStart(2,'0')}:00</td>
+                    <td class="numeric">${hourData.NB?.total || 0}</td>
+                    <td class="numeric">${hourData.SB?.total || 0}</td>
+                    <td class="numeric">${hourData.EB?.total || 0}</td>
+                    <td class="numeric">${hourData.WB?.total || 0}</td>
+                    <td class="numeric"><strong>${agg?.majorTotal || 0}</strong></td>
+                    <td class="numeric">${agg?.minorHighVolume || 0} (${agg?.minorHighApproach || ''})</td>
+                    <td class="numeric">-${agg?.rtReduction || 0}</td>
+                    <td class="numeric"><strong>${agg?.minorAdjusted || 0}</strong></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      document.getElementById('hourly-content').innerHTML = html;
+    }
+    
+    // ==========================================
+    // MEMO GENERATION
+    // ==========================================
+    
+    async function generateMemo() {
+      const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } = docx;
+      
+      const r = analysisResults;
+      const c = r.config;
+      
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            // Title
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({ text: 'TRAFFIC SIGNAL WARRANT ANALYSIS', bold: true, size: 32 }),
+              ]
+            }),
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({ text: 'Official Memorandum', size: 24 }),
+              ]
+            }),
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({ text: 'MUTCD 11th Edition (December 2023)', italics: true, size: 20 }),
+              ]
+            }),
+            new Paragraph({ text: '' }),
+            
+            // Location Info
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'INTERSECTION INFORMATION', bold: true, size: 24 }),
+              ]
+            }),
+            new Paragraph({ text: '' }),
+            new Paragraph({ children: [new TextRun({ text: 'Location: ', bold: true }), new TextRun({ text: c.intersectionName })] }),
+            new Paragraph({ children: [new TextRun({ text: 'Major Street: ', bold: true }), new TextRun({ text: `${c.majorStreet} (${c.majorLanes} lane${c.majorLanes > 1 ? 's' : ''})` })] }),
+            new Paragraph({ children: [new TextRun({ text: 'Minor Street: ', bold: true }), new TextRun({ text: `${c.minorStreet} (${c.minorLanes} lane${c.minorLanes > 1 ? 's' : ''})` })] }),
+            new Paragraph({ children: [new TextRun({ text: 'Lane Configuration: ', bold: true }), new TextRun({ text: c.laneConfig })] }),
+            new Paragraph({ children: [new TextRun({ text: 'Speed Limit: ', bold: true }), new TextRun({ text: `${c.speedLimit} mph` })] }),
+            new Paragraph({ children: [new TextRun({ text: 'Analysis Date: ', bold: true }), new TextRun({ text: new Date().toLocaleDateString() })] }),
+            new Paragraph({ children: [new TextRun({ text: 'Days Analyzed: ', bold: true }), new TextRun({ text: `${r.days} day(s)` })] }),
+            new Paragraph({ text: '' }),
+            
+            // Configuration
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'ANALYSIS CONFIGURATION', bold: true, size: 24 }),
+              ]
+            }),
+            new Paragraph({ text: '' }),
+            new Paragraph({ children: [new TextRun({ text: '70% Factor: ', bold: true }), new TextRun({ text: c.apply70Percent ? 'Applied (speed > 40 mph or community < 10,000)' : 'Not Applied' })] }),
+            new Paragraph({ children: [new TextRun({ text: 'Right-Turn Reduction: ', bold: true }), new TextRun({ text: c.rtMethod === 'fixed' ? `Fixed ${c.fixedRTPercent}%` : c.rtMethod === 'pagones' ? `Pagones Theorem (${c.pagonesConfig})` : 'None' })] }),
+            new Paragraph({ children: [new TextRun({ text: 'Count Duration: ', bold: true }), new TextRun({ text: c.countDuration === '12hr' ? '12-Hour (6 AM - 6 PM)' : '24-Hour' })] }),
+            new Paragraph({ text: '' }),
+            
+            // Results
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'WARRANT ANALYSIS RESULTS', bold: true, size: 24 }),
+              ]
+            }),
+            new Paragraph({ text: '' }),
+            new Paragraph({ children: [new TextRun({ text: 'Warrant 1 (Eight-Hour Volume): ', bold: true }), new TextRun({ text: r.warrant1.anyDayMet ? 'MET' : 'NOT MET' })] }),
+            new Paragraph({ children: [new TextRun({ text: 'Warrant 2 (Four-Hour Volume): ', bold: true }), new TextRun({ text: r.warrant2.anyDayMet ? 'MET' : 'NOT MET' })] }),
+            new Paragraph({ children: [new TextRun({ text: 'Warrant 3 (Peak Hour): ', bold: true }), new TextRun({ text: r.warrant3.anyDayMet ? 'MET' : 'NOT MET' })] }),
+            new Paragraph({ text: '' }),
+            
+            // Conclusion
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'CONCLUSION', bold: true, size: 24 }),
+              ]
+            }),
+            new Paragraph({ text: '' }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: r.overallWarranted
+                    ? `Based on this analysis, a traffic signal IS WARRANTED at this location. Warrant(s) satisfied: ${r.warrantsFound.join(', ')}.`
+                    : 'Based on this analysis, a traffic signal is NOT WARRANTED at this location based on the data analyzed.',
+                  bold: true,
+                  size: 24
+                }),
+              ]
+            }),
+            new Paragraph({ text: '' }),
+            new Paragraph({ text: '' }),
+            
+            // Disclaimer
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: 'DISCLAIMER: This analysis is for screening purposes only. Per MUTCD 11th Edition Section 4C.01: "The satisfaction of a traffic signal warrant or warrants shall not in itself require the installation of a traffic control signal." Final warrant determinations require review by a licensed Professional Engineer and field verification of all data inputs.',
+                  italics: true,
+                  size: 18
+                }),
+              ]
+            }),
+            new Paragraph({ text: '' }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Generated by Crash Lens Signal Warrant Analyzer', size: 18 }),
+              ]
+            }),
+          ]
+        }]
+      });
+      
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Signal_Warrant_Analysis_${c.intersectionName.replace(/[^a-z0-9]/gi, '_')}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    function exportCSV() {
+      if (extractedData.length === 0 || !analysisResults) {
+        alert('No data to export');
+        return;
+      }
+      
+      const day = extractedData[0];
+      const config = analysisResults.config;
+      const hours = getAnalysisHours(config.countDuration);
+      
+      let csv = 'Hour,NB_L,NB_T,NB_R,NB_Total,SB_L,SB_T,SB_R,SB_Total,EB_L,EB_T,EB_R,EB_Total,WB_L,WB_T,WB_R,WB_Total,Major_Total,Minor_High,RT_Reduction,Minor_Adjusted\n';
+      
+      hours.forEach(hour => {
+        const hourData = day.hourlyVolumes?.[hour] || day.hourlyVolumes?.[String(hour)];
+        const agg = day.computed?.hourlyAggregates?.[hour];
+        
+        if (!hourData) return;
+        
+        const nb = hourData.NB || {};
+        const sb = hourData.SB || {};
+        const eb = hourData.EB || {};
+        const wb = hourData.WB || {};
+        
+        csv += `${hour}:00,`;
+        csv += `${nb.left||0},${nb.thru||0},${nb.right||0},${nb.total||0},`;
+        csv += `${sb.left||0},${sb.thru||0},${sb.right||0},${sb.total||0},`;
+        csv += `${eb.left||0},${eb.thru||0},${eb.right||0},${eb.total||0},`;
+        csv += `${wb.left||0},${wb.thru||0},${wb.right||0},${wb.total||0},`;
+        csv += `${agg?.majorTotal||0},${agg?.minorHighVolume||0},${agg?.rtReduction||0},${agg?.minorAdjusted||0}\n`;
+      });
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Signal_Warrant_Data_${config.intersectionName.replace(/[^a-z0-9]/gi, '_')}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    // Initialize
+    update70PercentCheckbox();
+  </script>
+</body>
+</html>
