@@ -737,29 +737,52 @@ def main():
     os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
 
     df = None
+    df_filtered = None
+    used_fallback = False
 
     # Try primary API first
     try:
         df = download_from_arcgis(config, jurisdiction_config)
+
+        # Filter by jurisdiction immediately to check if data is available
+        logger.info("Filtering API data by jurisdiction...")
+        df_filtered = filter_jurisdiction(df, jurisdiction_config)
+
+        if df_filtered.empty:
+            logger.warning(f"API data has no records for {jurisdiction_config.get('name', jurisdiction_id)}")
+            logger.info("API endpoint may not contain data for this jurisdiction. Trying fallback...")
+            df = None  # Reset to trigger fallback
+
     except Exception as e:
         logger.error(f"Primary API failed: {e}")
         logger.info("Falling back to CSV download...")
 
-    # Try fallback if primary failed
-    if df is None or df.empty:
+    # Try fallback if primary failed or returned no records for jurisdiction
+    if df is None or (df_filtered is not None and df_filtered.empty):
         try:
+            logger.info("=" * 40)
+            logger.info("Attempting fallback CSV download (full statewide data)...")
             df = download_from_fallback(config)
+            used_fallback = True
+
+            # Filter fallback data by jurisdiction
+            logger.info("Filtering fallback data by jurisdiction...")
+            df_filtered = filter_jurisdiction(df, jurisdiction_config)
+
         except Exception as e:
             logger.error(f"Fallback download also failed: {e}")
             sys.exit(1)
 
-    # Filter by jurisdiction
-    logger.info("Filtering by jurisdiction...")
-    df = filter_jurisdiction(df, jurisdiction_config)
+    # Use the filtered dataframe
+    df = df_filtered
 
-    if df.empty:
+    if df is None or df.empty:
         logger.error(f"No {jurisdiction_config.get('name', jurisdiction_id)} records found after filtering!")
+        logger.error("Neither API nor fallback CSV contained data for this jurisdiction.")
         sys.exit(1)
+
+    if used_fallback:
+        logger.info(f"Successfully retrieved {len(df)} records using fallback CSV source")
 
     # Filter by road system
     logger.info("Applying road type filter...")
