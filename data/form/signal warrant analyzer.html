@@ -3749,12 +3749,7 @@
         clearManualEntry();
 
         // Auto-advance to next day of week
-        const dowSelect = document.getElementById('manual-dow');
-        const currentDayIndex = dayIndex;
-        // Day values: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
-        // Advance: 1→2→3→4→5→6→0→1 (Mon→Tue→Wed→Thu→Fri→Sat→Sun→Mon)
-        const nextDayIndex = currentDayIndex === 6 ? 0 : (currentDayIndex === 0 ? 1 : currentDayIndex + 1);
-        dowSelect.value = nextDayIndex.toString();
+        advanceToNextDayOfWeek(dayIndex);
       }
     }
     
@@ -4936,12 +4931,18 @@ OR if corrections needed:
 
     function skipCurrentReview() {
       // Move to next day in queue without adding current
+      // Capture current day before skipping
+      const currentDayIndex = parseInt(document.getElementById('manual-dow').value);
+
       currentReviewIndex++;
 
       if (currentReviewIndex >= reviewQueue.length) {
         // Finished queue
         exitReviewMode();
         document.getElementById('extraction-status').innerHTML = '<span style="color: var(--success);">✅ Review complete!</span>';
+
+        // Auto-advance to next day of week after completing review
+        advanceToNextDayOfWeek(currentDayIndex);
       } else {
         loadCurrentReviewData();
       }
@@ -4949,17 +4950,32 @@ OR if corrections needed:
 
     function advanceReviewQueue() {
       // Called after successfully adding a day in review mode
+      // Capture current day before advancing
+      const currentDayIndex = parseInt(document.getElementById('manual-dow').value);
+
       currentReviewIndex++;
 
       if (currentReviewIndex >= reviewQueue.length) {
         // All days done
         exitReviewMode();
         document.getElementById('extraction-status').innerHTML = '<span style="color: var(--success);">✅ All days added to analysis!</span>';
+
+        // Auto-advance to next day of week after completing review
+        advanceToNextDayOfWeek(currentDayIndex);
       } else {
-        // Load next day
+        // Load next day from queue
         loadCurrentReviewData();
         document.getElementById('extraction-status').innerHTML = `<span style="color: var(--success);">✅ Day added! Now reviewing day ${currentReviewIndex + 1} of ${reviewQueue.length}.</span>`;
       }
+    }
+
+    // Helper function to advance day of week dropdown
+    function advanceToNextDayOfWeek(currentDayIndex) {
+      const dowSelect = document.getElementById('manual-dow');
+      // Day values: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+      // Advance: 1→2→3→4→5→6→0→1 (Mon→Tue→Wed→Thu→Fri→Sat→Sun→Mon)
+      const nextDayIndex = currentDayIndex === 6 ? 0 : (currentDayIndex === 0 ? 1 : currentDayIndex + 1);
+      dowSelect.value = nextDayIndex.toString();
     }
     
     function rejectExtractedData() {
