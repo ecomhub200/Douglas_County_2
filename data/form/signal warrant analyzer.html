@@ -6410,7 +6410,9 @@ OR if corrections needed:
         infoBox: [239, 246, 255],        // #eff6ff - info boxes
         warningHighlight: [254, 249, 195], // #fef9c3 - peak hour highlight
         white: [255, 255, 255],
-        textDark: [30, 41, 59]           // #1e293b - dark text
+        textDark: [30, 41, 59],          // #1e293b - dark text
+        metColor: [220, 252, 231],       // light green for met
+        notMetColor: [254, 226, 226]     // light red for not met
       };
 
       // Helper function to draw status pill
@@ -6443,6 +6445,11 @@ OR if corrections needed:
         }
         hourlyData.sort((a, b) => b.majorTotal - a.majorTotal);
         return hourlyData.slice(0, 4).map(d => d.hour);
+      }
+
+      // Helper to format hour range
+      function formatHour(h) {
+        return `${String(h).padStart(2, '0')}:00`;
       }
 
       const peakHours = getPeakHours();
@@ -6510,11 +6517,6 @@ OR if corrections needed:
       doc.setTextColor(80, 80, 80);
       if (r.overallWarranted && r.warrantsFound.length > 0) {
         if (r.averagingMethod === 'any-single-day') {
-          // Show which day(s) satisfied warrants
-          const satisfiedInfo = [];
-          if (r.warrant1.satisfiedBy) satisfiedInfo.push(`W1: ${r.warrant1.satisfiedBy}`);
-          if (r.warrant2.satisfiedBy) satisfiedInfo.push(`W2: ${r.warrant2.satisfiedBy}`);
-          if (r.warrant3.satisfiedBy) satisfiedInfo.push(`W3: ${r.warrant3.satisfiedBy}`);
           doc.text(`Satisfied: ${r.warrantsFound.join(', ')} (Individual Day Analysis)`, pageWidth / 2, y + 17, { align: 'center' });
         } else {
           doc.text(`Satisfied: ${r.warrantsFound.join(', ')}`, pageWidth / 2, y + 17, { align: 'center' });
@@ -6542,6 +6544,9 @@ OR if corrections needed:
         'custom': 'Custom Selection'
       };
 
+      // Calculate data quality info
+      const dataQualityInfo = r.dataQuality ? `CV: ${r.dataQuality.cv}% | Mean: ${Math.round(r.dataQuality.mean).toLocaleString()} vpd` : 'N/A';
+
       doc.autoTable({
         startY: y,
         head: [['Parameter', 'Value']],
@@ -6552,6 +6557,7 @@ OR if corrections needed:
           ['Speed Limit', `${c.speedLimit} mph`],
           ['Analysis Method', avgMethodDisplayNames[r.averagingMethod] || r.averagingMethod],
           ['Days Analyzed', `${r.daysUsed} day(s)${r.averagingMethod === 'any-single-day' ? ' (each analyzed individually)' : ''}`],
+          ['Data Quality', dataQualityInfo],
           ['70% Reduction Factor', c.apply70Percent ? 'Applied (population < 10,000 or isolated community)' : 'Not Applied'],
           ['Right-Turn Adjustment', c.rtAdjustment !== 'none' ? `Applied (${c.rtAdjustment})` : 'Not Applied']
         ],
@@ -6580,43 +6586,126 @@ OR if corrections needed:
       y = doc.lastAutoTable.finalY + 12;
 
       // =============================================
-      // 4. WARRANT DETAIL SECTIONS
+      // 4. WARRANT ANALYSIS SUMMARY
       // =============================================
 
-      y = checkPageBreak(y, 80);
+      y = checkPageBreak(y, 60);
 
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text('WARRANT ANALYSIS RESULTS', margin, y);
-      y += 8;
+      doc.text('WARRANT ANALYSIS SUMMARY', margin, y);
+      y += 6;
 
-      // --- WARRANT 1: Eight-Hour Volume ---
-      doc.setFillColor(...colors.infoBox);
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.3);
-      doc.rect(margin, y, contentWidth, 50, 'FD');
+      // Create summary table with all warrants
+      const warrantSummaryRows = [
+        ['Warrant 1', 'Eight-Hour Vehicular Volume', r.warrant1.warranted ? 'SATISFIED' : 'NOT SATISFIED',
+         `Cond A: ${r.warrant1.conditionAHours}/8 hrs | Cond B: ${r.warrant1.conditionBHours}/8 hrs`],
+        ['Warrant 2', 'Four-Hour Vehicular Volume', r.warrant2.warranted ? 'SATISFIED' : 'NOT SATISFIED',
+         `${r.warrant2.hoursMet}/4 hours above curve`],
+        ['Warrant 3', 'Peak Hour', r.warrant3.warranted ? 'SATISFIED' : 'NOT SATISFIED',
+         `Peak: ${r.warrant3.peakHourFormatted} | Minor: ${r.warrant3.minorVolume} vph (Req: ${r.warrant3.threshold} vph)`]
+      ];
 
-      doc.setFontSize(10);
+      if (r.warrant7 && r.warrant7.enabled) {
+        warrantSummaryRows.push(['Warrant 7', 'Crash Experience', r.warrant7.warranted ? 'SATISFIED' : 'NOT SATISFIED',
+          `Crashes: ${r.warrant7.totalCrashes} (Req: ${r.warrant7.thresholds?.total || 'N/A'})`]);
+      }
+      if (r.warrant4 && r.warrant4.enabled) {
+        warrantSummaryRows.push(['Warrant 4', 'Pedestrian Volume', r.warrant4.warranted ? 'SATISFIED' : 'NOT SATISFIED',
+          `${r.warrant4.hoursMet || 0} hours meeting threshold`]);
+      }
+      if (r.warrant5 && r.warrant5.enabled) {
+        warrantSummaryRows.push(['Warrant 5', 'School Crossing', r.warrant5.warranted ? 'SATISFIED' : 'NOT SATISFIED',
+          `${r.warrant5.schoolchildrenCount || 0} students crossing`]);
+      }
+
+      doc.autoTable({
+        startY: y,
+        head: [['Warrant', 'Description', 'Result', 'Key Metrics']],
+        body: warrantSummaryRows,
+        theme: 'plain',
+        headStyles: {
+          fillColor: colors.primaryDark,
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+          cellPadding: 3
+        },
+        bodyStyles: { fontSize: 8, cellPadding: 3 },
+        columnStyles: {
+          0: { fontStyle: 'bold', cellWidth: 22 },
+          1: { cellWidth: 42 },
+          2: { cellWidth: 28, halign: 'center' },
+          3: { cellWidth: contentWidth - 92 }
+        },
+        alternateRowStyles: { fillColor: colors.lightGray },
+        margin: { left: margin, right: margin },
+        didParseCell: function(data) {
+          if (data.section === 'body' && data.column.index === 2) {
+            const val = data.cell.text[0];
+            if (val === 'SATISFIED') {
+              data.cell.styles.textColor = colors.success;
+              data.cell.styles.fontStyle = 'bold';
+            } else {
+              data.cell.styles.textColor = colors.danger;
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        }
+      });
+
+      y = doc.lastAutoTable.finalY + 15;
+
+      // =============================================
+      // 5. DETAILED WARRANT 1 CALCULATIONS (NEW PAGE)
+      // =============================================
+
+      doc.addPage();
+      y = 25;
+
+      doc.setFillColor(...colors.primaryDark);
+      doc.rect(0, 0, pageWidth, 18, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...colors.primaryDark);
-      doc.text('WARRANT 1: Eight-Hour Vehicular Volume', margin + 4, y + 7);
-
-      // Status pill
-      drawStatusPill(pageWidth - margin - 35, y + 3, 32, 8, r.warrant1.warranted ? 'SATISFIED' : 'NOT SATISFIED', r.warrant1.warranted);
-
+      doc.text('WARRANT 1: EIGHT-HOUR VEHICULAR VOLUME - DETAILED CALCULATIONS', pageWidth / 2, 12, { align: 'center' });
       doc.setTextColor(0, 0, 0);
+
+      y = 28;
+
+      // Status pill for Warrant 1
+      drawStatusPill(margin, y, 35, 10, r.warrant1.warranted ? 'SATISFIED' : 'NOT SATISFIED', r.warrant1.warranted);
+      y += 16;
+
+      // Warrant 1 explanation
       doc.setFontSize(8);
       doc.setFont('helvetica', 'italic');
-      doc.text('Minimum traffic volumes must be met for 8 hours of an average day.', margin + 4, y + 14);
+      doc.setTextColor(80, 80, 80);
+      const w1Explanation = 'Per MUTCD Section 4C.01, this warrant requires minimum vehicular volumes for 8 hours of an average day. Warrant is satisfied if Condition A OR Condition B meets 100% thresholds for 8 hours, OR if BOTH conditions meet 80% thresholds for 8 hours.';
+      const splitW1Exp = doc.splitTextToSize(w1Explanation, contentWidth);
+      doc.text(splitW1Exp, margin, y);
+      y += splitW1Exp.length * 4 + 6;
+      doc.setTextColor(0, 0, 0);
 
-      // Warrant 1 details table
+      // Threshold table for Warrant 1
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('APPLICABLE THRESHOLDS', margin, y);
+      y += 5;
+
+      const thresholdKey = c.apply70Percent ? 'p70' : 'p100';
+      const comboKey = c.apply70Percent ? 'p56' : 'p80';
+      const thresholdLabel = c.apply70Percent ? '70% (Reduced)' : '100% (Standard)';
+      const comboLabel = c.apply70Percent ? '56% (Reduced)' : '80% (Standard)';
+
       doc.autoTable({
-        startY: y + 18,
-        head: [['Condition', 'Hours Met', 'Required', 'Status']],
+        startY: y,
+        head: [['Condition', 'Threshold Level', 'Major Street (vph)', 'Minor Street (vph)', 'Hours Required']],
         body: [
-          ['Condition A (100%)', `${r.warrant1.conditionAHours}`, '8 hours', r.warrant1.conditionAHours >= 8 ? 'Met' : 'Not Met'],
-          ['Condition B (100%)', `${r.warrant1.conditionBHours}`, '8 hours', r.warrant1.conditionBHours >= 8 ? 'Met' : 'Not Met'],
-          ['80% Combination', `A=${r.warrant1.combinationAHours}, B=${r.warrant1.combinationBHours}`, 'Both >=8', (r.warrant1.combinationAHours >= 8 && r.warrant1.combinationBHours >= 8) ? 'Met' : 'Not Met']
+          ['Condition A', thresholdLabel, r.warrant1.thresholdA?.major || 'N/A', r.warrant1.thresholdA?.minor || 'N/A', '8'],
+          ['Condition B', thresholdLabel, r.warrant1.thresholdB?.major || 'N/A', r.warrant1.thresholdB?.minor || 'N/A', '8'],
+          ['Combination A', comboLabel, r.warrant1.comboA?.major || 'N/A', r.warrant1.comboA?.minor || 'N/A', '8'],
+          ['Combination B', comboLabel, r.warrant1.comboB?.major || 'N/A', r.warrant1.comboB?.minor || 'N/A', '8']
         ],
         theme: 'plain',
         headStyles: {
@@ -6624,211 +6713,277 @@ OR if corrections needed:
           textColor: [255, 255, 255],
           fontStyle: 'bold',
           fontSize: 8,
-          cellPadding: 2
+          cellPadding: 3,
+          halign: 'center'
         },
-        bodyStyles: { fontSize: 8, cellPadding: 2 },
+        bodyStyles: { fontSize: 8, cellPadding: 3, halign: 'center' },
         columnStyles: {
-          0: { fontStyle: 'bold', cellWidth: 45 },
-          3: { cellWidth: 30 }
+          0: { fontStyle: 'bold', halign: 'left', cellWidth: 35 },
+          1: { cellWidth: 35 }
         },
-        margin: { left: margin + 4, right: margin + 4 },
-        tableWidth: contentWidth - 8
+        alternateRowStyles: { fillColor: colors.lightGray },
+        margin: { left: margin, right: margin }
       });
 
-      y += 54;
+      y = doc.lastAutoTable.finalY + 8;
 
-      // --- WARRANT 2: Four-Hour Volume ---
-      y = checkPageBreak(y, 40);
-
-      doc.setFillColor(...colors.infoBox);
-      doc.rect(margin, y, contentWidth, 35, 'FD');
-
-      doc.setFontSize(10);
+      // Hourly Analysis Table for Warrant 1
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...colors.primaryDark);
-      doc.text('WARRANT 2: Four-Hour Vehicular Volume', margin + 4, y + 7);
+      doc.text('HOURLY VOLUME ANALYSIS (Average Day)', margin, y);
+      y += 5;
 
-      drawStatusPill(pageWidth - margin - 35, y + 3, 32, 8, r.warrant2.warranted ? 'SATISFIED' : 'NOT SATISFIED', r.warrant2.warranted);
+      const w1HourlyRows = [];
+      for (let h = 0; h < 24; h++) {
+        const agg = r.avgComputed.hourlyAggregates[h] || {};
+        const detail = r.warrant1.details?.find(d => d.hour === h) || {};
 
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'italic');
-      doc.text('Plotted point (major street vs minor street volume) must fall above curve for 4 hours.', margin + 4, y + 14);
-
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Hours Above Curve: ${r.warrant2.hoursMet} of 4 required`, margin + 4, y + 22);
-      doc.text(`Threshold Type: ${c.laneConfig} lane configuration${c.apply70Percent ? ' (70% reduced)' : ''}`, margin + 4, y + 28);
-
-      y += 40;
-
-      // --- WARRANT 3: Peak Hour ---
-      y = checkPageBreak(y, 45);
-
-      doc.setFillColor(...colors.infoBox);
-      doc.rect(margin, y, contentWidth, 40, 'FD');
-
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...colors.primaryDark);
-      doc.text('WARRANT 3: Peak Hour', margin + 4, y + 7);
-
-      drawStatusPill(pageWidth - margin - 35, y + 3, 32, 8, r.warrant3.warranted ? 'SATISFIED' : 'NOT SATISFIED', r.warrant3.warranted);
-
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'italic');
-      doc.text('Minor street delay must exceed threshold during peak hour of an average day.', margin + 4, y + 14);
+        w1HourlyRows.push([
+          formatHour(h),
+          (agg.majorTotal || 0).toLocaleString(),
+          (agg.minorAdjusted || 0).toLocaleString(),
+          detail.meetsA ? 'YES' : 'NO',
+          detail.meetsB ? 'YES' : 'NO',
+          detail.meetsComboA ? 'YES' : 'NO',
+          detail.meetsComboB ? 'YES' : 'NO'
+        ]);
+      }
 
       doc.autoTable({
-        startY: y + 18,
-        body: [
-          ['Peak Hour', r.warrant3.peakHourFormatted, 'Major Street Vol', `${r.warrant3.majorVolume} vph`],
-          ['Minor Street Vol', `${r.warrant3.minorVolume} vph`, 'Threshold', `${r.warrant3.threshold} vph`]
-        ],
+        startY: y,
+        head: [['Hour', 'Major (vph)', 'Minor Adj (vph)', 'Cond A', 'Cond B', '80% A', '80% B']],
+        body: w1HourlyRows,
         theme: 'plain',
-        bodyStyles: { fontSize: 8, cellPadding: 2 },
-        columnStyles: {
-          0: { fontStyle: 'bold', cellWidth: 35 },
-          1: { cellWidth: 35 },
-          2: { fontStyle: 'bold', cellWidth: 35 },
-          3: { cellWidth: 35 }
+        headStyles: {
+          fillColor: colors.primaryDark,
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 7,
+          cellPadding: 2,
+          halign: 'center'
         },
-        margin: { left: margin + 4, right: margin + 4 },
-        tableWidth: contentWidth - 8
+        bodyStyles: { fontSize: 7, cellPadding: 1.5, halign: 'center' },
+        columnStyles: {
+          0: { halign: 'left', cellWidth: 18 },
+          1: { cellWidth: 25, halign: 'right' },
+          2: { cellWidth: 28, halign: 'right' },
+          3: { cellWidth: 18 },
+          4: { cellWidth: 18 },
+          5: { cellWidth: 18 },
+          6: { cellWidth: 18 }
+        },
+        alternateRowStyles: { fillColor: colors.lightGray },
+        margin: { left: margin, right: margin },
+        didParseCell: function(data) {
+          if (data.section === 'body' && data.column.index >= 3) {
+            const val = data.cell.text[0];
+            if (val === 'YES') {
+              data.cell.styles.fillColor = colors.metColor;
+              data.cell.styles.textColor = [22, 101, 52];
+              data.cell.styles.fontStyle = 'bold';
+            } else if (val === 'NO') {
+              data.cell.styles.fillColor = colors.notMetColor;
+              data.cell.styles.textColor = [153, 27, 27];
+            }
+          }
+        }
       });
 
-      y += 45;
+      y = doc.lastAutoTable.finalY + 6;
 
-      // --- WARRANT 7: Crash Experience (if enabled) ---
-      if (r.warrant7.enabled) {
-        y = checkPageBreak(y, 50);
+      // Warrant 1 Summary
+      doc.setFillColor(230, 230, 230);
+      doc.rect(margin, y, contentWidth, 18, 'F');
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('WARRANT 1 CALCULATION SUMMARY:', margin + 4, y + 5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Condition A (100%): ${r.warrant1.conditionAHours} hours meet threshold (8 required) - ${r.warrant1.conditionAHours >= 8 ? 'SATISFIED' : 'NOT SATISFIED'}`, margin + 4, y + 10);
+      doc.text(`Condition B (100%): ${r.warrant1.conditionBHours} hours meet threshold (8 required) - ${r.warrant1.conditionBHours >= 8 ? 'SATISFIED' : 'NOT SATISFIED'}`, margin + 4, y + 15);
 
-        doc.setFillColor(...colors.infoBox);
-        doc.rect(margin, y, contentWidth, 45, 'FD');
+      y += 20;
 
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...colors.primaryDark);
-        doc.text('WARRANT 7: Crash Experience', margin + 4, y + 7);
+      doc.setFillColor(230, 230, 230);
+      doc.rect(margin, y, contentWidth, 10, 'F');
+      doc.text(`80% Combination: A=${r.warrant1.combinationAHours} hrs, B=${r.warrant1.combinationBHours} hrs (both need >=8) - ${(r.warrant1.combinationAHours >= 8 && r.warrant1.combinationBHours >= 8) ? 'SATISFIED' : 'NOT SATISFIED'}`, margin + 4, y + 6);
 
-        drawStatusPill(pageWidth - margin - 35, y + 3, 32, 8, r.warrant7.warranted ? 'SATISFIED' : 'NOT SATISFIED', r.warrant7.warranted);
-
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        doc.text('Crash history and volume thresholds must be met to justify signal based on safety.', margin + 4, y + 14);
-
-        doc.autoTable({
-          startY: y + 18,
-          body: [
-            ['Analysis Period', r.warrant7.period === '1year' ? '12 months' : '36 months', 'Table Used', r.warrant7.tableName],
-            ['Total Crashes', `${r.warrant7.totalCrashes}`, 'Required', `>=${r.warrant7.thresholds.total}`],
-            ['Injury Crashes', `${r.warrant7.injuryCrashes || 0}`, 'Required', `>=${r.warrant7.thresholds.injury}`]
-          ],
-          theme: 'plain',
-          bodyStyles: { fontSize: 8, cellPadding: 2 },
-          columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 35 },
-            1: { cellWidth: 35 },
-            2: { fontStyle: 'bold', cellWidth: 35 },
-            3: { cellWidth: 35 }
-          },
-          margin: { left: margin + 4, right: margin + 4 },
-          tableWidth: contentWidth - 8
-        });
-
-        y += 50;
-      }
-
-      // --- WARRANT 4: Pedestrian Volume (if enabled) ---
-      if (r.warrant4 && r.warrant4.enabled) {
-        y = checkPageBreak(y, 50);
-
-        doc.setFillColor(...colors.infoBox);
-        doc.rect(margin, y, contentWidth, 45, 'FD');
-
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...colors.primaryDark);
-        doc.text('WARRANT 4: Pedestrian Volume', margin + 4, y + 7);
-
-        drawStatusPill(pageWidth - margin - 35, y + 3, 32, 8, r.warrant4.warranted ? 'SATISFIED' : 'NOT SATISFIED', r.warrant4.warranted);
-
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        doc.text('Pedestrian crossing volume must exceed threshold based on major street volume.', margin + 4, y + 14);
-
-        const w4AnalysisLabel = r.warrant4.analysisType === 'peak' ? 'Peak Hour' : 'Four-Hour';
-        const w4SpeedLabel = r.warrant4.crossingSpeed === 'slow' ? 'Slow (<3.5 ft/s)' : 'Normal (>=3.5 ft/s)';
-
-        doc.autoTable({
-          startY: y + 18,
-          body: [
-            ['Analysis Type', w4AnalysisLabel, 'Crossing Speed', w4SpeedLabel],
-            ['Hours Meeting Threshold', `${r.warrant4.hoursMet || 0}`, 'Required Hours', r.warrant4.analysisType === 'peak' ? '1' : '4'],
-            ['Figure Reference', r.warrant4.figureName || 'N/A', 'Status', r.warrant4.warranted ? 'Threshold Met' : 'Below Threshold']
-          ],
-          theme: 'plain',
-          bodyStyles: { fontSize: 8, cellPadding: 2 },
-          columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 40 },
-            1: { cellWidth: 30 },
-            2: { fontStyle: 'bold', cellWidth: 40 },
-            3: { cellWidth: 30 }
-          },
-          margin: { left: margin + 4, right: margin + 4 },
-          tableWidth: contentWidth - 8
-        });
-
-        y += 50;
-      }
-
-      // --- WARRANT 5: School Crossing (if enabled) ---
-      if (r.warrant5 && r.warrant5.enabled) {
-        y = checkPageBreak(y, 50);
-
-        doc.setFillColor(...colors.infoBox);
-        doc.rect(margin, y, contentWidth, 45, 'FD');
-
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...colors.primaryDark);
-        doc.text('WARRANT 5: School Crossing', margin + 4, y + 7);
-
-        drawStatusPill(pageWidth - margin - 35, y + 3, 32, 8, r.warrant5.warranted ? 'SATISFIED' : 'NOT SATISFIED', r.warrant5.warranted);
-
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        doc.text('School crossing signal justified when gaps are inadequate for safe pedestrian crossing.', margin + 4, y + 14);
-
-        doc.autoTable({
-          startY: y + 18,
-          body: [
-            ['Schoolchildren Crossing', `${r.warrant5.schoolchildrenCount || 0}`, 'Minimum Required', '20'],
-            ['Adequate Gaps (per period)', `${r.warrant5.adequateGaps || 0}`, 'Crossing Minutes', `${r.warrant5.crossingMinutes || 0}`],
-            ['Gap Study Completed', r.warrant5.gapStudyDone ? 'Yes' : 'No', 'Gap Condition', (r.warrant5.adequateGaps || 0) < (r.warrant5.crossingMinutes || 0) ? 'Insufficient' : 'Adequate']
-          ],
-          theme: 'plain',
-          bodyStyles: { fontSize: 8, cellPadding: 2 },
-          columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 40 },
-            1: { cellWidth: 30 },
-            2: { fontStyle: 'bold', cellWidth: 40 },
-            3: { cellWidth: 30 }
-          },
-          margin: { left: margin + 4, right: margin + 4 },
-          tableWidth: contentWidth - 8
-        });
-
-        y += 50;
-      }
-
-      y += 8;
+      y += 18;
 
       // =============================================
-      // 5. HOURLY VOLUME TABLE (NEW PAGE)
+      // 6. DETAILED WARRANT 2 CALCULATIONS (NEW PAGE)
+      // =============================================
+
+      doc.addPage();
+      y = 25;
+
+      doc.setFillColor(...colors.primaryDark);
+      doc.rect(0, 0, pageWidth, 18, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('WARRANT 2: FOUR-HOUR VEHICULAR VOLUME - DETAILED CALCULATIONS', pageWidth / 2, 12, { align: 'center' });
+      doc.setTextColor(0, 0, 0);
+
+      y = 28;
+
+      drawStatusPill(margin, y, 35, 10, r.warrant2.warranted ? 'SATISFIED' : 'NOT SATISFIED', r.warrant2.warranted);
+      y += 16;
+
+      // Warrant 2 explanation
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(80, 80, 80);
+      const w2Explanation = 'Per MUTCD Section 4C.02, this warrant uses plotted points of major street vs minor street volumes. For each hour, if the point falls above the curve threshold, that hour counts toward the warrant. Requires 4 hours above the curve.';
+      const splitW2Exp = doc.splitTextToSize(w2Explanation, contentWidth);
+      doc.text(splitW2Exp, margin, y);
+      y += splitW2Exp.length * 4 + 6;
+      doc.setTextColor(0, 0, 0);
+
+      // Warrant 2 hourly analysis
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('HOURLY ANALYSIS - VOLUME vs THRESHOLD COMPARISON', margin, y);
+      y += 5;
+
+      const w2HourlyRows = [];
+      const w2Details = r.warrant2.details || [];
+
+      // Sort by hours that met the threshold first
+      const sortedW2Details = [...w2Details].sort((a, b) => {
+        if (a.met && !b.met) return -1;
+        if (!a.met && b.met) return 1;
+        return b.minor - a.minor;
+      });
+
+      for (const detail of sortedW2Details) {
+        const margin_val = detail.minor - detail.threshold;
+        const margin_pct = detail.threshold > 0 ? ((margin_val / detail.threshold) * 100).toFixed(1) : '0.0';
+        w2HourlyRows.push([
+          formatHour(detail.hour),
+          detail.major.toLocaleString(),
+          detail.minor.toLocaleString(),
+          detail.threshold.toLocaleString(),
+          margin_val >= 0 ? `+${margin_val}` : `${margin_val}`,
+          `${margin_pct}%`,
+          detail.met ? 'ABOVE' : 'BELOW'
+        ]);
+      }
+
+      doc.autoTable({
+        startY: y,
+        head: [['Hour', 'Major (vph)', 'Minor Adj (vph)', 'Threshold', 'Margin', '% Diff', 'Status']],
+        body: w2HourlyRows,
+        theme: 'plain',
+        headStyles: {
+          fillColor: colors.primaryDark,
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 7,
+          cellPadding: 2,
+          halign: 'center'
+        },
+        bodyStyles: { fontSize: 7, cellPadding: 1.5, halign: 'center' },
+        columnStyles: {
+          0: { halign: 'left', cellWidth: 18 },
+          1: { cellWidth: 25, halign: 'right' },
+          2: { cellWidth: 28, halign: 'right' },
+          3: { cellWidth: 25, halign: 'right' },
+          4: { cellWidth: 20, halign: 'right' },
+          5: { cellWidth: 20, halign: 'right' },
+          6: { cellWidth: 20 }
+        },
+        alternateRowStyles: { fillColor: colors.lightGray },
+        margin: { left: margin, right: margin },
+        didParseCell: function(data) {
+          if (data.section === 'body' && data.column.index === 6) {
+            const val = data.cell.text[0];
+            if (val === 'ABOVE') {
+              data.cell.styles.fillColor = colors.metColor;
+              data.cell.styles.textColor = [22, 101, 52];
+              data.cell.styles.fontStyle = 'bold';
+            } else {
+              data.cell.styles.fillColor = colors.notMetColor;
+              data.cell.styles.textColor = [153, 27, 27];
+            }
+          }
+        }
+      });
+
+      y = doc.lastAutoTable.finalY + 6;
+
+      // Warrant 2 Summary
+      doc.setFillColor(230, 230, 230);
+      doc.rect(margin, y, contentWidth, 14, 'F');
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('WARRANT 2 CALCULATION SUMMARY:', margin + 4, y + 5);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Hours Above Curve: ${r.warrant2.hoursMet} of 4 required | Configuration: ${c.laneConfig} | 70% Factor: ${c.apply70Percent ? 'Applied' : 'Not Applied'}`, margin + 4, y + 10);
+
+      y += 22;
+
+      // =============================================
+      // 7. DETAILED WARRANT 3 CALCULATIONS
+      // =============================================
+
+      y = checkPageBreak(y, 80);
+
+      doc.setFillColor(...colors.primaryDark);
+      doc.rect(margin, y, contentWidth, 14, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('WARRANT 3: PEAK HOUR - DETAILED CALCULATIONS', margin + 4, y + 9);
+      doc.setTextColor(0, 0, 0);
+
+      y += 18;
+
+      drawStatusPill(margin, y, 35, 10, r.warrant3.warranted ? 'SATISFIED' : 'NOT SATISFIED', r.warrant3.warranted);
+      y += 16;
+
+      // Warrant 3 explanation
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(80, 80, 80);
+      const w3Explanation = 'Per MUTCD Section 4C.03, this warrant addresses peak hour delay conditions. The minor street volume during the peak hour must exceed the threshold based on major street volume.';
+      const splitW3Exp = doc.splitTextToSize(w3Explanation, contentWidth);
+      doc.text(splitW3Exp, margin, y);
+      y += splitW3Exp.length * 4 + 6;
+      doc.setTextColor(0, 0, 0);
+
+      // Peak hour calculation details
+      doc.autoTable({
+        startY: y,
+        head: [['Parameter', 'Value', 'Calculation Details']],
+        body: [
+          ['Peak Hour Identified', r.warrant3.peakHourFormatted, 'Hour with highest total volume (Major + Minor)'],
+          ['Major Street Volume', `${r.warrant3.majorVolume.toLocaleString()} vph`, 'Sum of both major street approaches'],
+          ['Minor Street Volume', `${r.warrant3.minorVolume.toLocaleString()} vph`, 'Higher of both minor street approaches (adjusted)'],
+          ['Threshold Required', `${r.warrant3.threshold.toLocaleString()} vph`, `Based on ${c.laneConfig} configuration${c.apply70Percent ? ' (70% reduced)' : ''}`],
+          ['Margin', `${r.warrant3.minorVolume - r.warrant3.threshold >= 0 ? '+' : ''}${r.warrant3.minorVolume - r.warrant3.threshold} vph`, r.warrant3.warranted ? 'Exceeds threshold - SATISFIED' : 'Below threshold - NOT SATISFIED']
+        ],
+        theme: 'plain',
+        headStyles: {
+          fillColor: colors.primaryDark,
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+          cellPadding: 3
+        },
+        bodyStyles: { fontSize: 8, cellPadding: 3 },
+        columnStyles: {
+          0: { fontStyle: 'bold', cellWidth: 40 },
+          1: { cellWidth: 35, halign: 'right' },
+          2: { cellWidth: contentWidth - 75 }
+        },
+        alternateRowStyles: { fillColor: colors.lightGray },
+        margin: { left: margin, right: margin }
+      });
+
+      y = doc.lastAutoTable.finalY + 15;
+
+      // =============================================
+      // 8. AVERAGE DAY HOURLY VOLUMES TABLE
       // =============================================
 
       doc.addPage();
@@ -6841,14 +6996,19 @@ OR if corrections needed:
       y += 4;
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text('Peak hours (top 4 by major street volume) highlighted in yellow.', margin, y);
+      doc.text(`Averaging Method: ${avgMethodDisplayNames[r.averagingMethod] || r.averagingMethod} | Days Used: ${r.daysUsed} | Peak hours highlighted in yellow.`, margin, y);
       y += 6;
 
       const hourlyRows = [];
       for (let h = 0; h < 24; h++) {
         const a = r.avgComputed.hourlyAggregates[h] || {};
+        const d = r.avgHourlyData ? r.avgHourlyData[h] : {};
         hourlyRows.push([
           `${String(h).padStart(2, '0')}:00 - ${String((h + 1) % 24).padStart(2, '0')}:00`,
+          (d?.NB?.total || 0).toLocaleString(),
+          (d?.SB?.total || 0).toLocaleString(),
+          (d?.EB?.total || 0).toLocaleString(),
+          (d?.WB?.total || 0).toLocaleString(),
           (a.majorTotal || 0).toLocaleString(),
           (a.minorHigh || 0).toLocaleString(),
           (a.minorAdjusted || 0).toLocaleString()
@@ -6857,27 +7017,31 @@ OR if corrections needed:
 
       doc.autoTable({
         startY: y,
-        head: [['Hour', 'Major St (vph)', 'Minor St (vph)', 'Minor Adjusted (vph)']],
+        head: [['Hour', 'NB', 'SB', 'EB', 'WB', 'Major Total', 'Minor High', 'Minor Adj']],
         body: hourlyRows,
         theme: 'plain',
         headStyles: {
           fillColor: colors.primaryDark,
           textColor: [255, 255, 255],
           fontStyle: 'bold',
-          fontSize: 8,
-          cellPadding: 3,
+          fontSize: 7,
+          cellPadding: 2,
           halign: 'center'
         },
         bodyStyles: {
-          fontSize: 8,
-          cellPadding: 2,
+          fontSize: 7,
+          cellPadding: 1.5,
           halign: 'right'
         },
         columnStyles: {
-          0: { halign: 'left', cellWidth: 40 },
-          1: { cellWidth: 35 },
-          2: { cellWidth: 35 },
-          3: { cellWidth: 40 }
+          0: { halign: 'left', cellWidth: 28 },
+          1: { cellWidth: 18 },
+          2: { cellWidth: 18 },
+          3: { cellWidth: 18 },
+          4: { cellWidth: 18 },
+          5: { cellWidth: 25, fontStyle: 'bold' },
+          6: { cellWidth: 22 },
+          7: { cellWidth: 22, fontStyle: 'bold' }
         },
         alternateRowStyles: { fillColor: colors.lightGray },
         margin: { left: margin, right: margin },
@@ -6896,18 +7060,18 @@ OR if corrections needed:
       const totalMinor = Object.values(r.avgComputed.hourlyAggregates).reduce((sum, a) => sum + (a.minorAdjusted || 0), 0);
 
       doc.setFillColor(230, 230, 230);
-      doc.rect(margin, y, contentWidth, 10, 'F');
+      doc.rect(margin, y, contentWidth, 12, 'F');
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.text('DAILY TOTALS:', margin + 4, y + 6);
-      doc.text(`Major: ${totalMajor.toLocaleString()} vph`, margin + 50, y + 6);
-      doc.text(`Minor Adjusted: ${totalMinor.toLocaleString()} vph`, margin + 100, y + 6);
-      doc.text(`Peak Hour: ${r.warrant3.peakHourFormatted}`, margin + 160, y + 6);
+      doc.text('DAILY TOTALS:', margin + 4, y + 5);
+      doc.text(`Major Street: ${totalMajor.toLocaleString()} vpd`, margin + 40, y + 5);
+      doc.text(`Minor Street (Adj): ${totalMinor.toLocaleString()} vpd`, margin + 95, y + 5);
+      doc.text(`Peak Hour: ${r.warrant3.peakHourFormatted}`, margin + 155, y + 5);
 
       y += 18;
 
       // =============================================
-      // 6. INDIVIDUAL DAY RESULTS
+      // 9. INDIVIDUAL DAY RESULTS
       // =============================================
 
       y = checkPageBreak(y, 80);
@@ -6917,7 +7081,6 @@ OR if corrections needed:
       doc.text('INDIVIDUAL DAY RESULTS', margin, y);
       y += 5;
 
-      // Add note for any-single-day mode
       if (r.averagingMethod === 'any-single-day') {
         doc.setFontSize(8);
         doc.setFont('helvetica', 'italic');
@@ -6933,36 +7096,40 @@ OR if corrections needed:
         res.day.dayType,
         res.day.totalVolume.toLocaleString(),
         res.warrant1.warranted ? 'YES' : 'NO',
+        `${res.warrant1.conditionAHours}/8`,
         res.warrant2.warranted ? 'YES' : 'NO',
+        `${res.warrant2.hoursMet}/4`,
         res.warrant3.warranted ? 'YES' : 'NO'
       ]);
 
       doc.autoTable({
         startY: y,
-        head: [['Date', 'Day', 'Type', 'Total Volume', 'W1', 'W2', 'W3']],
+        head: [['Date', 'Day', 'Type', 'Total Vol', 'W1', 'W1 Hrs', 'W2', 'W2 Hrs', 'W3']],
         body: dayRows,
         theme: 'plain',
         headStyles: {
           fillColor: colors.primaryDark,
           textColor: [255, 255, 255],
           fontStyle: 'bold',
-          fontSize: 8,
-          cellPadding: 3,
+          fontSize: 7,
+          cellPadding: 2,
           halign: 'center'
         },
         bodyStyles: {
-          fontSize: 8,
+          fontSize: 7,
           cellPadding: 2,
           halign: 'center'
         },
         columnStyles: {
-          0: { halign: 'left', cellWidth: 30 },
-          1: { cellWidth: 25 },
-          2: { cellWidth: 25 },
-          3: { halign: 'right', cellWidth: 30 },
-          4: { cellWidth: 15 },
-          5: { cellWidth: 15 },
-          6: { cellWidth: 15 }
+          0: { halign: 'left', cellWidth: 22 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 18 },
+          3: { halign: 'right', cellWidth: 22 },
+          4: { cellWidth: 14 },
+          5: { cellWidth: 16 },
+          6: { cellWidth: 14 },
+          7: { cellWidth: 16 },
+          8: { cellWidth: 14 }
         },
         alternateRowStyles: { fillColor: colors.lightGray },
         margin: { left: margin, right: margin },
@@ -6970,12 +7137,14 @@ OR if corrections needed:
           if (data.section === 'body') {
             const colIndex = data.column.index;
             const cellValue = data.cell.text[0];
-            if (colIndex >= 4 && colIndex <= 6) {
+            if (colIndex === 4 || colIndex === 6 || colIndex === 8) {
               if (cellValue === 'YES') {
-                data.cell.styles.textColor = colors.success;
+                data.cell.styles.fillColor = colors.metColor;
+                data.cell.styles.textColor = [22, 101, 52];
                 data.cell.styles.fontStyle = 'bold';
               } else if (cellValue === 'NO') {
-                data.cell.styles.textColor = colors.danger;
+                data.cell.styles.fillColor = colors.notMetColor;
+                data.cell.styles.textColor = [153, 27, 27];
               }
             }
           }
@@ -6985,32 +7154,52 @@ OR if corrections needed:
       y = doc.lastAutoTable.finalY + 15;
 
       // =============================================
-      // 8. METHODOLOGY NOTE
+      // 10. METHODOLOGY AND REFERENCES
       // =============================================
 
-      y = checkPageBreak(y, 40);
+      y = checkPageBreak(y, 60);
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('METHODOLOGY & REFERENCES', margin, y);
+      y += 6;
 
       doc.setFillColor(...colors.infoBox);
       doc.setDrawColor(200, 200, 200);
-      doc.rect(margin, y, contentWidth, 25, 'FD');
+      doc.rect(margin, y, contentWidth, 45, 'FD');
 
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.text('METHODOLOGY NOTE', margin + 4, y + 6);
+      doc.text('ANALYSIS METHODOLOGY', margin + 4, y + 6);
 
       doc.setFont('helvetica', 'normal');
-      let methodText = 'Analysis performed per MUTCD 11th Edition signal warrant criteria. ';
+      let methodText = `• Data Source: ${r.daysUsed} day(s) of traffic counts analyzed using ${avgMethodDisplayNames[r.averagingMethod] || r.averagingMethod} method\n`;
+      methodText += `• Lane Configuration: ${c.laneConfig} (${c.majorLanes} major lanes × ${c.minorLanes} minor lanes)\n`;
+      methodText += `• Volume Adjustments: ${c.apply70Percent ? '70% reduction applied per MUTCD for low-volume conditions' : 'Standard thresholds used (no reduction)'}\n`;
       if (r.averagingMethod === 'any-single-day') {
-        methodText += 'Individual Day Analysis method used: warrant is satisfied if ANY single day meets the volume thresholds. This approach is accepted by some agencies as justification when at least one day of counts shows sufficient volumes. ';
+        methodText += '• Individual Day Analysis: Warrant satisfied if ANY single day meets volume thresholds\n';
       }
-      methodText += 'Warrant satisfaction indicates volume thresholds are met but does not mandate signal installation. Final determination requires engineering judgment, alternatives analysis, and P.E. approval.';
+      methodText += '• Reference: MUTCD 11th Edition, Part 4C - Traffic Control Signal Needs Studies';
       const splitMethod = doc.splitTextToSize(methodText, contentWidth - 8);
       doc.text(splitMethod, margin + 4, y + 12);
 
-      y += 30;
+      y += 50;
+
+      // Disclaimer
+      y = checkPageBreak(y, 30);
+
+      doc.setFillColor(254, 249, 195);
+      doc.rect(margin, y, contentWidth, 20, 'F');
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DISCLAIMER', margin + 4, y + 5);
+      doc.setFont('helvetica', 'normal');
+      const disclaimer = 'Warrant satisfaction indicates volume thresholds are met but does not mandate signal installation. Final determination requires engineering judgment, field investigation, alternatives analysis, and licensed P.E. approval. This report is for planning purposes only.';
+      const splitDisclaimer = doc.splitTextToSize(disclaimer, contentWidth - 8);
+      doc.text(splitDisclaimer, margin + 4, y + 10);
 
       // =============================================
-      // 7. FOOTER (Every Page)
+      // 11. FOOTER (Every Page)
       // =============================================
 
       const timestamp = new Date().toLocaleString('en-US', {
@@ -7051,6 +7240,7 @@ OR if corrections needed:
         return;
       }
       const r = analysisResults;
+      const c = r.config;
       const avgMethodNames = {
         'tue-wed-thu': 'Tuesday/Wednesday/Thursday',
         'all-weekdays': 'All Weekdays (Mon-Fri)',
@@ -7058,43 +7248,144 @@ OR if corrections needed:
         'custom': 'Custom Selection'
       };
 
-      let csv = `CrashLens Signal Warrant Analysis\n`;
-      csv += `Intersection,${r.config.intersectionName}\n`;
-      csv += `Major Street,${r.config.majorStreet}\n`;
-      csv += `Minor Street,${r.config.minorStreet}\n`;
-      csv += `Lane Configuration,${r.config.laneConfig}\n`;
+      let csv = `CrashLens Signal Warrant Analysis - Detailed Report\n`;
+      csv += `Generated,${new Date().toLocaleString()}\n\n`;
+
+      // =============================================
+      // INTERSECTION CONFIGURATION
+      // =============================================
+      csv += `INTERSECTION CONFIGURATION\n`;
+      csv += `Intersection,${c.intersectionName}\n`;
+      csv += `Major Street,${c.majorStreet}\n`;
+      csv += `Minor Street,${c.minorStreet}\n`;
+      csv += `Lane Configuration,${c.laneConfig}\n`;
+      csv += `Major Street Lanes,${c.majorLanes}\n`;
+      csv += `Minor Street Lanes,${c.minorLanes}\n`;
+      csv += `Speed Limit,${c.speedLimit} mph\n`;
+      csv += `70% Reduction Applied,${c.apply70Percent ? 'Yes' : 'No'}\n`;
       csv += `Analysis Method,${avgMethodNames[r.averagingMethod] || r.averagingMethod}\n`;
       csv += `Days Analyzed,${r.daysUsed}${r.averagingMethod === 'any-single-day' ? ' (each analyzed individually)' : ''}\n`;
       csv += `Include Weekend,${r.includeWeekend ? 'Yes' : 'No'}\n`;
-      csv += `Data Quality (CV),${r.dataQuality.cv}%\n`;
-      csv += `Mean Daily Volume,${r.dataQuality.mean.toLocaleString()}\n\n`;
+      csv += `Data Quality (CV),${r.dataQuality?.cv || 'N/A'}%\n`;
+      csv += `Mean Daily Volume,${r.dataQuality?.mean ? Math.round(r.dataQuality.mean).toLocaleString() : 'N/A'}\n\n`;
 
-      csv += `WARRANT RESULTS\n`;
+      // =============================================
+      // WARRANT RESULTS SUMMARY
+      // =============================================
+      csv += `WARRANT RESULTS SUMMARY\n`;
       csv += `Overall Result,${r.overallWarranted ? 'WARRANTED' : 'NOT WARRANTED'}${r.averagingMethod === 'any-single-day' ? ' (Individual Day Analysis)' : ''}\n`;
-      csv += `Warrant 1 (8-Hour),${r.warrant1.warranted ? 'MET' : 'NOT MET'},Cond A: ${r.warrant1.conditionAHours}/8,Cond B: ${r.warrant1.conditionBHours}/8${r.warrant1.satisfiedBy ? `,Satisfied by: ${r.warrant1.satisfiedBy}` : ''}\n`;
-      csv += `Warrant 2 (4-Hour),${r.warrant2.warranted ? 'MET' : 'NOT MET'},Hours Met: ${r.warrant2.hoursMet}/4${r.warrant2.satisfiedBy ? `,Satisfied by: ${r.warrant2.satisfiedBy}` : ''}\n`;
-      csv += `Warrant 3 (Peak Hour),${r.warrant3.warranted ? 'MET' : 'NOT MET'},Peak: ${r.warrant3.peakHourFormatted},Minor: ${r.warrant3.minorVolume} vph${r.warrant3.satisfiedBy ? `,Satisfied by: ${r.warrant3.satisfiedBy}` : ''}\n`;
-      if (r.warrant7.enabled) {
-        csv += `Warrant 7 (Crash),${r.warrant7.warranted ? 'MET' : 'NOT MET'},Crashes: ${r.warrant7.totalCrashes}\n`;
+      csv += `Warrants Satisfied,${r.warrantsFound?.length > 0 ? r.warrantsFound.join('; ') : 'None'}\n\n`;
+
+      // =============================================
+      // WARRANT 1 THRESHOLDS & CALCULATIONS
+      // =============================================
+      csv += `WARRANT 1 - EIGHT-HOUR VEHICULAR VOLUME\n`;
+      csv += `Status,${r.warrant1.warranted ? 'SATISFIED' : 'NOT SATISFIED'}\n`;
+      csv += `\nApplicable Thresholds (${c.apply70Percent ? '70% Reduced' : '100% Standard'})\n`;
+      csv += `Threshold Type,Major Street (vph),Minor Street (vph)\n`;
+      csv += `Condition A,${r.warrant1.thresholdA?.major || 'N/A'},${r.warrant1.thresholdA?.minor || 'N/A'}\n`;
+      csv += `Condition B,${r.warrant1.thresholdB?.major || 'N/A'},${r.warrant1.thresholdB?.minor || 'N/A'}\n`;
+      csv += `Combination A (${c.apply70Percent ? '56%' : '80%'}),${r.warrant1.comboA?.major || 'N/A'},${r.warrant1.comboA?.minor || 'N/A'}\n`;
+      csv += `Combination B (${c.apply70Percent ? '56%' : '80%'}),${r.warrant1.comboB?.major || 'N/A'},${r.warrant1.comboB?.minor || 'N/A'}\n`;
+      csv += `\nResults\n`;
+      csv += `Condition A Hours Met,${r.warrant1.conditionAHours}/8,${r.warrant1.conditionAHours >= 8 ? 'SATISFIED' : 'NOT SATISFIED'}\n`;
+      csv += `Condition B Hours Met,${r.warrant1.conditionBHours}/8,${r.warrant1.conditionBHours >= 8 ? 'SATISFIED' : 'NOT SATISFIED'}\n`;
+      csv += `Combination A Hours Met,${r.warrant1.combinationAHours}/8\n`;
+      csv += `Combination B Hours Met,${r.warrant1.combinationBHours}/8\n`;
+      csv += `80% Combination,${(r.warrant1.combinationAHours >= 8 && r.warrant1.combinationBHours >= 8) ? 'SATISFIED' : 'NOT SATISFIED'}\n`;
+      if (r.warrant1.satisfiedBy) csv += `Satisfied By,${r.warrant1.satisfiedBy}\n`;
+      csv += `\n`;
+
+      // =============================================
+      // WARRANT 2 THRESHOLDS & CALCULATIONS
+      // =============================================
+      csv += `WARRANT 2 - FOUR-HOUR VEHICULAR VOLUME\n`;
+      csv += `Status,${r.warrant2.warranted ? 'SATISFIED' : 'NOT SATISFIED'}\n`;
+      csv += `Hours Above Curve,${r.warrant2.hoursMet}/4\n`;
+      csv += `Lane Configuration,${c.laneConfig}\n`;
+      csv += `70% Factor,${c.apply70Percent ? 'Applied' : 'Not Applied'}\n`;
+      if (r.warrant2.satisfiedBy) csv += `Satisfied By,${r.warrant2.satisfiedBy}\n`;
+      csv += `\nHourly Threshold Comparison (Sorted by Performance)\n`;
+      csv += `Hour,Major (vph),Minor Adj (vph),Threshold,Margin,% Difference,Status\n`;
+      const w2Details = r.warrant2.details || [];
+      const sortedW2 = [...w2Details].sort((a, b) => {
+        if (a.met && !b.met) return -1;
+        if (!a.met && b.met) return 1;
+        return b.minor - a.minor;
+      });
+      for (const detail of sortedW2) {
+        const margin = detail.minor - detail.threshold;
+        const pctDiff = detail.threshold > 0 ? ((margin / detail.threshold) * 100).toFixed(1) : '0.0';
+        csv += `${detail.hour}:00,${detail.major},${detail.minor},${detail.threshold},${margin >= 0 ? '+' : ''}${margin},${pctDiff}%,${detail.met ? 'ABOVE' : 'BELOW'}\n`;
       }
       csv += `\n`;
 
-      // Add Individual Day Analysis section for any-single-day mode
+      // =============================================
+      // WARRANT 3 CALCULATIONS
+      // =============================================
+      csv += `WARRANT 3 - PEAK HOUR\n`;
+      csv += `Status,${r.warrant3.warranted ? 'SATISFIED' : 'NOT SATISFIED'}\n`;
+      csv += `Peak Hour,${r.warrant3.peakHourFormatted}\n`;
+      csv += `Major Street Volume,${r.warrant3.majorVolume} vph\n`;
+      csv += `Minor Street Volume,${r.warrant3.minorVolume} vph\n`;
+      csv += `Threshold Required,${r.warrant3.threshold} vph\n`;
+      csv += `Margin,${r.warrant3.minorVolume - r.warrant3.threshold >= 0 ? '+' : ''}${r.warrant3.minorVolume - r.warrant3.threshold} vph\n`;
+      if (r.warrant3.satisfiedBy) csv += `Satisfied By,${r.warrant3.satisfiedBy}\n`;
+      csv += `\n`;
+
+      // =============================================
+      // WARRANT 7 (IF ENABLED)
+      // =============================================
+      if (r.warrant7 && r.warrant7.enabled) {
+        csv += `WARRANT 7 - CRASH EXPERIENCE\n`;
+        csv += `Status,${r.warrant7.warranted ? 'SATISFIED' : 'NOT SATISFIED'}\n`;
+        csv += `Analysis Period,${r.warrant7.period === '1year' ? '12 months' : '36 months'}\n`;
+        csv += `Table Used,${r.warrant7.tableName || 'N/A'}\n`;
+        csv += `Total Crashes,${r.warrant7.totalCrashes}\n`;
+        csv += `Injury Crashes,${r.warrant7.injuryCrashes || 0}\n`;
+        csv += `Total Crashes Required,${r.warrant7.thresholds?.total || 'N/A'}\n`;
+        csv += `Injury Crashes Required,${r.warrant7.thresholds?.injury || 'N/A'}\n`;
+        csv += `Alternatives Tried,${r.warrant7.conditionA ? 'Yes' : 'No'}\n`;
+        csv += `\n`;
+      }
+
+      // =============================================
+      // WARRANT 1 HOURLY ANALYSIS
+      // =============================================
+      csv += `WARRANT 1 - HOURLY THRESHOLD ANALYSIS\n`;
+      csv += `Hour,Major (vph),Minor Adj (vph),Meets Cond A,Meets Cond B,Meets 80% A,Meets 80% B\n`;
+      for (let h = 0; h < 24; h++) {
+        const agg = r.avgComputed.hourlyAggregates[h] || {};
+        const detail = r.warrant1.details?.find(d => d.hour === h) || {};
+        csv += `${h}:00,${agg.majorTotal || 0},${agg.minorAdjusted || 0},`;
+        csv += `${detail.meetsA ? 'YES' : 'NO'},${detail.meetsB ? 'YES' : 'NO'},`;
+        csv += `${detail.meetsComboA ? 'YES' : 'NO'},${detail.meetsComboB ? 'YES' : 'NO'}\n`;
+      }
+      csv += `\n`;
+
+      // =============================================
+      // INDIVIDUAL DAY WARRANT RESULTS
+      // =============================================
       if (r.averagingMethod === 'any-single-day') {
         csv += `INDIVIDUAL DAY WARRANT RESULTS\n`;
         csv += `Note: Warrant is satisfied if ANY single day meets the criteria\n`;
-        csv += `Date,Day,Type,Total Volume,Warrant 1,Warrant 2,Warrant 3\n`;
+        csv += `Date,Day,Type,Total Volume,W1 Status,W1 Cond A Hrs,W1 Cond B Hrs,W2 Status,W2 Hours Met,W3 Status\n`;
         Object.entries(r.individualResults).forEach(([key, res]) => {
           csv += `${res.day.date || key},${res.day.dayOfWeek},${res.day.dayType},${res.day.totalVolume},`;
-          csv += `${res.warrant1?.warranted ? 'MET' : 'NOT MET'},`;
-          csv += `${res.warrant2?.warranted ? 'MET' : 'NOT MET'},`;
+          csv += `${res.warrant1?.warranted ? 'MET' : 'NOT MET'},${res.warrant1?.conditionAHours || 0},${res.warrant1?.conditionBHours || 0},`;
+          csv += `${res.warrant2?.warranted ? 'MET' : 'NOT MET'},${res.warrant2?.hoursMet || 0},`;
           csv += `${res.warrant3?.warranted ? 'MET' : 'NOT MET'}\n`;
         });
         csv += `\n`;
       }
 
-      csv += `AVERAGE DAY HOURLY DATA\n`;
-      csv += `Note: Values below are ${r.averagingMethod === 'any-single-day' ? 'AVERAGED for reference' : 'AVERAGED'} across ${r.daysUsed} day(s) using ${avgMethodNames[r.averagingMethod] || r.averagingMethod} method\n`;
+      // =============================================
+      // AVERAGE DAY HOURLY DATA (DETAILED)
+      // =============================================
+      csv += `AVERAGE DAY HOURLY VOLUMES\n`;
+      csv += `Averaging Method,${avgMethodNames[r.averagingMethod] || r.averagingMethod}\n`;
+      csv += `Days Included,${r.daysUsed}\n`;
+      csv += `\n`;
       csv += 'Hour,NB_L,NB_T,NB_R,NB_UT,NB_Tot,SB_L,SB_T,SB_R,SB_UT,SB_Tot,EB_L,EB_T,EB_R,EB_UT,EB_Tot,WB_L,WB_T,WB_R,WB_UT,WB_Tot,Major_Total,Minor_High,RT_Reduction,Minor_Adjusted\n';
       for (let h = 0; h < 24; h++) {
         const d = r.avgHourlyData[h] || {};
@@ -7106,21 +7397,31 @@ OR if corrections needed:
         csv += `${d.WB?.L||0},${d.WB?.T||0},${d.WB?.R||0},${d.WB?.UT||0},${d.WB?.total||0},`;
         csv += `${a.majorTotal||0},${a.minorHigh||0},${a.rtReduction||0},${a.minorAdjusted||0}\n`;
       }
-      
-      // Add individual day data if available
+
+      // Daily totals
+      const totalMajor = Object.values(r.avgComputed.hourlyAggregates).reduce((sum, a) => sum + (a.majorTotal || 0), 0);
+      const totalMinor = Object.values(r.avgComputed.hourlyAggregates).reduce((sum, a) => sum + (a.minorAdjusted || 0), 0);
+      csv += `\nDaily Totals\n`;
+      csv += `Total Major Street Volume,${totalMajor} vpd\n`;
+      csv += `Total Minor Street Volume (Adjusted),${totalMinor} vpd\n`;
+      csv += `Peak Hour,${r.warrant3.peakHourFormatted}\n`;
+
+      // =============================================
+      // INDIVIDUAL DAY TOTALS
+      // =============================================
       if (r.individualResults && Object.keys(r.individualResults).length > 1) {
-        csv += `\nINDIVIDUAL DAY TOTALS\n`;
-        csv += 'Day,Date,Day Type,Total Volume,Included\n';
+        csv += `\nINDIVIDUAL DAY SUMMARY\n`;
+        csv += 'Day,Date,Day Type,Total Volume,Included in Average\n';
         Object.entries(r.individualResults).forEach(([key, res]) => {
           if (res.day) {
             csv += `${res.day.dayOfWeek},${res.day.date || key},${res.day.dayType},${res.day.totalVolume},${res.day.included ? 'Yes' : 'No'}\n`;
           }
         });
       }
-      
+
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-      a.download = `Signal_Warrant_Data_${r.config.intersectionName.replace(/[^a-z0-9]/gi, '_')}.csv`;
+      a.download = `Signal_Warrant_Analysis_${c.intersectionName.replace(/[^a-z0-9]/gi, '_')}.csv`;
       a.click();
     }
     
