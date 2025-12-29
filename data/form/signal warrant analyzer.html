@@ -1730,6 +1730,34 @@
           </div>
           <div id="api-status" style="margin-bottom: 16px;"></div>
 
+          <!-- AI Extraction Settings Bar -->
+          <div style="display: flex; gap: 16px; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap; padding: 12px 16px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%); border-radius: var(--radius); border: 1px solid rgba(59, 130, 246, 0.2);">
+            <div class="form-group" style="flex: 1; min-width: 160px;">
+              <label class="form-label" style="color: var(--accent); font-weight: 600; font-size: 0.8rem;">📊 Count Type</label>
+              <select class="form-select" id="ai-count-type" style="border-color: var(--accent);" onchange="syncAICountType()">
+                <option value="12hr">12 Hour (6am-6pm)</option>
+                <option value="24hr">24 Hour (Full Day)</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex: 1; min-width: 160px;">
+              <label class="form-label" style="color: var(--accent); font-weight: 600; font-size: 0.8rem;">📅 Day Type</label>
+              <select class="form-select" id="ai-day-type" style="border-color: var(--accent);">
+                <option value="weekday">Weekday (5 days)</option>
+                <option value="weekend">Weekend (2 days)</option>
+                <option value="all">All Days (7 days)</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex: 1; min-width: 140px;">
+              <label class="form-label" style="color: var(--accent); font-weight: 600; font-size: 0.8rem;">↩️ U-Turn</label>
+              <select class="form-select" id="ai-uturn-selection" style="border-color: var(--accent);" onchange="syncAIUTurn()">
+                <option value="none">None</option>
+                <option value="major">Major Street</option>
+                <option value="minor">Minor Street</option>
+              </select>
+            </div>
+          </div>
+          <p style="text-align: center; font-size: 0.7rem; color: var(--gray-500); margin: -8px 0 12px 0;">These settings sync with Traffic Count configuration below</p>
+
           <!-- Compact Upload Zone -->
           <div class="upload-zone-compact" id="ai-upload-zone" onclick="document.getElementById('ai-bulk-file-input').click()">
             <div class="upload-zone-icon-small">📁</div>
@@ -2842,6 +2870,45 @@
     function handleDisclaimerCheckbox() {
       aiDisclaimerAccepted = document.getElementById('ai-disclaimer-checkbox').checked;
       document.getElementById('extract-validate-btn').disabled = !aiDisclaimerAccepted;
+    }
+
+    // NEW: Sync AI Count Type to Manual Count Type
+    function syncAICountType() {
+      const aiCountType = document.getElementById('ai-count-type').value;
+      const manualCountType = document.getElementById('count-type');
+
+      if (manualCountType && manualCountType.value !== aiCountType) {
+        manualCountType.value = aiCountType;
+        // Trigger the change event to update the TMC grid
+        manualCountType.dispatchEvent(new Event('change'));
+
+        // Visual feedback - brief highlight
+        manualCountType.style.transition = 'box-shadow 0.3s ease';
+        manualCountType.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.4)';
+        setTimeout(() => {
+          manualCountType.style.boxShadow = '';
+        }, 800);
+      }
+    }
+
+    // NEW: Sync AI U-Turn to Manual U-Turn
+    function syncAIUTurn() {
+      const aiUTurn = document.getElementById('ai-uturn-selection').value;
+      const manualUTurn = document.getElementById('uturn-selection');
+
+      if (manualUTurn && manualUTurn.value !== aiUTurn) {
+        manualUTurn.value = aiUTurn;
+        // Trigger the change event to update the TMC grid
+        manualUTurn.dispatchEvent(new Event('change'));
+        updateTMCGrid();
+
+        // Visual feedback - brief highlight
+        manualUTurn.style.transition = 'box-shadow 0.3s ease';
+        manualUTurn.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.4)';
+        setTimeout(() => {
+          manualUTurn.style.boxShadow = '';
+        }, 800);
+      }
     }
 
     // NEW: Get TMC Columns based on configuration
@@ -4363,7 +4430,15 @@ Return JSON with complete re-extraction:
       const fileContent = await readFileContent(file);
       const countType = document.getElementById('count-type').value;
       const hourRange = countType === '12hr' ? '6 AM to 6 PM (hours 6-17)' : 'all 24 hours (0-23)';
-      
+
+      // Get U-Turn configuration from AI settings (or manual fallback)
+      const uTurnSetting = document.getElementById('ai-uturn-selection')?.value || document.getElementById('uturn-selection')?.value || 'none';
+      const uTurnGuidance = uTurnSetting === 'none'
+        ? 'U-Turn data is NOT required for this analysis. Set uturn to 0 for all directions if not present.'
+        : uTurnSetting === 'major'
+          ? 'U-Turn data IS IMPORTANT for MAJOR street directions (EB/WB for E-W major, NB/SB for N-S major). Extract U-turn volumes carefully for major street approaches.'
+          : 'U-Turn data IS IMPORTANT for MINOR street directions (NB/SB for E-W major, EB/WB for N-S major). Extract U-turn volumes carefully for minor street approaches.';
+
       // ========== AGENT 1: EXTRACTION ==========
       const extractionPrompt = `You are an expert traffic data extraction specialist. Your task is to extract Turning Movement Count (TMC) data from traffic count files.
 
@@ -4412,7 +4487,8 @@ STEP 5: EXTRACT ALL HOURLY DATA
 - DO NOT stop at the first few rows - read ALL hours
 - DO NOT default to 0 - only use 0 if the cell actually contains 0 or is empty
 - If only totals are provided (no L/T/R breakdown), use total for "thru" and 0 for L/R/U
-- Extract U-turn data if present (may be labeled U, UT, U-Turn) - set to 0 if not present
+- U-TURN EXTRACTION SETTING: ${uTurnGuidance}
+- Extract U-turn data if present (may be labeled U, UT, U-Turn) - set to 0 if not present in source
 
 STEP 6: IDENTIFY PEAK HOURS
 - Calculate total intersection volume for each hour
@@ -4544,6 +4620,7 @@ STEP 6: CHECK FOR MISSED DATA
 - Did extraction miss any sheets?
 - Are there multiple time periods or directions not captured?
 - Were all 4 directions (NB, SB, EB, WB) extracted?
+- U-TURN SETTING: ${uTurnGuidance}
 - Were U-turn volumes captured if present in source?
 
 STEP 7: CORRECTIONS
