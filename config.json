@@ -3,6 +3,13 @@
   "appSubtitle": "Virginia Crash Analysis Tool",
   "version": "2.0.0",
 
+  "apis": {
+    "mapbox": {
+      "accessToken": "YOUR_MAPBOX_ACCESS_TOKEN_HERE",
+      "geocodingEndpoint": "https://api.mapbox.com/geocoding/v5/mapbox.places"
+    }
+  },
+
   "jurisdictions": {
     "accomack": {
       "name": "Accomack County",
