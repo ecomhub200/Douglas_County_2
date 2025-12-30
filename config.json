@@ -5,7 +5,7 @@
 
   "apis": {
     "mapbox": {
-      "accessToken": "YOUR_MAPBOX_ACCESS_TOKEN_HERE",
+      "accessToken": "pk.eyJ1IjoibXVyYWRhbHF1cmlzaGVlIiwiYSI6ImNtanNwbjhidjR1NW0zY3EzczY5NnF4c3QifQ.hw1nrpC1vJX5RAF7wTdSOw",
       "geocodingEndpoint": "https://api.mapbox.com/geocoding/v5/mapbox.places"
     }
   },
