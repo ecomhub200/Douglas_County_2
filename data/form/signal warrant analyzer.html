@@ -4077,11 +4077,76 @@
     // ==========================================
     // DUAL-AGENT AI EXTRACTION WITH VALIDATION
     // ==========================================
-    
+
+    // Rate limit handling helpers
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // Track API calls for rate limiting
+    let lastApiCallTime = 0;
+    const MIN_DELAY_BETWEEN_CALLS = 3000; // 3 seconds minimum between calls
+    const RATE_LIMIT_DELAY = 65000; // Wait 65 seconds if rate limited
+
+    async function fetchWithRetry(url, options, maxRetries = 3, context = 'API call') {
+      let lastError;
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        // Enforce minimum delay between API calls
+        const timeSinceLastCall = Date.now() - lastApiCallTime;
+        if (timeSinceLastCall < MIN_DELAY_BETWEEN_CALLS) {
+          await sleep(MIN_DELAY_BETWEEN_CALLS - timeSinceLastCall);
+        }
+
+        try {
+          lastApiCallTime = Date.now();
+          const response = await fetch(url, options);
+
+          if (response.ok) {
+            return response;
+          }
+
+          // Handle rate limit (429) or overloaded (529) errors
+          if (response.status === 429 || response.status === 529) {
+            const retryAfter = response.headers.get('retry-after');
+            const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : RATE_LIMIT_DELAY;
+
+            console.log(`[Rate Limit] ${context} - Attempt ${attempt + 1}/${maxRetries}. Waiting ${Math.round(waitTime/1000)}s...`);
+
+            // Update UI to show rate limit wait
+            const progressText = document.getElementById('progress-text');
+            if (progressText) {
+              progressText.textContent = `⏳ Rate limit reached. Waiting ${Math.round(waitTime/1000)} seconds before retry...`;
+            }
+
+            await sleep(waitTime);
+            continue; // Retry after waiting
+          }
+
+          // For other errors, don't retry
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error?.message || `HTTP ${response.status}`);
+
+        } catch (error) {
+          lastError = error;
+
+          // Network errors - retry with backoff
+          if (error.name === 'TypeError' || error.message.includes('network')) {
+            const backoffTime = Math.pow(2, attempt) * 2000; // 2s, 4s, 8s
+            console.log(`[Network Error] ${context} - Attempt ${attempt + 1}/${maxRetries}. Retrying in ${backoffTime/1000}s...`);
+            await sleep(backoffTime);
+            continue;
+          }
+
+          throw error; // Re-throw non-retryable errors
+        }
+      }
+
+      throw lastError || new Error(`${context} failed after ${maxRetries} attempts`);
+    }
+
     // ==========================================
     // MULTI-FILE AI EXTRACTION WITH ENHANCED QA/QC
     // ==========================================
-    
+
     let pendingExtractions = []; // Store extracted data before confirmation
     let reviewQueue = []; // Queue of extractions awaiting review in Manual Entry
     let currentReviewIndex = 0; // Current index in review queue
@@ -4257,8 +4322,14 @@
         
         processedCount++;
         progressFill.style.width = `${(processedCount / filesToProcess.length) * 100}%`;
+
+        // Add delay between files to avoid rate limits (skip after last file)
+        if (processedCount < filesToProcess.length) {
+          progressText.textContent = `Processed ${processedCount}/${filesToProcess.length}. Waiting before next file...`;
+          await sleep(5000); // 5 second cooldown between files
+        }
       }
-      
+
       // Display validation summary
       validationPanel.classList.remove('hidden');
       let validationHtml = '<div style="margin-bottom: 16px;">';
@@ -4337,10 +4408,13 @@
             } catch (e) {
               console.warn('Agent 3 re-extraction error:', e);
             }
+
+            // Delay between variance re-extractions
+            await sleep(3000);
           }
         }
       }
-      
+
       // Show data preview if we have any successful extractions
       if (pendingExtractions.length > 0) {
         previewPanel.classList.remove('hidden');
@@ -4395,33 +4469,37 @@ Return JSON with complete re-extraction:
 }`;
 
       try {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true'
+        const response = await fetchWithRetry(
+          'https://api.anthropic.com/v1/messages',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 12000,
+              system: prompt,
+              messages: [{ role: 'user', content: 'Re-extract this traffic data file completely. Find ALL hours and ALL directions.' }]
+            })
           },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 12000,
-            system: prompt,
-            messages: [{ role: 'user', content: 'Re-extract this traffic data file completely. Find ALL hours and ALL directions.' }]
-          })
-        });
-        
-        if (!response.ok) return { success: false };
-        
+          3, // maxRetries
+          `Re-extraction for ${file.name}`
+        );
+
         const result = await response.json();
         const text = result.content?.[0]?.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        
+
         if (jsonMatch) {
           return JSON.parse(jsonMatch[0]);
         }
         return { success: false };
       } catch (e) {
+        console.warn('Variance re-extraction failed:', e.message);
         return { success: false };
       }
     }
@@ -4544,29 +4622,29 @@ CRITICAL RULES:
 - ALWAYS include confidence score
 - Return ONLY the JSON object, no other text`;
 
-      const extractionResponse = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
+      const extractionResponse = await fetchWithRetry(
+        'https://api.anthropic.com/v1/messages',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 12000,
+            system: extractionPrompt,
+            messages: [{
+              role: 'user',
+              content: `Extract TMC data from this traffic count file. Pay special attention to finding the date and day of week.\n\nFilename: "${file.name}"\n\nFile content:\n${fileContent.substring(0, 120000)}`
+            }]
+          })
         },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 12000,
-          system: extractionPrompt,
-          messages: [{ 
-            role: 'user', 
-            content: `Extract TMC data from this traffic count file. Pay special attention to finding the date and day of week.\n\nFilename: "${file.name}"\n\nFile content:\n${fileContent.substring(0, 120000)}` 
-          }]
-        })
-      });
-      
-      if (!extractionResponse.ok) {
-        const errorData = await extractionResponse.json().catch(() => ({}));
-        return { success: false, error: errorData.error?.message || `HTTP ${extractionResponse.status}` };
-      }
+        3, // maxRetries
+        `Extraction for ${file.name}`
+      );
       
       const extractionResult = await extractionResponse.json();
       const extractedText = extractionResult.content[0].text;
@@ -4683,22 +4761,27 @@ OR if corrections needed:
 }`;
 
       try {
-        const validationResponse = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true'
+        const validationResponse = await fetchWithRetry(
+          'https://api.anthropic.com/v1/messages',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 12000,
+              system: validationPrompt,
+              messages: [{ role: 'user', content: 'Validate this extracted traffic data against the source file. If you find ANY discrepancies, provide correctedVolumes.' }]
+            })
           },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 12000,
-            system: validationPrompt,
-            messages: [{ role: 'user', content: 'Validate this extracted traffic data against the source file. If you find ANY discrepancies, provide correctedVolumes.' }]
-          })
-        });
-        
+          3, // maxRetries
+          `Validation for ${file.name}`
+        );
+
         if (validationResponse.ok) {
           const validationResult = await validationResponse.json();
           const validationText = validationResult.content[0].text;
