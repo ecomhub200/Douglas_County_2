@@ -4550,14 +4550,25 @@ STEP 3: FIND AND VALIDATE AGAINST GRAND TOTAL
 - Your extracted total should match this Grand Total
 
 STEP 4: EXTRACT DATE AND DAY INFORMATION
-- Look carefully for date information ANYWHERE in the file:
-  * Title/header rows (e.g., "Traffic Count - March 15, 2024")
-  * Column headers (e.g., "Date: 3/15/24")
-  * File metadata or summary sections
-  * Cell values containing dates
-- Also check the FILENAME for date patterns: "${file.name}"
+PRIORITY ORDER (use the FIRST reliable source found):
+1. INSIDE THE FILE (highest priority):
+   * Look for explicit date labels: "Date:", "Count Date:", "Survey Date:"
+   * Title/header rows (e.g., "Traffic Count - March 15, 2024")
+   * Column headers with dates (e.g., "Tuesday 10/14/2025")
+   * Summary sections with date information
+   * Look for dates in format: MM/DD/YYYY, MM-DD-YYYY, Month DD, YYYY
+2. FILENAME (lower priority, use ONLY if no date found in file):
+   * Look for clear date patterns like "10-14-2025" or "2025-10-14"
+   * Example: "Glenside and Coachman 10-14-2025.xlsx" → date is 2025-10-14
+
+CRITICAL WARNING - DO NOT misinterpret these as dates:
+- File ID numbers (e.g., "17300101", "17300102") are NOT dates - these are reference IDs
+- Node numbers or location codes are NOT dates
+- If a number doesn't make sense as a recent date (years 2020-2030), it's probably an ID
+
 - Extract the date in YYYY-MM-DD format
 - Determine the day of the week from the date
+- If NO reliable date found, set date to null and dayOfWeek to null
 
 STEP 5: EXTRACT ALL HOURLY DATA
 - Extract hours: ${hourRange}
@@ -4684,9 +4695,13 @@ STEP 3: SPOT-CHECK AGAINST SOURCE
 - If discrepancies found, RE-EXTRACT those values
 
 STEP 4: VERIFY DATE AND DAY OF WEEK
-- Confirm date matches source file
+- Confirm date matches what is ACTUALLY in the source file content
+- CRITICAL: File ID numbers like "17300101", "17300102" are NOT dates - these are reference IDs
+- Look for actual dates in the file: "Date:", "Count Date:", column headers with MM/DD/YYYY
+- The filename "${file.name}" may contain dates like "10-14-2025" - these ARE valid
+- If the extracted date is from year 2017 or earlier but filename shows 2025, the extraction is WRONG
 - Confirm day of week is correct for that date
-- If missing or wrong, find correct date/day from source
+- If missing or wrong, find correct date/day from source file content
 
 STEP 5: VERIFY INTERSECTION CONFIGURATION
 - Check if majorStreet, minorStreet, lanes, speedLimit, intersectionLegs were extracted
