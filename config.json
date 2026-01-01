@@ -79,7 +79,11 @@
       "namePatterns": ["ARLINGTON", "007. Arlington County"],
       "mapCenter": [38.88, -77.10],
       "mapZoom": 12,
-      "maintainsOwnRoads": true
+      "maintainsOwnRoads": true,
+      "education": {
+        "leaId": "5100180",
+        "districtName": "Arlington County Public Schools"
+      }
     },
     "augusta": {
       "name": "Augusta County",
@@ -219,7 +223,11 @@
       "namePatterns": ["CHESTERFIELD", "021. Chesterfield County"],
       "mapCenter": [37.38, -77.50],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100840",
+        "districtName": "Chesterfield County Public Schools"
+      }
     },
     "clarke": {
       "name": "Clarke County",
@@ -299,7 +307,11 @@
       "namePatterns": ["FAIRFAX COUNTY", "029. Fairfax County"],
       "mapCenter": [38.83, -77.28],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101260",
+        "districtName": "Fairfax County Public Schools"
+      }
     },
     "fauquier": {
       "name": "Fauquier County",
@@ -543,7 +555,11 @@
       "namePatterns": ["LOUDOUN", "053. Loudoun County"],
       "mapCenter": [39.08, -77.64],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102250",
+        "districtName": "Loudoun County Public Schools"
+      }
     },
     "louisa": {
       "name": "Louisa County",
@@ -743,7 +759,11 @@
       "namePatterns": ["PRINCE WILLIAM", "073. Prince William County"],
       "mapCenter": [38.70, -77.48],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5103130",
+        "districtName": "Prince William County Public Schools"
+      }
     },
     "pulaski": {
       "name": "Pulaski County",
@@ -973,7 +993,11 @@
       "namePatterns": ["ALEXANDRIA", "096. Alexandria City"],
       "mapCenter": [38.82, -77.08],
       "mapZoom": 12,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100120",
+        "districtName": "Alexandria City Public Schools"
+      }
     },
     "bristol": {
       "name": "Bristol City",
@@ -1063,7 +1087,11 @@
       "namePatterns": ["FAIRFAX CITY", "105. Fairfax City"],
       "mapCenter": [38.85, -77.30],
       "mapZoom": 13,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101230",
+        "districtName": "City of Fairfax Public Schools"
+      }
     },
     "falls_church": {
       "name": "Falls Church City",
@@ -1193,7 +1221,11 @@
       "namePatterns": ["NEWPORT NEWS", "118. Newport News City"],
       "mapCenter": [37.09, -76.47],
       "mapZoom": 11,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102640",
+        "districtName": "Newport News City Public Schools"
+      }
     },
     "norfolk": {
       "name": "Norfolk City",
@@ -1203,7 +1235,11 @@
       "namePatterns": ["NORFOLK", "119. Norfolk City"],
       "mapCenter": [36.85, -76.29],
       "mapZoom": 12,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102670",
+        "districtName": "Norfolk City Public Schools"
+      }
     },
     "norton": {
       "name": "Norton City",
@@ -1263,7 +1299,11 @@
       "namePatterns": ["RICHMOND CITY", "125. Richmond City"],
       "mapCenter": [37.54, -77.44],
       "mapZoom": 12,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5103240",
+        "districtName": "Richmond City Public Schools"
+      }
     },
     "roanoke_city": {
       "name": "Roanoke City",
@@ -1313,7 +1353,11 @@
       "namePatterns": ["VIRGINIA BEACH", "130. Virginia Beach City"],
       "mapCenter": [36.85, -75.98],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5103840",
+        "districtName": "Virginia Beach City Public Schools"
+      }
     },
     "waynesboro": {
       "name": "Waynesboro City",
