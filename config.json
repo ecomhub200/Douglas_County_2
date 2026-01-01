@@ -1378,5 +1378,21 @@
     ],
     "fallbackUrl": "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0",
     "datasetId": "1a96a2f31b4f4d77991471b6cabb38ba"
+  },
+
+  "transitStops": {
+    "enabled": true,
+    "serviceUrl": "https://services9.arcgis.com/ZzrwbbMCZ5LnPz3n/arcgis/rest/services/Virginia_Transit_Stops/FeatureServer/0",
+    "description": "Virginia DRPT Transit Stops - Updated biannually",
+    "fields": {
+      "county": "COUNTY",
+      "agency": "AGENCY",
+      "stopName": "STOP_NAME",
+      "stopId": "STOP_ID",
+      "lat": "LAT",
+      "lng": "LON"
+    },
+    "defaultRadius": 300,
+    "defaultCrashFilter": "ped_bike"
   }
 }
