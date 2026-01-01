@@ -1627,29 +1627,27 @@
   "transitStops": {
     "enabled": true,
     "serviceUrls": [
-      "https://opendata.arcgis.com/datasets/52a9af0ebd794ca5abc382aaa2743205_0.geojson",
-      "https://gis-drpt.opendata.arcgis.com/api/download/v1/items/52a9af0ebd794ca5abc382aaa2743205/geojson?layers=0",
-      "https://vgin.vdem.virginia.gov/api/download/v1/items/52a9af0ebd794ca5abc382aaa2743205/geojson?layers=0"
+      "https://services.arcgis.com/xOi1kZaI0eWDREZv/ArcGIS/rest/services/NTAD_National_Transit_Map_Stops/FeatureServer/0"
     ],
     "grtcApiUrl": "https://data.richmondgov.com/resource/dt8y-2apj.json",
-    "serviceUrl": "https://opendata.arcgis.com/datasets/52a9af0ebd794ca5abc382aaa2743205_0.geojson",
-    "description": "Virginia DRPT Transit Stops - Updated biannually (Aug 2025)",
-    "dataSource": "https://gis-drpt.opendata.arcgis.com/",
+    "serviceUrl": "https://services.arcgis.com/xOi1kZaI0eWDREZv/ArcGIS/rest/services/NTAD_National_Transit_Map_Stops/FeatureServer/0",
+    "description": "BTS National Transit Map - Federal dataset with all US transit stops",
+    "dataSource": "https://data-usdot.opendata.arcgis.com/",
     "fields": {
       "county": "COUNTY",
-      "agency": "AGENCY",
-      "stopName": "STOP_NAME",
-      "stopId": "STOP_ID",
-      "lat": "LAT",
-      "lng": "LON"
+      "agency": "agency_name",
+      "stopName": "stop_name",
+      "stopId": "stop_id",
+      "lat": "stop_lat",
+      "lng": "stop_lon"
     },
     "alternateFields": {
       "county": ["COUNTY", "county", "County", "JURISDICTION"],
-      "agency": ["AGENCY", "agency", "Agency", "OPERATOR"],
-      "stopName": ["STOP_NAME", "stop_name", "StopName", "NAME"],
-      "stopId": ["STOP_ID", "stop_id", "StopId", "ID"],
-      "lat": ["LAT", "lat", "Lat", "LATITUDE", "Y"],
-      "lng": ["LON", "lon", "Lon", "LNG", "lng", "LONGITUDE", "X"]
+      "agency": ["agency_name", "AGENCY", "agency", "Agency", "OPERATOR"],
+      "stopName": ["stop_name", "STOP_NAME", "StopName", "NAME"],
+      "stopId": ["stop_id", "STOP_ID", "StopId", "ID"],
+      "lat": ["stop_lat", "LAT", "lat", "Lat", "LATITUDE", "Y"],
+      "lng": ["stop_lon", "LON", "lon", "Lon", "LNG", "lng", "LONGITUDE", "X"]
     },
     "defaultRadius": 300,
     "defaultCrashFilter": "ped_bike",
