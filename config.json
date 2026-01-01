@@ -1382,8 +1382,14 @@
 
   "transitStops": {
     "enabled": true,
-    "serviceUrl": "https://services9.arcgis.com/ZzrwbbMCZ5LnPz3n/arcgis/rest/services/Virginia_Transit_Stops/FeatureServer/0",
-    "description": "Virginia DRPT Transit Stops - Updated biannually",
+    "serviceUrls": [
+      "https://services9.arcgis.com/9oDT7ErWemWCzvY7/arcgis/rest/services/Virginia_Transit_Stops_Aug2025/FeatureServer/0",
+      "https://services3.arcgis.com/bmH6mExvnLDAoXJh/arcgis/rest/services/Virginia_Transit_Stops/FeatureServer/0",
+      "https://gis-drpt.opendata.arcgis.com/api/v3/datasets/virginia-transit-stops-aug2025/downloads/data?format=geojson"
+    ],
+    "serviceUrl": "https://services9.arcgis.com/9oDT7ErWemWCzvY7/arcgis/rest/services/Virginia_Transit_Stops_Aug2025/FeatureServer/0",
+    "description": "Virginia DRPT Transit Stops - Updated biannually (Aug 2025)",
+    "dataSource": "https://gis-drpt.opendata.arcgis.com/",
     "fields": {
       "county": "COUNTY",
       "agency": "AGENCY",
@@ -1392,7 +1398,16 @@
       "lat": "LAT",
       "lng": "LON"
     },
+    "alternateFields": {
+      "county": ["COUNTY", "county", "County", "JURISDICTION"],
+      "agency": ["AGENCY", "agency", "Agency", "OPERATOR"],
+      "stopName": ["STOP_NAME", "stop_name", "StopName", "NAME"],
+      "stopId": ["STOP_ID", "stop_id", "StopId", "ID"],
+      "lat": ["LAT", "lat", "Lat", "LATITUDE", "Y"],
+      "lng": ["LON", "lon", "Lon", "LNG", "lng", "LONGITUDE", "X"]
+    },
     "defaultRadius": 300,
-    "defaultCrashFilter": "ped_bike"
+    "defaultCrashFilter": "ped_bike",
+    "enableDemoFallback": true
   }
 }
