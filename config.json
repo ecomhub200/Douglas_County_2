@@ -19,7 +19,11 @@
       "namePatterns": ["ACCOMACK", "001. Accomack County"],
       "mapCenter": [37.76, -75.66],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100060",
+        "districtName": "Accomack County Public Schools"
+      }
     },
     "albemarle": {
       "name": "Albemarle County",
@@ -29,7 +33,11 @@
       "namePatterns": ["ALBEMARLE", "002. Albemarle County"],
       "mapCenter": [38.02, -78.56],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100090",
+        "districtName": "Albemarle County Public Schools"
+      }
     },
     "alleghany": {
       "name": "Alleghany County",
@@ -39,7 +47,11 @@
       "namePatterns": ["ALLEGHANY", "003. Alleghany County"],
       "mapCenter": [37.79, -79.95],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100152",
+        "districtName": "Alleghany County Public Schools"
+      }
     },
     "amelia": {
       "name": "Amelia County",
@@ -59,7 +71,11 @@
       "namePatterns": ["AMHERST", "005. Amherst County"],
       "mapCenter": [37.60, -79.14],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100210",
+        "districtName": "Amherst County Public Schools"
+      }
     },
     "appomattox": {
       "name": "Appomattox County",
@@ -69,7 +85,11 @@
       "namePatterns": ["APPOMATTOX", "006. Appomattox County"],
       "mapCenter": [37.37, -78.81],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100240",
+        "districtName": "Appomattox County Public Schools"
+      }
     },
     "arlington": {
       "name": "Arlington County",
@@ -79,7 +99,11 @@
       "namePatterns": ["ARLINGTON", "007. Arlington County"],
       "mapCenter": [38.88, -77.10],
       "mapZoom": 12,
-      "maintainsOwnRoads": true
+      "maintainsOwnRoads": true,
+      "education": {
+        "leaId": "5100180",
+        "districtName": "Arlington County Public Schools"
+      }
     },
     "augusta": {
       "name": "Augusta County",
@@ -89,7 +113,11 @@
       "namePatterns": ["AUGUSTA", "008. Augusta County"],
       "mapCenter": [38.16, -79.13],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100300",
+        "districtName": "Augusta County Public Schools"
+      }
     },
     "bath": {
       "name": "Bath County",
@@ -109,7 +137,11 @@
       "namePatterns": ["BEDFORD", "010. Bedford County"],
       "mapCenter": [37.31, -79.52],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100360",
+        "districtName": "Bedford County Public Schools"
+      }
     },
     "bland": {
       "name": "Bland County",
@@ -179,7 +211,11 @@
       "namePatterns": ["CAROLINE", "017. Caroline County"],
       "mapCenter": [38.03, -77.35],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100660",
+        "districtName": "Caroline County Public Schools"
+      }
     },
     "carroll": {
       "name": "Carroll County",
@@ -199,7 +235,11 @@
       "namePatterns": ["CHARLES CITY", "019. Charles City County"],
       "mapCenter": [37.36, -77.06],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100720",
+        "districtName": "Charles City County Public Schools"
+      }
     },
     "charlotte": {
       "name": "Charlotte County",
@@ -209,7 +249,11 @@
       "namePatterns": ["CHARLOTTE", "020. Charlotte County"],
       "mapCenter": [37.01, -78.66],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100750",
+        "districtName": "Charlotte County Public Schools"
+      }
     },
     "chesterfield": {
       "name": "Chesterfield County",
@@ -219,7 +263,11 @@
       "namePatterns": ["CHESTERFIELD", "021. Chesterfield County"],
       "mapCenter": [37.38, -77.50],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100840",
+        "districtName": "Chesterfield County Public Schools"
+      }
     },
     "clarke": {
       "name": "Clarke County",
@@ -249,7 +297,11 @@
       "namePatterns": ["CULPEPER", "024. Culpeper County"],
       "mapCenter": [38.49, -77.96],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101050",
+        "districtName": "Culpeper County Public Schools"
+      }
     },
     "cumberland": {
       "name": "Cumberland County",
@@ -279,7 +331,11 @@
       "namePatterns": ["DINWIDDIE", "027. Dinwiddie County"],
       "mapCenter": [37.08, -77.58],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101170",
+        "districtName": "Dinwiddie County Public Schools"
+      }
     },
     "essex": {
       "name": "Essex County",
@@ -289,7 +345,11 @@
       "namePatterns": ["ESSEX", "028. Essex County"],
       "mapCenter": [37.94, -76.94],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101200",
+        "districtName": "Essex County Public Schools"
+      }
     },
     "fairfax_county": {
       "name": "Fairfax County",
@@ -299,7 +359,11 @@
       "namePatterns": ["FAIRFAX COUNTY", "029. Fairfax County"],
       "mapCenter": [38.83, -77.28],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101260",
+        "districtName": "Fairfax County Public Schools"
+      }
     },
     "fauquier": {
       "name": "Fauquier County",
@@ -309,7 +373,11 @@
       "namePatterns": ["FAUQUIER", "030. Fauquier County"],
       "mapCenter": [38.72, -77.81],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101320",
+        "districtName": "Fauquier County Public Schools"
+      }
     },
     "floyd": {
       "name": "Floyd County",
@@ -319,7 +387,11 @@
       "namePatterns": ["FLOYD", "031. Floyd County"],
       "mapCenter": [36.93, -80.36],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101350",
+        "districtName": "Floyd County Public Schools"
+      }
     },
     "fluvanna": {
       "name": "Fluvanna County",
@@ -329,7 +401,11 @@
       "namePatterns": ["FLUVANNA", "032. Fluvanna County"],
       "mapCenter": [37.84, -78.28],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101380",
+        "districtName": "Fluvanna County Public Schools"
+      }
     },
     "franklin_county": {
       "name": "Franklin County",
@@ -339,7 +415,11 @@
       "namePatterns": ["FRANKLIN COUNTY", "033. Franklin County"],
       "mapCenter": [37.00, -79.89],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101440",
+        "districtName": "Franklin County Public Schools"
+      }
     },
     "frederick": {
       "name": "Frederick County",
@@ -349,7 +429,11 @@
       "namePatterns": ["FREDERICK", "034. Frederick County"],
       "mapCenter": [39.28, -78.27],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101470",
+        "districtName": "Frederick County Public Schools"
+      }
     },
     "giles": {
       "name": "Giles County",
@@ -359,7 +443,11 @@
       "namePatterns": ["GILES", "035. Giles County"],
       "mapCenter": [37.32, -80.66],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101590",
+        "districtName": "Giles County Public Schools"
+      }
     },
     "gloucester": {
       "name": "Gloucester County",
@@ -369,7 +457,11 @@
       "namePatterns": ["GLOUCESTER", "036. Gloucester County"],
       "mapCenter": [37.41, -76.52],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101620",
+        "districtName": "Gloucester County Public Schools"
+      }
     },
     "goochland": {
       "name": "Goochland County",
@@ -379,7 +471,11 @@
       "namePatterns": ["GOOCHLAND", "037. Goochland County"],
       "mapCenter": [37.72, -77.93],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101650",
+        "districtName": "Goochland County Public Schools"
+      }
     },
     "grayson": {
       "name": "Grayson County",
@@ -389,7 +485,11 @@
       "namePatterns": ["GRAYSON", "038. Grayson County"],
       "mapCenter": [36.66, -81.22],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101690",
+        "districtName": "Grayson County Public Schools"
+      }
     },
     "greene": {
       "name": "Greene County",
@@ -399,7 +499,11 @@
       "namePatterns": ["GREENE", "039. Greene County"],
       "mapCenter": [38.30, -78.47],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101710",
+        "districtName": "Greene County Public Schools"
+      }
     },
     "greensville": {
       "name": "Greensville County",
@@ -409,7 +513,11 @@
       "namePatterns": ["GREENSVILLE", "040. Greensville County"],
       "mapCenter": [36.68, -77.56],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101740",
+        "districtName": "Greensville County Public Schools"
+      }
     },
     "halifax": {
       "name": "Halifax County",
@@ -419,7 +527,11 @@
       "namePatterns": ["HALIFAX", "041. Halifax County"],
       "mapCenter": [36.77, -78.93],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101770",
+        "districtName": "Halifax County Public Schools"
+      }
     },
     "hanover": {
       "name": "Hanover County",
@@ -493,7 +605,11 @@
       "namePatterns": ["KING AND QUEEN", "048. King and Queen County"],
       "mapCenter": [37.72, -76.88],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102070",
+        "districtName": "King and Queen County Public Schools"
+      }
     },
     "king_george": {
       "name": "King George County",
@@ -503,7 +619,11 @@
       "namePatterns": ["KING GEORGE", "049. King George County"],
       "mapCenter": [38.27, -77.16],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102100",
+        "districtName": "King George County Public Schools"
+      }
     },
     "king_william": {
       "name": "King William County",
@@ -513,7 +633,11 @@
       "namePatterns": ["KING WILLIAM", "050. King William County"],
       "mapCenter": [37.70, -77.08],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102120",
+        "districtName": "King William County Public Schools"
+      }
     },
     "lancaster": {
       "name": "Lancaster County",
@@ -523,7 +647,11 @@
       "namePatterns": ["LANCASTER", "051. Lancaster County"],
       "mapCenter": [37.70, -76.46],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102160",
+        "districtName": "Lancaster County Public Schools"
+      }
     },
     "lee": {
       "name": "Lee County",
@@ -533,7 +661,11 @@
       "namePatterns": ["LEE", "052. Lee County"],
       "mapCenter": [36.70, -83.12],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102190",
+        "districtName": "Lee County Public Schools"
+      }
     },
     "loudoun": {
       "name": "Loudoun County",
@@ -543,7 +675,11 @@
       "namePatterns": ["LOUDOUN", "053. Loudoun County"],
       "mapCenter": [39.08, -77.64],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102250",
+        "districtName": "Loudoun County Public Schools"
+      }
     },
     "louisa": {
       "name": "Louisa County",
@@ -553,7 +689,11 @@
       "namePatterns": ["LOUISA", "054. Louisa County"],
       "mapCenter": [38.00, -78.00],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102280",
+        "districtName": "Louisa County Public Schools"
+      }
     },
     "lunenburg": {
       "name": "Lunenburg County",
@@ -563,7 +703,11 @@
       "namePatterns": ["LUNENBURG", "055. Lunenburg County"],
       "mapCenter": [36.95, -78.26],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102310",
+        "districtName": "Lunenburg County Public Schools"
+      }
     },
     "madison": {
       "name": "Madison County",
@@ -573,7 +717,11 @@
       "namePatterns": ["MADISON", "056. Madison County"],
       "mapCenter": [38.41, -78.28],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102370",
+        "districtName": "Madison County Public Schools"
+      }
     },
     "mathews": {
       "name": "Mathews County",
@@ -583,7 +731,11 @@
       "namePatterns": ["MATHEWS", "057. Mathews County"],
       "mapCenter": [37.43, -76.32],
       "mapZoom": 11,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102430",
+        "districtName": "Mathews County Public Schools"
+      }
     },
     "mecklenburg": {
       "name": "Mecklenburg County",
@@ -593,7 +745,11 @@
       "namePatterns": ["MECKLENBURG", "058. Mecklenburg County"],
       "mapCenter": [36.68, -78.37],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102460",
+        "districtName": "Mecklenburg County Public Schools"
+      }
     },
     "middlesex": {
       "name": "Middlesex County",
@@ -603,7 +759,11 @@
       "namePatterns": ["MIDDLESEX", "059. Middlesex County"],
       "mapCenter": [37.61, -76.55],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102490",
+        "districtName": "Middlesex County Public Schools"
+      }
     },
     "montgomery": {
       "name": "Montgomery County",
@@ -613,7 +773,11 @@
       "namePatterns": ["MONTGOMERY", "060. Montgomery County"],
       "mapCenter": [37.18, -80.39],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102520",
+        "districtName": "Montgomery County Public Schools"
+      }
     },
     "nelson": {
       "name": "Nelson County",
@@ -623,7 +787,11 @@
       "namePatterns": ["NELSON", "061. Nelson County"],
       "mapCenter": [37.79, -78.88],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102580",
+        "districtName": "Nelson County Public Schools"
+      }
     },
     "new_kent": {
       "name": "New Kent County",
@@ -743,7 +911,11 @@
       "namePatterns": ["PRINCE WILLIAM", "073. Prince William County"],
       "mapCenter": [38.70, -77.48],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5103130",
+        "districtName": "Prince William County Public Schools"
+      }
     },
     "pulaski": {
       "name": "Pulaski County",
@@ -803,7 +975,11 @@
       "namePatterns": ["ROCKINGHAM", "079. Rockingham County"],
       "mapCenter": [38.52, -78.88],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5103390",
+        "districtName": "Rockingham County Public Schools"
+      }
     },
     "russell": {
       "name": "Russell County",
@@ -973,7 +1149,11 @@
       "namePatterns": ["ALEXANDRIA", "096. Alexandria City"],
       "mapCenter": [38.82, -77.08],
       "mapZoom": 12,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100120",
+        "districtName": "Alexandria City Public Schools"
+      }
     },
     "bristol": {
       "name": "Bristol City",
@@ -993,7 +1173,11 @@
       "namePatterns": ["BUENA VISTA", "098. Buena Vista City"],
       "mapCenter": [37.73, -79.35],
       "mapZoom": 13,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100560",
+        "districtName": "Buena Vista City Public Schools"
+      }
     },
     "charlottesville": {
       "name": "Charlottesville City",
@@ -1013,7 +1197,11 @@
       "namePatterns": ["CHESAPEAKE", "100. Chesapeake City"],
       "mapCenter": [36.77, -76.29],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100810",
+        "districtName": "Chesapeake City Public Schools"
+      }
     },
     "colonial_heights": {
       "name": "Colonial Heights City",
@@ -1023,7 +1211,11 @@
       "namePatterns": ["COLONIAL HEIGHTS", "101. Colonial Heights City"],
       "mapCenter": [37.26, -77.40],
       "mapZoom": 13,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5100960",
+        "districtName": "Colonial Heights City Public Schools"
+      }
     },
     "covington": {
       "name": "Covington City",
@@ -1043,7 +1235,11 @@
       "namePatterns": ["DANVILLE", "103. Danville City"],
       "mapCenter": [36.59, -79.39],
       "mapZoom": 12,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101110",
+        "districtName": "Danville City Public Schools"
+      }
     },
     "emporia": {
       "name": "Emporia City",
@@ -1063,7 +1259,11 @@
       "namePatterns": ["FAIRFAX CITY", "105. Fairfax City"],
       "mapCenter": [38.85, -77.30],
       "mapZoom": 13,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101230",
+        "districtName": "City of Fairfax Public Schools"
+      }
     },
     "falls_church": {
       "name": "Falls Church City",
@@ -1083,7 +1283,11 @@
       "namePatterns": ["FRANKLIN CITY", "107. Franklin City"],
       "mapCenter": [36.68, -76.92],
       "mapZoom": 13,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101410",
+        "districtName": "Franklin City Public Schools"
+      }
     },
     "fredericksburg": {
       "name": "Fredericksburg City",
@@ -1093,7 +1297,11 @@
       "namePatterns": ["FREDERICKSBURG", "108. Fredericksburg City"],
       "mapCenter": [38.30, -77.46],
       "mapZoom": 13,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101510",
+        "districtName": "Fredericksburg City Public Schools"
+      }
     },
     "galax": {
       "name": "Galax City",
@@ -1113,7 +1321,11 @@
       "namePatterns": ["HAMPTON", "110. Hampton City"],
       "mapCenter": [37.03, -76.35],
       "mapZoom": 12,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5101800",
+        "districtName": "Hampton City Public Schools"
+      }
     },
     "harrisonburg": {
       "name": "Harrisonburg City",
@@ -1153,7 +1365,11 @@
       "namePatterns": ["LYNCHBURG", "114. Lynchburg City"],
       "mapCenter": [37.41, -79.14],
       "mapZoom": 12,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102340",
+        "districtName": "Lynchburg City Public Schools"
+      }
     },
     "manassas": {
       "name": "Manassas City",
@@ -1193,7 +1409,11 @@
       "namePatterns": ["NEWPORT NEWS", "118. Newport News City"],
       "mapCenter": [37.09, -76.47],
       "mapZoom": 11,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102640",
+        "districtName": "Newport News City Public Schools"
+      }
     },
     "norfolk": {
       "name": "Norfolk City",
@@ -1203,7 +1423,11 @@
       "namePatterns": ["NORFOLK", "119. Norfolk City"],
       "mapCenter": [36.85, -76.29],
       "mapZoom": 12,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5102670",
+        "districtName": "Norfolk City Public Schools"
+      }
     },
     "norton": {
       "name": "Norton City",
@@ -1243,7 +1467,11 @@
       "namePatterns": ["PORTSMOUTH", "123. Portsmouth City"],
       "mapCenter": [36.84, -76.35],
       "mapZoom": 12,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5103000",
+        "districtName": "Portsmouth City Public Schools"
+      }
     },
     "radford": {
       "name": "Radford City",
@@ -1263,7 +1491,11 @@
       "namePatterns": ["RICHMOND CITY", "125. Richmond City"],
       "mapCenter": [37.54, -77.44],
       "mapZoom": 12,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5103240",
+        "districtName": "Richmond City Public Schools"
+      }
     },
     "roanoke_city": {
       "name": "Roanoke City",
@@ -1313,7 +1545,11 @@
       "namePatterns": ["VIRGINIA BEACH", "130. Virginia Beach City"],
       "mapCenter": [36.85, -75.98],
       "mapZoom": 10,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5103840",
+        "districtName": "Virginia Beach City Public Schools"
+      }
     },
     "waynesboro": {
       "name": "Waynesboro City",
@@ -1323,7 +1559,11 @@
       "namePatterns": ["WAYNESBORO", "131. Waynesboro City"],
       "mapCenter": [38.07, -78.89],
       "mapZoom": 13,
-      "maintainsOwnRoads": false
+      "maintainsOwnRoads": false,
+      "education": {
+        "leaId": "5103930",
+        "districtName": "Waynesboro City Public Schools"
+      }
     },
     "williamsburg": {
       "name": "Williamsburg City",
