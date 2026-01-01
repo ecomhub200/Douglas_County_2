@@ -439,7 +439,11 @@
       "namePatterns": ["HENRICO", "043. Henrico County"],
       "mapCenter": [37.55, -77.45],
       "mapZoom": 11,
-      "maintainsOwnRoads": true
+      "maintainsOwnRoads": true,
+      "education": {
+        "leaId": "5101890",
+        "districtName": "Henrico County Public Schools"
+      }
     },
     "henry": {
       "name": "Henry County",
