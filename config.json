@@ -1383,11 +1383,12 @@
   "transitStops": {
     "enabled": true,
     "serviceUrls": [
-      "https://services9.arcgis.com/9oDT7ErWemWCzvY7/arcgis/rest/services/Virginia_Transit_Stops_Aug2025/FeatureServer/0",
-      "https://services3.arcgis.com/bmH6mExvnLDAoXJh/arcgis/rest/services/Virginia_Transit_Stops/FeatureServer/0",
-      "https://gis-drpt.opendata.arcgis.com/api/v3/datasets/virginia-transit-stops-aug2025/downloads/data?format=geojson"
+      "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/Virginia_Transit_Stops/FeatureServer/0",
+      "https://gis-drpt.opendata.arcgis.com/datasets/virginia-transit-stops-aug2025.geojson",
+      "https://opendata.arcgis.com/api/v3/datasets/52a9af0ebd794ca5abc382aaa2743205_3/downloads/data?format=geojson&spatialRefId=4326"
     ],
-    "serviceUrl": "https://services9.arcgis.com/9oDT7ErWemWCzvY7/arcgis/rest/services/Virginia_Transit_Stops_Aug2025/FeatureServer/0",
+    "grtcApiUrl": "https://data.richmondgov.com/resource/dt8y-2apj.json",
+    "serviceUrl": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/Virginia_Transit_Stops/FeatureServer/0",
     "description": "Virginia DRPT Transit Stops - Updated biannually (Aug 2025)",
     "dataSource": "https://gis-drpt.opendata.arcgis.com/",
     "fields": {
