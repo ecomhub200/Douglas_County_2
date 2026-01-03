@@ -1,0 +1,284 @@
+# ============================================================
+# CRASH LENS - .gitignore
+# ============================================================
+# IMPORTANT: This file prevents sensitive credentials from
+# being committed to the repository. NEVER remove entries
+# related to API keys, secrets, or environment variables.
+# ============================================================
+
+# ============================================================
+# ENVIRONMENT VARIABLES & SECRETS
+# ============================================================
+# These files contain sensitive API keys and credentials
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+*.env
+
+# API Keys configuration (create these manually)
+config/api-keys.json
+config/supabase-config.json
+config/stripe-config.json
+config/firebase-secrets.json
+secrets/
+credentials/
+
+# ============================================================
+# SUPABASE
+# ============================================================
+# Supabase local development
+supabase/.env
+supabase/.branches
+supabase/.temp
+supabase/config.toml.local
+
+# Supabase generated files
+supabase/.supabase/
+supabase/functions/.env
+supabase/seed.local.sql
+
+# Database dumps with potential sensitive data
+*.dump
+*.sql.gz
+database-backup/
+
+# ============================================================
+# STRIPE
+# ============================================================
+stripe-cli.json
+.stripe/
+stripe-webhook-secret.txt
+
+# ============================================================
+# FIREBASE (legacy - being replaced by Supabase)
+# ============================================================
+firebase-debug.log
+firebase-debug.*.log
+.firebase/
+firebase-adminsdk*.json
+serviceAccountKey.json
+
+# ============================================================
+# AI API KEYS
+# ============================================================
+# These should NEVER be committed
+openai-key.txt
+gemini-key.txt
+claude-key.txt
+anthropic-key.txt
+*-api-key.txt
+*-api-key.json
+
+# ============================================================
+# NODE.JS / NPM (if using build tools)
+# ============================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+package-lock.json
+yarn.lock
+
+# ============================================================
+# PYTHON
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# ============================================================
+# IDE / EDITORS
+# ============================================================
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# JetBrains (PyCharm, WebStorm, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# ============================================================
+# OPERATING SYSTEM
+# ============================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================================
+# BUILD & OUTPUT
+# ============================================================
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+*.tsbuildinfo
+
+# Compiled files
+*.min.js
+*.min.css
+*.map
+
+# ============================================================
+# LOGS & TEMPORARY FILES
+# ============================================================
+logs/
+*.log
+npm-debug.log*
+crash-report-*.txt
+temp/
+tmp/
+*.tmp
+*.temp
+
+# ============================================================
+# DATA FILES (optional - uncomment if needed)
+# ============================================================
+# Large data files that shouldn't be in repo
+# Uncomment these if you want to exclude data files:
+# data/*.csv
+# data/*.json
+# !data/cmf_processed.json
+# !data/cmf_metadata.json
+# !data/grants.csv
+
+# User-uploaded files
+data/uploads/
+data/downloads/user_exports/
+
+# ============================================================
+# TESTING
+# ============================================================
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# ============================================================
+# DOCUMENTATION (generated)
+# ============================================================
+docs/_build/
+site/
+.docusaurus/
+
+# ============================================================
+# MISCELLANEOUS
+# ============================================================
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Archive files (usually shouldn't be in repo)
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# SSL certificates (if any)
+*.pem
+*.key
+*.crt
+*.csr
+
+# License keys
+license.key
+*.license
+
+# ============================================================
+# PROJECT-SPECIFIC EXCLUSIONS
+# ============================================================
+# Add any project-specific files to exclude below:
+
+# Local configuration overrides
+config.local.json
+settings.local.json
+
+# Personal notes
+NOTES.md
+TODO.local.md
+SCRATCH.md
+
+# Test data with real crash information
+test-data-real/
+sample-crashes-real.csv
