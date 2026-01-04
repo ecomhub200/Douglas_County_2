@@ -1,0 +1,13 @@
+{
+  "_instructions": "Copy this file to api-keys.json and replace the placeholder values with your actual API keys",
+  "_security_note": "NEVER commit api-keys.json to version control - it is gitignored",
+
+  "mapbox": {
+    "accessToken": "YOUR_MAPBOX_ACCESS_TOKEN_HERE",
+    "_help": "Get your token at https://account.mapbox.com/access-tokens/"
+  },
+  "google": {
+    "mapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE",
+    "_help": "Get your key at https://console.cloud.google.com/apis/credentials"
+  }
+}
