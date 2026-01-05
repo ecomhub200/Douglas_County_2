@@ -331,27 +331,49 @@ const CrashLensAuth = {
 
   /**
    * Check if user has active subscription
+   * Note: We allow access even after trial expires - this returns true for all verified users
+   * The trial is just for premium features/tracking purposes
    */
   hasActiveSubscription: function() {
     if (!this.userData) return false;
 
-    const { plan, subscriptionStatus, trialEndsAt } = this.userData;
+    const { subscriptionStatus } = this.userData;
 
     // Pending verification - no active subscription yet
     if (subscriptionStatus === 'pending_verification') {
       return false;
     }
 
-    // Check trial
-    if (plan === 'trial') {
-      if (trialEndsAt && trialEndsAt.toDate() > new Date()) {
-        return true;
-      }
-      return false;
-    }
+    // All verified users have access (free tier after trial)
+    return true;
+  },
 
-    // Check paid subscription
-    return subscriptionStatus === 'active';
+  /**
+   * Check if trial period is still active (for display purposes)
+   */
+  isTrialActive: function() {
+    if (!this.userData) return false;
+
+    const { plan, trialEndsAt } = this.userData;
+
+    if (plan !== 'trial') return false;
+    if (!trialEndsAt) return false;
+
+    return trialEndsAt.toDate() > new Date();
+  },
+
+  /**
+   * Check if trial has expired (for display/upgrade prompts)
+   */
+  isTrialExpired: function() {
+    if (!this.userData) return false;
+
+    const { plan, trialEndsAt } = this.userData;
+
+    if (plan !== 'trial') return false;
+    if (!trialEndsAt) return true;
+
+    return trialEndsAt.toDate() <= new Date();
   },
 
   /**
