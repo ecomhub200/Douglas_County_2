@@ -60,8 +60,9 @@ firebase-debug.*.log
 .firebase/
 firebase-adminsdk*.json
 serviceAccountKey.json
-# Firebase config with actual credentials (use firebase-config.example.js as template)
-assets/js/firebase-config.js
+# Firebase config with actual credentials
+# Note: firebase-config.js is now committed as it reads from config.json
+# assets/js/firebase-config.js
 
 # ============================================================
 # AI API KEYS
