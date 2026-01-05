@@ -10,6 +10,14 @@
     },
     "google": {
       "mapsApiKey": "AIzaSyAMgu9WO10fkz1yd8NcejMVX-yThL5hIe8"
+    },
+    "firebase": {
+      "apiKey": "AIzaSyBg1QtvbcYxyrhbw0tmpyBiD-zzoCWbxyM",
+      "authDomain": "crash-lens-f50e7.firebaseapp.com",
+      "projectId": "crash-lens-f50e7",
+      "storageBucket": "crash-lens-f50e7.firebasestorage.app",
+      "messagingSenderId": "345091421318",
+      "appId": "1:345091421318:web:88f99469eb0ce73c734d07"
     }
   },
 
