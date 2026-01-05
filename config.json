@@ -4,9 +4,12 @@
   "version": "2.0.0",
 
   "apis": {
-    "_note": "API keys are loaded from config/api-keys.json (gitignored). See config/api-keys.example.json for setup.",
     "mapbox": {
+      "accessToken": "pk.eyJ1IjoibXVyYWRhbHF1cmlzaGVlIiwiYSI6ImNtazA0cnoyaTcwN20zY3EybGVlNWlmMzcifQ.VaJ4IEUf2vmFM4EexagsMg",
       "geocodingEndpoint": "https://api.mapbox.com/geocoding/v5/mapbox.places"
+    },
+    "google": {
+      "mapsApiKey": "AIzaSyAMgu9WO10fkz1yd8NcejMVX-yThL5hIe8"
     }
   },
 
