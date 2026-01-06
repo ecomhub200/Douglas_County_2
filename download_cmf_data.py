@@ -51,11 +51,11 @@ MAX_RETRIES = 4
 RETRY_BACKOFF_FACTOR = 2  # 2s, 4s, 8s, 16s
 
 # Quality threshold (1-5 stars)
-MIN_QUALITY_RATING = 3
+MIN_QUALITY_RATING = 2  # Lowered from 3 to include more countermeasures
 
-# Valid CMF range
-MIN_CMF = 0.01
-MAX_CMF = 3.0
+# Valid CMF range (expanded to include more records)
+MIN_CMF = 0.001  # Lowered from 0.01
+MAX_CMF = 5.0    # Raised from 3.0 to capture high-increase CMFs
 
 # ============================================================
 # CRASH TYPE NORMALIZATION MAPPING
