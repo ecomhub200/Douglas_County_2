@@ -11,6 +11,10 @@
     "google": {
       "mapsApiKey": "AIzaSyAMgu9WO10fkz1yd8NcejMVX-yThL5hIe8"
     },
+    "mapillary": {
+      "accessToken": "MLY|25481058261563991|475f516039ebcba6dc3f46f7f862e105",
+      "enabled": true
+    },
     "firebase": {
       "apiKey": "AIzaSyBg1QtvbcYxyrhbw0tmpyBiD-zzoCWbxyM",
       "authDomain": "crash-lens-f50e7.firebaseapp.com",
