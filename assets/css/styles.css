@@ -388,3 +388,556 @@ a:hover {
     display: none !important;
   }
 }
+
+/* ============================================================
+   LANDING PAGE ANIMATION & POLISH SYSTEM
+   Premium micro-interactions for marketing pages
+   ============================================================ */
+
+/* --- Smooth Scroll Behavior --- */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- Enhanced Animation Keyframes --- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(30, 64, 175, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(30, 64, 175, 0.5);
+  }
+}
+
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInStagger {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Animation Utility Classes --- */
+.animate-fadeInUp {
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fadeInDown {
+  animation: fadeInDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fadeInLeft {
+  animation: fadeInLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fadeInRight {
+  animation: fadeInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+/* Staggered delay classes */
+.animate-delay-100 { animation-delay: 0.1s; opacity: 0; }
+.animate-delay-200 { animation-delay: 0.2s; opacity: 0; }
+.animate-delay-300 { animation-delay: 0.3s; opacity: 0; }
+.animate-delay-400 { animation-delay: 0.4s; opacity: 0; }
+.animate-delay-500 { animation-delay: 0.5s; opacity: 0; }
+.animate-delay-600 { animation-delay: 0.6s; opacity: 0; }
+.animate-delay-700 { animation-delay: 0.7s; opacity: 0; }
+.animate-delay-800 { animation-delay: 0.8s; opacity: 0; }
+
+/* --- Scroll-Triggered Animation Classes --- */
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-on-scroll.animate-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.animate-on-scroll.from-left {
+  transform: translateX(-30px);
+}
+
+.animate-on-scroll.from-left.animate-visible {
+  transform: translateX(0);
+}
+
+.animate-on-scroll.from-right {
+  transform: translateX(30px);
+}
+
+.animate-on-scroll.from-right.animate-visible {
+  transform: translateX(0);
+}
+
+.animate-on-scroll.scale-in {
+  transform: scale(0.9);
+}
+
+.animate-on-scroll.scale-in.animate-visible {
+  transform: scale(1);
+}
+
+/* Staggered children animation */
+.stagger-children > * {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stagger-children.animate-visible > *:nth-child(1) { transition-delay: 0s; }
+.stagger-children.animate-visible > *:nth-child(2) { transition-delay: 0.1s; }
+.stagger-children.animate-visible > *:nth-child(3) { transition-delay: 0.2s; }
+.stagger-children.animate-visible > *:nth-child(4) { transition-delay: 0.3s; }
+.stagger-children.animate-visible > *:nth-child(5) { transition-delay: 0.4s; }
+.stagger-children.animate-visible > *:nth-child(6) { transition-delay: 0.5s; }
+.stagger-children.animate-visible > *:nth-child(7) { transition-delay: 0.6s; }
+.stagger-children.animate-visible > *:nth-child(8) { transition-delay: 0.7s; }
+
+.stagger-children.animate-visible > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* --- Enhanced Button Interactions --- */
+.btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.6s ease, height 0.6s ease;
+}
+
+.btn:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-gradient {
+  position: relative;
+  z-index: 1;
+}
+
+.btn-gradient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--primary-gradient);
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.btn-gradient:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(30, 64, 175, 0.4), 0 0 0 1px rgba(30, 64, 175, 0.1);
+}
+
+.btn-gradient:hover::after {
+  opacity: 0.9;
+}
+
+/* Primary CTA with glow */
+.btn-cta-primary {
+  background: var(--primary-gradient);
+  color: var(--white);
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-cta-primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(30, 64, 175, 0.5), 0 0 40px rgba(30, 64, 175, 0.2);
+}
+
+.btn-cta-primary:active {
+  transform: translateY(-1px) scale(0.98);
+}
+
+/* --- Enhanced Card Hover Effects --- */
+.card-dark {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-dark:hover {
+  border-color: rgba(30, 64, 175, 0.5);
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(30, 64, 175, 0.2);
+}
+
+/* Feature card with icon glow on hover */
+.feature-card {
+  position: relative;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.feature-card:hover {
+  transform: translateY(-8px);
+}
+
+.feature-card:hover .feature-icon {
+  background: rgba(30, 64, 175, 0.3);
+  box-shadow: 0 0 30px rgba(30, 64, 175, 0.3);
+}
+
+.feature-icon {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --- Stats Count-Up Animation --- */
+.stat-value,
+.trust-stat-value,
+.roi-result-value {
+  transition: all 0.3s ease;
+}
+
+.stat-value.counting,
+.trust-stat-value.counting,
+.roi-result-value.counting {
+  animation: countUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* --- Trust Logo Hover Effects --- */
+.trusted-logo-item {
+  transition: all 0.3s ease;
+}
+
+.trusted-logo-item:hover {
+  transform: scale(1.1);
+}
+
+.trusted-logo-item img {
+  transition: all 0.4s ease;
+}
+
+/* --- Pricing Card Enhancements --- */
+.pricing-card {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pricing-card:hover {
+  transform: translateY(-10px);
+}
+
+.pricing-card.featured {
+  box-shadow: 0 0 0 2px var(--primary), 0 20px 40px rgba(30, 64, 175, 0.3);
+}
+
+.pricing-card.featured:hover {
+  box-shadow: 0 0 0 2px var(--primary), 0 30px 60px rgba(30, 64, 175, 0.4);
+}
+
+/* --- Step/Process Animation --- */
+.step {
+  transition: all 0.3s ease;
+}
+
+.step:hover {
+  transform: translateY(-5px);
+}
+
+.step:hover .step-number {
+  transform: scale(1.1);
+  box-shadow: 0 0 30px rgba(30, 64, 175, 0.4);
+}
+
+.step-number {
+  transition: all 0.3s ease;
+}
+
+/* --- Video Play Button Enhancement --- */
+.demo-play-btn {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.demo-video-placeholder:hover .demo-play-btn {
+  transform: scale(1.15);
+  box-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
+}
+
+/* --- Case Study Card Enhancement --- */
+.case-study-card {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.case-study-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+.case-study-card:hover .case-study-image img {
+  transform: scale(1.05);
+}
+
+.case-study-image {
+  overflow: hidden;
+}
+
+.case-study-image img {
+  transition: transform 0.5s ease;
+}
+
+/* --- Navigation Enhancement --- */
+.nav {
+  transition: all 0.3s ease;
+}
+
+.nav.scrolled {
+  background: rgba(6, 18, 32, 0.98);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.nav-link {
+  position: relative;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+  width: 100%;
+}
+
+/* --- Hero Badge Enhancement --- */
+.hero-badge {
+  animation: fadeInDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 0.1s;
+  opacity: 0;
+}
+
+/* --- Trust Indicator Enhancement --- */
+.trust-item {
+  transition: all 0.3s ease;
+}
+
+.trust-item:hover {
+  color: var(--white);
+  transform: translateX(3px);
+}
+
+.trust-item svg {
+  transition: all 0.3s ease;
+}
+
+.trust-item:hover svg {
+  transform: scale(1.2);
+}
+
+/* --- ROI Calculator Enhancement --- */
+.roi-input-group input {
+  transition: all 0.3s ease;
+}
+
+.roi-input-group input:focus {
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.2);
+  border-color: var(--primary);
+}
+
+.roi-result-card {
+  transition: all 0.3s ease;
+}
+
+.roi-result-card:hover {
+  transform: translateY(-3px);
+}
+
+/* --- Section Header Animation --- */
+.features-header,
+.pricing-preview-header,
+.case-studies-header,
+.how-it-works-header,
+.demo-video-header,
+.roi-calculator-header {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.features-header.animate-visible,
+.pricing-preview-header.animate-visible,
+.case-studies-header.animate-visible,
+.how-it-works-header.animate-visible,
+.demo-video-header.animate-visible,
+.roi-calculator-header.animate-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* --- Focus States (Accessibility) --- */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(30, 64, 175, 0.2);
+}
+
+/* --- Print Optimization --- */
+@media print {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
