@@ -22,6 +22,16 @@
       "storageBucket": "crash-lens-f50e7.firebasestorage.app",
       "messagingSenderId": "345091421318",
       "appId": "1:345091421318:web:88f99469eb0ce73c734d07"
+    },
+    "mapillary": {
+      "accessToken": "",
+      "organizationId": "crash-lens",
+      "graphApiUrl": "https://graph.mapillary.com",
+      "tilesApiUrl": "https://tiles.mapillary.com",
+      "searchRadius": 50,
+      "maxImagesPerLocation": 8,
+      "rateLimitPerMinute": 60000,
+      "tileLimitPerDay": 50000
     }
   },
 
