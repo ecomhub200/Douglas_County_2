@@ -1674,6 +1674,174 @@
         alert('Demo video coming soon! Contact us for a live demo.');
       }
     }
+
+    // ============================================================
+    // LANDING PAGE ANIMATION SYSTEM
+    // ============================================================
+
+    // Intersection Observer for scroll-triggered animations
+    function initScrollAnimations() {
+      // Check for reduced motion preference
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        // Show all elements without animation
+        document.querySelectorAll('.animate-on-scroll, .stagger-children').forEach(el => {
+          el.classList.add('animate-visible');
+        });
+        return;
+      }
+
+      const observerOptions = {
+        root: null,
+        rootMargin: '0px 0px -50px 0px',
+        threshold: 0.1
+      };
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('animate-visible');
+
+            // Trigger count-up for stats
+            if (entry.target.classList.contains('stats-grid') ||
+                entry.target.classList.contains('trust-stats')) {
+              animateCountUp(entry.target);
+            }
+
+            // Unobserve after animation
+            observer.unobserve(entry.target);
+          }
+        });
+      }, observerOptions);
+
+      // Observe elements
+      const animatedElements = document.querySelectorAll(
+        '.animate-on-scroll, .stagger-children, ' +
+        '.features-header, .pricing-preview-header, .case-studies-header, ' +
+        '.how-it-works-header, .demo-video-header, .roi-calculator-header, ' +
+        '.features-grid, .pricing-cards, .case-studies-grid, .steps-container, ' +
+        '.stats-grid, .trust-stats'
+      );
+
+      animatedElements.forEach(el => observer.observe(el));
+    }
+
+    // Count-Up Animation for Statistics
+    function animateCountUp(container) {
+      const statValues = container.querySelectorAll('.stat-value, .trust-stat-value');
+
+      statValues.forEach(el => {
+        const text = el.textContent.trim();
+        const hasPlus = text.includes('+');
+        const hasPercent = text.includes('%');
+        const hasDollar = text.includes('$');
+        const hasK = text.includes('K');
+        const hasM = text.includes('M');
+
+        // Extract numeric value
+        let numericValue = parseFloat(text.replace(/[^0-9.]/g, ''));
+        if (isNaN(numericValue)) return;
+
+        // Adjust for K/M suffixes
+        let suffix = '';
+        if (hasK) suffix = 'K';
+        if (hasM) suffix = 'M';
+
+        const prefix = hasDollar ? '$' : '';
+        const postfix = (hasPlus ? '+' : '') + (hasPercent ? '%' : '');
+
+        // Animate
+        el.classList.add('counting');
+        const duration = 1500;
+        const startTime = performance.now();
+        const startValue = 0;
+
+        function updateValue(currentTime) {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+
+          // Easing function (ease-out-expo)
+          const easeOutExpo = 1 - Math.pow(2, -10 * progress);
+          const currentValue = startValue + (numericValue - startValue) * easeOutExpo;
+
+          // Format the value
+          let displayValue;
+          if (numericValue >= 100) {
+            displayValue = Math.round(currentValue);
+          } else if (numericValue >= 10) {
+            displayValue = Math.round(currentValue);
+          } else {
+            displayValue = currentValue.toFixed(1);
+          }
+
+          el.textContent = prefix + displayValue.toLocaleString() + suffix + postfix;
+
+          if (progress < 1) {
+            requestAnimationFrame(updateValue);
+          } else {
+            el.classList.remove('counting');
+          }
+        }
+
+        requestAnimationFrame(updateValue);
+      });
+    }
+
+    // Navigation scroll effect
+    function initNavScrollEffect() {
+      const nav = document.querySelector('.nav');
+      if (!nav) return;
+
+      let lastScroll = 0;
+
+      window.addEventListener('scroll', () => {
+        const currentScroll = window.pageYOffset;
+
+        if (currentScroll > 50) {
+          nav.classList.add('scrolled');
+        } else {
+          nav.classList.remove('scrolled');
+        }
+
+        lastScroll = currentScroll;
+      }, { passive: true });
+    }
+
+    // Smooth scroll for anchor links
+    function initSmoothScroll() {
+      document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+          const targetId = this.getAttribute('href');
+          if (targetId === '#') return;
+
+          const targetElement = document.querySelector(targetId);
+          if (targetElement) {
+            e.preventDefault();
+            targetElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          }
+        });
+      });
+    }
+
+    // Add stagger-children class to grids
+    function initStaggeredGrids() {
+      const grids = document.querySelectorAll(
+        '.features-grid, .pricing-cards, .case-studies-grid, .steps-container, .trusted-logos'
+      );
+      grids.forEach(grid => {
+        grid.classList.add('stagger-children');
+      });
+    }
+
+    // Initialize all animations on DOM ready
+    document.addEventListener('DOMContentLoaded', function() {
+      initStaggeredGrids();
+      initScrollAnimations();
+      initNavScrollEffect();
+      initSmoothScroll();
+    });
   </script>
 </body>
 </html>
