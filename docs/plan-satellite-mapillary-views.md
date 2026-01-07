@@ -1,13 +1,15 @@
-# Implementation Plan: Satellite View & Mapillary Integration
+# Implementation Plan: Satellite View & Assets View Integration
 
 ## Overview
 
-Add Mapbox Satellite View and Mapillary street-level imagery across Map, Countermeasures (CMF), and Warrants tabs to provide traffic engineers with comprehensive visual context for safety analysis.
+Add Mapbox Satellite View and Assets View (Mapillary with detected infrastructure) across Map, Countermeasures (CMF), and Warrants tabs to provide traffic engineers with comprehensive visual context for safety analysis.
+
+**Note:** "Assets View" shows Mapillary street-level imagery with detected infrastructure overlays (traffic signs, signals, road markings).
 
 ### Final Feature Matrix
 
-| Location Type | Street View | Satellite View | Mapillary View |
-|---------------|-------------|----------------|----------------|
+| Location Type | Street View | Satellite View | Assets View |
+|---------------|-------------|----------------|-------------|
 | **Intersection** | ✅ (existing) | ✅ NEW | ✅ NEW (500ft buffer) |
 | **Road Segment** | ❌ | ✅ NEW | ✅ NEW |
 | **Polygon Selection** | ❌ | ✅ NEW (centroid) | ✅ NEW (centroid) |
