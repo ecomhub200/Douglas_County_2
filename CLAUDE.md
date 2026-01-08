@@ -273,7 +273,7 @@ Key column indices used throughout the codebase:
 
 Equivalent Property Damage Only (EPDO) weights:
 ```javascript
-const EPDO_WEIGHTS = { K: 1500, A: 240, B: 12, C: 6, O: 1 };
+const EPDO_WEIGHTS = { K: 462, A: 62, B: 12, C: 5, O: 1 };
 ```
 
 Always use `calcEPDO(severityObject)` for consistent calculations.
