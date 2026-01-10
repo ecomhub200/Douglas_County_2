@@ -12,7 +12,7 @@
       "mapsApiKey": "AIzaSyAMgu9WO10fkz1yd8NcejMVX-yThL5hIe8"
     },
     "mapillary": {
-      "accessToken": "MLY|25481058261563991|475f516039ebcba6dc3f46f7f862e105",
+      "accessToken": "MLY|25640485455606987|8996c6094d2cb50ab597f5a3b680a182",
       "enabled": true,
       "organizationId": "crash-lens",
       "graphApiUrl": "https://graph.mapillary.com",
