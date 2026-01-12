@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapillary Asset Downloader v4.3 - Virginia Traffic Infrastructure</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root{--primary:#1e40af;--primary-light:#3b82f6;--primary-dark:#1e3a8a;--success:#059669;--success-bg:#d1fae5;--warning:#d97706;--warning-bg:#fef3c7;--error:#dc2626;--error-bg:#fee2e2;--bg:#f1f5f9;--card-bg:#fff;--text:#0f172a;--text-muted:#64748b;--border:#cbd5e1;--border-light:#e2e8f0;--mutcd-red:#cf2030;--mutcd-yellow:#f59e0b;--mutcd-green:#059669;--mutcd-school:#84cc16;--mutcd-orange:#ea580c}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+        .app-header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;padding:0.75rem 1.5rem}
+        .header-content{max-width:1800px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem}
+        .header-title h1{font-size:1.1rem;font-weight:700}
+        .header-title p{opacity:0.9;font-size:0.75rem}
+        .header-badges{display:flex;gap:0.5rem}
+        .header-badge{background:rgba(255,255,255,0.2);padding:0.35rem 0.75rem;border-radius:6px;font-size:0.75rem}
+        .container{max-width:1800px;margin:0 auto;padding:1rem}
+        .grid-layout{display:grid;grid-template-columns:1fr 340px;gap:1rem}
+        @media(max-width:1200px){.grid-layout{grid-template-columns:1fr}}
+        .card{background:var(--card-bg);border:1px solid var(--border-light);border-radius:10px;padding:1rem;margin-bottom:1rem}
+        .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border-light)}
+        .card-title{font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:0.4rem}
+        .badge{display:inline-flex;align-items:center;padding:0.2rem 0.6rem;border-radius:9999px;font-size:0.7rem;font-weight:600}
+        .badge-success{background:var(--success-bg);color:var(--success)}
+        .badge-warning{background:var(--warning-bg);color:var(--warning)}
+        .badge-info{background:var(--primary-light);color:#fff}
+        .config-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem}
+        @media(max-width:768px){.config-grid{grid-template-columns:1fr}}
+        .input-row{display:flex;gap:0.4rem}
+        input,select{width:100%;padding:0.5rem 0.7rem;border:1.5px solid var(--border);border-radius:6px;font-size:0.8rem;font-family:inherit}
+        input:focus,select:focus{outline:none;border-color:var(--primary)}
+        .btn{display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;padding:0.5rem 0.8rem;border:none;border-radius:6px;font-size:0.8rem;font-weight:500;cursor:pointer;transition:all 0.2s;font-family:inherit}
+        .btn-primary{background:var(--primary);color:#fff}
+        .btn-primary:hover:not(:disabled){background:var(--primary-dark)}
+        .btn-success{background:var(--success);color:#fff}
+        .btn-ghost{background:transparent;color:var(--text-muted);border:1.5px solid var(--border)}
+        .btn-ghost:hover:not(:disabled){background:var(--bg)}
+        .btn-sm{padding:0.3rem 0.6rem;font-size:0.75rem}
+        .btn-lg{padding:0.7rem 1.2rem;font-size:0.9rem;font-weight:600}
+        .btn:disabled{opacity:0.5;cursor:not-allowed}
+        .btn-block{width:100%}
+        .series-tabs{display:flex;gap:0.25rem;margin-bottom:0.75rem;flex-wrap:wrap}
+        .series-tab{padding:0.4rem 0.8rem;font-size:0.75rem;font-weight:600;border-radius:6px;cursor:pointer;border:2px solid transparent;transition:all 0.2s}
+        .series-tab.r-series{background:#fef2f2;color:var(--mutcd-red)}
+        .series-tab.r-series.active{background:var(--mutcd-red);color:#fff}
+        .series-tab.w-series{background:#fef9c3;color:#92400e}
+        .series-tab.w-series.active{background:var(--mutcd-yellow);color:#000}
+        .series-tab.g-series{background:#d1fae5;color:var(--mutcd-green)}
+        .series-tab.g-series.active{background:var(--mutcd-green);color:#fff}
+        .series-tab.s-series{background:#ecfccb;color:#4d7c0f}
+        .series-tab.s-series.active{background:var(--mutcd-school);color:#fff}
+        .series-tab.om-series{background:#ffedd5;color:var(--mutcd-orange)}
+        .series-tab.om-series.active{background:var(--mutcd-orange);color:#fff}
+        .series-tab.infra-series{background:#f1f5f9;color:#475569}
+        .series-tab.infra-series.active{background:#475569;color:#fff}
+        .quick-actions{display:flex;gap:0.25rem;flex-wrap:wrap;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px dashed var(--border-light)}
+        .series-panel{display:none;background:#fafbfc;border:1px solid var(--border-light);border-radius:8px;padding:0.75rem;max-height:380px;overflow-y:auto}
+        .series-panel.active{display:block}
+        .series-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:2px solid var(--border-light)}
+        .series-title{font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:0.4rem}
+        .series-badge{font-size:0.65rem;padding:0.15rem 0.4rem;border-radius:4px;font-weight:700}
+        .series-badge.r{background:var(--mutcd-red);color:#fff}
+        .series-badge.w{background:var(--mutcd-yellow);color:#000}
+        .series-badge.g{background:var(--mutcd-green);color:#fff}
+        .series-badge.s{background:var(--mutcd-school);color:#fff}
+        .series-badge.om{background:var(--mutcd-orange);color:#fff}
+        .series-badge.infra{background:#475569;color:#fff}
+        .sign-category{margin-bottom:0.75rem}
+        .category-header{display:flex;align-items:center;justify-content:space-between;padding:0.3rem 0;margin-bottom:0.4rem}
+        .category-header h4{font-size:0.8rem;font-weight:600}
+        .category-range{font-size:0.65rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;background:var(--bg);padding:0.15rem 0.4rem;border-radius:4px}
+        .asset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:0.35rem}
+        .asset-grid.speed-grid{grid-template-columns:repeat(auto-fill,minmax(70px,1fr))}
+        .asset-item{display:flex;align-items:center;gap:0.35rem;padding:0.35rem 0.5rem;border:1.5px solid var(--border-light);border-radius:6px;cursor:pointer;background:#fff;font-size:0.75rem;transition:all 0.15s}
+        .asset-item:hover{border-color:var(--primary-light);background:#f8faff}
+        .asset-item.selected{border-color:var(--primary);background:#eff6ff}
+        .asset-item input[type="checkbox"]{width:12px;height:12px;accent-color:var(--primary);flex-shrink:0}
+        .asset-item .sign-code{font-family:'JetBrains Mono',monospace;font-size:0.65rem;background:var(--bg);padding:0.1rem 0.25rem;border-radius:3px;color:var(--text-muted)}
+        .asset-item .sign-name{font-size:0.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .progress-section{display:none;margin-top:0.75rem}
+        .progress-section.active{display:block}
+        .progress-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;font-size:0.8rem}
+        .progress-track{height:6px;background:var(--border-light);border-radius:4px;overflow:hidden}
+        .progress-bar{height:100%;background:linear-gradient(90deg,var(--primary),#0891b2);border-radius:4px;width:0%;transition:width 0.3s}
+        .stats-row{display:flex;gap:0.75rem;margin-top:0.5rem;font-size:0.75rem;flex-wrap:wrap}
+        .stat{display:flex;align-items:center;gap:0.2rem;padding:0.2rem 0.4rem;background:var(--bg);border-radius:4px}
+        .stat.success{color:var(--success)}
+        .stat.error{color:var(--error)}
+        .log-container{background:#1e293b;border-radius:6px;padding:0.5rem;margin-top:0.5rem;max-height:150px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:0.65rem}
+        .log-entry{padding:0.15rem 0;color:#94a3b8}
+        .log-entry.success{color:#4ade80}
+        .log-entry.error{color:#f87171}
+        .log-entry.info{color:#60a5fa}
+        .log-entry.warn{color:#fbbf24}
+        .results-panel{display:none}
+        .results-panel.active{display:block}
+        .results-summary{background:linear-gradient(135deg,var(--success),#047857);color:#fff;border-radius:8px;padding:0.75rem;margin-bottom:0.75rem}
+        .results-summary h3{font-size:0.9rem;margin-bottom:0.4rem}
+        .results-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:0.4rem}
+        .result-stat{background:rgba(255,255,255,0.15);border-radius:6px;padding:0.5rem;text-align:center}
+        .result-stat .value{font-size:1.25rem;font-weight:700}
+        .result-stat .label{font-size:0.65rem;opacity:0.9}
+        .export-section{background:var(--bg);border-radius:6px;padding:0.75rem}
+        .export-section h4{font-size:0.8rem;margin-bottom:0.5rem}
+        .export-buttons{display:grid;grid-template-columns:repeat(2,1fr);gap:0.4rem}
+        .export-btn{display:flex;flex-direction:column;align-items:center;gap:0.2rem;padding:0.5rem;border:1.5px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;transition:all 0.15s}
+        .export-btn:hover{border-color:var(--primary);background:#f8faff}
+        .export-btn .icon{font-size:1rem}
+        .export-btn .name{font-size:0.7rem;font-weight:600}
+        .toast-container{position:fixed;top:1rem;right:1rem;z-index:1000;display:flex;flex-direction:column;gap:0.4rem}
+        .toast{padding:0.6rem 0.8rem;border-radius:6px;animation:slideIn 0.3s ease;font-size:0.8rem;font-weight:500;display:flex;align-items:center;gap:0.4rem;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+        .toast.success{background:var(--success);color:#fff}
+        .toast.error{background:var(--error);color:#fff}
+        .toast.info{background:var(--primary);color:#fff}
+        .toast.warn{background:var(--warning);color:#fff}
+        @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+        .spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#fff;animation:spin 0.8s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .map-container{height:480px;border-radius:10px;overflow:hidden;border:2px solid var(--border-light)}
+        #assetMap{height:100%;width:100%}
+        .map-controls{display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.5rem;align-items:center}
+        .map-filter-btn{padding:0.3rem 0.6rem;font-size:0.7rem;border:1.5px solid var(--border);border-radius:5px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:0.3rem;transition:all 0.15s}
+        .map-filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+        .map-filter-btn .filter-dot{width:6px;height:6px;border-radius:50%}
+        .map-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0.4rem;margin-top:0.5rem}
+        .map-stat{background:#fff;padding:0.4rem;border-radius:5px;text-align:center;border:1px solid var(--border-light)}
+        .map-stat-value{font-size:0.9rem;font-weight:700;color:var(--primary)}
+        .map-stat-label{font-size:0.6rem;color:var(--text-muted)}
+        .custom-marker{background:transparent;border:none}
+        .jurisdiction-info{display:none;background:var(--bg);border-radius:6px;padding:0.5rem;margin-top:0.5rem;font-size:0.75rem}
+        .jurisdiction-info.visible{display:flex;gap:0.75rem;flex-wrap:wrap}
+        .quick-stats-card{display:none;margin-top:0.75rem}
+        .quick-stats-card.visible{display:block}
+        .rate-limit-warning{background:var(--warning-bg);color:var(--warning);padding:0.5rem;border-radius:6px;margin-top:0.5rem;font-size:0.75rem;display:none}
+        .rate-limit-warning.visible{display:block}
+        .speed-filter-panel{background:#f8fafc;border:1px solid var(--border-light);border-radius:6px;padding:0.5rem;margin-top:0.5rem;display:none}
+        .speed-filter-panel.visible{display:block}
+        .speed-filter-title{font-size:0.75rem;font-weight:600;margin-bottom:0.4rem;display:flex;align-items:center;justify-content:space-between}
+        .speed-filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:0.25rem}
+        .speed-filter-btn{padding:0.25rem 0.1rem;font-size:0.7rem;font-weight:600;border:1.5px solid var(--border);border-radius:4px;background:#fff;cursor:pointer;text-align:center;transition:all 0.15s}
+        .speed-filter-btn.active{background:#000;color:#fff;border-color:#000}
+        .speed-filter-btn:hover:not(.active){background:#f1f5f9}
+        .speed-filter-actions{display:flex;gap:0.25rem;margin-top:0.4rem}
+        footer{text-align:center;padding:1rem;color:var(--text-muted);font-size:0.75rem;border-top:1px solid var(--border-light);margin-top:1rem}
+        footer a{color:var(--primary);text-decoration:none}
+        .speed-category-label{font-size:0.65rem;color:var(--text-muted);margin:0.4rem 0 0.2rem;font-weight:500}
+    </style>
+</head>
+<body>
+    <div class="toast-container" id="toastContainer"></div>
+    <header class="app-header">
+        <div class="header-content">
+            <div class="header-title">
+                <h1>🗺️ Mapillary Asset Downloader v4.3</h1>
+                <p>MUTCD Traffic Infrastructure Inventory • Virginia</p>
+            </div>
+            <div class="header-badges">
+                <div class="header-badge">API v4</div>
+                <div class="header-badge" id="selectedCountHeader">0 selected</div>
+            </div>
+        </div>
+    </header>
+    <div class="container">
+        <div class="grid-layout">
+            <div class="main-content">
+                <div class="config-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">🔑 API Token</span>
+                            <span class="badge badge-warning" id="tokenStatus">Not Set</span>
+                        </div>
+                        <div class="input-row">
+                            <input type="password" id="apiToken" placeholder="MLY|app_id|token">
+                            <button class="btn btn-primary btn-sm" onclick="saveToken()">Save</button>
+                            <button class="btn btn-ghost btn-sm" onclick="testToken()">Test</button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">📍 Jurisdiction</span>
+                            <span class="badge badge-info" id="tileCount">0 tiles</span>
+                        </div>
+                        <select id="jurisdiction" onchange="updateJurisdiction()">
+                            <option value="">-- Select --</option>
+                        </select>
+                        <div class="jurisdiction-info" id="jurisdictionInfo">
+                            <div><strong>Type:</strong> <span id="jurisdictionType">-</span></div>
+                            <div><strong>FIPS:</strong> <span id="jurisdictionFips">-</span></div>
+                            <div><strong>Area:</strong> <span id="jurisdictionArea">-</span> sq mi</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">🚦 Asset Types</span>
+                        <span class="badge" id="selectedCount">0 selected</span>
+                    </div>
+                    <div class="quick-actions">
+                        <button class="btn btn-sm btn-ghost" onclick="selectAllAssets()">✓ All</button>
+                        <button class="btn btn-sm btn-ghost" onclick="clearAllAssets()">✗ Clear</button>
+                        <button class="btn btn-sm btn-ghost" onclick="selectSeries('R')">R</button>
+                        <button class="btn btn-sm btn-ghost" onclick="selectSeries('W')">W</button>
+                        <button class="btn btn-sm btn-ghost" onclick="selectSeries('G')">G</button>
+                        <button class="btn btn-sm btn-ghost" onclick="selectSeries('S')">S</button>
+                        <button class="btn btn-sm btn-ghost" onclick="selectSeries('OM')">OM</button>
+                        <button class="btn btn-sm btn-ghost" onclick="selectSeries('INFRA')">Infra</button>
+                    </div>
+                    <div class="series-tabs">
+                        <div class="series-tab r-series active" onclick="switchSeries('R')">🛑 R</div>
+                        <div class="series-tab w-series" onclick="switchSeries('W')">⚠️ W</div>
+                        <div class="series-tab g-series" onclick="switchSeries('G')">🟢 G</div>
+                        <div class="series-tab s-series" onclick="switchSeries('S')">🏫 S</div>
+                        <div class="series-tab om-series" onclick="switchSeries('OM')">🔶 OM</div>
+                        <div class="series-tab infra-series" onclick="switchSeries('INFRA')">⚙️ Infra</div>
+                    </div>
+                    <!-- R-Series -->
+                    <div class="series-panel active" id="panel-R">
+                        <div class="series-header"><span class="series-title"><span class="series-badge r">R</span> Regulatory</span></div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>🛑 Stop & Yield</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R1_stop"><span class="sign-code">R1-1</span><span class="sign-name">STOP</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R1_yield"><span class="sign-code">R1-2</span><span class="sign-name">YIELD</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R1_allway"><span class="sign-code">R1-3P</span><span class="sign-name">ALL WAY</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>🚗 Speed Limits</h4></div>
+                            <div class="speed-category-label">US Standard (mph)</div>
+                            <div class="asset-grid speed-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_5"><span class="sign-code">5</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_10"><span class="sign-code">10</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_15"><span class="sign-code">15</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_20"><span class="sign-code">20</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_25"><span class="sign-code">25</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_30"><span class="sign-code">30</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_35"><span class="sign-code">35</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_40"><span class="sign-code">40</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_45"><span class="sign-code">45</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_50"><span class="sign-code">50</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_55"><span class="sign-code">55</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_60"><span class="sign-code">60</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_65"><span class="sign-code">65</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_70"><span class="sign-code">70</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_75"><span class="sign-code">75</span></label>
+                            </div>
+                            <div class="speed-category-label">Metric (kph)</div>
+                            <div class="asset-grid speed-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_80"><span class="sign-code">80</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_90"><span class="sign-code">90</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_100"><span class="sign-code">100</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_110"><span class="sign-code">110</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_120"><span class="sign-code">120</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_130"><span class="sign-code">130</span></label>
+                            </div>
+                            <div class="speed-category-label">Other</div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_end"><span class="sign-code">R2-1E</span><span class="sign-name">End Speed</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_truck"><span class="sign-code">R2-2</span><span class="sign-name">Truck</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_night"><span class="sign-code">R2-3</span><span class="sign-name">Night</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R2_minimum"><span class="sign-code">R2-4</span><span class="sign-name">Min</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>↩️ Turn & Movement</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R3_no_right"><span class="sign-code">R3-1</span><span class="sign-name">No Right</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R3_no_left"><span class="sign-code">R3-2</span><span class="sign-name">No Left</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R3_no_uturn"><span class="sign-code">R3-4</span><span class="sign-name">No U-Turn</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R3_turn_only"><span class="sign-code">R3-5a</span><span class="sign-name">Turn Only</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R4_keep"><span class="sign-code">R4-7</span><span class="sign-name">Keep R/L</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R5_dne"><span class="sign-code">R5-1</span><span class="sign-name">DNE</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R5_wrong"><span class="sign-code">R5-1a</span><span class="sign-name">Wrong Way</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R6_oneway"><span class="sign-code">R6-1</span><span class="sign-name">One Way</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>🅿️ Parking</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R7_nopark"><span class="sign-code">R7-1</span><span class="sign-name">No Park</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R7_nostand"><span class="sign-code">R7-4</span><span class="sign-name">No Stand</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R7_nostop"><span class="sign-code">R7-2a</span><span class="sign-name">No Stop</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R7_handicap"><span class="sign-code">R7-8</span><span class="sign-name">Handicap</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>🚦 Signals</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R10_rtor"><span class="sign-code">R10-11</span><span class="sign-name">No Red Turn</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="R" value="R15_cross"><span class="sign-code">R15-1</span><span class="sign-name">Crossbuck</span></label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- W-Series -->
+                    <div class="series-panel" id="panel-W">
+                        <div class="series-header"><span class="series-title"><span class="series-badge w">W</span> Warning</span></div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>↪️ Curves</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W1_turn"><span class="sign-code">W1-1</span><span class="sign-name">Turn</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W1_curve"><span class="sign-code">W1-2</span><span class="sign-name">Curve</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W1_reverse"><span class="sign-code">W1-4</span><span class="sign-name">Reverse</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W1_winding"><span class="sign-code">W1-5</span><span class="sign-name">Winding</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W1_chevron"><span class="sign-code">W1-8</span><span class="sign-name">Chevron</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>✚ Intersections</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W2_cross"><span class="sign-code">W2-1</span><span class="sign-name">Cross Rd</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W2_side"><span class="sign-code">W2-2</span><span class="sign-name">Side Rd</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W2_t"><span class="sign-code">W2-4</span><span class="sign-name">T-Int</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W2_y"><span class="sign-code">W2-5</span><span class="sign-name">Y-Int</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W2_circle"><span class="sign-code">W2-6</span><span class="sign-name">Circle</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>⚠️ Advance</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W3_stop"><span class="sign-code">W3-1</span><span class="sign-name">Stop Ahead</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W3_yield"><span class="sign-code">W3-2</span><span class="sign-name">Yield Ahead</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W3_signal"><span class="sign-code">W3-3</span><span class="sign-name">Signal</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>🔀 Lanes & Road</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W4_merge"><span class="sign-code">W4-1</span><span class="sign-name">Merge</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W4_ends"><span class="sign-code">W4-2</span><span class="sign-name">Lane Ends</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W5_narrow"><span class="sign-code">W5-1</span><span class="sign-name">Narrows</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W7_hill"><span class="sign-code">W7-1</span><span class="sign-name">Hill</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W8_bump"><span class="sign-code">W8-1</span><span class="sign-name">Bump</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W8_dip"><span class="sign-code">W8-2</span><span class="sign-name">Dip</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W8_slippery"><span class="sign-code">W8-5</span><span class="sign-name">Slippery</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>🚶 Crossings</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W10_rr"><span class="sign-code">W10-1</span><span class="sign-name">RR</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W11_bike"><span class="sign-code">W11-1</span><span class="sign-name">Bike</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W11_ped"><span class="sign-code">W11-2</span><span class="sign-name">Ped</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W11_deer"><span class="sign-code">W11-3</span><span class="sign-name">Deer</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W11_cattle"><span class="sign-code">W11-4</span><span class="sign-name">Cattle</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W11_farm"><span class="sign-code">W11-5</span><span class="sign-name">Farm</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>📋 Supplemental</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W13_adv"><span class="sign-code">W13-1P</span><span class="sign-name">Advisory</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W14_dead"><span class="sign-code">W14-1</span><span class="sign-name">Dead End</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="W" value="W14_noout"><span class="sign-code">W14-2</span><span class="sign-name">No Outlet</span></label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- G-Series -->
+                    <div class="series-panel" id="panel-G">
+                        <div class="series-header"><span class="series-title"><span class="series-badge g">G</span> Guide</span></div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>🛣️ Routes</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="M1_inter"><span class="sign-code">M1-1</span><span class="sign-name">Interstate</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="M1_us"><span class="sign-code">M1-4</span><span class="sign-name">US Route</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="M1_state"><span class="sign-code">M1-5</span><span class="sign-name">State</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="M1_county"><span class="sign-code">M1-6</span><span class="sign-name">County</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>📍 Destination</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="D_dest"><span class="sign-code">D1</span><span class="sign-name">Dest</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="D_street"><span class="sign-code">D3</span><span class="sign-name">Street</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="D_mile"><span class="sign-code">D10-1</span><span class="sign-name">Mile</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="D_exit"><span class="sign-code">E1</span><span class="sign-name">Exit</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>🏥 Services</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="D9_hosp"><span class="sign-code">D9-2</span><span class="sign-name">Hospital</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="D9_gas"><span class="sign-code">D9-7</span><span class="sign-name">Gas</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="D9_food"><span class="sign-code">D9-8</span><span class="sign-name">Food</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="D9_lodging"><span class="sign-code">D9-9</span><span class="sign-name">Lodging</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="G" value="D9_park"><span class="sign-code">D9-4</span><span class="sign-name">Parking</span></label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- S-Series -->
+                    <div class="series-panel" id="panel-S">
+                        <div class="series-header"><span class="series-title"><span class="series-badge s">S</span> School</span></div>
+                        <div class="sign-category">
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="S" value="S1_school"><span class="sign-code">S1-1</span><span class="sign-name">School</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="S" value="S2_xing"><span class="sign-code">S2-1</span><span class="sign-name">Xing</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="S" value="S3_bus"><span class="sign-code">S3-1</span><span class="sign-name">Bus</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="S" value="S4_speed"><span class="sign-code">S4</span><span class="sign-name">Speed</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="S" value="S5_end"><span class="sign-code">S5-2</span><span class="sign-name">End</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="S" value="W15_play"><span class="sign-code">W15-1</span><span class="sign-name">Play</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="S" value="W_child"><span class="sign-code">W11-12</span><span class="sign-name">Children</span></label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- OM-Series -->
+                    <div class="series-panel" id="panel-OM">
+                        <div class="series-header"><span class="series-title"><span class="series-badge om">OM</span> Object Markers</span></div>
+                        <div class="sign-category">
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="OM" value="OM1"><span class="sign-code">OM1</span><span class="sign-name">Type 1</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="OM" value="OM2"><span class="sign-code">OM2</span><span class="sign-name">Type 2</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="OM" value="OM3"><span class="sign-code">OM3</span><span class="sign-name">Type 3</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="OM" value="OM4"><span class="sign-code">OM4</span><span class="sign-name">End Rd</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="OM" value="delin_post"><span class="sign-code">3G</span><span class="sign-name">Post</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="OM" value="delin_flex"><span class="sign-code">3G</span><span class="sign-name">Flex</span></label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Infrastructure -->
+                    <div class="series-panel" id="panel-INFRA">
+                        <div class="series-header"><span class="series-title"><span class="series-badge infra">INFRA</span> Infrastructure</span></div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>🚦 Signals</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="street_light"><span class="sign-name">💡 Lights</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="utility_pole"><span class="sign-name">📡 Poles</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="signal_upright"><span class="sign-name">🚦 Signal V</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="signal_horiz"><span class="sign-name">🚦 Signal H</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="signal_ped"><span class="sign-name">🚶 Ped Sig</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>🛡️ Safety</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="guard_rail"><span class="sign-name">🛡️ Guard</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="barrier"><span class="sign-name">🧱 Barrier</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="bollard"><span class="sign-name">🚧 Bollard</span></label>
+                            </div>
+                        </div>
+                        <div class="sign-category">
+                            <div class="category-header"><h4>🔧 Utilities</h4></div>
+                            <div class="asset-grid">
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="fire_hydrant"><span class="sign-name">🚒 Hydrant</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="manhole"><span class="sign-name">⬛ Manhole</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="crosswalk"><span class="sign-name">🚶 Xwalk</span></label>
+                                <label class="asset-item"><input type="checkbox" data-series="INFRA" value="stop_bar"><span class="sign-name">━ Stop Bar</span></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Download -->
+                <div class="card">
+                    <button class="btn btn-success btn-lg btn-block" id="downloadBtn" onclick="startDownload()">⬇️ Start Download</button>
+                    <button class="btn btn-ghost btn-block" id="cancelBtn" style="display:none;margin-top:0.4rem" onclick="cancelDownload()">Cancel</button>
+                    <div class="rate-limit-warning" id="rateLimitWarning">⚠️ Rate limit - adding delays...</div>
+                    <div class="progress-section" id="progressSection">
+                        <div class="progress-header"><span id="progressLabel">Tile 0/0</span><span id="progressPercent">0%</span></div>
+                        <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+                        <div class="stats-row">
+                            <span class="stat">📍 <span id="foundCount">0</span></span>
+                            <span class="stat success">✓ <span id="successCount">0</span></span>
+                            <span class="stat error">✗ <span id="errorCount">0</span></span>
+                        </div>
+                        <div class="log-container" id="logContainer"></div>
+                    </div>
+                </div>
+                <!-- Map -->
+                <div class="card">
+                    <div class="card-header"><span class="card-title">🗺️ Asset Map</span><span class="badge badge-info" id="mapAssetCount">0</span></div>
+                    <div class="map-controls">
+                        <button class="map-filter-btn active" data-filter="stop" onclick="toggleMapFilter('stop')"><span class="filter-dot" style="background:#cf2030"></span>Stop</button>
+                        <button class="map-filter-btn active" data-filter="speed" onclick="toggleMapFilter('speed')"><span class="filter-dot" style="background:#000"></span>Speed</button>
+                        <button class="map-filter-btn active" data-filter="warning" onclick="toggleMapFilter('warning')"><span class="filter-dot" style="background:#f59e0b"></span>Warning</button>
+                        <button class="map-filter-btn active" data-filter="school" onclick="toggleMapFilter('school')"><span class="filter-dot" style="background:#84cc16"></span>School</button>
+                        <button class="map-filter-btn active" data-filter="guide" onclick="toggleMapFilter('guide')"><span class="filter-dot" style="background:#059669"></span>Guide</button>
+                        <button class="map-filter-btn active" data-filter="infra" onclick="toggleMapFilter('infra')"><span class="filter-dot" style="background:#475569"></span>Infra</button>
+                        <button class="btn btn-sm btn-ghost" onclick="showAllFilters()">All</button>
+                        <button class="btn btn-sm btn-ghost" onclick="hideAllFilters()">None</button>
+                    </div>
+                    <!-- Speed Sub-Filter -->
+                    <div class="speed-filter-panel" id="speedFilterPanel">
+                        <div class="speed-filter-title">
+                            <span>🚗 Speed Limit Filter</span>
+                            <span style="font-size:0.65rem;color:var(--text-muted)" id="speedFilterCount">0 visible</span>
+                        </div>
+                        <div class="speed-filter-grid" id="speedFilterGrid"></div>
+                        <div class="speed-filter-actions">
+                            <button class="btn btn-sm btn-ghost" onclick="selectAllSpeedFilters()">All</button>
+                            <button class="btn btn-sm btn-ghost" onclick="clearAllSpeedFilters()">None</button>
+                            <button class="btn btn-sm btn-ghost" onclick="selectLowSpeedFilters()">≤30</button>
+                            <button class="btn btn-sm btn-ghost" onclick="selectMidSpeedFilters()">35-50</button>
+                            <button class="btn btn-sm btn-ghost" onclick="selectHighSpeedFilters()">≥55</button>
+                        </div>
+                    </div>
+                    <div class="map-container"><div id="assetMap"></div></div>
+                    <div class="map-stats">
+                        <div class="map-stat"><span class="map-stat-value" id="totalMapAssets">0</span><span class="map-stat-label">Total</span></div>
+                        <div class="map-stat"><span class="map-stat-value" id="visibleAssetCount">0</span><span class="map-stat-label">Visible</span></div>
+                        <div class="map-stat"><span class="map-stat-value" id="mapJurisdiction">-</span><span class="map-stat-label">Jurisdiction</span></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="card results-panel" id="resultsPanel">
+                    <div class="results-summary">
+                        <h3>✅ Complete</h3>
+                        <div class="results-grid">
+                            <div class="result-stat"><span class="value" id="totalAssets">0</span><span class="label">Total</span></div>
+                            <div class="result-stat"><span class="value" id="uniqueTypes">0</span><span class="label">Types</span></div>
+                        </div>
+                    </div>
+                    <div class="export-section">
+                        <h4>📁 Export</h4>
+                        <div class="export-buttons">
+                            <button class="export-btn" onclick="exportData('csv')"><span class="icon">💾</span><span class="name">CSV</span></button>
+                            <button class="export-btn" onclick="exportMUTCDReportPDF()"><span class="icon">📋</span><span class="name">PDF</span></button>
+                            <button class="export-btn" onclick="exportData('geojson')"><span class="icon">🌐</span><span class="name">GeoJSON</span></button>
+                            <button class="export-btn" onclick="exportData('kml')"><span class="icon">🗺️</span><span class="name">KML</span></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card quick-stats-card" id="quickStatsCard">
+                    <div class="card-header"><span class="card-title">📊 Top 10</span></div>
+                    <div id="quickStatsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer>Mapillary Asset Downloader v4.3 | <a href="https://www.mapillary.com" target="_blank">Mapillary</a> | <a href="https://mutcd.fhwa.dot.gov/" target="_blank">MUTCD</a></footer>
+    <script>
+        let apiToken = localStorage.getItem('mapillary_token') || '';
+        let isDownloading = false;
+        let allFeatures = [];
+        let currentJurisdiction = null;
+        let assetMap = null;
+        let markersLayer = null;
+        let markersByType = {};
+        let speedLayers = {};
+        let activeFilters = { stop: true, speed: true, warning: true, school: true, guide: true, infra: true };
+        let activeSpeedFilters = {};
+        const ALL_SPEEDS = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,90,100,110,120,130];
+        ALL_SPEEDS.forEach(s => activeSpeedFilters[s] = true);
+
+        // Generate dynamic speed limit icon SVG
+        function createSpeedIcon(speed) {
+            const text = speed.toString();
+            const fontSize = text.length === 1 ? 11 : text.length === 2 ? 9 : 7;
+            return `<svg width="24" height="28" viewBox="0 0 24 28"><rect x="2" y="2" width="20" height="24" rx="2" fill="#fff" stroke="#000" stroke-width="2"/><text x="12" y="18" text-anchor="middle" fill="#000" font-size="${fontSize}" font-weight="bold" font-family="Arial,sans-serif">${text}</text></svg>`;
+        }
+
+        // ========== INDIVIDUAL SIGN SVG ICONS ==========
+        const SIGN_SVG_ICONS = {
+            // ===== REGULATORY (R-Series) =====
+            R1_stop: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="4,9 9,4 15,4 20,9 20,15 15,20 9,20 4,15" fill="#cf2030" stroke="#fff" stroke-width="1.5"/><text x="12" y="14.5" text-anchor="middle" fill="#fff" font-size="5" font-weight="bold" font-family="Arial">STOP</text></svg>',
+            R1_yield: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,4 22,20 2,20" fill="#fff" stroke="#cf2030" stroke-width="2.5"/><text x="12" y="16" text-anchor="middle" fill="#cf2030" font-size="4" font-weight="bold" font-family="Arial">YIELD</text></svg>',
+            R1_allway: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="10" rx="1" fill="#fff" stroke="#000" stroke-width="1.5"/><text x="12" y="15" text-anchor="middle" fill="#000" font-size="4.5" font-weight="bold" font-family="Arial">ALL WAY</text></svg>',
+            R2_end: '<svg width="24" height="28" viewBox="0 0 24 28"><rect x="2" y="2" width="20" height="24" rx="2" fill="#fff" stroke="#000" stroke-width="2"/><text x="12" y="12" text-anchor="middle" fill="#000" font-size="5" font-weight="bold">END</text><text x="12" y="20" text-anchor="middle" fill="#000" font-size="4">SPEED</text></svg>',
+            R2_truck: '<svg width="24" height="28" viewBox="0 0 24 28"><rect x="2" y="2" width="20" height="24" rx="2" fill="#fff" stroke="#000" stroke-width="2"/><rect x="6" y="6" width="12" height="6" rx="1" fill="#000"/><circle cx="8" cy="14" r="2" fill="#000"/><circle cx="16" cy="14" r="2" fill="#000"/><text x="12" y="23" text-anchor="middle" fill="#000" font-size="5" font-weight="bold">TRUCK</text></svg>',
+            R2_night: '<svg width="24" height="28" viewBox="0 0 24 28"><rect x="2" y="2" width="20" height="24" rx="2" fill="#fff" stroke="#000" stroke-width="2"/><path d="M12 5 Q8 8 10 12 Q6 10 8 14" fill="#000"/><text x="12" y="23" text-anchor="middle" fill="#000" font-size="5" font-weight="bold">NIGHT</text></svg>',
+            R2_minimum: '<svg width="24" height="28" viewBox="0 0 24 28"><rect x="2" y="2" width="20" height="24" rx="2" fill="#fff" stroke="#000" stroke-width="2"/><text x="12" y="12" text-anchor="middle" fill="#000" font-size="4">MINIMUM</text><text x="12" y="24" text-anchor="middle" fill="#000" font-size="6" font-weight="bold">MIN</text></svg>',
+            R3_no_right: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff" stroke="#cf2030" stroke-width="2"/><path d="M8 14 L12 14 L12 8 L16 12" fill="none" stroke="#000" stroke-width="2"/><line x1="5" y1="19" x2="19" y2="5" stroke="#cf2030" stroke-width="2.5"/></svg>',
+            R3_no_left: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff" stroke="#cf2030" stroke-width="2"/><path d="M16 14 L12 14 L12 8 L8 12" fill="none" stroke="#000" stroke-width="2"/><line x1="5" y1="19" x2="19" y2="5" stroke="#cf2030" stroke-width="2.5"/></svg>',
+            R3_no_uturn: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff" stroke="#cf2030" stroke-width="2"/><path d="M8 16 L8 10 Q8 6 12 6 Q16 6 16 10 L16 14" fill="none" stroke="#000" stroke-width="2"/><line x1="5" y1="19" x2="19" y2="5" stroke="#cf2030" stroke-width="2.5"/></svg>',
+            R3_turn_only: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#000"/><polygon points="8,10 12,6 16,10" fill="#fff"/><line x1="12" y1="6" x2="12" y2="18" stroke="#fff" stroke-width="2.5"/></svg>',
+            R4_keep: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#000"/><polygon points="12,6 18,12 12,18 12,14 6,14 6,10 12,10" fill="#fff"/></svg>',
+            R5_dne: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#cf2030" stroke="#fff" stroke-width="1.5"/><rect x="5" y="10" width="14" height="4" fill="#fff"/></svg>',
+            R5_wrong: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2" fill="#cf2030"/><text x="12" y="14" text-anchor="middle" fill="#fff" font-size="5" font-weight="bold">WRONG</text></svg>',
+            R6_oneway: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="1" fill="#000"/><polygon points="6,12 14,12 14,9 20,12 14,15 14,12" fill="#fff"/></svg>',
+            R7_nopark: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff" stroke="#cf2030" stroke-width="2"/><text x="12" y="15" text-anchor="middle" fill="#000" font-size="10" font-weight="bold">P</text><line x1="5" y1="19" x2="19" y2="5" stroke="#cf2030" stroke-width="2.5"/></svg>',
+            R7_nostand: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff" stroke="#cf2030" stroke-width="2"/><text x="12" y="15" text-anchor="middle" fill="#000" font-size="8" font-weight="bold">NS</text><line x1="5" y1="19" x2="19" y2="5" stroke="#cf2030" stroke-width="2.5"/></svg>',
+            R7_nostop: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#fff" stroke="#cf2030" stroke-width="2"/><polygon points="7,10 10,7 14,7 17,10 17,14 14,17 10,17 7,14" fill="none" stroke="#000" stroke-width="1"/><line x1="5" y1="19" x2="19" y2="5" stroke="#cf2030" stroke-width="2.5"/></svg>',
+            R7_handicap: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#1e40af"/><circle cx="12" cy="8" r="2" fill="#fff"/><path d="M12 10 L12 14 L9 14 L9 16 L13 16 L15 20 L17 19 L15 15 L15 12 L12 12" fill="#fff"/></svg>',
+            R10_rtor: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#fff" stroke="#cf2030" stroke-width="2"/><circle cx="12" cy="8" r="3" fill="#cf2030"/><path d="M10 14 L10 18 L14 14" fill="none" stroke="#000" stroke-width="2"/><line x1="6" y1="20" x2="18" y2="6" stroke="#cf2030" stroke-width="2"/></svg>',
+            R15_cross: '<svg width="24" height="24" viewBox="0 0 24 24"><line x1="4" y1="4" x2="20" y2="20" stroke="#fff" stroke-width="4"/><line x1="20" y1="4" x2="4" y2="20" stroke="#fff" stroke-width="4"/><line x1="4" y1="4" x2="20" y2="20" stroke="#000" stroke-width="2"/><line x1="20" y1="4" x2="4" y2="20" stroke="#000" stroke-width="2"/></svg>',
+            // ===== WARNING (W-Series) =====
+            W1_turn: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M9 15 L9 10 Q9 8 12 8 L15 8" fill="none" stroke="#000" stroke-width="2"/><polygon points="13,6 17,8 13,10" fill="#000"/></svg>',
+            W1_curve: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M8 15 Q8 8 15 8" fill="none" stroke="#000" stroke-width="2"/><polygon points="13,6 17,8 13,10" fill="#000"/></svg>',
+            W1_reverse: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M8 15 Q8 12 11 12 Q14 12 14 9 Q14 6 17 6" fill="none" stroke="#000" stroke-width="2"/></svg>',
+            W1_winding: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M8 16 Q10 14 10 12 Q10 10 12 10 Q14 10 14 8 Q14 6 16 6" fill="none" stroke="#000" stroke-width="2"/></svg>',
+            W1_chevron: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M6 16 L12 10 L18 16" fill="none" stroke="#000" stroke-width="3"/></svg>',
+            W2_cross: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><line x1="12" y1="7" x2="12" y2="17" stroke="#000" stroke-width="2"/><line x1="7" y1="12" x2="17" y2="12" stroke="#000" stroke-width="2"/></svg>',
+            W2_side: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><line x1="12" y1="7" x2="12" y2="17" stroke="#000" stroke-width="2"/><line x1="12" y1="12" x2="17" y2="12" stroke="#000" stroke-width="2"/></svg>',
+            W2_t: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><line x1="12" y1="8" x2="12" y2="16" stroke="#000" stroke-width="2"/><line x1="7" y1="16" x2="17" y2="16" stroke="#000" stroke-width="2"/></svg>',
+            W2_y: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><line x1="12" y1="11" x2="12" y2="17" stroke="#000" stroke-width="2"/><line x1="7" y1="7" x2="12" y2="11" stroke="#000" stroke-width="2"/><line x1="17" y1="7" x2="12" y2="11" stroke="#000" stroke-width="2"/></svg>',
+            W2_circle: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="none" stroke="#000" stroke-width="2"/><path d="M12 8 L12 5 M16 12 L19 12 M12 16 L12 18 M8 12 L5 12" stroke="#000" stroke-width="1.5"/></svg>',
+            W3_stop: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><polygon points="8,10 10,8 14,8 16,10 16,14 14,16 10,16 8,14" fill="#cf2030"/><text x="12" y="13" text-anchor="middle" fill="#fff" font-size="4" font-weight="bold">STOP</text></svg>',
+            W3_yield: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><polygon points="12,7 17,15 7,15" fill="#fff" stroke="#cf2030" stroke-width="1.5"/></svg>',
+            W3_signal: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><rect x="9" y="6" width="6" height="12" rx="1" fill="#000"/><circle cx="12" cy="8" r="1.5" fill="#cf2030"/><circle cx="12" cy="12" r="1.5" fill="#f59e0b"/><circle cx="12" cy="16" r="1.5" fill="#059669"/></svg>',
+            W4_merge: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M8 16 L12 8 L16 16" fill="none" stroke="#000" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="16" stroke="#000" stroke-width="2"/></svg>',
+            W4_ends: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><line x1="9" y1="16" x2="9" y2="7" stroke="#000" stroke-width="2"/><path d="M15 16 L15 10 L9 7" fill="none" stroke="#000" stroke-width="2"/></svg>',
+            W5_narrow: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M7 16 L10 8 L10 16 M17 16 L14 8 L14 16" fill="none" stroke="#000" stroke-width="2"/></svg>',
+            W7_hill: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M6 16 L12 7 L18 16" fill="none" stroke="#000" stroke-width="2"/><text x="12" y="14" text-anchor="middle" fill="#000" font-size="5" font-weight="bold">%</text></svg>',
+            W8_bump: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M6 14 L9 14 Q12 8 15 14 L18 14" fill="none" stroke="#000" stroke-width="2"/></svg>',
+            W8_dip: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M6 10 L9 10 Q12 16 15 10 L18 10" fill="none" stroke="#000" stroke-width="2"/></svg>',
+            W8_slippery: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M8 16 Q10 12 9 10 Q8 8 10 7 Q12 6 14 8 Q15 10 14 12 Q13 14 15 16" fill="none" stroke="#000" stroke-width="2"/></svg>',
+            W10_rr: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><line x1="6" y1="6" x2="18" y2="18" stroke="#000" stroke-width="2"/><line x1="18" y1="6" x2="6" y2="18" stroke="#000" stroke-width="2"/><text x="8" y="10" fill="#000" font-size="5" font-weight="bold">R</text><text x="14" y="17" fill="#000" font-size="5" font-weight="bold">R</text></svg>',
+            W11_bike: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><circle cx="8" cy="14" r="2.5" fill="none" stroke="#000" stroke-width="1.5"/><circle cx="16" cy="14" r="2.5" fill="none" stroke="#000" stroke-width="1.5"/><path d="M8 14 L10 10 L14 10 L16 14 M10 10 L12 7 L14 10" fill="none" stroke="#000" stroke-width="1.5"/></svg>',
+            W11_ped: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><circle cx="12" cy="7" r="2" fill="#000"/><path d="M12 9 L12 13 M9 11 L15 11 M12 13 L9 18 M12 13 L15 18" stroke="#000" stroke-width="1.5"/></svg>',
+            W11_deer: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><path d="M8 16 L8 12 L10 10 L12 8 L14 10 L16 12 L16 16 M10 10 L8 7 M14 10 L16 7" fill="none" stroke="#000" stroke-width="1.5"/></svg>',
+            W11_cattle: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><ellipse cx="12" cy="13" rx="5" ry="3" fill="none" stroke="#000" stroke-width="1.5"/><circle cx="12" cy="9" r="2" fill="none" stroke="#000" stroke-width="1.5"/><path d="M9 8 L7 6 M15 8 L17 6" stroke="#000" stroke-width="1.5"/></svg>',
+            W11_farm: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><circle cx="8" cy="15" r="2" fill="none" stroke="#000" stroke-width="1.5"/><circle cx="16" cy="15" r="3" fill="none" stroke="#000" stroke-width="1.5"/><path d="M6 13 L8 9 L14 9 L16 12" fill="none" stroke="#000" stroke-width="1.5"/></svg>',
+            W13_adv: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><text x="12" y="15" text-anchor="middle" fill="#000" font-size="8" font-weight="bold">25</text></svg>',
+            W14_dead: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><text x="12" y="11" text-anchor="middle" fill="#000" font-size="4" font-weight="bold">DEAD</text><text x="12" y="16" text-anchor="middle" fill="#000" font-size="4" font-weight="bold">END</text></svg>',
+            W14_noout: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><text x="12" y="11" text-anchor="middle" fill="#000" font-size="3.5" font-weight="bold">NO</text><text x="12" y="16" text-anchor="middle" fill="#000" font-size="3.5" font-weight="bold">OUTLET</text></svg>',
+            // ===== GUIDE (G-Series) =====
+            M1_inter: '<svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 2 L20 8 L20 20 L12 22 L4 20 L4 8 Z" fill="#1e40af" stroke="#fff" stroke-width="1"/><path d="M12 4 L18 9 L18 18 L12 20 L6 18 L6 9 Z" fill="#cf2030"/><text x="12" y="15" text-anchor="middle" fill="#fff" font-size="7" font-weight="bold">64</text></svg>',
+            M1_us: '<svg width="24" height="24" viewBox="0 0 24 24"><path d="M4 6 L12 2 L20 6 L20 18 L12 22 L4 18 Z" fill="#fff" stroke="#000" stroke-width="1.5"/><text x="12" y="10" text-anchor="middle" fill="#000" font-size="4">US</text><text x="12" y="17" text-anchor="middle" fill="#000" font-size="6" font-weight="bold">1</text></svg>',
+            M1_state: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#fff" stroke="#000" stroke-width="1.5"/><text x="12" y="10" text-anchor="middle" fill="#000" font-size="4">VA</text><text x="12" y="17" text-anchor="middle" fill="#000" font-size="6" font-weight="bold">7</text></svg>',
+            M1_county: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,10 18,22 6,22 2,10" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><text x="12" y="15" text-anchor="middle" fill="#000" font-size="6" font-weight="bold">CR</text></svg>',
+            D_dest: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2" fill="#059669"/><text x="12" y="14" text-anchor="middle" fill="#fff" font-size="5" font-weight="bold">DEST</text></svg>',
+            D_street: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="8" rx="1" fill="#059669"/><text x="12" y="14" text-anchor="middle" fill="#fff" font-size="4" font-weight="bold">MAIN ST</text></svg>',
+            D_mile: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1" fill="#059669"/><text x="12" y="11" text-anchor="middle" fill="#fff" font-size="4">MILE</text><text x="12" y="17" text-anchor="middle" fill="#fff" font-size="6" font-weight="bold">42</text></svg>',
+            D_exit: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2" fill="#059669"/><text x="12" y="11" text-anchor="middle" fill="#fff" font-size="4">EXIT</text><text x="12" y="16" text-anchor="middle" fill="#fff" font-size="5" font-weight="bold">42</text></svg>',
+            D9_hosp: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#1e40af"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">H</text></svg>',
+            D9_gas: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#1e40af"/><rect x="7" y="7" width="6" height="10" rx="1" fill="#fff"/><path d="M15 9 L17 9 L17 15 L15 13" fill="#fff"/></svg>',
+            D9_food: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#1e40af"/><path d="M8 7 L8 17 M8 7 L10 10 L8 10 M16 7 L16 11 Q16 13 14 13 L14 17 M14 7 L14 11" stroke="#fff" stroke-width="1.5" fill="none"/></svg>',
+            D9_lodging: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#1e40af"/><rect x="6" y="12" width="12" height="5" fill="#fff"/><path d="M6 12 L6 9 Q6 7 9 7 L9 12" fill="#fff"/></svg>',
+            D9_park: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#1e40af"/><text x="12" y="16" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">P</text></svg>',
+            // ===== SCHOOL (S-Series) =====
+            S1_school: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,1 22,6 22,18 12,23 2,18 2,6" fill="#84cc16" stroke="#000" stroke-width="1.5"/><circle cx="9" cy="10" r="2" fill="#000"/><circle cx="15" cy="10" r="2" fill="#000"/><path d="M7 14 L9 12 L9 18 M17 14 L15 12 L15 18" stroke="#000" stroke-width="1.5"/></svg>',
+            S2_xing: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,1 22,6 22,18 12,23 2,18 2,6" fill="#84cc16" stroke="#000" stroke-width="1.5"/><circle cx="9" cy="9" r="1.5" fill="#000"/><circle cx="15" cy="9" r="1.5" fill="#000"/><path d="M7 12 L9 11 L9 16 M17 12 L15 11 L15 16 M6 18 L18 18" stroke="#000" stroke-width="1.5"/></svg>',
+            S3_bus: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,1 22,6 22,18 12,23 2,18 2,6" fill="#84cc16" stroke="#000" stroke-width="1.5"/><rect x="6" y="8" width="12" height="8" rx="2" fill="#f59e0b" stroke="#000" stroke-width="1"/><rect x="7" y="9" width="4" height="3" fill="#fff"/><rect x="13" y="9" width="4" height="3" fill="#fff"/><circle cx="8" cy="15" r="1" fill="#000"/><circle cx="16" cy="15" r="1" fill="#000"/></svg>',
+            S4_speed: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,1 22,6 22,18 12,23 2,18 2,6" fill="#84cc16" stroke="#000" stroke-width="1.5"/><text x="12" y="10" text-anchor="middle" fill="#000" font-size="4">SCHOOL</text><text x="12" y="17" text-anchor="middle" fill="#000" font-size="7" font-weight="bold">25</text></svg>',
+            S5_end: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,1 22,6 22,18 12,23 2,18 2,6" fill="#84cc16" stroke="#000" stroke-width="1.5"/><text x="12" y="10" text-anchor="middle" fill="#000" font-size="4" font-weight="bold">END</text><text x="12" y="15" text-anchor="middle" fill="#000" font-size="3.5">SCHOOL</text><text x="12" y="19" text-anchor="middle" fill="#000" font-size="3.5">ZONE</text></svg>',
+            W15_play: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,1 22,6 22,18 12,23 2,18 2,6" fill="#84cc16" stroke="#000" stroke-width="1.5"/><circle cx="12" cy="8" r="2" fill="#000"/><path d="M12 10 L12 14 L8 18 M12 14 L16 18 M9 12 L15 12" stroke="#000" stroke-width="1.5"/></svg>',
+            W_child: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 22,20 2,20" fill="#84cc16" stroke="#000" stroke-width="1.5"/><circle cx="10" cy="8" r="1.5" fill="#000"/><circle cx="14" cy="8" r="1.5" fill="#000"/><path d="M10 10 L10 14 L8 17 M10 12 L14 12 M14 10 L14 14 L16 17" stroke="#000" stroke-width="1.5"/></svg>',
+            // ===== OBJECT MARKERS (OM) =====
+            OM1: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" fill="#f59e0b"/><rect x="3" y="6" width="4" height="12" fill="#000"/><rect x="11" y="6" width="4" height="12" fill="#000"/></svg>',
+            OM2: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" fill="#f59e0b"/><rect x="6" y="3" width="12" height="4" fill="#000"/><rect x="6" y="11" width="12" height="4" fill="#000"/></svg>',
+            OM3: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,3 21,12 12,21 3,12" fill="#f59e0b" stroke="#000" stroke-width="1.5"/></svg>',
+            OM4: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" fill="#cf2030"/><rect x="3" y="3" width="4" height="18" fill="#fff"/><rect x="10" y="3" width="4" height="18" fill="#fff"/><rect x="17" y="3" width="4" height="18" fill="#fff"/></svg>',
+            delin_post: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="10" y="4" width="4" height="16" fill="#fff" stroke="#000" stroke-width="1"/><rect x="10" y="4" width="4" height="4" fill="#cf2030"/><rect x="10" y="12" width="4" height="4" fill="#cf2030"/></svg>',
+            delin_flex: '<svg width="24" height="24" viewBox="0 0 24 24"><path d="M10 20 Q12 10 14 20" fill="#ea580c" stroke="#000" stroke-width="1"/><rect x="10" y="4" width="4" height="4" fill="#fff" stroke="#ea580c" stroke-width="1"/></svg>',
+            // ===== INFRASTRUCTURE =====
+            street_light: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="11" y="10" width="2" height="12" fill="#475569"/><ellipse cx="12" cy="8" rx="4" ry="3" fill="#fbbf24" stroke="#475569" stroke-width="1"/><path d="M8 11 L6 14 M16 11 L18 14 M12 11 L12 14" stroke="#fbbf24" stroke-width="1" opacity="0.7"/></svg>',
+            utility_pole: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="11" y="4" width="2" height="18" fill="#8b5a2b"/><rect x="5" y="6" width="14" height="2" fill="#8b5a2b"/><line x1="5" y1="7" x2="5" y2="10" stroke="#333" stroke-width="1"/><line x1="19" y1="7" x2="19" y2="10" stroke="#333" stroke-width="1"/></svg>',
+            signal_upright: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="11" y="14" width="2" height="8" fill="#475569"/><rect x="8" y="2" width="8" height="14" rx="1" fill="#1e293b"/><circle cx="12" cy="5" r="2" fill="#cf2030"/><circle cx="12" cy="9" r="2" fill="#f59e0b"/><circle cx="12" cy="13" r="2" fill="#059669"/></svg>',
+            signal_horiz: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="8" rx="1" fill="#1e293b"/><circle cx="6" cy="12" r="2.5" fill="#cf2030"/><circle cx="12" cy="12" r="2.5" fill="#f59e0b"/><circle cx="18" cy="12" r="2.5" fill="#059669"/></svg>',
+            signal_ped: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="1" fill="#1e293b"/><circle cx="12" cy="8" r="2" fill="#cf2030"/><path d="M12 14 L12 18 M9 16 L15 16 M10 12 L14 12" stroke="#fff" stroke-width="2"/></svg>',
+            guard_rail: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="6" fill="#9ca3af" stroke="#475569" stroke-width="1"/><rect x="4" y="14" width="2" height="6" fill="#475569"/><rect x="11" y="14" width="2" height="6" fill="#475569"/><rect x="18" y="14" width="2" height="6" fill="#475569"/></svg>',
+            barrier: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="10" width="20" height="8" rx="1" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/><line x1="2" y1="14" x2="22" y2="14" stroke="#9ca3af" stroke-width="1"/></svg>',
+            bollard: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="8" y="6" width="8" height="14" rx="2" fill="#ea580c" stroke="#000" stroke-width="1"/><rect x="8" y="8" width="8" height="2" fill="#fff"/><rect x="8" y="14" width="8" height="2" fill="#fff"/></svg>',
+            fire_hydrant: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="8" y="8" width="8" height="12" rx="1" fill="#cf2030"/><rect x="6" y="12" width="12" height="4" rx="1" fill="#cf2030"/><ellipse cx="12" cy="7" rx="3" ry="2" fill="#cf2030"/><circle cx="12" cy="14" r="2" fill="#fbbf24"/></svg>',
+            manhole: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#475569" stroke="#1e293b" stroke-width="2"/><circle cx="12" cy="12" r="6" fill="none" stroke="#1e293b" stroke-width="1"/><line x1="6" y1="12" x2="18" y2="12" stroke="#1e293b" stroke-width="1"/><line x1="12" y1="6" x2="12" y2="18" stroke="#1e293b" stroke-width="1"/></svg>',
+            crosswalk: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="8" fill="#fff" stroke="#000" stroke-width="1"/><rect x="4" y="8" width="3" height="8" fill="#000"/><rect x="10" y="8" width="3" height="8" fill="#000"/><rect x="16" y="8" width="3" height="8" fill="#000"/></svg>',
+            stop_bar: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="2" y="10" width="20" height="4" fill="#fff" stroke="#000" stroke-width="1"/></svg>'
+        };
+
+        // Map from internal key to filter type
+        const KEY_TO_FILTER_TYPE = {
+            R1_stop:'stop', R1_yield:'stop', R1_allway:'stop',
+            R2_end:'speed', R2_truck:'speed', R2_night:'speed', R2_minimum:'speed',
+            R3_no_right:'stop', R3_no_left:'stop', R3_no_uturn:'stop', R3_turn_only:'guide',
+            R4_keep:'guide', R5_dne:'stop', R5_wrong:'stop', R6_oneway:'guide',
+            R7_nopark:'stop', R7_nostand:'stop', R7_nostop:'stop', R7_handicap:'guide',
+            R10_rtor:'stop', R15_cross:'warning',
+            W1_turn:'warning', W1_curve:'warning', W1_reverse:'warning', W1_winding:'warning', W1_chevron:'warning',
+            W2_cross:'warning', W2_side:'warning', W2_t:'warning', W2_y:'warning', W2_circle:'warning',
+            W3_stop:'warning', W3_yield:'warning', W3_signal:'warning',
+            W4_merge:'warning', W4_ends:'warning', W5_narrow:'warning',
+            W7_hill:'warning', W8_bump:'warning', W8_dip:'warning', W8_slippery:'warning',
+            W10_rr:'warning', W11_bike:'warning', W11_ped:'warning', W11_deer:'warning', W11_cattle:'warning', W11_farm:'warning',
+            W13_adv:'warning', W14_dead:'warning', W14_noout:'warning',
+            M1_inter:'guide', M1_us:'guide', M1_state:'guide', M1_county:'guide',
+            D_dest:'guide', D_street:'guide', D_mile:'guide', D_exit:'guide',
+            D9_hosp:'guide', D9_gas:'guide', D9_food:'guide', D9_lodging:'guide', D9_park:'guide',
+            S1_school:'school', S2_xing:'school', S3_bus:'school', S4_speed:'school', S5_end:'school', W15_play:'school', W_child:'school',
+            OM1:'warning', OM2:'warning', OM3:'warning', OM4:'warning', delin_post:'warning', delin_flex:'warning',
+            street_light:'infra', utility_pole:'infra', signal_upright:'infra', signal_horiz:'infra', signal_ped:'infra',
+            guard_rail:'infra', barrier:'infra', bollard:'infra', fire_hydrant:'infra', manhole:'infra', crosswalk:'infra', stop_bar:'infra'
+        };
+
+        // Fallback generic icons
+        const FALLBACK_ICONS = {
+            stop: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="4,9 9,4 15,4 20,9 20,15 15,20 9,20 4,15" fill="#cf2030" stroke="#fff" stroke-width="2"/></svg>',
+            warning: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 23,22 1,22" fill="#f59e0b" stroke="#000" stroke-width="1.5"/></svg>',
+            school: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,1 22,6 22,18 12,23 2,18 2,6" fill="#84cc16" stroke="#000" stroke-width="1.5"/></svg>',
+            guide: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#059669" stroke="#fff" stroke-width="2"/></svg>',
+            infra: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#475569" stroke="#fff" stroke-width="2"/></svg>'
+        };
+
+        const SIGN_ICONS = {
+            stop: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="4,9 9,4 15,4 20,9 20,15 15,20 9,20 4,15" fill="#cf2030" stroke="#fff" stroke-width="2"/><text x="12" y="14" text-anchor="middle" fill="#fff" font-size="5" font-weight="bold">STOP</text></svg>',
+            warning: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 23,22 1,22" fill="#f59e0b" stroke="#000" stroke-width="1.5"/><text x="12" y="18" text-anchor="middle" fill="#000" font-size="10" font-weight="bold">!</text></svg>',
+            school: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,1 22,6 22,18 12,23 2,18 2,6" fill="#84cc16" stroke="#000" stroke-width="1.5"/></svg>',
+            guide: '<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="#059669" stroke="#fff" stroke-width="2"/></svg>',
+            infra: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#475569" stroke="#fff" stroke-width="2"/></svg>'
+        };
+
+        const ICON_TYPE_MAP = {
+            'R1-1':'stop','R1-2':'stop','R1-3P':'stop','R2-1':'speed','R2-1E':'speed','R2-2':'speed','R2-3':'speed','R2-4':'speed',
+            'R3-1':'stop','R3-2':'stop','R3-4':'stop','R3-5a':'guide','R4-7':'guide','R5-1':'stop','R5-1a':'stop','R6-1':'guide',
+            'R7-1':'stop','R7-4':'stop','R7-2a':'stop','R7-8':'guide','R10-11':'stop','R15-1':'warning',
+            'W1-1':'warning','W1-2':'warning','W1-4':'warning','W1-5':'warning','W1-8':'warning',
+            'W2-1':'warning','W2-2':'warning','W2-4':'warning','W2-5':'warning','W2-6':'warning',
+            'W3-1':'warning','W3-2':'warning','W3-3':'warning','W4-1':'warning','W4-2':'warning','W5-1':'warning',
+            'W7-1':'warning','W8-1':'warning','W8-2':'warning','W8-5':'warning','W10-1':'warning',
+            'W11-1':'warning','W11-2':'warning','W11-3':'warning','W11-4':'warning','W11-5':'warning',
+            'W13-1P':'warning','W14-1':'warning','W14-2':'warning',
+            'M1-1':'guide','M1-4':'guide','M1-5':'guide','M1-6':'guide','D1':'guide','D3':'guide','D10-1':'guide','E1':'guide',
+            'D9-2':'guide','D9-7':'guide','D9-8':'guide','D9-9':'guide','D9-4':'guide',
+            'S1-1':'school','S2-1':'school','S3-1':'school','S4':'school','S5-2':'school','W15-1':'school','W11-12':'school',
+            'OM1':'warning','OM2':'warning','OM3':'warning','OM4':'warning','3G':'warning','N/A':'infra'
+        };
+
+        // Build reverse lookup: mapillary value -> internal key (built after MUTCD_MAPPINGS loads)
+        let MAPILLARY_TO_KEY = {};
+
+        const JURISDICTIONS = {
+            albemarle:{name:"Albemarle County",type:"county",fips:"003",bbox:[-78.85,37.8333,-78.25,38.2833],mapCenter:[38.02,-78.56],mapZoom:10},
+            alexandria:{name:"Alexandria City",type:"city",fips:"510",bbox:[-77.15,38.77,-77.02,38.86],mapCenter:[38.82,-77.08],mapZoom:13},
+            arlington:{name:"Arlington County",type:"county",fips:"013",bbox:[-77.17,38.82,-77.03,38.93],mapCenter:[38.88,-77.10],mapZoom:13},
+            chesapeake:{name:"Chesapeake",type:"city",fips:"550",bbox:[-76.4667,36.55,-76.1333,36.85],mapCenter:[36.77,-76.29],mapZoom:11},
+            chesterfield:{name:"Chesterfield County",type:"county",fips:"041",bbox:[-77.80,37.20,-77.35,37.50],mapCenter:[37.38,-77.51],mapZoom:10},
+            fairfax_county:{name:"Fairfax County",type:"county",fips:"059",bbox:[-77.55,38.65,-77.05,38.97],mapCenter:[38.83,-77.28],mapZoom:10},
+            hanover:{name:"Hanover County",type:"county",fips:"085",bbox:[-77.75,37.60,-77.25,38.00],mapCenter:[37.76,-77.47],mapZoom:10},
+            henrico:{name:"Henrico County",type:"county",fips:"087",bbox:[-77.61,37.39,-77.15,37.72],mapCenter:[37.55,-77.40],mapZoom:11},
+            loudoun:{name:"Loudoun County",type:"county",fips:"107",bbox:[-77.9667,38.85,-77.3167,39.3167],mapCenter:[39.08,-77.64],mapZoom:10},
+            newport_news:{name:"Newport News",type:"city",fips:"700",bbox:[-76.6167,36.95,-76.35,37.2167],mapCenter:[37.09,-76.47],mapZoom:11},
+            norfolk:{name:"Norfolk",type:"city",fips:"710",bbox:[-76.35,36.8167,-76.1833,36.9667],mapCenter:[36.85,-76.29],mapZoom:12},
+            prince_william:{name:"Prince William County",type:"county",fips:"153",bbox:[-77.7833,38.5167,-77.2833,38.85],mapCenter:[38.70,-77.48],mapZoom:10},
+            richmond_city:{name:"Richmond City",type:"city",fips:"760",bbox:[-77.57,37.48,-77.37,37.60],mapCenter:[37.54,-77.44],mapZoom:12},
+            roanoke:{name:"Roanoke County",type:"county",fips:"161",bbox:[-80.2167,37.15,-79.8167,37.40],mapCenter:[37.27,-79.94],mapZoom:10},
+            stafford:{name:"Stafford County",type:"county",fips:"179",bbox:[-77.65,38.35,-77.2833,38.55],mapCenter:[38.42,-77.45],mapZoom:10},
+            virginia_beach:{name:"Virginia Beach",type:"city",fips:"810",bbox:[-76.2333,36.6333,-75.8667,36.9333],mapCenter:[36.85,-75.98],mapZoom:10}
+        };
+
+        const MUTCD_MAPPINGS = {
+            R1_stop:{mutcd:"R1-1",name:"STOP",mapillary:["regulatory--stop--g1","regulatory--stop--g2","regulatory--stop--g3","regulatory--stop--g4","regulatory--stop--g5"]},
+            R1_yield:{mutcd:"R1-2",name:"YIELD",mapillary:["regulatory--yield--g1","regulatory--yield--g2"]},
+            R1_allway:{mutcd:"R1-3P",name:"ALL WAY",mapillary:["regulatory--all-way--g1"]},
+            R2_5:{mutcd:"R2-1",name:"Speed 5",mapillary:["regulatory--maximum-speed-limit-5--g1","regulatory--maximum-speed-limit-5--g2","regulatory--maximum-speed-limit-5--g3"]},
+            R2_10:{mutcd:"R2-1",name:"Speed 10",mapillary:["regulatory--maximum-speed-limit-10--g1","regulatory--maximum-speed-limit-10--g2","regulatory--maximum-speed-limit-10--g3"]},
+            R2_15:{mutcd:"R2-1",name:"Speed 15",mapillary:["regulatory--maximum-speed-limit-15--g1","regulatory--maximum-speed-limit-15--g2","regulatory--maximum-speed-limit-15--g3"]},
+            R2_20:{mutcd:"R2-1",name:"Speed 20",mapillary:["regulatory--maximum-speed-limit-20--g1","regulatory--maximum-speed-limit-20--g2","regulatory--maximum-speed-limit-20--g3"]},
+            R2_25:{mutcd:"R2-1",name:"Speed 25",mapillary:["regulatory--maximum-speed-limit-25--g1","regulatory--maximum-speed-limit-25--g2","regulatory--maximum-speed-limit-25--g3"]},
+            R2_30:{mutcd:"R2-1",name:"Speed 30",mapillary:["regulatory--maximum-speed-limit-30--g1","regulatory--maximum-speed-limit-30--g2","regulatory--maximum-speed-limit-30--g3"]},
+            R2_35:{mutcd:"R2-1",name:"Speed 35",mapillary:["regulatory--maximum-speed-limit-35--g1","regulatory--maximum-speed-limit-35--g2","regulatory--maximum-speed-limit-35--g3"]},
+            R2_40:{mutcd:"R2-1",name:"Speed 40",mapillary:["regulatory--maximum-speed-limit-40--g1","regulatory--maximum-speed-limit-40--g2","regulatory--maximum-speed-limit-40--g3"]},
+            R2_45:{mutcd:"R2-1",name:"Speed 45",mapillary:["regulatory--maximum-speed-limit-45--g1","regulatory--maximum-speed-limit-45--g2","regulatory--maximum-speed-limit-45--g3"]},
+            R2_50:{mutcd:"R2-1",name:"Speed 50",mapillary:["regulatory--maximum-speed-limit-50--g1","regulatory--maximum-speed-limit-50--g2","regulatory--maximum-speed-limit-50--g3"]},
+            R2_55:{mutcd:"R2-1",name:"Speed 55",mapillary:["regulatory--maximum-speed-limit-55--g1","regulatory--maximum-speed-limit-55--g2","regulatory--maximum-speed-limit-55--g3"]},
+            R2_60:{mutcd:"R2-1",name:"Speed 60",mapillary:["regulatory--maximum-speed-limit-60--g1","regulatory--maximum-speed-limit-60--g2","regulatory--maximum-speed-limit-60--g3"]},
+            R2_65:{mutcd:"R2-1",name:"Speed 65",mapillary:["regulatory--maximum-speed-limit-65--g1","regulatory--maximum-speed-limit-65--g2","regulatory--maximum-speed-limit-65--g3"]},
+            R2_70:{mutcd:"R2-1",name:"Speed 70",mapillary:["regulatory--maximum-speed-limit-70--g1","regulatory--maximum-speed-limit-70--g2","regulatory--maximum-speed-limit-70--g3"]},
+            R2_75:{mutcd:"R2-1",name:"Speed 75",mapillary:["regulatory--maximum-speed-limit-75--g1","regulatory--maximum-speed-limit-75--g2","regulatory--maximum-speed-limit-75--g3"]},
+            R2_80:{mutcd:"R2-1",name:"Speed 80",mapillary:["regulatory--maximum-speed-limit-80--g1","regulatory--maximum-speed-limit-80--g2"]},
+            R2_90:{mutcd:"R2-1",name:"Speed 90",mapillary:["regulatory--maximum-speed-limit-90--g1","regulatory--maximum-speed-limit-90--g2"]},
+            R2_100:{mutcd:"R2-1",name:"Speed 100",mapillary:["regulatory--maximum-speed-limit-100--g1","regulatory--maximum-speed-limit-100--g2"]},
+            R2_110:{mutcd:"R2-1",name:"Speed 110",mapillary:["regulatory--maximum-speed-limit-110--g1","regulatory--maximum-speed-limit-110--g2"]},
+            R2_120:{mutcd:"R2-1",name:"Speed 120",mapillary:["regulatory--maximum-speed-limit-120--g1","regulatory--maximum-speed-limit-120--g2"]},
+            R2_130:{mutcd:"R2-1",name:"Speed 130",mapillary:["regulatory--maximum-speed-limit-130--g1","regulatory--maximum-speed-limit-130--g2"]},
+            R2_end:{mutcd:"R2-1E",name:"End Speed",mapillary:["regulatory--end-of-maximum-speed-limit-5--g1","regulatory--end-of-maximum-speed-limit-10--g1","regulatory--end-of-maximum-speed-limit-15--g1","regulatory--end-of-maximum-speed-limit-20--g1","regulatory--end-of-maximum-speed-limit-25--g1","regulatory--end-of-maximum-speed-limit-30--g1","regulatory--end-of-maximum-speed-limit-35--g1","regulatory--end-of-maximum-speed-limit-40--g1","regulatory--end-of-maximum-speed-limit-45--g1","regulatory--end-of-maximum-speed-limit-50--g1","regulatory--end-of-speed-limit--g1"]},
+            R2_truck:{mutcd:"R2-2",name:"Truck Speed",mapillary:["regulatory--truck-speed-limit--g1"]},
+            R2_night:{mutcd:"R2-3",name:"Night Speed",mapillary:["regulatory--night-speed-limit--g1"]},
+            R2_minimum:{mutcd:"R2-4",name:"Min Speed",mapillary:["regulatory--minimum-speed-limit--g1"]},
+            R3_no_right:{mutcd:"R3-1",name:"No Right",mapillary:["regulatory--no-right-turn--g1","regulatory--no-right-turn--g2"]},
+            R3_no_left:{mutcd:"R3-2",name:"No Left",mapillary:["regulatory--no-left-turn--g1","regulatory--no-left-turn--g2"]},
+            R3_no_uturn:{mutcd:"R3-4",name:"No U-Turn",mapillary:["regulatory--no-u-turn--g1"]},
+            R3_turn_only:{mutcd:"R3-5a",name:"Turn Only",mapillary:["regulatory--turn-left-only--g1","regulatory--turn-right-only--g1"]},
+            R4_keep:{mutcd:"R4-7",name:"Keep Right",mapillary:["regulatory--keep-right--g1","regulatory--keep-left--g1"]},
+            R5_dne:{mutcd:"R5-1",name:"Do Not Enter",mapillary:["regulatory--do-not-enter--g1"]},
+            R5_wrong:{mutcd:"R5-1a",name:"Wrong Way",mapillary:["regulatory--wrong-way--g1"]},
+            R6_oneway:{mutcd:"R6-1",name:"One Way",mapillary:["regulatory--one-way-left--g1","regulatory--one-way-right--g1"]},
+            R7_nopark:{mutcd:"R7-1",name:"No Parking",mapillary:["regulatory--no-parking--g1","regulatory--no-parking--g2"]},
+            R7_nostand:{mutcd:"R7-4",name:"No Standing",mapillary:["regulatory--no-standing--g1"]},
+            R7_nostop:{mutcd:"R7-2a",name:"No Stopping",mapillary:["regulatory--no-stopping--g1"]},
+            R7_handicap:{mutcd:"R7-8",name:"Handicap",mapillary:["regulatory--disabled-parking--g1"]},
+            R10_rtor:{mutcd:"R10-11",name:"No Turn Red",mapillary:["regulatory--no-turn-on-red--g1"]},
+            R15_cross:{mutcd:"R15-1",name:"Crossbuck",mapillary:["regulatory--railroad-crossing--g1"]},
+            W1_turn:{mutcd:"W1-1",name:"Turn",mapillary:["warning--turn-left--g1","warning--turn-right--g1"]},
+            W1_curve:{mutcd:"W1-2",name:"Curve",mapillary:["warning--curve-left--g1","warning--curve-right--g1"]},
+            W1_reverse:{mutcd:"W1-4",name:"Reverse",mapillary:["warning--reverse-curve-left--g1","warning--reverse-curve-right--g1"]},
+            W1_winding:{mutcd:"W1-5",name:"Winding",mapillary:["warning--winding-road-first-left--g1","warning--winding-road-first-right--g1"]},
+            W1_chevron:{mutcd:"W1-8",name:"Chevron",mapillary:["warning--chevron-alignment--g1","warning--chevron-alignment-left--g1","warning--chevron-alignment-right--g1"]},
+            W2_cross:{mutcd:"W2-1",name:"Cross Road",mapillary:["warning--crossroads--g1"]},
+            W2_side:{mutcd:"W2-2",name:"Side Road",mapillary:["warning--side-road-left--g1","warning--side-road-right--g1"]},
+            W2_t:{mutcd:"W2-4",name:"T-Int",mapillary:["warning--t-roads--g1"]},
+            W2_y:{mutcd:"W2-5",name:"Y-Int",mapillary:["warning--y-roads--g1"]},
+            W2_circle:{mutcd:"W2-6",name:"Roundabout",mapillary:["warning--roundabout--g1"]},
+            W3_stop:{mutcd:"W3-1",name:"Stop Ahead",mapillary:["warning--stop-ahead--g1","warning--stop-ahead--g2"]},
+            W3_yield:{mutcd:"W3-2",name:"Yield Ahead",mapillary:["warning--yield-ahead--g1"]},
+            W3_signal:{mutcd:"W3-3",name:"Signal Ahead",mapillary:["warning--traffic-signals--g1"]},
+            W4_merge:{mutcd:"W4-1",name:"Merge",mapillary:["warning--merge-left--g1","warning--merge-right--g1"]},
+            W4_ends:{mutcd:"W4-2",name:"Lane Ends",mapillary:["warning--lane-ends--g1"]},
+            W5_narrow:{mutcd:"W5-1",name:"Narrows",mapillary:["warning--road-narrows--g1"]},
+            W7_hill:{mutcd:"W7-1",name:"Hill",mapillary:["warning--steep-descent--g1","warning--steep-ascent--g1"]},
+            W8_bump:{mutcd:"W8-1",name:"Bump",mapillary:["warning--bump--g1"]},
+            W8_dip:{mutcd:"W8-2",name:"Dip",mapillary:["warning--dip--g1"]},
+            W8_slippery:{mutcd:"W8-5",name:"Slippery",mapillary:["warning--slippery-road-surface--g1"]},
+            W10_rr:{mutcd:"W10-1",name:"RR",mapillary:["warning--railroad-crossing--g1"]},
+            W11_bike:{mutcd:"W11-1",name:"Bicycle",mapillary:["warning--bicycles-crossing--g1"]},
+            W11_ped:{mutcd:"W11-2",name:"Pedestrian",mapillary:["warning--pedestrians-crossing--g1","warning--pedestrians-crossing--g2"]},
+            W11_deer:{mutcd:"W11-3",name:"Deer",mapillary:["warning--wild-animals--g1"]},
+            W11_cattle:{mutcd:"W11-4",name:"Cattle",mapillary:["warning--cattle--g1"]},
+            W11_farm:{mutcd:"W11-5",name:"Farm",mapillary:["warning--farm-vehicles--g1"]},
+            W13_adv:{mutcd:"W13-1P",name:"Advisory",mapillary:["warning--advisory-speed--g1"]},
+            W14_dead:{mutcd:"W14-1",name:"Dead End",mapillary:["warning--dead-end--g1"]},
+            W14_noout:{mutcd:"W14-2",name:"No Outlet",mapillary:["warning--no-exit--g1"]},
+            M1_inter:{mutcd:"M1-1",name:"Interstate",mapillary:["information--interstate-route--g1"]},
+            M1_us:{mutcd:"M1-4",name:"US Route",mapillary:["information--us-route--g1"]},
+            M1_state:{mutcd:"M1-5",name:"State Route",mapillary:["information--state-route--g1"]},
+            M1_county:{mutcd:"M1-6",name:"County Route",mapillary:["information--county-route--g1"]},
+            D_dest:{mutcd:"D1",name:"Destination",mapillary:["information--destination--g1"]},
+            D_street:{mutcd:"D3",name:"Street Name",mapillary:["information--street-name--g1"]},
+            D_mile:{mutcd:"D10-1",name:"Mile Marker",mapillary:["information--mile-marker--g1"]},
+            D_exit:{mutcd:"E1",name:"Exit",mapillary:["information--exit--g1"]},
+            D9_hosp:{mutcd:"D9-2",name:"Hospital",mapillary:["information--hospital--g1"]},
+            D9_gas:{mutcd:"D9-7",name:"Gas",mapillary:["information--gas-station--g1"]},
+            D9_food:{mutcd:"D9-8",name:"Food",mapillary:["information--food--g1"]},
+            D9_lodging:{mutcd:"D9-9",name:"Lodging",mapillary:["information--lodging--g1"]},
+            D9_park:{mutcd:"D9-4",name:"Parking",mapillary:["information--parking--g1"]},
+            S1_school:{mutcd:"S1-1",name:"School",mapillary:["warning--school-zone--g1"]},
+            S2_xing:{mutcd:"S2-1",name:"School Xing",mapillary:["warning--school-crossing--g1"]},
+            S3_bus:{mutcd:"S3-1",name:"School Bus",mapillary:["warning--school-bus-stop-ahead--g1"]},
+            S4_speed:{mutcd:"S4",name:"School Speed",mapillary:["regulatory--school-speed-limit--g1"]},
+            S5_end:{mutcd:"S5-2",name:"End School",mapillary:["information--end-of-school-zone--g1"]},
+            W15_play:{mutcd:"W15-1",name:"Playground",mapillary:["warning--playground--g1"]},
+            W_child:{mutcd:"W11-12",name:"Children",mapillary:["warning--children--g1","warning--children--g2"]},
+            OM1:{mutcd:"OM1",name:"Type 1",mapillary:["warning--object-marker--g1"]},
+            OM2:{mutcd:"OM2",name:"Type 2",mapillary:["warning--object-marker--g2"]},
+            OM3:{mutcd:"OM3",name:"Type 3",mapillary:["warning--object-marker--g3"]},
+            OM4:{mutcd:"OM4",name:"End Road",mapillary:["warning--end-of-road--g1"]},
+            delin_post:{mutcd:"3G",name:"Post Delin",mapillary:["object--delineator-post"]},
+            delin_flex:{mutcd:"3G",name:"Flex Delin",mapillary:["object--delineator-flexible"]},
+            street_light:{mutcd:"N/A",name:"Street Light",mapillary:["object--street-light"]},
+            utility_pole:{mutcd:"N/A",name:"Utility Pole",mapillary:["object--utility-pole"]},
+            signal_upright:{mutcd:"N/A",name:"Signal V",mapillary:["object--traffic-light--general-upright-front"]},
+            signal_horiz:{mutcd:"N/A",name:"Signal H",mapillary:["object--traffic-light--general-horizontal-front"]},
+            signal_ped:{mutcd:"N/A",name:"Ped Signal",mapillary:["object--traffic-light--pedestrians-front"]},
+            guard_rail:{mutcd:"N/A",name:"Guard Rail",mapillary:["object--guard-rail"]},
+            barrier:{mutcd:"N/A",name:"Barrier",mapillary:["object--barrier"]},
+            bollard:{mutcd:"N/A",name:"Bollard",mapillary:["object--bollard"]},
+            fire_hydrant:{mutcd:"N/A",name:"Fire Hydrant",mapillary:["object--fire-hydrant"]},
+            manhole:{mutcd:"N/A",name:"Manhole",mapillary:["object--manhole"]},
+            crosswalk:{mutcd:"N/A",name:"Crosswalk",mapillary:["marking--discrete--crosswalk-zebra"]},
+            stop_bar:{mutcd:"N/A",name:"Stop Bar",mapillary:["marking--discrete--stop-line"]}
+        };
+
+        document.addEventListener('DOMContentLoaded',()=>{
+            // Build reverse lookup: mapillary value -> internal key
+            Object.entries(MUTCD_MAPPINGS).forEach(([key, data]) => {
+                data.mapillary.forEach(mv => {
+                    MAPILLARY_TO_KEY[mv] = key;
+                });
+            });
+            initMap();populateJurisdictions();setupEventListeners();loadSavedToken();switchSeries('R');initSpeedFilterPanel();
+        });
+
+        function initMap(){
+            assetMap=L.map('assetMap').setView([37.55,-77.40],10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(assetMap);
+            markersLayer=L.layerGroup().addTo(assetMap);
+            markersByType={stop:L.layerGroup(),speed:L.layerGroup(),warning:L.layerGroup(),school:L.layerGroup(),guide:L.layerGroup(),infra:L.layerGroup()};
+            Object.values(markersByType).forEach(l=>l.addTo(assetMap));
+            ALL_SPEEDS.forEach(s=>{speedLayers[s]=L.layerGroup();});
+        }
+
+        function initSpeedFilterPanel(){
+            const grid=document.getElementById('speedFilterGrid');
+            grid.innerHTML=ALL_SPEEDS.map(s=>`<button class="speed-filter-btn active" data-speed="${s}" onclick="toggleSpeedFilter(${s})">${s}</button>`).join('');
+        }
+
+        function populateJurisdictions(){
+            const sel=document.getElementById('jurisdiction');
+            Object.entries(JURISDICTIONS).forEach(([k,v])=>{const o=document.createElement('option');o.value=k;o.textContent=v.name;sel.appendChild(o);});
+        }
+
+        function setupEventListeners(){
+            document.querySelectorAll('.asset-item input[type="checkbox"]').forEach(cb=>{
+                cb.addEventListener('change',()=>{updateSelectedCount();cb.closest('.asset-item').classList.toggle('selected',cb.checked);});
+            });
+        }
+
+        function loadSavedToken(){if(apiToken){document.getElementById('apiToken').value=apiToken;updateTokenStatus(true);}}
+        function saveToken(){apiToken=document.getElementById('apiToken').value.trim();if(apiToken){localStorage.setItem('mapillary_token',apiToken);updateTokenStatus(true);showToast('Saved','success');}}
+        async function testToken(){
+            const t=document.getElementById('apiToken').value.trim();
+            if(!t)return showToast('Enter token','error');
+            try{const r=await fetch('https://graph.mapillary.com/map_features?fields=id&bbox=-77.45,37.55,-77.44,37.56&limit=1',{headers:{'Authorization':`OAuth ${t}`}});
+            if(r.ok){updateTokenStatus(true);showToast('Valid!','success');}else{updateTokenStatus(false);showToast('Invalid','error');}}
+            catch(e){showToast('Error','error');}
+        }
+        function updateTokenStatus(v){const el=document.getElementById('tokenStatus');el.className=`badge ${v?'badge-success':'badge-warning'}`;el.textContent=v?'✓ Valid':'Not Set';}
+
+        function updateJurisdiction(){
+            const v=document.getElementById('jurisdiction').value;
+            currentJurisdiction=JURISDICTIONS[v]||null;
+            if(currentJurisdiction){
+                const tiles=generateTiles(currentJurisdiction.bbox);
+                document.getElementById('tileCount').textContent=`${tiles.length} tiles`;
+                document.getElementById('jurisdictionInfo').classList.add('visible');
+                document.getElementById('jurisdictionType').textContent=currentJurisdiction.type==='city'?'City':'County';
+                document.getElementById('jurisdictionFips').textContent=currentJurisdiction.fips;
+                const bb=currentJurisdiction.bbox;
+                const area=Math.abs((bb[2]-bb[0])*(bb[3]-bb[1])*69*69*Math.cos(bb[1]*Math.PI/180));
+                document.getElementById('jurisdictionArea').textContent=Math.round(area);
+                document.getElementById('mapJurisdiction').textContent=currentJurisdiction.name.split(' ')[0];
+                assetMap.setView(currentJurisdiction.mapCenter,currentJurisdiction.mapZoom);
+                clearAllMarkers();
+                L.rectangle([[bb[1],bb[0]],[bb[3],bb[2]]],{color:"#1e40af",weight:2,fillOpacity:0.05,dashArray:'5,5'}).addTo(markersLayer);
+            }else{document.getElementById('jurisdictionInfo').classList.remove('visible');}
+        }
+
+        function generateTiles(bbox,size=0.009){const[w,s,e,n]=bbox;const tiles=[];for(let lon=w;lon<e;lon+=size){for(let lat=s;lat<n;lat+=size){tiles.push([lon,lat,Math.min(lon+size,e),Math.min(lat+size,n)]);}}return tiles;}
+        function switchSeries(s){document.querySelectorAll('.series-tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.series-panel').forEach(p=>p.classList.remove('active'));document.querySelector(`.series-tab.${s.toLowerCase()}-series`)?.classList.add('active');document.getElementById(`panel-${s}`)?.classList.add('active');}
+        function updateSelectedCount(){const c=document.querySelectorAll('.asset-item input:checked').length;document.getElementById('selectedCount').textContent=`${c} selected`;document.getElementById('selectedCountHeader').textContent=`${c} selected`;}
+        function selectAllAssets(){document.querySelectorAll('.asset-item input[type="checkbox"]').forEach(cb=>{cb.checked=true;cb.closest('.asset-item').classList.add('selected');});updateSelectedCount();}
+        function clearAllAssets(){document.querySelectorAll('.asset-item input[type="checkbox"]').forEach(cb=>{cb.checked=false;cb.closest('.asset-item').classList.remove('selected');});updateSelectedCount();}
+        function selectSeries(s){document.querySelectorAll(`.asset-item input[data-series="${s}"]`).forEach(cb=>{cb.checked=true;cb.closest('.asset-item').classList.add('selected');});updateSelectedCount();}
+
+        function toggleMapFilter(f){
+            activeFilters[f]=!activeFilters[f];
+            document.querySelector(`.map-filter-btn[data-filter="${f}"]`)?.classList.toggle('active',activeFilters[f]);
+            if(f==='speed'){
+                document.getElementById('speedFilterPanel').classList.toggle('visible',activeFilters[f]);
+                updateSpeedLayersVisibility();
+            }else{
+                if(activeFilters[f]){markersByType[f].addTo(assetMap);}else{assetMap.removeLayer(markersByType[f]);}
+            }
+            updateVisibleCount();
+        }
+
+        function showAllFilters(){Object.keys(activeFilters).forEach(k=>{activeFilters[k]=true;document.querySelector(`.map-filter-btn[data-filter="${k}"]`)?.classList.add('active');if(k==='speed'){document.getElementById('speedFilterPanel').classList.add('visible');updateSpeedLayersVisibility();}else{markersByType[k].addTo(assetMap);}});updateVisibleCount();}
+        function hideAllFilters(){Object.keys(activeFilters).forEach(k=>{activeFilters[k]=false;document.querySelector(`.map-filter-btn[data-filter="${k}"]`)?.classList.remove('active');if(k==='speed'){document.getElementById('speedFilterPanel').classList.remove('visible');ALL_SPEEDS.forEach(s=>assetMap.removeLayer(speedLayers[s]));}else{assetMap.removeLayer(markersByType[k]);}});updateVisibleCount();}
+
+        function toggleSpeedFilter(speed){
+            activeSpeedFilters[speed]=!activeSpeedFilters[speed];
+            document.querySelector(`.speed-filter-btn[data-speed="${speed}"]`)?.classList.toggle('active',activeSpeedFilters[speed]);
+            updateSpeedLayersVisibility();
+            updateVisibleCount();
+        }
+
+        function selectAllSpeedFilters(){ALL_SPEEDS.forEach(s=>{activeSpeedFilters[s]=true;document.querySelector(`.speed-filter-btn[data-speed="${s}"]`)?.classList.add('active');});updateSpeedLayersVisibility();updateVisibleCount();}
+        function clearAllSpeedFilters(){ALL_SPEEDS.forEach(s=>{activeSpeedFilters[s]=false;document.querySelector(`.speed-filter-btn[data-speed="${s}"]`)?.classList.remove('active');});updateSpeedLayersVisibility();updateVisibleCount();}
+        function selectLowSpeedFilters(){ALL_SPEEDS.forEach(s=>{activeSpeedFilters[s]=s<=30;document.querySelector(`.speed-filter-btn[data-speed="${s}"]`)?.classList.toggle('active',s<=30);});updateSpeedLayersVisibility();updateVisibleCount();}
+        function selectMidSpeedFilters(){ALL_SPEEDS.forEach(s=>{activeSpeedFilters[s]=s>=35&&s<=50;document.querySelector(`.speed-filter-btn[data-speed="${s}"]`)?.classList.toggle('active',s>=35&&s<=50);});updateSpeedLayersVisibility();updateVisibleCount();}
+        function selectHighSpeedFilters(){ALL_SPEEDS.forEach(s=>{activeSpeedFilters[s]=s>=55;document.querySelector(`.speed-filter-btn[data-speed="${s}"]`)?.classList.toggle('active',s>=55);});updateSpeedLayersVisibility();updateVisibleCount();}
+
+        function updateSpeedLayersVisibility(){
+            if(!activeFilters.speed){ALL_SPEEDS.forEach(s=>assetMap.removeLayer(speedLayers[s]));return;}
+            ALL_SPEEDS.forEach(s=>{if(activeSpeedFilters[s]){speedLayers[s].addTo(assetMap);}else{assetMap.removeLayer(speedLayers[s]);}});
+            let visibleSpeedCount=0;
+            ALL_SPEEDS.forEach(s=>{if(activeSpeedFilters[s])visibleSpeedCount+=speedLayers[s].getLayers().length;});
+            document.getElementById('speedFilterCount').textContent=`${visibleSpeedCount} visible`;
+        }
+
+        function updateVisibleCount(){
+            let visible=0;
+            Object.keys(markersByType).forEach(k=>{if(k!=='speed'&&activeFilters[k]){visible+=markersByType[k].getLayers().length;}});
+            if(activeFilters.speed){ALL_SPEEDS.forEach(s=>{if(activeSpeedFilters[s])visible+=speedLayers[s].getLayers().length;});}
+            document.getElementById('visibleAssetCount').textContent=visible;
+        }
+
+        function clearAllMarkers(){
+            markersLayer.clearLayers();
+            Object.values(markersByType).forEach(l=>l.clearLayers());
+            ALL_SPEEDS.forEach(s=>speedLayers[s].clearLayers());
+        }
+
+        function extractSpeedValue(objValue){
+            const m=objValue?.match(/speed-limit-(\d+)/);
+            return m?parseInt(m[1]):null;
+        }
+
+        // Get individual icon for a feature
+        function getIconForFeature(objValue) {
+            // First check for speed limit signs
+            const speedVal = extractSpeedValue(objValue);
+            if (speedVal) {
+                return { svg: createSpeedIcon(speedVal), filterType: 'speed', speedVal: speedVal };
+            }
+            
+            // Try to find the internal key from mapillary value
+            const internalKey = MAPILLARY_TO_KEY[objValue];
+            
+            // If we have an internal key and a specific icon for it
+            if (internalKey && SIGN_SVG_ICONS[internalKey]) {
+                const filterType = KEY_TO_FILTER_TYPE[internalKey] || 'infra';
+                return { svg: SIGN_SVG_ICONS[internalKey], filterType: filterType, speedVal: null };
+            }
+            
+            // Fallback: determine type from MUTCD code
+            const mutcdCode = getMUTCDCode(objValue);
+            const filterType = ICON_TYPE_MAP[mutcdCode] || 'infra';
+            
+            // Return fallback icon
+            return { svg: FALLBACK_ICONS[filterType] || FALLBACK_ICONS['infra'], filterType: filterType, speedVal: null };
+        }
+
+        function updateMapMarkers(features){
+            features.forEach(f=>{
+                if(f.geometry&&f.geometry.coordinates){
+                    const[lng,lat]=f.geometry.coordinates;
+                    const iconData = getIconForFeature(f.object_value);
+                    const mutcdCode = getMUTCDCode(f.object_value);
+                    
+                    const icon=L.divIcon({
+                        html: iconData.svg,
+                        className:'custom-marker',
+                        iconSize:[24,28],
+                        iconAnchor:[12,14],
+                        popupAnchor:[0,-14]
+                    });
+                    
+                    const marker=L.marker([lat,lng],{icon:icon});
+                    const speedInfo = iconData.speedVal ? ` (${iconData.speedVal} mph/kph)` : '';
+                    marker.bindPopup(`<div style="min-width:180px"><strong>${mutcdCode}</strong>${speedInfo}<br>${getMUTCDName(f.object_value)}<hr style="margin:6px 0"><small>Class: ${f.object_value}<br>ID: ${f.id}<br>Coords: ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>First: ${f.first_seen_at?.split('T')[0]||'N/A'}</small></div>`);
+                    
+                    if(iconData.filterType==='speed' && iconData.speedVal){
+                        marker.addTo(speedLayers[iconData.speedVal]||markersByType.speed);
+                    }else if(markersByType[iconData.filterType]){
+                        marker.addTo(markersByType[iconData.filterType]);
+                    }else{
+                        marker.addTo(markersLayer);
+                    }
+                }
+            });
+            updateSpeedLayersVisibility();
+        }
+
+        async function startDownload(){
+            if(!apiToken)return showToast('Set token','error');
+            if(!currentJurisdiction)return showToast('Select jurisdiction','error');
+            const selected=[];document.querySelectorAll('.asset-item input:checked').forEach(cb=>selected.push(cb.value));
+            if(!selected.length)return showToast('Select assets','error');
+            const objectValues=[];selected.forEach(k=>{if(MUTCD_MAPPINGS[k])objectValues.push(...MUTCD_MAPPINGS[k].mapillary);});
+            const tiles=generateTiles(currentJurisdiction.bbox);
+            document.getElementById('downloadBtn').disabled=true;
+            document.getElementById('downloadBtn').innerHTML='<span class="spinner"></span> Downloading...';
+            document.getElementById('cancelBtn').style.display='block';
+            document.getElementById('progressSection').classList.add('active');
+            document.getElementById('resultsPanel').classList.remove('active');
+            document.getElementById('quickStatsCard').classList.remove('visible');
+            document.getElementById('rateLimitWarning').classList.remove('visible');
+            document.getElementById('logContainer').innerHTML='';
+            allFeatures=[];clearAllMarkers();
+            const bb=currentJurisdiction.bbox;
+            L.rectangle([[bb[1],bb[0]],[bb[3],bb[2]]],{color:"#1e40af",weight:2,fillOpacity:0.05,dashArray:'5,5'}).addTo(markersLayer);
+            let success=0,errors=0;isDownloading=true;
+            addLog(`Start: ${currentJurisdiction.name}`,'info');
+            addLog(`${tiles.length} tiles, ${objectValues.length} classes`,'info');
+            for(let i=0;i<tiles.length&&isDownloading;i++){
+                updateProgress(i+1,tiles.length);
+                try{
+                    const features=await fetchFeatures(tiles[i],objectValues);
+                    if(features.length){allFeatures.push(...features);addLog(`Tile ${i+1}: ${features.length}`,'success');updateMapMarkers(features);}
+                    success++;document.getElementById('successCount').textContent=success;
+                    document.getElementById('foundCount').textContent=allFeatures.length;
+                    document.getElementById('totalMapAssets').textContent=allFeatures.length;
+                    updateVisibleCount();await sleep(100);
+                }catch(err){
+                    errors++;document.getElementById('errorCount').textContent=errors;
+                    if(err.message.includes('rate')){addLog('Rate limit - waiting...','warn');document.getElementById('rateLimitWarning').classList.add('visible');await sleep(30000);i--;}
+                    else{addLog(`Tile ${i+1}: ${err.message}`,'error');if(errors>20)break;await sleep(500);}
+                }
+            }
+            isDownloading=false;
+            document.getElementById('downloadBtn').disabled=false;
+            document.getElementById('downloadBtn').innerHTML='⬇️ Start Download';
+            document.getElementById('cancelBtn').style.display='none';
+            document.getElementById('rateLimitWarning').classList.remove('visible');
+            if(allFeatures.length){showResults();showQuickStats();addLog(`Done! ${allFeatures.length} found`,'success');showToast(`${allFeatures.length} assets!`,'success');}
+            else{showToast('No assets found','info');}
+        }
+
+        function cancelDownload(){isDownloading=false;document.getElementById('downloadBtn').disabled=false;document.getElementById('downloadBtn').innerHTML='⬇️ Start Download';document.getElementById('cancelBtn').style.display='none';addLog('Cancelled','info');showToast('Cancelled','info');}
+
+        async function fetchFeatures(bbox,values){
+            const url=`https://graph.mapillary.com/map_features?fields=id,object_value,geometry,first_seen_at,last_seen_at&bbox=${bbox.join(',')}&object_values=${values.join(',')}&limit=2000`;
+            const res=await fetch(url,{headers:{'Authorization':`OAuth ${apiToken}`}});
+            if(!res.ok){const d=await res.json().catch(()=>({}));if(d.error?.code===4)throw new Error('Rate limit');throw new Error(`HTTP ${res.status}`);}
+            const data=await res.json();return data.data||[];
+        }
+
+        function updateProgress(cur,total){const pct=Math.round((cur/total)*100);document.getElementById('progressLabel').textContent=`Tile ${cur}/${total}`;document.getElementById('progressPercent').textContent=`${pct}%`;document.getElementById('progressBar').style.width=`${pct}%`;}
+        function addLog(msg,type='info'){const el=document.getElementById('logContainer');const entry=document.createElement('div');entry.className=`log-entry ${type}`;entry.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(entry);el.scrollTop=el.scrollHeight;}
+        function showResults(){document.getElementById('resultsPanel').classList.add('active');document.getElementById('totalAssets').textContent=allFeatures.length.toLocaleString();document.getElementById('uniqueTypes').textContent=new Set(allFeatures.map(f=>getMUTCDCode(f.object_value))).size;}
+        function showQuickStats(){
+            const stats={};allFeatures.forEach(f=>{const code=getMUTCDCode(f.object_value);const name=getMUTCDName(f.object_value);if(!stats[code])stats[code]={count:0,name};stats[code].count++;});
+            const sorted=Object.entries(stats).sort((a,b)=>b[1].count-a[1].count).slice(0,10);
+            document.getElementById('quickStatsList').innerHTML=sorted.map(([code,data])=>`<div style="display:flex;justify-content:space-between;padding:0.35rem 0;border-bottom:1px solid #f1f5f9;font-size:0.75rem"><span><span style="font-family:monospace;font-size:0.7rem;background:#f1f5f9;padding:0.1rem 0.25rem;border-radius:3px;margin-right:0.4rem">${code}</span>${data.name}</span><span style="color:#64748b;font-weight:500">${data.count}</span></div>`).join('');
+            document.getElementById('quickStatsCard').classList.add('visible');
+        }
+
+        function getMUTCDCode(v){for(const[k,m]of Object.entries(MUTCD_MAPPINGS)){if(m.mapillary.includes(v))return m.mutcd;}const sm=v?.match(/maximum-speed-limit-(\d+)/);if(sm)return'R2-1';return'N/A';}
+        function getMUTCDName(v){for(const[k,m]of Object.entries(MUTCD_MAPPINGS)){if(m.mapillary.includes(v))return m.name;}const sm=v?.match(/maximum-speed-limit-(\d+)/);if(sm)return`Speed ${sm[1]}`;return v?.split('--')[1]?.replace(/-/g,' ')||'Unknown';}
+
+        function exportData(format){
+            if(!allFeatures.length)return showToast('No data','error');
+            const ts=new Date().toISOString().split('T')[0];
+            const name=currentJurisdiction?.name.replace(/\s+/g,'_')||'assets';
+            const filename=`MUTCD_${name}_${ts}`;
+            let content,mime,ext;
+            switch(format){
+                case'csv':content=generateCSV();mime='text/csv';ext='csv';break;
+                case'kml':content=generateKML();mime='application/vnd.google-earth.kml+xml';ext='kml';break;
+                case'geojson':content=generateGeoJSON();mime='application/geo+json';ext='geojson';break;
+            }
+            downloadFile(content,`${filename}.${ext}`,mime);
+            showToast(`Exported ${ext.toUpperCase()}`,'success');
+        }
+
+        function generateCSV(){
+            const headers=['id','mutcd','name','class','speed','lat','lon','first_seen'];
+            const rows=[headers.join(',')];
+            allFeatures.forEach(f=>{
+                const coords=f.geometry?.coordinates||[0,0];
+                const sm=f.object_value?.match(/speed-limit-(\d+)/);
+                rows.push([f.id,`"${getMUTCDCode(f.object_value)}"`,`"${getMUTCDName(f.object_value)}"`,`"${f.object_value||''}"`,sm?sm[1]:'',coords[1],coords[0],f.first_seen_at?.split('T')[0]||''].join(','));
+            });
+            return rows.join('\n');
+        }
+
+        function generateGeoJSON(){
+            return JSON.stringify({type:"FeatureCollection",features:allFeatures.map(f=>{const sm=f.object_value?.match(/speed-limit-(\d+)/);return{type:"Feature",properties:{id:f.id,mutcd:getMUTCDCode(f.object_value),name:getMUTCDName(f.object_value),class:f.object_value,speed:sm?parseInt(sm[1]):null,first_seen:f.first_seen_at},geometry:f.geometry};})},null,2);
+        }
+
+        function generateKML(){
+            const placemarks=allFeatures.map(f=>{const coords=f.geometry?.coordinates||[0,0];return`<Placemark><name>${escapeXML(getMUTCDCode(f.object_value)+' - '+getMUTCDName(f.object_value))}</name><Point><coordinates>${coords[0]},${coords[1]},0</coordinates></Point></Placemark>`;}).join('\n');
+            return`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>MUTCD Assets - ${escapeXML(currentJurisdiction?.name||'')}</name>${placemarks}</Document></kml>`;
+        }
+
+        function exportMUTCDReportPDF(){
+            if(!allFeatures.length)return showToast('No data','error');
+            const{jsPDF}=window.jspdf;const doc=new jsPDF('p','mm','letter');const pw=doc.internal.pageSize.getWidth();const m=20;
+            doc.setFillColor(30,64,175);doc.rect(0,0,pw,40,'F');doc.setTextColor(255,255,255);doc.setFontSize(20);doc.setFont('helvetica','bold');
+            doc.text('MUTCD Asset Report',pw/2,18,{align:'center'});doc.setFontSize(10);doc.setFont('helvetica','normal');
+            doc.text(currentJurisdiction?.name||'',pw/2,28,{align:'center'});doc.text(new Date().toLocaleDateString(),pw/2,35,{align:'center'});
+            doc.setTextColor(0,0,0);let y=55;
+            doc.setFontSize(14);doc.setFont('helvetica','bold');doc.text(`Total Assets: ${allFeatures.length}`,m,y);y+=10;
+            const grouped={};allFeatures.forEach(f=>{const c=getMUTCDCode(f.object_value);if(!grouped[c])grouped[c]={name:getMUTCDName(f.object_value),count:0};grouped[c].count++;});
+            const sorted=Object.entries(grouped).sort((a,b)=>b[1].count-a[1].count).map(([code,data])=>[code,data.name,data.count.toLocaleString(),((data.count/allFeatures.length)*100).toFixed(1)+'%']);
+            doc.autoTable({startY:y,head:[['Code','Description','Count','%']],body:sorted,theme:'striped',headStyles:{fillColor:[30,64,175]},margin:{left:m,right:m}});
+            doc.save(`MUTCD_Report_${currentJurisdiction?.name.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+            showToast('PDF exported','success');
+        }
+
+        function downloadFile(content,filename,mime){const blob=new Blob([content],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url);}
+        function escapeXML(s){return s?.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')||'';}
+        function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+        function showToast(msg,type='info'){const c=document.getElementById('toastContainer');const t=document.createElement('div');t.className=`toast ${type}`;const icons={success:'✓',error:'✗',info:'ℹ',warn:'⚠'};t.innerHTML=`<span>${icons[type]||'ℹ'}</span> ${msg}`;c.appendChild(t);setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},3000);}
+    </script>
+</body>
+</html>
