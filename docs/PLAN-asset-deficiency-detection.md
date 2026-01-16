@@ -4,7 +4,19 @@
 
 The Asset Deficiency Detection system is an AI-powered infrastructure analysis feature that integrates multiple data sources to identify missing or deficient roadway infrastructure at crash locations and recommend evidence-based countermeasures.
 
-**Location in UI**: Analysis Tab → Infrastructure Assets → Asset Deficiency
+**Location in UI**: CMF / Countermeasures Tab → Asset Deficiency (sub-tab)
+
+### Why CMF Tab Placement?
+
+The fundamental question Asset Deficiency answers is: *"What infrastructure is missing that's causing crashes, and what countermeasure should I install?"* This aligns directly with the CMF tab's purpose.
+
+**Benefits of CMF Tab Integration:**
+- **Natural workflow**: "What's missing?" → "What countermeasure fixes it?" in one place
+- **Reuses existing AI infrastructure**: CMF tab already has multi-agent system
+- **Unified recommendations**: Deficiency-based + crash-based recommendations together
+- **User intent alignment**: Users come to CMF tab wanting "what to fix"
+- **CMF database already loaded**: No need to load separately
+- **Grant integration**: CMF tab already links to Grants
 
 ---
 
@@ -635,16 +647,26 @@ const DEFICIENCY_RULES = {
 ### 6.1 Tab Placement
 
 ```
-Analysis Tab
-├── 🚦 Infrastructure Assets
-│   ├── 📁 File Upload
-│   ├── 🌐 ArcGIS Service
-│   ├── 🏫 School Safety
-│   ├── 🚌 Transit Safety
-│   └── 🔍 Asset Deficiency    ← NEW TAB
+CMF / Countermeasures Tab
+├── 📍 Location Selection (existing)
+├── 📊 Crash Profile (existing)
+├── 💡 CMF Recommendations (existing)
+├── 🔍 Asset Deficiency         ← NEW SUB-TAB
+│   ├── Data Sources Panel
+│   ├── AI Analysis Controls
+│   └── Deficiency Results
+│       └── [Links to CMF Recommendations above]
 │
-└── 🗺️ Mapillary Assets
+└── 📋 Selected Countermeasures (existing)
 ```
+
+**Integration with CMF Tab Workflow:**
+1. User selects location → Crash profile loads (existing behavior)
+2. User clicks "Asset Deficiency" sub-tab
+3. System aggregates data sources (crashes, schools, transit, Mapillary, satellite)
+4. Multi-model AI analyzes infrastructure
+5. Deficiencies identified → Automatically mapped to CMF countermeasures
+6. User can add recommendations to Selected Countermeasures list
 
 ### 6.2 Main Interface Layout
 
@@ -832,7 +854,7 @@ When user selects location on map, add "Asset Deficiency" option:
 | Task | Description | Dependencies |
 |------|-------------|--------------|
 | 1.1 | Create `assetDeficiencyState` object | None |
-| 1.2 | Add "Asset Deficiency" sub-tab in Analysis | Existing tab structure |
+| 1.2 | Add "Asset Deficiency" sub-tab in CMF/Countermeasures | Existing CMF tab structure |
 | 1.3 | Implement location selection UI | `selectionState` |
 | 1.4 | Implement polygon-scoped Mapillary query | Existing Mapillary functions |
 | 1.5 | Create `queryAssetsForLocation()` function | School/Transit states |
@@ -1122,11 +1144,21 @@ schoolTabState.results         // Source for school data
 transitTabState.results        // Source for transit data (when implemented)
 assetState.assets              // Source for CSV/ArcGIS data
 selectionState                 // Source for user selection
+cmfState.selectedLocation      // Current CMF tab location selection
+cmfState.filteredCrashes       // Location + date filtered crashes
+cmfState.crashProfile          // Already-computed crash profile
 
-// Write to for cross-tab features
-cmfState                       // When "Add to CMF Tab"
+// Write to for integration features
+cmfState.recommendations       // Add deficiency-based CMF recommendations
 grantState                     // When "Add to Grant"
 ```
+
+**CMF Tab Integration Notes:**
+- Asset Deficiency is a sub-tab within CMF/Countermeasures
+- Inherits location selection from `cmfState.selectedLocation`
+- Uses `cmfState.filteredCrashes` for crash analysis (already filtered by location + date)
+- Deficiency recommendations automatically appear in CMF recommendations panel
+- User can seamlessly add to Selected Countermeasures list
 
 ---
 
@@ -1286,6 +1318,7 @@ Link deficiencies to countermeasures from existing CMF database:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-01-16 | Claude | Initial implementation plan |
+| 1.1 | 2026-01-16 | Claude | Moved from Analysis tab to CMF/Countermeasures tab for natural workflow integration |
 
 ---
 
