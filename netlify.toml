@@ -5,6 +5,14 @@
   command = "echo 'Static site - no build required'"
   publish = "."
   base = "."
+  # Functions directory for Netlify Functions
+  functions = "netlify/functions"
+
+# Redirect /api/* to Netlify Functions (for Qdrant CORS workaround)
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
 
 # Headers for security and caching
 [[headers]]
@@ -53,3 +61,9 @@
   from = "/*"
   to = "/404.html"
   status = 404
+
+# Environment variables (set these in Netlify dashboard for production)
+# QDRANT_ENDPOINT = "your-qdrant-cloud-url"
+# QDRANT_API_KEY = "your-api-key"
+# VOYAGE_API_KEY = "your-voyage-key"
+
