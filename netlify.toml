@@ -1,8 +1,13 @@
 # Netlify Configuration for CRASH LENS - Virginia Crash Analysis Tool
 
 [build]
-  # No build command needed - this is a static site
+  # No build command needed - this is a static HTML site
+  command = ""
   publish = "."
+
+[build.environment]
+  # Prevent any framework auto-detection
+  NODE_VERSION = "18"
 
 # Headers for security and caching
 [[headers]]
