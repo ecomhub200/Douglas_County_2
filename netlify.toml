@@ -2,12 +2,9 @@
 
 [build]
   # No build command needed - this is a static HTML site
-  command = ""
+  command = "echo 'Static site - no build required'"
   publish = "."
-
-[build.environment]
-  # Prevent any framework auto-detection
-  NODE_VERSION = "18"
+  base = "."
 
 # Headers for security and caching
 [[headers]]
