@@ -19,6 +19,7 @@ const QDRANT_API_KEY = process.env.QDRANT_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cC
 
 // Allowed origins for CORS (add your domains here)
 const ALLOWED_ORIGINS = [
+    'https://crash-lens.aicreatesai.com',
     'https://ecomhub200.github.io',
     'https://ecomhub200.netlify.app',
     'http://localhost:3000',
