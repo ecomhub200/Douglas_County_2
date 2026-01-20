@@ -32,11 +32,13 @@
     "tigerweb": {
       "enabled": true,
       "baseUrl": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer",
+      "countySubdivisionsUrl": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer",
       "stateFips": "51",
       "layers": {
         "counties": 82,
         "tracts": 14,
-        "blockGroups": 16
+        "blockGroups": 16,
+        "countySubdivisions": 1
       },
       "defaultEnabled": true,
       "boundaryStyle": {
@@ -45,7 +47,24 @@
         "fillColor": "#1e3a8a",
         "fillOpacity": 0.05,
         "dashArray": "8, 4"
-      }
+      },
+      "districtStyle": {
+        "color": "#7c3aed",
+        "weight": 2,
+        "fillColor": "#7c3aed",
+        "fillOpacity": 0.08,
+        "dashArray": null
+      },
+      "districtColors": [
+        "#ef4444",
+        "#f97316",
+        "#eab308",
+        "#22c55e",
+        "#06b6d4",
+        "#3b82f6",
+        "#8b5cf6",
+        "#ec4899"
+      ]
     }
   },
   "jurisdictions": {
