@@ -28,6 +28,24 @@
       "storageBucket": "crash-lens-f50e7.firebasestorage.app",
       "messagingSenderId": "345091421318",
       "appId": "1:345091421318:web:88f99469eb0ce73c734d07"
+    },
+    "tigerweb": {
+      "enabled": true,
+      "baseUrl": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer",
+      "stateFips": "51",
+      "layers": {
+        "counties": 82,
+        "tracts": 14,
+        "blockGroups": 16
+      },
+      "defaultEnabled": true,
+      "boundaryStyle": {
+        "color": "#1e3a8a",
+        "weight": 3,
+        "fillColor": "#1e3a8a",
+        "fillOpacity": 0.05,
+        "dashArray": "8, 4"
+      }
     }
   },
   "jurisdictions": {
