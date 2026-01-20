@@ -1,0 +1,2886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Road Attributes Extractor v3 | TIGERweb Boundary Edition</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-primary: #050a12;
+            --bg-secondary: #0c1220;
+            --bg-tertiary: #141d2f;
+            --bg-card: #0f1726;
+            --border-color: #1e2d45;
+            --border-highlight: #2a4066;
+            --text-primary: #f0f4f8;
+            --text-secondary: #8fa3bf;
+            --text-muted: #5a6f8a;
+            --accent-primary: #22c55e;
+            --accent-secondary: #06b6d4;
+            --accent-tertiary: #f59e0b;
+            --accent-danger: #ef4444;
+            --accent-purple: #a855f7;
+            --gradient-primary: linear-gradient(135deg, #22c55e 0%, #06b6d4 100%);
+            --gradient-secondary: linear-gradient(135deg, #06b6d4 0%, #a855f7 100%);
+            --shadow-glow: 0 0 40px rgba(34, 197, 94, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 20% 40%, rgba(34, 197, 94, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse 60% 40% at 80% 20%, rgba(6, 182, 212, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse 50% 30% at 50% 80%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Grid pattern overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(34, 197, 94, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(34, 197, 94, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(12, 18, 32, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            max-width: 1900px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--gradient-primary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .logo-text {
+            font-weight: 700;
+            font-size: 1.4rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-version {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--accent-primary);
+            background: rgba(34, 197, 94, 0.15);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            margin-left: 0.5rem;
+        }
+
+        .header-badges {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .header-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--accent-primary);
+        }
+
+        .header-badge.tigerweb {
+            background: rgba(6, 182, 212, 0.1);
+            border-color: rgba(6, 182, 212, 0.3);
+            color: var(--accent-secondary);
+        }
+
+        /* Main Container */
+        .main-container {
+            max-width: 1900px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Grid Layout */
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            gap: 1.5rem;
+            min-height: calc(100vh - 150px);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: border-color 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: var(--border-highlight);
+        }
+
+        .card-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            letter-spacing: -0.01em;
+        }
+
+        .card-title-icon {
+            width: 28px;
+            height: 28px;
+            background: rgba(34, 197, 94, 0.15);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        .card-body {
+            padding: 1.25rem;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        /* Mode Toggle */
+        .mode-toggle {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .mode-btn {
+            padding: 0.75rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .mode-btn:hover {
+            background: var(--bg-secondary);
+            border-color: var(--border-highlight);
+        }
+
+        .mode-btn.active {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .mode-btn.active.secondary {
+            background: rgba(6, 182, 212, 0.15);
+            border-color: var(--accent-secondary);
+            color: var(--accent-secondary);
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+        }
+
+        .form-select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%238fa3bf' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            padding-right: 2.5rem;
+        }
+
+        .input-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.875rem 1.5rem;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: #050a12;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(34, 197, 94, 0.25);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-sm {
+            padding: 0.5rem 0.875rem;
+            font-size: 0.8rem;
+        }
+
+        /* Map Container */
+        .map-container {
+            height: 100%;
+            min-height: 500px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            background: var(--bg-tertiary);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .stat-card {
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            padding: 0.875rem;
+            text-align: center;
+            border: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: var(--border-color);
+        }
+
+        .stat-value {
+            font-family: 'DM Mono', monospace;
+            font-size: 1.4rem;
+            font-weight: 500;
+            color: var(--accent-primary);
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-top: 0.25rem;
+        }
+
+        /* Data Table */
+        .data-table-container {
+            overflow-x: auto;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        .data-table th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+            padding: 0.75rem 0.875rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-size: 0.65rem;
+            letter-spacing: 0.08em;
+            border-bottom: 2px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        .data-table td {
+            padding: 0.625rem 0.875rem;
+            border-bottom: 1px solid var(--border-color);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+
+        .data-table tr:hover td {
+            background: rgba(34, 197, 94, 0.03);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 50px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .badge-primary { background: rgba(34, 197, 94, 0.15); color: var(--accent-primary); }
+        .badge-secondary { background: rgba(6, 182, 212, 0.15); color: var(--accent-secondary); }
+        .badge-tertiary { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); }
+        .badge-residential { background: rgba(245, 158, 11, 0.15); color: var(--accent-tertiary); }
+        .badge-service { background: rgba(100, 116, 139, 0.15); color: var(--text-muted); }
+        .badge-yes { background: rgba(34, 197, 94, 0.15); color: var(--accent-primary); }
+        .badge-no { background: rgba(100, 116, 139, 0.15); color: var(--text-muted); }
+
+        /* Loading */
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Status Messages */
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.875rem 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            font-size: 0.8rem;
+            border-left: 3px solid var(--border-color);
+        }
+
+        .status-bar.loading { border-left-color: var(--accent-secondary); }
+        .status-bar.success { border-left-color: var(--accent-primary); }
+        .status-bar.error { border-left-color: var(--accent-danger); }
+        .status-bar.warning { border-left-color: var(--accent-tertiary); }
+
+        /* Info Panel */
+        .info-panel {
+            background: rgba(6, 182, 212, 0.08);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            border-radius: 10px;
+            padding: 0.875rem 1rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .info-panel strong {
+            color: var(--accent-secondary);
+        }
+
+        .info-panel.tigerweb {
+            background: rgba(34, 197, 94, 0.08);
+            border-color: rgba(34, 197, 94, 0.2);
+        }
+
+        .info-panel.tigerweb strong {
+            color: var(--accent-primary);
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 0.75rem;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--gradient-primary);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            font-family: 'DM Mono', monospace;
+        }
+
+        /* Jurisdiction Info */
+        .jurisdiction-info {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-top: 0.5rem;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .jurisdiction-info .label {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+        }
+
+        .jurisdiction-info .value {
+            color: var(--accent-primary);
+            font-weight: 500;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 2.5rem 1.5rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+            opacity: 0.5;
+        }
+
+        .empty-state-text {
+            font-size: 0.9rem;
+        }
+
+        /* Export Buttons */
+        .export-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Radius Slider */
+        .radius-slider {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .radius-slider input[type="range"] {
+            flex: 1;
+            -webkit-appearance: none;
+            background: var(--bg-primary);
+            height: 6px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .radius-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+        }
+
+        .radius-value {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-primary);
+            min-width: 55px;
+            text-align: right;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        .footer a {
+            color: var(--accent-secondary);
+            text-decoration: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .grid-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .map-container {
+                min-height: 400px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Leaflet Customization */
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .leaflet-popup-tip {
+            background: var(--bg-card);
+        }
+
+        .leaflet-popup-content {
+            margin: 10px 12px;
+        }
+
+        /* Hidden sections */
+        .section-hidden {
+            display: none !important;
+        }
+
+        /* Map legend */
+        .map-legend {
+            position: absolute;
+            bottom: 30px;
+            left: 10px;
+            background: rgba(5, 10, 18, 0.95);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            z-index: 1000;
+            font-size: 0.75rem;
+            backdrop-filter: blur(8px);
+            max-width: 180px;
+        }
+        .map-legend h4 {
+            margin: 0 0 8px 0;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 6px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .legend-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .legend-item.dimmed {
+            opacity: 0.3;
+        }
+        .legend-line {
+            width: 28px;
+            height: 4px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .legend-line.interstate { 
+            background: linear-gradient(90deg, #ef4444, #f87171); 
+            height: 7px; 
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+        }
+        .legend-line.freeway { 
+            background: linear-gradient(90deg, #f97316, #fb923c); 
+            height: 6px; 
+            box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
+        }
+        .legend-line.arterial { 
+            background: linear-gradient(90deg, #eab308, #facc15); 
+            height: 5px;
+        }
+        .legend-line.collector { 
+            background: linear-gradient(90deg, #22c55e, #4ade80); 
+            height: 4px;
+        }
+        .legend-line.local { 
+            background: #64748b; 
+            height: 2px; 
+            opacity: 0.6;
+        }
+        .legend-count {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+        
+        /* Animation for major roads */
+        @keyframes roadPulse {
+            0%, 100% { stroke-opacity: 1; }
+            50% { stroke-opacity: 0.6; }
+        }
+        
+        @keyframes glowPulse {
+            0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
+            50% { filter: drop-shadow(0 0 8px currentColor); }
+        }
+        
+        /* Color scheme selector */
+        .color-scheme-toggle {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 0.75rem;
+            background: var(--bg-tertiary);
+            padding: 3px;
+            border-radius: 6px;
+        }
+        .scheme-btn {
+            flex: 1;
+            padding: 0.4rem 0.5rem;
+            font-size: 0.7rem;
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .scheme-btn.active {
+            background: var(--accent-primary);
+            color: black;
+            font-weight: 600;
+        }
+        .scheme-btn:hover:not(.active) {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">🗺️</div>
+                <div>
+                    <span class="logo-text">Road Attributes Extractor</span>
+                    <span class="logo-version">v3.0</span>
+                </div>
+            </div>
+            <div class="header-badges">
+                <div class="header-badge tigerweb">
+                    <span>◆</span>
+                    <span>TIGERweb Census Boundaries</span>
+                </div>
+                <div class="header-badge">
+                    <span>●</span>
+                    <span>OpenStreetMap Data</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <div class="grid-layout">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Selection Mode Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-title-icon">🎯</div>
+                            Selection Mode
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="mode-toggle">
+                            <button class="mode-btn active" id="mode-boundary" onclick="setMode('boundary')">
+                                🏛️ Jurisdiction
+                            </button>
+                            <button class="mode-btn secondary" id="mode-point" onclick="setMode('point')">
+                                📍 Point + Radius
+                            </button>
+                        </div>
+
+                        <!-- Boundary Mode Section -->
+                        <div id="boundary-section">
+                            <div class="form-group">
+                                <label class="form-label">Virginia Jurisdiction</label>
+                                <select class="form-select" id="jurisdiction-select" onchange="onJurisdictionChange()">
+                                    <optgroup label="Counties">
+                                        <!-- Populated by JS -->
+                                    </optgroup>
+                                    <optgroup label="Cities">
+                                        <!-- Populated by JS -->
+                                    </optgroup>
+                                </select>
+                            </div>
+
+                            <div class="jurisdiction-info" id="jurisdiction-info">
+                                <div class="label">FIPS CODE</div>
+                                <div class="value" id="juris-fips">51087</div>
+                                <button class="btn btn-secondary btn-sm" onclick="retryBoundary()" style="margin-top: 0.5rem; width: 100%;">
+                                    🔄 Reload Boundary
+                                </button>
+                            </div>
+
+                            <div class="info-panel tigerweb" style="margin-top: 1rem;">
+                                <strong>⚡ Boundary Mode:</strong> Uses TIGERweb for exact boundaries, then queries Overpass in chunks to avoid timeouts. If queries fail, try "Major Roads Only" or wait a few minutes for servers to recover.
+                            </div>
+                        </div>
+
+                        <!-- Point Mode Section -->
+                        <div id="point-section" class="section-hidden">
+                            <div class="form-group">
+                                <label class="form-label">Coordinates (Click map or enter)</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-input" id="lat-input" 
+                                        placeholder="Latitude" step="0.0001" value="37.5407">
+                                    <input type="number" class="form-input" id="lon-input" 
+                                        placeholder="Longitude" step="0.0001" value="-77.4360">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Search Radius</label>
+                                <div class="radius-slider">
+                                    <input type="range" id="radius-slider" min="100" max="3000" value="500" step="100">
+                                    <span class="radius-value" id="radius-value">500m</span>
+                                </div>
+                            </div>
+
+                            <div class="info-panel" style="margin-top: 0.5rem;">
+                                <strong>📍 Point Mode:</strong> Click anywhere on map to set location, adjust radius, then extract.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-title-icon">⚙️</div>
+                            Filters
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label">Map Color Scheme</label>
+                            <div class="color-scheme-toggle">
+                                <button class="scheme-btn active" data-scheme="functional" onclick="setColorScheme('functional')">
+                                    🎯 Functional
+                                </button>
+                                <button class="scheme-btn" data-scheme="speed" onclick="setColorScheme('speed')">
+                                    🚗 Speed
+                                </button>
+                                <button class="scheme-btn" data-scheme="quality" onclick="setColorScheme('quality')">
+                                    📊 Quality
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Road Types</label>
+                            <select class="form-select" id="road-type-filter">
+                                <option value="all">All Road Types</option>
+                                <option value="major">Major Roads (Primary/Secondary/Tertiary)</option>
+                                <option value="residential">Residential Only</option>
+                                <option value="motorway">Highways/Motorways Only</option>
+                                <option value="collectors">Collectors (Secondary/Tertiary)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Data Enrichment</label>
+                            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;">
+                                    <input type="checkbox" id="enrich-vdot" checked style="accent-color: var(--accent-primary);">
+                                    Add VDOT functional class
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;">
+                                    <input type="checkbox" id="enrich-computed" checked style="accent-color: var(--accent-primary);">
+                                    Compute derived attributes
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;">
+                                    <input type="checkbox" id="enrich-quality" checked style="accent-color: var(--accent-primary);">
+                                    Add data quality scores
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="simplify-group">
+                            <label class="form-label">Query Strategy</label>
+                            <select class="form-select" id="query-strategy">
+                                <option value="major-only" selected>⚡ Major Roads Only (fastest, recommended)</option>
+                                <option value="chunked4">All Roads - Standard (4x4 grid)</option>
+                                <option value="chunked3">All Roads - Fast (3x3 grid)</option>
+                                <option value="fine">All Roads - Detailed (6x6 grid)</option>
+                                <option value="single">All Roads - Single query (small areas)</option>
+                            </select>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.3rem;">
+                                💡 "Major Roads Only" skips residential streets but is 10x faster
+                            </div>
+                        </div>
+
+                        <!-- Fetch Button -->
+                        <button class="btn btn-primary" id="fetch-btn" onclick="fetchRoadData()" style="margin-top: 1rem;">
+                            <span id="fetch-btn-text">🔍 Extract Road Attributes</span>
+                            <div class="spinner" id="fetch-spinner" style="display: none;"></div>
+                        </button>
+
+                        <div class="progress-container" id="progress-container" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                            </div>
+                            <div class="progress-text" id="progress-text">Initializing...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-title-icon">📊</div>
+                            Status
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-bar" id="status-bar">
+                            <span>Ready — Select a jurisdiction or point to begin</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+                <!-- Map Card -->
+                <div class="card" style="flex: 1;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-title-icon">🗺️</div>
+                            Map View
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary btn-sm" onclick="zoomToBoundary()">Fit Boundary</button>
+                            <button class="btn btn-secondary btn-sm" onclick="resetMap()">Reset</button>
+                        </div>
+                    </div>
+                    <div class="map-container">
+                        <div id="map">
+                            <!-- Legend will be added dynamically -->
+                        </div>
+                        <div class="map-legend" id="map-legend" style="display: none;">
+                            <h4>🎨 Road Classification</h4>
+                            <div class="legend-item" data-class="interstate" onclick="toggleLegendFilter('interstate')">
+                                <div class="legend-line interstate"></div>
+                                <span>Interstate</span>
+                                <span class="legend-count" id="count-interstate">0</span>
+                            </div>
+                            <div class="legend-item" data-class="freeway" onclick="toggleLegendFilter('freeway')">
+                                <div class="legend-line freeway"></div>
+                                <span>Freeway/Expwy</span>
+                                <span class="legend-count" id="count-freeway">0</span>
+                            </div>
+                            <div class="legend-item" data-class="arterial" onclick="toggleLegendFilter('arterial')">
+                                <div class="legend-line arterial"></div>
+                                <span>Arterial</span>
+                                <span class="legend-count" id="count-arterial">0</span>
+                            </div>
+                            <div class="legend-item" data-class="collector" onclick="toggleLegendFilter('collector')">
+                                <div class="legend-line collector"></div>
+                                <span>Collector</span>
+                                <span class="legend-count" id="count-collector">0</span>
+                            </div>
+                            <div class="legend-item" data-class="local" onclick="toggleLegendFilter('local')">
+                                <div class="legend-line local"></div>
+                                <span>Local</span>
+                                <span class="legend-count" id="count-local">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-title-icon">📋</div>
+                            Road Attributes Data
+                        </div>
+                        <div class="export-buttons">
+                            <button class="btn btn-secondary btn-sm" onclick="exportCSV()">📥 CSV</button>
+                            <button class="btn btn-secondary btn-sm" onclick="exportGeoJSON()">📥 GeoJSON</button>
+                            <button class="btn btn-secondary btn-sm" onclick="exportBoundary()">📥 Boundary</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Stats -->
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-roads">0</div>
+                                <div class="stat-label">Road Segments</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-length">0</div>
+                                <div class="stat-label">Centerline Mi</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-lane-miles">0</div>
+                                <div class="stat-label">Lane Miles</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-quality">0%</div>
+                                <div class="stat-label">Data Quality</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Secondary Stats -->
+                        <div class="stats-grid" style="margin-bottom: 1rem;">
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-lanes" style="font-size: 1.1rem;">0</div>
+                                <div class="stat-label">Has Lanes</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-speed" style="font-size: 1.1rem;">0</div>
+                                <div class="stat-label">Has Speed</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-arterial" style="font-size: 1.1rem;">0</div>
+                                <div class="stat-label">Arterials</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="stat-local" style="font-size: 1.1rem;">0</div>
+                                <div class="stat-label">Local Roads</div>
+                            </div>
+                        </div>
+
+                        <!-- Data Table -->
+                        <div class="data-table-container" id="data-container">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">🛣️</div>
+                                <div class="empty-state-text">
+                                    Select a jurisdiction and click "Extract Road Attributes"
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Boundary Data: <a href="https://tigerweb.geo.census.gov" target="_blank">US Census TIGERweb</a> | 
+        Road Data: <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> (ODbL) | 
+        Query: <a href="https://overpass-api.de/" target="_blank">Overpass API</a></p>
+    </footer>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        
+        // Virginia jurisdictions with FIPS codes
+        const JURISDICTIONS = {
+            // Counties
+            counties: [
+                { key: "accomack", name: "Accomack County", fips: "001", center: [37.76, -75.66] },
+                { key: "albemarle", name: "Albemarle County", fips: "003", center: [38.02, -78.56] },
+                { key: "alleghany", name: "Alleghany County", fips: "005", center: [37.79, -79.95] },
+                { key: "amelia", name: "Amelia County", fips: "007", center: [37.34, -77.98] },
+                { key: "amherst", name: "Amherst County", fips: "009", center: [37.6, -79.14] },
+                { key: "appomattox", name: "Appomattox County", fips: "011", center: [37.37, -78.81] },
+                { key: "arlington", name: "Arlington County", fips: "013", center: [38.88, -77.1], maintainsOwnRoads: true },
+                { key: "augusta", name: "Augusta County", fips: "015", center: [38.16, -79.13] },
+                { key: "bath", name: "Bath County", fips: "017", center: [38.07, -79.73] },
+                { key: "bedford", name: "Bedford County", fips: "019", center: [37.31, -79.52] },
+                { key: "bland", name: "Bland County", fips: "021", center: [37.1, -81.12] },
+                { key: "botetourt", name: "Botetourt County", fips: "023", center: [37.55, -79.81] },
+                { key: "brunswick", name: "Brunswick County", fips: "025", center: [36.76, -77.85] },
+                { key: "buchanan", name: "Buchanan County", fips: "027", center: [37.27, -82.03] },
+                { key: "buckingham", name: "Buckingham County", fips: "029", center: [37.55, -78.55] },
+                { key: "campbell", name: "Campbell County", fips: "031", center: [37.2, -79.09] },
+                { key: "caroline", name: "Caroline County", fips: "033", center: [38.03, -77.35] },
+                { key: "carroll", name: "Carroll County", fips: "035", center: [36.73, -80.73] },
+                { key: "charles_city", name: "Charles City County", fips: "036", center: [37.36, -77.06] },
+                { key: "charlotte", name: "Charlotte County", fips: "037", center: [37.01, -78.66] },
+                { key: "chesterfield", name: "Chesterfield County", fips: "041", center: [37.38, -77.5] },
+                { key: "clarke", name: "Clarke County", fips: "043", center: [39.11, -77.99] },
+                { key: "craig", name: "Craig County", fips: "045", center: [37.47, -80.23] },
+                { key: "culpeper", name: "Culpeper County", fips: "047", center: [38.49, -77.96] },
+                { key: "cumberland", name: "Cumberland County", fips: "049", center: [37.51, -78.24] },
+                { key: "dickenson", name: "Dickenson County", fips: "051", center: [37.12, -82.35] },
+                { key: "dinwiddie", name: "Dinwiddie County", fips: "053", center: [37.08, -77.58] },
+                { key: "essex", name: "Essex County", fips: "057", center: [37.94, -76.94] },
+                { key: "fairfax", name: "Fairfax County", fips: "059", center: [38.83, -77.28] },
+                { key: "fauquier", name: "Fauquier County", fips: "061", center: [38.72, -77.81] },
+                { key: "floyd", name: "Floyd County", fips: "063", center: [36.93, -80.36] },
+                { key: "fluvanna", name: "Fluvanna County", fips: "065", center: [37.84, -78.28] },
+                { key: "franklin", name: "Franklin County", fips: "067", center: [37.0, -79.89] },
+                { key: "frederick", name: "Frederick County", fips: "069", center: [39.28, -78.27] },
+                { key: "giles", name: "Giles County", fips: "071", center: [37.32, -80.66] },
+                { key: "gloucester", name: "Gloucester County", fips: "073", center: [37.41, -76.52] },
+                { key: "goochland", name: "Goochland County", fips: "075", center: [37.72, -77.93] },
+                { key: "grayson", name: "Grayson County", fips: "077", center: [36.66, -81.22] },
+                { key: "greene", name: "Greene County", fips: "079", center: [38.3, -78.47] },
+                { key: "greensville", name: "Greensville County", fips: "081", center: [36.68, -77.56] },
+                { key: "halifax", name: "Halifax County", fips: "083", center: [36.77, -78.93] },
+                { key: "hanover", name: "Hanover County", fips: "085", center: [37.76, -77.48] },
+                { key: "henrico", name: "Henrico County", fips: "087", center: [37.55, -77.45], maintainsOwnRoads: true },
+                { key: "henry", name: "Henry County", fips: "089", center: [36.68, -79.87] },
+                { key: "highland", name: "Highland County", fips: "091", center: [38.37, -79.56] },
+                { key: "isle_of_wight", name: "Isle of Wight County", fips: "093", center: [36.9, -76.71] },
+                { key: "james_city", name: "James City County", fips: "095", center: [37.31, -76.78] },
+                { key: "king_and_queen", name: "King and Queen County", fips: "097", center: [37.72, -76.88] },
+                { key: "king_george", name: "King George County", fips: "099", center: [38.27, -77.16] },
+                { key: "king_william", name: "King William County", fips: "101", center: [37.7, -77.08] },
+                { key: "lancaster", name: "Lancaster County", fips: "103", center: [37.7, -76.46] },
+                { key: "lee", name: "Lee County", fips: "105", center: [36.7, -83.12] },
+                { key: "loudoun", name: "Loudoun County", fips: "107", center: [39.08, -77.64] },
+                { key: "louisa", name: "Louisa County", fips: "109", center: [38.0, -78.0] },
+                { key: "lunenburg", name: "Lunenburg County", fips: "111", center: [36.95, -78.26] },
+                { key: "madison", name: "Madison County", fips: "113", center: [38.41, -78.28] },
+                { key: "mathews", name: "Mathews County", fips: "115", center: [37.43, -76.32] },
+                { key: "mecklenburg", name: "Mecklenburg County", fips: "117", center: [36.68, -78.37] },
+                { key: "middlesex", name: "Middlesex County", fips: "119", center: [37.61, -76.55] },
+                { key: "montgomery", name: "Montgomery County", fips: "121", center: [37.18, -80.39] },
+                { key: "nelson", name: "Nelson County", fips: "125", center: [37.79, -78.88] },
+                { key: "new_kent", name: "New Kent County", fips: "127", center: [37.52, -76.98] },
+                { key: "northampton", name: "Northampton County", fips: "131", center: [37.3, -75.93] },
+                { key: "northumberland", name: "Northumberland County", fips: "133", center: [37.87, -76.43] },
+                { key: "nottoway", name: "Nottoway County", fips: "135", center: [37.14, -78.05] },
+                { key: "orange", name: "Orange County", fips: "137", center: [38.24, -78.01] },
+                { key: "page", name: "Page County", fips: "139", center: [38.62, -78.47] },
+                { key: "patrick", name: "Patrick County", fips: "141", center: [36.68, -80.28] },
+                { key: "pittsylvania", name: "Pittsylvania County", fips: "143", center: [36.82, -79.39] },
+                { key: "powhatan", name: "Powhatan County", fips: "145", center: [37.55, -77.92] },
+                { key: "prince_edward", name: "Prince Edward County", fips: "147", center: [37.23, -78.44] },
+                { key: "prince_george", name: "Prince George County", fips: "149", center: [37.19, -77.22] },
+                { key: "prince_william", name: "Prince William County", fips: "153", center: [38.7, -77.48] },
+                { key: "pulaski", name: "Pulaski County", fips: "155", center: [37.06, -80.72] },
+                { key: "rappahannock", name: "Rappahannock County", fips: "157", center: [38.68, -78.16] },
+                { key: "richmond", name: "Richmond County", fips: "159", center: [37.94, -76.73] },
+                { key: "roanoke", name: "Roanoke County", fips: "161", center: [37.28, -80.05] },
+                { key: "rockbridge", name: "Rockbridge County", fips: "163", center: [37.81, -79.45] },
+                { key: "rockingham", name: "Rockingham County", fips: "165", center: [38.52, -78.88] },
+                { key: "russell", name: "Russell County", fips: "167", center: [36.93, -82.1] },
+                { key: "scott", name: "Scott County", fips: "169", center: [36.71, -82.61] },
+                { key: "shenandoah", name: "Shenandoah County", fips: "171", center: [38.86, -78.57] },
+                { key: "smyth", name: "Smyth County", fips: "173", center: [36.85, -81.54] },
+                { key: "southampton", name: "Southampton County", fips: "175", center: [36.72, -77.1] },
+                { key: "spotsylvania", name: "Spotsylvania County", fips: "177", center: [38.18, -77.65] },
+                { key: "stafford", name: "Stafford County", fips: "179", center: [38.42, -77.45] },
+                { key: "surry", name: "Surry County", fips: "181", center: [37.12, -76.88] },
+                { key: "sussex", name: "Sussex County", fips: "183", center: [36.92, -77.27] },
+                { key: "tazewell", name: "Tazewell County", fips: "185", center: [37.12, -81.52] },
+                { key: "warren", name: "Warren County", fips: "187", center: [38.91, -78.21] },
+                { key: "washington", name: "Washington County", fips: "191", center: [36.75, -81.95] },
+                { key: "westmoreland", name: "Westmoreland County", fips: "193", center: [38.11, -76.8] },
+                { key: "wise", name: "Wise County", fips: "195", center: [36.97, -82.62] },
+                { key: "wythe", name: "Wythe County", fips: "197", center: [36.92, -81.08] },
+                { key: "york", name: "York County", fips: "199", center: [37.22, -76.54] }
+            ],
+            // Independent Cities
+            cities: [
+                { key: "alexandria", name: "Alexandria City", fips: "510", center: [38.82, -77.08] },
+                { key: "bristol", name: "Bristol City", fips: "520", center: [36.6, -82.19] },
+                { key: "buena_vista", name: "Buena Vista City", fips: "530", center: [37.73, -79.35] },
+                { key: "charlottesville", name: "Charlottesville City", fips: "540", center: [38.03, -78.48] },
+                { key: "chesapeake", name: "Chesapeake City", fips: "550", center: [36.77, -76.29] },
+                { key: "colonial_heights", name: "Colonial Heights City", fips: "570", center: [37.26, -77.4] },
+                { key: "covington", name: "Covington City", fips: "580", center: [37.79, -79.99] },
+                { key: "danville", name: "Danville City", fips: "590", center: [36.59, -79.39] },
+                { key: "emporia", name: "Emporia City", fips: "595", center: [36.69, -77.54] },
+                { key: "fairfax_city", name: "Fairfax City", fips: "600", center: [38.85, -77.3] },
+                { key: "falls_church", name: "Falls Church City", fips: "610", center: [38.88, -77.17] },
+                { key: "franklin_city", name: "Franklin City", fips: "620", center: [36.68, -76.92] },
+                { key: "fredericksburg", name: "Fredericksburg City", fips: "630", center: [38.3, -77.46] },
+                { key: "galax", name: "Galax City", fips: "640", center: [36.66, -80.92] },
+                { key: "hampton", name: "Hampton City", fips: "650", center: [37.03, -76.35] },
+                { key: "harrisonburg", name: "Harrisonburg City", fips: "660", center: [38.45, -78.87] },
+                { key: "hopewell", name: "Hopewell City", fips: "670", center: [37.3, -77.29] },
+                { key: "lexington", name: "Lexington City", fips: "678", center: [37.78, -79.44] },
+                { key: "lynchburg", name: "Lynchburg City", fips: "680", center: [37.41, -79.14] },
+                { key: "manassas", name: "Manassas City", fips: "683", center: [38.75, -77.47] },
+                { key: "manassas_park", name: "Manassas Park City", fips: "685", center: [38.77, -77.47] },
+                { key: "martinsville", name: "Martinsville City", fips: "690", center: [36.69, -79.87] },
+                { key: "newport_news", name: "Newport News City", fips: "700", center: [37.09, -76.47] },
+                { key: "norfolk", name: "Norfolk City", fips: "710", center: [36.85, -76.29] },
+                { key: "norton", name: "Norton City", fips: "720", center: [36.93, -82.63] },
+                { key: "petersburg", name: "Petersburg City", fips: "730", center: [37.23, -77.4] },
+                { key: "poquoson", name: "Poquoson City", fips: "735", center: [37.12, -76.35] },
+                { key: "portsmouth", name: "Portsmouth City", fips: "740", center: [36.84, -76.35] },
+                { key: "radford", name: "Radford City", fips: "750", center: [37.13, -80.58] },
+                { key: "richmond_city", name: "Richmond City", fips: "760", center: [37.54, -77.44] },
+                { key: "roanoke_city", name: "Roanoke City", fips: "770", center: [37.27, -79.94] },
+                { key: "salem", name: "Salem City", fips: "775", center: [37.29, -80.05] },
+                { key: "staunton", name: "Staunton City", fips: "790", center: [38.15, -79.07] },
+                { key: "suffolk", name: "Suffolk City", fips: "800", center: [36.73, -76.58] },
+                { key: "virginia_beach", name: "Virginia Beach City", fips: "810", center: [36.85, -75.98] },
+                { key: "waynesboro", name: "Waynesboro City", fips: "820", center: [38.07, -78.89] },
+                { key: "williamsburg", name: "Williamsburg City", fips: "830", center: [37.27, -76.71] },
+                { key: "winchester", name: "Winchester City", fips: "840", center: [39.19, -78.17] }
+            ]
+        };
+
+        // TIGERweb API configuration
+        const TIGERWEB_BASE_URL = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer';
+        const TIGERWEB_COUNTY_LAYER = 82; // Counties layer
+        const STATE_FIPS = '51'; // Virginia
+
+        // Overpass API endpoints with fallbacks - ordered by reliability
+        // Note: Some servers may be temporarily overloaded
+        const OVERPASS_ENDPOINTS = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
+            'https://overpass.openstreetmap.fr/api/interpreter',
+            'https://z.overpass-api.de/api/interpreter'
+        ];
+        let currentEndpointIndex = 0;
+        let consecutiveFailures = 0;
+
+        // ==================== GLOBAL STATE ====================
+        
+        let map;
+        let marker;
+        let roadLayer;
+        let boundaryLayer;
+        let radiusCircle;
+        let roadData = [];
+        let currentBoundary = null;
+        let currentMode = 'boundary';
+        let selectedLat = 37.5407;
+        let selectedLon = -77.4360;
+        let searchRadius = 500;
+        let selectedJurisdiction = null;
+
+        // ==================== INITIALIZATION ====================
+        
+        function initMap() {
+            map = L.map('map').setView([37.55, -77.45], 10);
+
+            // Dark styled tile layer
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Initialize layers
+            roadLayer = L.layerGroup().addTo(map);
+            boundaryLayer = L.layerGroup().addTo(map);
+
+            // Map click handler for point mode
+            map.on('click', function(e) {
+                if (currentMode === 'point') {
+                    updateCoordinates(e.latlng.lat, e.latlng.lng);
+                    if (marker) {
+                        marker.setLatLng(e.latlng);
+                    } else {
+                        marker = L.marker(e.latlng, { draggable: true }).addTo(map);
+                        marker.on('dragend', function(ev) {
+                            const pos = ev.target.getLatLng();
+                            updateCoordinates(pos.lat, pos.lng);
+                        });
+                    }
+                }
+            });
+
+            // Populate jurisdiction dropdown
+            populateJurisdictionDropdown();
+
+            // Set default jurisdiction (Henrico)
+            document.getElementById('jurisdiction-select').value = 'henrico';
+            onJurisdictionChange();
+
+            // Setup event listeners
+            setupEventListeners();
+        }
+
+        function populateJurisdictionDropdown() {
+            const select = document.getElementById('jurisdiction-select');
+            
+            // Counties optgroup
+            const countiesGroup = select.querySelector('optgroup[label="Counties"]');
+            JURISDICTIONS.counties.forEach(j => {
+                const option = document.createElement('option');
+                option.value = j.key;
+                option.textContent = j.name;
+                if (j.maintainsOwnRoads) {
+                    option.textContent += ' ★';
+                }
+                countiesGroup.appendChild(option);
+            });
+
+            // Cities optgroup
+            const citiesGroup = select.querySelector('optgroup[label="Cities"]');
+            JURISDICTIONS.cities.forEach(j => {
+                const option = document.createElement('option');
+                option.value = j.key;
+                option.textContent = j.name;
+                citiesGroup.appendChild(option);
+            });
+        }
+
+        function setupEventListeners() {
+            // Radius slider
+            document.getElementById('radius-slider').addEventListener('input', function(e) {
+                searchRadius = parseInt(e.target.value);
+                document.getElementById('radius-value').textContent = searchRadius + 'm';
+                if (radiusCircle) {
+                    radiusCircle.setRadius(searchRadius);
+                }
+            });
+
+            // Coordinate inputs
+            document.getElementById('lat-input').addEventListener('change', function() {
+                selectedLat = parseFloat(this.value);
+                if (marker) marker.setLatLng([selectedLat, selectedLon]);
+                map.setView([selectedLat, selectedLon], 14);
+            });
+
+            document.getElementById('lon-input').addEventListener('change', function() {
+                selectedLon = parseFloat(this.value);
+                if (marker) marker.setLatLng([selectedLat, selectedLon]);
+                map.setView([selectedLat, selectedLon], 14);
+            });
+        }
+
+        // ==================== MODE SWITCHING ====================
+        
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Update UI
+            document.getElementById('mode-boundary').classList.toggle('active', mode === 'boundary');
+            document.getElementById('mode-point').classList.toggle('active', mode === 'point');
+            document.getElementById('mode-point').classList.toggle('secondary', mode === 'point');
+            
+            document.getElementById('boundary-section').classList.toggle('section-hidden', mode !== 'boundary');
+            document.getElementById('point-section').classList.toggle('section-hidden', mode !== 'point');
+            document.getElementById('simplify-group').style.display = mode === 'boundary' ? 'block' : 'none';
+
+            // Clear layers based on mode
+            if (mode === 'boundary') {
+                if (marker) {
+                    map.removeLayer(marker);
+                    marker = null;
+                }
+                if (radiusCircle) {
+                    map.removeLayer(radiusCircle);
+                    radiusCircle = null;
+                }
+                // Reload boundary if jurisdiction selected
+                if (selectedJurisdiction) {
+                    fetchBoundary(selectedJurisdiction.fips);
+                }
+            } else {
+                boundaryLayer.clearLayers();
+                currentBoundary = null;
+                // Add marker for point mode
+                if (!marker) {
+                    marker = L.marker([selectedLat, selectedLon], { draggable: true }).addTo(map);
+                    marker.on('dragend', function(e) {
+                        const pos = e.target.getLatLng();
+                        updateCoordinates(pos.lat, pos.lng);
+                    });
+                }
+                map.setView([selectedLat, selectedLon], 14);
+            }
+        }
+
+        // ==================== JURISDICTION HANDLING ====================
+        
+        function onJurisdictionChange() {
+            const key = document.getElementById('jurisdiction-select').value;
+            
+            // Find jurisdiction in counties or cities
+            selectedJurisdiction = JURISDICTIONS.counties.find(j => j.key === key) ||
+                                   JURISDICTIONS.cities.find(j => j.key === key);
+            
+            if (selectedJurisdiction) {
+                // Update FIPS display
+                const fipsCode = selectedJurisdiction.fips.length === 3 
+                    ? STATE_FIPS + selectedJurisdiction.fips 
+                    : STATE_FIPS + selectedJurisdiction.fips;
+                document.getElementById('juris-fips').textContent = fipsCode;
+                
+                // Fetch boundary
+                fetchBoundary(selectedJurisdiction.fips);
+                
+                // Center map
+                map.setView(selectedJurisdiction.center, selectedJurisdiction.fips.length === 3 ? 12 : 10);
+                
+                updateStatus(`Selected: ${selectedJurisdiction.name}`, 'success');
+            }
+        }
+
+        async function fetchBoundary(fips) {
+            updateStatus('Fetching boundary from TIGERweb...', 'loading');
+            
+            try {
+                // TIGERweb Counties layer (82) contains both counties and independent cities for Virginia
+                // Using exact format from working example URL
+                const url = `${TIGERWEB_BASE_URL}/${TIGERWEB_COUNTY_LAYER}/query?` + 
+                    `where=COUNTY=%27${fips}%27%20AND%20STATE=%27${STATE_FIPS}%27` +
+                    `&outFields=*&returnGeometry=true&f=geojson&outSR=4326`;
+
+                console.log('Fetching boundary:', url);
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+                const response = await fetch(url, { 
+                    signal: controller.signal,
+                    mode: 'cors'
+                });
+                clearTimeout(timeoutId);
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const geojson = await response.json();
+                console.log('TIGERweb response:', geojson);
+                
+                if (geojson.features && geojson.features.length > 0) {
+                    currentBoundary = geojson.features[0];
+                    displayBoundary(currentBoundary);
+                    updateStatus(`✓ Boundary loaded: ${selectedJurisdiction.name}`, 'success');
+                } else if (geojson.error) {
+                    throw new Error(geojson.error.message || 'API error');
+                } else {
+                    // Try alternative: fetch using GEOID
+                    console.log('No features found, trying fallback...');
+                    await fetchBoundaryFallback(fips);
+                }
+            } catch (error) {
+                console.error('Boundary fetch error:', error);
+                if (error.name === 'AbortError') {
+                    updateStatus(`⚠ Boundary request timed out. Click "Extract" to retry.`, 'warning');
+                } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    updateStatus(`⚠ Network error fetching boundary. TIGERweb may be temporarily unavailable.`, 'warning');
+                    // Still allow user to try point mode
+                } else {
+                    updateStatus(`⚠ Could not fetch boundary: ${error.message}`, 'error');
+                }
+                currentBoundary = null;
+            }
+        }
+
+        async function fetchBoundaryFallback(fips) {
+            // Fallback: query by GEOID which combines state+county FIPS
+            const geoid = STATE_FIPS + fips;
+            const url = `${TIGERWEB_BASE_URL}/${TIGERWEB_COUNTY_LAYER}/query?` +
+                `where=GEOID=%27${geoid}%27` +
+                `&outFields=*&returnGeometry=true&f=geojson&outSR=4326`;
+            
+            console.log('Fallback URL:', url);
+            
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`Fallback HTTP ${response.status}`);
+            
+            const geojson = await response.json();
+            
+            if (geojson.features && geojson.features.length > 0) {
+                currentBoundary = geojson.features[0];
+                displayBoundary(currentBoundary);
+                updateStatus(`✓ Boundary loaded: ${selectedJurisdiction.name}`, 'success');
+            } else {
+                throw new Error('Boundary not found in TIGERweb');
+            }
+        }
+
+        function displayBoundary(feature) {
+            boundaryLayer.clearLayers();
+            
+            const style = {
+                color: '#22c55e',
+                weight: 3,
+                fillColor: '#22c55e',
+                fillOpacity: 0.08,
+                dashArray: '8, 4'
+            };
+
+            const layer = L.geoJSON(feature, { style }).addTo(boundaryLayer);
+            
+            // Fit map to boundary
+            map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+        }
+
+        // ==================== COORDINATE HELPERS ====================
+        
+        function updateCoordinates(lat, lon) {
+            selectedLat = parseFloat(lat.toFixed(6));
+            selectedLon = parseFloat(lon.toFixed(6));
+            document.getElementById('lat-input').value = selectedLat;
+            document.getElementById('lon-input').value = selectedLon;
+            
+            if (radiusCircle) {
+                radiusCircle.setLatLng([selectedLat, selectedLon]);
+            }
+        }
+
+        // ==================== ROAD DATA FETCHING ====================
+        
+        async function fetchRoadData() {
+            const btn = document.getElementById('fetch-btn');
+            const btnText = document.getElementById('fetch-btn-text');
+            const spinner = document.getElementById('fetch-spinner');
+            const progressContainer = document.getElementById('progress-container');
+
+            // Update UI
+            btn.disabled = true;
+            btnText.style.display = 'none';
+            spinner.style.display = 'block';
+            progressContainer.style.display = 'block';
+            updateProgress(0, 'Initializing...');
+
+            // Clear previous data
+            roadLayer.clearLayers();
+            roadData = [];
+
+            try {
+                if (currentMode === 'boundary') {
+                    await fetchRoadsByBoundary();
+                } else {
+                    await fetchRoadsByPoint();
+                }
+
+                updateStats();
+                renderDataTable();
+                
+                // Fit map to roads if we have any
+                if (roadData.length > 0 && roadLayer.getLayers().length > 0) {
+                    try {
+                        const bounds = roadLayer.getBounds();
+                        if (bounds.isValid()) {
+                            map.fitBounds(bounds, { padding: [30, 30] });
+                        }
+                    } catch (e) {
+                        console.warn('Could not fit to road bounds:', e);
+                    }
+                }
+
+                updateStatus(`✓ Found ${roadData.length} road segments`, 'success');
+            } catch (error) {
+                console.error('Fetch error:', error);
+                
+                // Check if it's likely a server overload issue
+                const isOverloadError = error.message.includes('timeout') || 
+                                        error.message.includes('failed') ||
+                                        error.message.includes('overloaded') ||
+                                        error.message.includes('All') ||
+                                        error.message.includes('No roads');
+                
+                const currentStrategy = document.getElementById('query-strategy').value;
+                
+                if (isOverloadError && currentStrategy !== 'major-only') {
+                    updateStatus(`✗ ${error.message}`, 'error');
+                    
+                    // Show helpful suggestion
+                    setTimeout(() => {
+                        const statusPanel = document.getElementById('status-panel');
+                        const existingSuggestion = statusPanel.querySelector('.overload-suggestion');
+                        if (existingSuggestion) existingSuggestion.remove();
+                        
+                        const suggestion = document.createElement('div');
+                        suggestion.className = 'overload-suggestion';
+                        suggestion.innerHTML = `
+                            <div style="margin-top: 0.5rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; border-radius: 6px;">
+                                <strong style="color: #f59e0b;">💡 Servers Overloaded - Try This:</strong>
+                                <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <button onclick="document.getElementById('query-strategy').value='major-only'; document.getElementById('fetch-btn').click(); this.closest('.overload-suggestion').remove();" 
+                                            style="padding: 0.5rem 1rem; background: #f59e0b; color: black; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+                                        ⚡ Try Major Roads Only
+                                    </button>
+                                    <button onclick="this.closest('.overload-suggestion').remove(); document.getElementById('fetch-btn').click();" 
+                                            style="padding: 0.5rem 1rem; background: transparent; color: #f59e0b; border: 1px solid #f59e0b; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">
+                                        🔄 Retry Current
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        statusPanel.appendChild(suggestion);
+                    }, 100);
+                } else {
+                    updateStatus(`✗ ${error.message}`, 'error');
+                }
+            }
+
+            // Reset UI
+            btn.disabled = false;
+            btnText.style.display = 'inline-flex';
+            spinner.style.display = 'none';
+            progressContainer.style.display = 'none';
+        }
+
+        async function fetchRoadsByBoundary() {
+            if (!currentBoundary) {
+                // Try to fetch boundary again
+                if (selectedJurisdiction) {
+                    await fetchBoundary(selectedJurisdiction.fips);
+                }
+                
+                if (!currentBoundary) {
+                    throw new Error('Boundary not loaded. Please wait for the boundary to appear on the map (green dashed line), or try selecting the jurisdiction again.');
+                }
+            }
+
+            updateProgress(10, 'Calculating bounding box...');
+            consecutiveFailures = 0;
+
+            // Get bounding box from boundary
+            const bbox = getBoundingBox(currentBoundary.geometry);
+            
+            console.log('Bounding box:', bbox);
+
+            const strategy = document.getElementById('query-strategy').value;
+            
+            switch (strategy) {
+                case 'single':
+                    updateProgress(15, 'Using single bounding box query...');
+                    await fetchRoadsSingleBbox(bbox);
+                    break;
+                case 'fine':
+                    updateProgress(15, 'Using fine grid (6x6) queries...');
+                    await fetchRoadsChunked(bbox, 6);
+                    break;
+                case 'chunked3':
+                    updateProgress(15, 'Using fast (3x3) grid queries...');
+                    await fetchRoadsChunked(bbox, 3);
+                    break;
+                case 'major-only':
+                    updateProgress(15, 'Fetching major roads only (fastest)...');
+                    await fetchMajorRoadsOnly(bbox);
+                    break;
+                case 'chunked4':
+                default:
+                    updateProgress(15, 'Using standard (4x4) grid queries...');
+                    await fetchRoadsChunked(bbox, 4);
+                    break;
+            }
+        }
+
+        async function fetchMajorRoadsOnly(bbox) {
+            // Only fetch arterials and above - much faster
+            const query = `
+                [out:json][timeout:120];
+                (
+                    way["highway"~"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link"](${bbox.minLat},${bbox.minLon},${bbox.maxLat},${bbox.maxLon});
+                );
+                out body geom;
+            `;
+
+            updateProgress(30, 'Querying major roads only...');
+            await executeOverpassQuery(query);
+        }
+
+        async function fetchRoadsSingleBbox(bbox) {
+            const roadTypeFilter = getRoadTypeFilter();
+            
+            // Overpass bbox format: (south,west,north,east)
+            const query = `
+                [out:json][timeout:90];
+                (
+                    way${roadTypeFilter}(${bbox.minLat},${bbox.minLon},${bbox.maxLat},${bbox.maxLon});
+                );
+                out body geom;
+            `;
+
+            updateProgress(30, 'Querying Overpass API...');
+            await executeOverpassQuery(query);
+        }
+
+        async function fetchRoadsChunked(bbox, gridSize = 4) {
+            const roadTypeFilter = getRoadTypeFilter();
+            
+            // Divide into grid chunks
+            const latStep = (bbox.maxLat - bbox.minLat) / gridSize;
+            const lonStep = (bbox.maxLon - bbox.minLon) / gridSize;
+            
+            const chunks = [];
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    chunks.push({
+                        minLat: bbox.minLat + (i * latStep),
+                        maxLat: bbox.minLat + ((i + 1) * latStep),
+                        minLon: bbox.minLon + (j * lonStep),
+                        maxLon: bbox.minLon + ((j + 1) * lonStep)
+                    });
+                }
+            }
+
+            let allElements = [];
+            const seenIds = new Set();
+            let successfulChunks = 0;
+            let failedChunks = 0;
+
+            for (let idx = 0; idx < chunks.length; idx++) {
+                const chunk = chunks[idx];
+                const progress = 20 + Math.round((idx / chunks.length) * 60);
+                updateProgress(progress, `Fetching chunk ${idx + 1}/${chunks.length}...`);
+
+                const query = `
+                    [out:json][timeout:45];
+                    (
+                        way${roadTypeFilter}(${chunk.minLat},${chunk.minLon},${chunk.maxLat},${chunk.maxLon});
+                    );
+                    out body geom;
+                `;
+
+                try {
+                    const elements = await executeOverpassQueryChunk(query);
+                    if (elements && elements.length > 0) {
+                        successfulChunks++;
+                        // Deduplicate
+                        let newCount = 0;
+                        elements.forEach(el => {
+                            if (!seenIds.has(el.id)) {
+                                seenIds.add(el.id);
+                                allElements.push(el);
+                                newCount++;
+                            }
+                        });
+                        updateProgress(progress, `Chunk ${idx + 1}/${chunks.length}: +${newCount} roads (total: ${allElements.length})`);
+                    } else {
+                        failedChunks++;
+                        updateProgress(progress, `Chunk ${idx + 1}/${chunks.length}: no data or failed`);
+                    }
+                } catch (e) {
+                    console.warn(`Chunk ${idx + 1} failed:`, e.message);
+                    failedChunks++;
+                }
+
+                // Delay between chunks - longer if we're having failures
+                if (idx < chunks.length - 1) {
+                    const delayMs = consecutiveFailures > 2 ? 2000 : 800;
+                    await new Promise(r => setTimeout(r, delayMs));
+                }
+            }
+
+            updateProgress(85, `Processing ${allElements.length} roads from ${successfulChunks}/${chunks.length} chunks...`);
+            
+            if (allElements.length > 0) {
+                processRoadData(allElements);
+                if (failedChunks > 0) {
+                    updateStatus(`⚠ Partial data: ${failedChunks} of ${chunks.length} chunks failed. Found ${allElements.length} roads.`, 'warning');
+                }
+            } else {
+                throw new Error(`No roads found. ${successfulChunks}/${chunks.length} chunks succeeded. Overpass servers may be overloaded - try again in a few minutes or use "Major Roads Only".`);
+            }
+
+            updateProgress(100, 'Complete!');
+        }
+
+        async function executeOverpassQueryChunk(query, retryCount = 0) {
+            const maxRetries = 2;
+            
+            for (let i = 0; i < OVERPASS_ENDPOINTS.length; i++) {
+                const endpointIdx = (currentEndpointIndex + i) % OVERPASS_ENDPOINTS.length;
+                const endpoint = OVERPASS_ENDPOINTS[endpointIdx];
+                
+                try {
+                    console.log(`Chunk query to ${endpoint}`);
+                    
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        body: `data=${encodeURIComponent(query)}`,
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        if (response.status === 429) {
+                            console.warn(`Rate limited at ${endpoint}, waiting and trying next...`);
+                            await new Promise(r => setTimeout(r, 2000));
+                            continue;
+                        }
+                        if (response.status === 504 || response.status === 503) {
+                            console.warn(`Server overloaded at ${endpoint}, trying next...`);
+                            continue;
+                        }
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    // Check content type
+                    const contentType = response.headers.get('content-type') || '';
+                    if (!contentType.includes('application/json') && !contentType.includes('text/javascript')) {
+                        console.warn(`Non-JSON response from ${endpoint}, trying next...`);
+                        continue;
+                    }
+
+                    const text = await response.text();
+                    
+                    // Check if it's actually JSON
+                    if (text.trim().startsWith('<')) {
+                        console.warn(`HTML response from ${endpoint}, trying next...`);
+                        continue;
+                    }
+
+                    const data = JSON.parse(text);
+                    
+                    if (data.elements) {
+                        currentEndpointIndex = endpointIdx;
+                        consecutiveFailures = 0;
+                        return data.elements;
+                    } else if (data.remark) {
+                        console.warn('Overpass remark:', data.remark);
+                        if (data.remark.includes('rate_limited') || data.remark.includes('timeout')) {
+                            await new Promise(r => setTimeout(r, 3000));
+                        }
+                        continue;
+                    }
+                } catch (error) {
+                    console.warn(`Chunk query to ${endpoint} failed:`, error.message);
+                    
+                    if (error.name === 'AbortError') {
+                        console.warn('Request timed out');
+                    }
+                }
+            }
+            
+            // All endpoints failed - retry with backoff if we haven't exceeded retries
+            consecutiveFailures++;
+            
+            if (retryCount < maxRetries && consecutiveFailures < 10) {
+                const backoffTime = Math.min(5000 * Math.pow(2, retryCount), 30000);
+                console.log(`All endpoints failed, retrying in ${backoffTime/1000}s...`);
+                await new Promise(r => setTimeout(r, backoffTime));
+                return executeOverpassQueryChunk(query, retryCount + 1);
+            }
+            
+            return null;
+        }
+
+        function getBoundingBox(geometry) {
+            let minLat = Infinity, maxLat = -Infinity;
+            let minLon = Infinity, maxLon = -Infinity;
+
+            const processCoords = (coords) => {
+                coords.forEach(coord => {
+                    if (Array.isArray(coord[0])) {
+                        processCoords(coord);
+                    } else {
+                        const [lon, lat] = coord;
+                        minLat = Math.min(minLat, lat);
+                        maxLat = Math.max(maxLat, lat);
+                        minLon = Math.min(minLon, lon);
+                        maxLon = Math.max(maxLon, lon);
+                    }
+                });
+            };
+
+            if (geometry.type === 'Polygon') {
+                processCoords(geometry.coordinates);
+            } else if (geometry.type === 'MultiPolygon') {
+                geometry.coordinates.forEach(poly => processCoords(poly));
+            }
+
+            return { minLat, maxLat, minLon, maxLon };
+        }
+
+        async function fetchRoadsByPoint() {
+            // Add radius circle
+            if (radiusCircle) map.removeLayer(radiusCircle);
+            radiusCircle = L.circle([selectedLat, selectedLon], {
+                radius: searchRadius,
+                color: '#06b6d4',
+                fillColor: '#06b6d4',
+                fillOpacity: 0.1,
+                weight: 2
+            }).addTo(map);
+
+            updateProgress(20, 'Querying roads within radius...');
+
+            const roadTypeFilter = getRoadTypeFilter();
+            const query = `
+                [out:json][timeout:30];
+                (
+                    way${roadTypeFilter}(around:${searchRadius},${selectedLat},${selectedLon});
+                );
+                out body geom;
+            `;
+
+            await executeOverpassQuery(query);
+        }
+
+        async function executeOverpassQuery(query) {
+            let success = false;
+            let lastError = null;
+
+            for (let i = 0; i < OVERPASS_ENDPOINTS.length && !success; i++) {
+                const endpoint = OVERPASS_ENDPOINTS[(currentEndpointIndex + i) % OVERPASS_ENDPOINTS.length];
+                
+                try {
+                    updateProgress(40 + (i * 10), `Trying server ${i + 1}/${OVERPASS_ENDPOINTS.length}...`);
+                    console.log(`Query to ${endpoint}`);
+                    
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minute timeout
+
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        body: `data=${encodeURIComponent(query)}`,
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        if (response.status === 429) {
+                            console.warn(`Rate limited at ${endpoint}, waiting...`);
+                            lastError = new Error('Rate limited (429) - servers busy');
+                            await new Promise(r => setTimeout(r, 3000));
+                            continue;
+                        }
+                        if (response.status === 504 || response.status === 503) {
+                            console.warn(`Server overloaded at ${endpoint}`);
+                            lastError = new Error('Server overloaded (504/503)');
+                            continue;
+                        }
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    // Check content type to avoid parsing HTML error pages
+                    const contentType = response.headers.get('content-type') || '';
+                    if (!contentType.includes('application/json') && !contentType.includes('text/javascript')) {
+                        console.warn(`Non-JSON response from ${endpoint}`);
+                        lastError = new Error('Invalid response format');
+                        continue;
+                    }
+
+                    updateProgress(70, 'Processing response...');
+                    
+                    const text = await response.text();
+                    
+                    // Check if response is actually HTML
+                    if (text.trim().startsWith('<')) {
+                        console.warn(`HTML response from ${endpoint}`);
+                        lastError = new Error('Server returned error page');
+                        continue;
+                    }
+                    
+                    const data = JSON.parse(text);
+                    
+                    if (data.elements) {
+                        updateProgress(85, 'Rendering roads...');
+                        processRoadData(data.elements);
+                        success = true;
+                        currentEndpointIndex = (currentEndpointIndex + i) % OVERPASS_ENDPOINTS.length;
+                    } else if (data.remark) {
+                        // Overpass error message
+                        console.warn('Overpass remark:', data.remark);
+                        lastError = new Error(data.remark.substring(0, 100));
+                        continue;
+                    }
+
+                } catch (error) {
+                    console.warn(`Endpoint ${endpoint} failed:`, error.message);
+                    if (error.name === 'AbortError') {
+                        lastError = new Error('Request timed out - try "Major Roads Only" or smaller area');
+                    } else {
+                        lastError = error;
+                    }
+                }
+            }
+
+            if (!success) {
+                throw new Error(lastError?.message || 'All Overpass servers failed. Try "Major Roads Only" option or wait a few minutes.');
+            }
+
+            updateProgress(100, 'Complete!');
+        }
+
+        // ==================== DATA PROCESSING ====================
+        
+        function getRoadTypeFilter() {
+            const filter = document.getElementById('road-type-filter').value;
+            
+            switch (filter) {
+                case 'major':
+                    return '["highway"~"primary|secondary|tertiary|primary_link|secondary_link|tertiary_link"]';
+                case 'residential':
+                    return '["highway"="residential"]';
+                case 'motorway':
+                    return '["highway"~"motorway|motorway_link|trunk|trunk_link"]';
+                case 'collectors':
+                    return '["highway"~"secondary|secondary_link|tertiary|tertiary_link"]';
+                default:
+                    return '["highway"~"motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street"]';
+            }
+        }
+
+        function processRoadData(elements) {
+            roadData = [];
+            let totalLength = 0;
+
+            const enrichVDOT = document.getElementById('enrich-vdot')?.checked ?? true;
+            const enrichComputed = document.getElementById('enrich-computed')?.checked ?? true;
+            const enrichQuality = document.getElementById('enrich-quality')?.checked ?? true;
+
+            elements.forEach(element => {
+                if (element.type === 'way' && element.geometry) {
+                    const tags = element.tags || {};
+
+                    // Calculate length
+                    const length = calculateRoadLength(element.geometry);
+                    totalLength += length;
+
+                    const road = {
+                        id: element.id,
+                        name: tags.name || 'Unnamed',
+                        highway: tags.highway || 'unknown',
+                        lanes: tags.lanes || null,
+                        lanes_forward: tags['lanes:forward'] || null,
+                        lanes_backward: tags['lanes:backward'] || null,
+                        maxspeed: tags.maxspeed || null,
+                        oneway: tags.oneway || 'no',
+                        surface: tags.surface || null,
+                        width: tags.width || null,
+                        lit: tags.lit || null,
+                        sidewalk: tags.sidewalk || null,
+                        cycleway: tags.cycleway || null,
+                        turn_lanes: tags['turn:lanes'] || tags['turn:lanes:forward'] || null,
+                        ref: tags.ref || null,
+                        length_m: length,
+                        geometry: element.geometry
+                    };
+
+                    // === DATA ENRICHMENT ===
+                    
+                    // VDOT Functional Classification (inferred from OSM type)
+                    if (enrichVDOT) {
+                        road.functional_class = inferFunctionalClass(road.highway, road.ref);
+                        road.functional_class_code = getFunctionalClassCode(road.functional_class);
+                        road.road_system = inferRoadSystem(road.highway, road.ref);
+                        road.maintenance = inferMaintenance(road.highway, road.ref, selectedJurisdiction);
+                    }
+
+                    // Computed/Estimated attributes
+                    if (enrichComputed) {
+                        road.est_lanes = road.lanes || estimateLanes(road.highway, road.oneway);
+                        road.est_speed_mph = road.maxspeed ? parseSpeed(road.maxspeed) : estimateSpeed(road.highway);
+                        road.est_width_ft = road.width ? parseWidth(road.width) : estimateWidth(road.highway, road.est_lanes);
+                        road.lane_miles = (length / 1609.34) * (parseInt(road.est_lanes) || 2);
+                        road.centerline_miles = length / 1609.34;
+                    }
+
+                    // Data quality score
+                    if (enrichQuality) {
+                        road.data_quality = calculateDataQuality(road);
+                        road.missing_critical = getMissingCritical(road);
+                    }
+
+                    roadData.push(road);
+
+                    // Add to map
+                    const coords = element.geometry.map(p => [p.lat, p.lon]);
+                    const color = getRoadColor(road.highway, road);
+                    const weight = getLineWeight(road.highway, road);
+                    const opacity = getLineOpacity(road);
+
+                    const polyline = L.polyline(coords, {
+                        color: color,
+                        weight: weight,
+                        opacity: opacity,
+                        className: `road-${getFunctionalClassCategory(road.functional_class)}`
+                    }).addTo(roadLayer);
+
+                    // Store road data on layer for recoloring
+                    polyline.roadData = road;
+
+                    // Enhanced popup
+                    const popupContent = buildPopupContent(road);
+                    polyline.bindPopup(popupContent);
+                    
+                    // Add hover effect
+                    polyline.on('mouseover', function() {
+                        this.setStyle({ weight: weight + 2, opacity: 1 });
+                        this.bringToFront();
+                    });
+                    polyline.on('mouseout', function() {
+                        this.setStyle({ weight: weight, opacity: opacity });
+                    });
+                }
+            });
+
+            // Store total length
+            roadData.totalLength = totalLength;
+            
+            // Update legend counts
+            updateLegendCounts();
+        }
+
+        // === VDOT FUNCTIONAL CLASSIFICATION ===
+        function inferFunctionalClass(highway, ref) {
+            // Based on FHWA functional classification system
+            const classMap = {
+                'motorway': 'Interstate',
+                'motorway_link': 'Interstate',
+                'trunk': 'Other Freeway/Expressway',
+                'trunk_link': 'Other Freeway/Expressway',
+                'primary': 'Other Principal Arterial',
+                'primary_link': 'Other Principal Arterial',
+                'secondary': 'Minor Arterial',
+                'secondary_link': 'Minor Arterial',
+                'tertiary': 'Major Collector',
+                'tertiary_link': 'Major Collector',
+                'residential': 'Local',
+                'unclassified': 'Local',
+                'living_street': 'Local'
+            };
+            
+            // Check for US/Interstate routes
+            if (ref) {
+                if (ref.match(/^I-\d+/)) return 'Interstate';
+                if (ref.match(/^US \d+/)) return 'Other Principal Arterial';
+                if (ref.match(/^VA \d+/) || ref.match(/^SR \d+/)) {
+                    return highway === 'secondary' ? 'Minor Arterial' : 'Major Collector';
+                }
+            }
+            
+            return classMap[highway] || 'Local';
+        }
+
+        function getFunctionalClassCode(funcClass) {
+            const codes = {
+                'Interstate': 1,
+                'Other Freeway/Expressway': 2,
+                'Other Principal Arterial': 3,
+                'Minor Arterial': 4,
+                'Major Collector': 5,
+                'Minor Collector': 6,
+                'Local': 7
+            };
+            return codes[funcClass] || 7;
+        }
+
+        function inferRoadSystem(highway, ref) {
+            if (ref) {
+                if (ref.match(/^I-\d+/)) return 'Interstate';
+                if (ref.match(/^US \d+/)) return 'US Route';
+                if (ref.match(/^VA \d+/)) return 'VA Primary';
+                if (ref.match(/^SR \d+/)) return 'VA Secondary';
+            }
+            if (['motorway', 'trunk'].includes(highway)) return 'Interstate/US';
+            if (['primary', 'secondary'].includes(highway)) return 'State';
+            return 'Local';
+        }
+
+        function inferMaintenance(highway, ref, jurisdiction) {
+            // In Virginia, most roads are VDOT-maintained except:
+            // - Arlington and Henrico maintain their own roads
+            // - Some cities maintain their own
+            const selfMaintaining = ['henrico', 'arlington'];
+            
+            if (jurisdiction && selfMaintaining.includes(jurisdiction.key)) {
+                // Interstate always VDOT
+                if (highway === 'motorway' || highway === 'motorway_link') return 'VDOT';
+                if (ref && ref.match(/^I-\d+/)) return 'VDOT';
+                // Primary routes usually VDOT
+                if (ref && (ref.match(/^US \d+/) || ref.match(/^VA \d+/))) return 'VDOT';
+                // Local roads - county maintained
+                if (['residential', 'unclassified', 'living_street'].includes(highway)) {
+                    return jurisdiction.name.replace(' County', '').replace(' City', '');
+                }
+                return 'VDOT/County';
+            }
+            return 'VDOT';
+        }
+
+        // === ESTIMATED ATTRIBUTES ===
+        function estimateLanes(highway, oneway) {
+            const defaults = {
+                'motorway': 4, 'motorway_link': 2,
+                'trunk': 4, 'trunk_link': 2,
+                'primary': 4, 'primary_link': 2,
+                'secondary': 2, 'secondary_link': 1,
+                'tertiary': 2, 'tertiary_link': 1,
+                'residential': 2,
+                'unclassified': 2,
+                'living_street': 2
+            };
+            let lanes = defaults[highway] || 2;
+            if (oneway === 'yes' || oneway === '-1') {
+                lanes = Math.ceil(lanes / 2);
+            }
+            return lanes;
+        }
+
+        function estimateSpeed(highway) {
+            const defaults = {
+                'motorway': 65, 'motorway_link': 45,
+                'trunk': 55, 'trunk_link': 45,
+                'primary': 45, 'primary_link': 35,
+                'secondary': 40, 'secondary_link': 30,
+                'tertiary': 35, 'tertiary_link': 25,
+                'residential': 25,
+                'unclassified': 25,
+                'living_street': 15
+            };
+            return defaults[highway] || 25;
+        }
+
+        function estimateWidth(highway, lanes) {
+            // Standard lane width 11-12 ft + shoulders
+            const laneWidth = 11;
+            const numLanes = parseInt(lanes) || 2;
+            const shoulderWidth = ['motorway', 'trunk', 'primary'].includes(highway) ? 10 : 2;
+            return (numLanes * laneWidth) + (shoulderWidth * 2);
+        }
+
+        function parseSpeed(speedStr) {
+            if (!speedStr) return null;
+            const match = speedStr.match(/(\d+)/);
+            if (match) {
+                let speed = parseInt(match[1]);
+                if (speedStr.includes('km')) speed = Math.round(speed * 0.621371);
+                return speed;
+            }
+            return null;
+        }
+
+        function parseWidth(widthStr) {
+            if (!widthStr) return null;
+            const match = widthStr.match(/(\d+\.?\d*)/);
+            if (match) {
+                let width = parseFloat(match[1]);
+                if (widthStr.includes('m') && !widthStr.includes('mi')) width = width * 3.28084;
+                return Math.round(width);
+            }
+            return null;
+        }
+
+        // === DATA QUALITY ===
+        function calculateDataQuality(road) {
+            let score = 0;
+            let maxScore = 10;
+            
+            // Critical attributes (higher weight)
+            if (road.name && road.name !== 'Unnamed') score += 2;
+            if (road.lanes) score += 2;
+            if (road.maxspeed) score += 2;
+            
+            // Important attributes
+            if (road.surface) score += 1;
+            if (road.ref) score += 1;
+            if (road.sidewalk) score += 1;
+            if (road.lit || road.turn_lanes || road.width) score += 1;
+            
+            return Math.round((score / maxScore) * 100);
+        }
+
+        function getMissingCritical(road) {
+            const missing = [];
+            if (!road.lanes) missing.push('lanes');
+            if (!road.maxspeed) missing.push('speed');
+            if (!road.surface) missing.push('surface');
+            if (road.name === 'Unnamed') missing.push('name');
+            return missing.join(', ') || 'none';
+        }
+
+        function buildPopupContent(road) {
+            const enriched = document.getElementById('enrich-vdot')?.checked ?? true;
+            
+            return `
+                <div style="font-family: 'Outfit', sans-serif; min-width: 240px;">
+                    <strong style="font-size: 13px; color: #f0f4f8;">${escapeHtml(road.name)}</strong>
+                    ${road.ref ? `<span style="color: #8fa3bf;"> (${road.ref})</span>` : ''}
+                    <hr style="border: none; border-top: 1px solid #1e2d45; margin: 6px 0;">
+                    <div style="font-size: 11px; color: #8fa3bf; line-height: 1.7;">
+                        <div><strong>Type:</strong> ${road.highway}</div>
+                        ${enriched && road.functional_class ? `<div><strong>Func. Class:</strong> ${road.functional_class}</div>` : ''}
+                        ${enriched && road.maintenance ? `<div><strong>Maintained by:</strong> ${road.maintenance}</div>` : ''}
+                        <div><strong>Lanes:</strong> ${road.lanes || `<span style="color:#f59e0b;">~${road.est_lanes} (est)</span>`}</div>
+                        <div><strong>Speed:</strong> ${road.maxspeed || `<span style="color:#f59e0b;">~${road.est_speed_mph} mph (est)</span>`}</div>
+                        ${road.surface ? `<div><strong>Surface:</strong> ${road.surface}</div>` : ''}
+                        <div><strong>One-way:</strong> ${road.oneway}</div>
+                        <div><strong>Length:</strong> ${road.centerline_miles?.toFixed(2) || (road.length_m / 1609.34).toFixed(2)} mi</div>
+                        ${enriched && road.data_quality !== undefined ? `<div><strong>Data Quality:</strong> <span style="color:${road.data_quality >= 60 ? '#22c55e' : road.data_quality >= 30 ? '#f59e0b' : '#ef4444'}">${road.data_quality}%</span></div>` : ''}
+                    </div>
+                    <a href="https://www.openstreetmap.org/way/${road.id}" target="_blank" 
+                       style="display: inline-block; margin-top: 6px; color: #06b6d4; font-size: 10px;">
+                       View/Edit on OSM →
+                    </a>
+                </div>
+            `;
+        }
+
+        function calculateRoadLength(geometry) {
+            let length = 0;
+            for (let i = 1; i < geometry.length; i++) {
+                length += haversineDistance(
+                    geometry[i-1].lat, geometry[i-1].lon,
+                    geometry[i].lat, geometry[i].lon
+                );
+            }
+            return length;
+        }
+
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Earth radius in meters
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // ==================== UI HELPERS ====================
+        
+        function updateStatus(message, type = '') {
+            const statusBar = document.getElementById('status-bar');
+            statusBar.className = 'status-bar ' + type;
+            statusBar.innerHTML = type === 'loading' 
+                ? `<div class="spinner"></div><span>${message}</span>`
+                : `<span>${message}</span>`;
+        }
+
+        function updateProgress(percent, text) {
+            document.getElementById('progress-fill').style.width = `${percent}%`;
+            document.getElementById('progress-text').textContent = text;
+        }
+
+        function updateStats() {
+            const total = roadData.length;
+            const withLanes = roadData.filter(r => r.lanes).length;
+            const withSpeed = roadData.filter(r => r.maxspeed).length;
+            const totalMiles = (roadData.totalLength || 0) / 1609.34;
+            
+            // Calculate lane miles
+            const laneMiles = roadData.reduce((sum, r) => sum + (r.lane_miles || 0), 0);
+            
+            // Calculate average data quality
+            const avgQuality = roadData.length > 0 
+                ? Math.round(roadData.reduce((sum, r) => sum + (r.data_quality || 0), 0) / roadData.length)
+                : 0;
+            
+            // Count by functional class
+            const arterials = roadData.filter(r => 
+                ['Interstate', 'Other Freeway/Expressway', 'Other Principal Arterial', 'Minor Arterial'].includes(r.functional_class)
+            ).length;
+            const locals = roadData.filter(r => r.functional_class === 'Local').length;
+
+            document.getElementById('stat-roads').textContent = total.toLocaleString();
+            document.getElementById('stat-lanes').textContent = withLanes.toLocaleString();
+            document.getElementById('stat-speed').textContent = withSpeed.toLocaleString();
+            document.getElementById('stat-length').textContent = totalMiles.toFixed(1);
+            document.getElementById('stat-lane-miles').textContent = laneMiles.toFixed(1);
+            document.getElementById('stat-quality').textContent = avgQuality + '%';
+            document.getElementById('stat-arterial').textContent = arterials.toLocaleString();
+            document.getElementById('stat-local').textContent = locals.toLocaleString();
+        }
+
+        function renderDataTable() {
+            const container = document.getElementById('data-container');
+
+            if (roadData.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🚫</div>
+                        <div class="empty-state-text">No roads found in this area</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const enriched = document.getElementById('enrich-vdot')?.checked ?? true;
+
+            const tableHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            ${enriched ? '<th>Func. Class</th>' : ''}
+                            <th>Lanes</th>
+                            <th>Speed</th>
+                            <th>Surface</th>
+                            ${enriched ? '<th>Maint.</th>' : ''}
+                            <th>Miles</th>
+                            ${enriched ? '<th>Quality</th>' : ''}
+                            <th>OSM ID</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${roadData.slice(0, 500).map(road => `
+                            <tr>
+                                <td style="font-family: 'Outfit', sans-serif; font-weight: 500; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(road.name)}</td>
+                                <td><span class="badge badge-${getBadgeClass(road.highway)}">${road.highway}</span></td>
+                                ${enriched ? `<td style="font-size: 0.7rem;">${road.functional_class || '-'}</td>` : ''}
+                                <td>${road.lanes || `<span style="color:#f59e0b;">~${road.est_lanes}</span>`}</td>
+                                <td>${road.maxspeed || `<span style="color:#f59e0b;">~${road.est_speed_mph}</span>`}</td>
+                                <td>${road.surface || '-'}</td>
+                                ${enriched ? `<td style="font-size: 0.7rem;">${road.maintenance || '-'}</td>` : ''}
+                                <td>${road.centerline_miles?.toFixed(2) || (road.length_m / 1609.34).toFixed(2)}</td>
+                                ${enriched ? `<td><span style="color:${road.data_quality >= 60 ? '#22c55e' : road.data_quality >= 30 ? '#f59e0b' : '#ef4444'}">${road.data_quality}%</span></td>` : ''}
+                                <td><a href="https://www.openstreetmap.org/way/${road.id}" target="_blank" style="color: #06b6d4;">${road.id}</a></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                ${roadData.length > 500 ? `<div style="text-align: center; padding: 1rem; color: var(--text-muted); font-size: 0.8rem;">Showing 500 of ${roadData.length.toLocaleString()} roads. Export CSV to see all.</div>` : ''}
+            `;
+
+            container.innerHTML = tableHTML;
+        }
+
+        function getBadgeClass(highway) {
+            if (['motorway', 'motorway_link', 'trunk', 'trunk_link'].includes(highway)) return 'primary';
+            if (['primary', 'primary_link'].includes(highway)) return 'secondary';
+            if (['secondary', 'secondary_link', 'tertiary', 'tertiary_link'].includes(highway)) return 'tertiary';
+            if (highway === 'residential') return 'residential';
+            return 'service';
+        }
+
+        // Current color scheme
+        let currentColorScheme = 'functional';
+        
+        function setColorScheme(scheme) {
+            currentColorScheme = scheme;
+            
+            // Update button states
+            document.querySelectorAll('.scheme-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.scheme === scheme);
+            });
+            
+            // Re-render roads with new colors if data exists
+            if (roadData.length > 0) {
+                recolorRoads();
+            }
+        }
+
+        function recolorRoads() {
+            roadLayer.eachLayer(layer => {
+                if (layer.roadData) {
+                    const color = getRoadColor(layer.roadData.highway, layer.roadData);
+                    const weight = getLineWeight(layer.roadData.highway, layer.roadData);
+                    layer.setStyle({ 
+                        color: color, 
+                        weight: weight,
+                        opacity: getLineOpacity(layer.roadData)
+                    });
+                }
+            });
+        }
+
+        function getRoadColor(highway, roadData = null) {
+            if (currentColorScheme === 'speed' && roadData) {
+                return getSpeedColor(roadData.est_speed_mph || roadData.maxspeed);
+            } else if (currentColorScheme === 'quality' && roadData) {
+                return getQualityColor(roadData.data_quality);
+            } else {
+                return getFunctionalColor(highway);
+            }
+        }
+
+        function getFunctionalColor(highway) {
+            const colors = {
+                // Interstate - Red (highest priority)
+                motorway: '#ef4444',
+                motorway_link: '#f87171',
+                // Freeway/Expressway - Orange
+                trunk: '#f97316',
+                trunk_link: '#fb923c',
+                // Principal Arterial - Yellow/Gold
+                primary: '#eab308',
+                primary_link: '#facc15',
+                // Minor Arterial - Yellow-Green
+                secondary: '#84cc16',
+                secondary_link: '#a3e635',
+                // Collectors - Green
+                tertiary: '#22c55e',
+                tertiary_link: '#4ade80',
+                // Local - Blue/Gray
+                residential: '#64748b',
+                unclassified: '#64748b',
+                living_street: '#64748b'
+            };
+            return colors[highway] || '#475569';
+        }
+
+        function getSpeedColor(speed) {
+            const mph = parseInt(speed) || 25;
+            if (mph >= 55) return '#ef4444';      // High speed - Red
+            if (mph >= 45) return '#f97316';      // Medium-high - Orange
+            if (mph >= 35) return '#eab308';      // Medium - Yellow
+            if (mph >= 25) return '#22c55e';      // Low-medium - Green
+            return '#3b82f6';                      // Low speed - Blue
+        }
+
+        function getQualityColor(quality) {
+            const q = parseInt(quality) || 0;
+            if (q >= 70) return '#22c55e';        // Good quality - Green
+            if (q >= 50) return '#84cc16';        // Decent - Light green
+            if (q >= 30) return '#eab308';        // Moderate - Yellow
+            if (q >= 15) return '#f97316';        // Low - Orange
+            return '#ef4444';                      // Poor - Red
+        }
+
+        function getLineWeight(highway, roadData = null) {
+            const weights = {
+                motorway: 6, motorway_link: 4,
+                trunk: 5, trunk_link: 4,
+                primary: 4, primary_link: 3,
+                secondary: 3, secondary_link: 2,
+                tertiary: 2.5, tertiary_link: 2,
+                residential: 1.5,
+                unclassified: 1.5,
+                living_street: 1
+            };
+            return weights[highway] || 1;
+        }
+
+        function getLineOpacity(roadData) {
+            // Make local roads slightly transparent for better visibility
+            if (roadData && ['residential', 'unclassified', 'living_street'].includes(roadData.highway)) {
+                return 0.6;
+            }
+            return 0.85;
+        }
+
+        function toggleLegendFilter(roadClass) {
+            const item = document.querySelector(`.legend-item[data-class="${roadClass}"]`);
+            item.classList.toggle('dimmed');
+            
+            const isDimmed = item.classList.contains('dimmed');
+            
+            // Filter roads on map
+            roadLayer.eachLayer(layer => {
+                if (layer.roadData) {
+                    const layerClass = getFunctionalClassCategory(layer.roadData.functional_class);
+                    if (layerClass === roadClass) {
+                        layer.setStyle({ opacity: isDimmed ? 0.1 : getLineOpacity(layer.roadData) });
+                    }
+                }
+            });
+        }
+
+        function getFunctionalClassCategory(funcClass) {
+            if (funcClass === 'Interstate') return 'interstate';
+            if (funcClass === 'Other Freeway/Expressway') return 'freeway';
+            if (funcClass === 'Other Principal Arterial' || funcClass === 'Minor Arterial') return 'arterial';
+            if (funcClass === 'Major Collector' || funcClass === 'Minor Collector') return 'collector';
+            return 'local';
+        }
+
+        function updateLegendCounts() {
+            const counts = { interstate: 0, freeway: 0, arterial: 0, collector: 0, local: 0 };
+            
+            roadData.forEach(road => {
+                const cat = getFunctionalClassCategory(road.functional_class);
+                counts[cat]++;
+            });
+            
+            Object.keys(counts).forEach(key => {
+                const el = document.getElementById(`count-${key}`);
+                if (el) el.textContent = counts[key].toLocaleString();
+            });
+            
+            // Show legend
+            document.getElementById('map-legend').style.display = 'block';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ==================== EXPORT FUNCTIONS ====================
+        
+        function exportCSV() {
+            if (roadData.length === 0) {
+                alert('No data to export.');
+                return;
+            }
+
+            const enriched = document.getElementById('enrich-vdot')?.checked ?? true;
+            const computed = document.getElementById('enrich-computed')?.checked ?? true;
+            const quality = document.getElementById('enrich-quality')?.checked ?? true;
+
+            // Build headers dynamically
+            let headers = ['Name', 'Type', 'Lanes', 'Lanes Forward', 'Lanes Backward', 'Speed Limit', 'One-way', 'Surface', 'Width', 'Lit', 'Sidewalk', 'Cycleway', 'Turn Lanes', 'Reference', 'Length (m)', 'Centerline Miles'];
+            
+            if (enriched) {
+                headers.push('Functional Class', 'Func Class Code', 'Road System', 'Maintenance');
+            }
+            if (computed) {
+                headers.push('Est Lanes', 'Est Speed (mph)', 'Est Width (ft)', 'Lane Miles');
+            }
+            if (quality) {
+                headers.push('Data Quality %', 'Missing Critical');
+            }
+            headers.push('OSM ID');
+
+            const rows = roadData.map(r => {
+                let row = [
+                    `"${r.name.replace(/"/g, '""')}"`,
+                    r.highway,
+                    r.lanes || '',
+                    r.lanes_forward || '',
+                    r.lanes_backward || '',
+                    r.maxspeed || '',
+                    r.oneway,
+                    r.surface || '',
+                    r.width || '',
+                    r.lit || '',
+                    r.sidewalk || '',
+                    r.cycleway || '',
+                    r.turn_lanes || '',
+                    r.ref || '',
+                    r.length_m.toFixed(2),
+                    r.centerline_miles?.toFixed(4) || (r.length_m / 1609.34).toFixed(4)
+                ];
+                
+                if (enriched) {
+                    row.push(
+                        r.functional_class || '',
+                        r.functional_class_code || '',
+                        r.road_system || '',
+                        r.maintenance || ''
+                    );
+                }
+                if (computed) {
+                    row.push(
+                        r.est_lanes || '',
+                        r.est_speed_mph || '',
+                        r.est_width_ft || '',
+                        r.lane_miles?.toFixed(4) || ''
+                    );
+                }
+                if (quality) {
+                    row.push(
+                        r.data_quality || '',
+                        `"${r.missing_critical || ''}"`
+                    );
+                }
+                row.push(r.id);
+                
+                return row;
+            });
+
+            const filename = currentMode === 'boundary' && selectedJurisdiction 
+                ? `road_attributes_${selectedJurisdiction.key}_enriched.csv`
+                : `road_attributes_${selectedLat.toFixed(4)}_${selectedLon.toFixed(4)}_enriched.csv`;
+
+            downloadFile(
+                [headers.join(','), ...rows.map(r => r.join(','))].join('\n'),
+                filename,
+                'text/csv'
+            );
+        }
+
+        function exportGeoJSON() {
+            if (roadData.length === 0) {
+                alert('No data to export.');
+                return;
+            }
+
+            const geojson = {
+                type: 'FeatureCollection',
+                properties: {
+                    source: 'OpenStreetMap via Overpass API',
+                    boundary_source: 'US Census TIGERweb',
+                    license: 'ODbL',
+                    extracted: new Date().toISOString(),
+                    jurisdiction: selectedJurisdiction?.name || null,
+                    total_roads: roadData.length,
+                    total_length_m: roadData.totalLength
+                },
+                features: roadData.map(road => ({
+                    type: 'Feature',
+                    properties: {
+                        osm_id: road.id,
+                        name: road.name,
+                        highway: road.highway,
+                        lanes: road.lanes,
+                        lanes_forward: road.lanes_forward,
+                        lanes_backward: road.lanes_backward,
+                        maxspeed: road.maxspeed,
+                        oneway: road.oneway,
+                        surface: road.surface,
+                        width: road.width,
+                        lit: road.lit,
+                        sidewalk: road.sidewalk,
+                        cycleway: road.cycleway,
+                        turn_lanes: road.turn_lanes,
+                        ref: road.ref,
+                        length_m: road.length_m
+                    },
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: road.geometry.map(p => [p.lon, p.lat])
+                    }
+                }))
+            };
+
+            const filename = currentMode === 'boundary' && selectedJurisdiction 
+                ? `road_attributes_${selectedJurisdiction.key}.geojson`
+                : `road_attributes_${selectedLat.toFixed(4)}_${selectedLon.toFixed(4)}.geojson`;
+
+            downloadFile(JSON.stringify(geojson, null, 2), filename, 'application/json');
+        }
+
+        function exportBoundary() {
+            if (!currentBoundary) {
+                alert('No boundary loaded. Please select a jurisdiction and wait for the boundary to load (green dashed line on map).');
+                return;
+            }
+
+            const geojson = {
+                type: 'FeatureCollection',
+                properties: {
+                    source: 'US Census TIGERweb',
+                    jurisdiction: selectedJurisdiction?.name || 'Unknown',
+                    fips: selectedJurisdiction?.fips || '',
+                    state: 'Virginia',
+                    extracted: new Date().toISOString()
+                },
+                features: [currentBoundary]
+            };
+
+            const filename = `boundary_${selectedJurisdiction?.key || 'custom'}.geojson`;
+            downloadFile(JSON.stringify(geojson, null, 2), filename, 'application/json');
+        }
+
+        function downloadFile(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // ==================== MAP CONTROLS ====================
+        
+        function zoomToBoundary() {
+            try {
+                if (currentMode === 'boundary' && boundaryLayer.getLayers().length > 0) {
+                    const bounds = boundaryLayer.getBounds();
+                    if (bounds && bounds.isValid()) {
+                        map.fitBounds(bounds, { padding: [30, 30] });
+                        return;
+                    }
+                }
+                if (roadLayer.getLayers().length > 0) {
+                    const bounds = roadLayer.getBounds();
+                    if (bounds && bounds.isValid()) {
+                        map.fitBounds(bounds, { padding: [30, 30] });
+                        return;
+                    }
+                }
+                // Fallback to jurisdiction center
+                if (selectedJurisdiction) {
+                    map.setView(selectedJurisdiction.center, 10);
+                }
+            } catch (e) {
+                console.warn('Zoom error:', e);
+            }
+        }
+
+        function resetMap() {
+            if (currentMode === 'boundary' && selectedJurisdiction) {
+                map.setView(selectedJurisdiction.center, 10);
+            } else {
+                map.setView([37.55, -77.45], 10);
+            }
+        }
+
+        function retryBoundary() {
+            if (selectedJurisdiction) {
+                fetchBoundary(selectedJurisdiction.fips);
+            } else {
+                updateStatus('Please select a jurisdiction first', 'warning');
+            }
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initMap);
+    </script>
+</body>
+</html>
