@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crash Analysis by Magisterial District</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-primary: #0a0f1c;
+            --bg-secondary: #111827;
+            --bg-card: #1a2234;
+            --bg-hover: #243049;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-primary: #3b82f6;
+            --accent-secondary: #8b5cf6;
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
+            --accent-danger: #ef4444;
+            --border-color: #2d3a52;
+            --gradient-1: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            --shadow-lg: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            grid-template-rows: auto 1fr;
+            min-height: 100vh;
+            gap: 0;
+        }
+
+        /* Header */
+        .header {
+            grid-column: 1 / -1;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-1);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .header-stat {
+            text-align: right;
+        }
+
+        .header-stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+
+        .header-stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .panel {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .panel-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .panel-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: var(--gradient-1);
+            border-radius: 2px;
+        }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        select, input[type="file"] {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        select:hover, select:focus {
+            border-color: var(--accent-primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        select option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .file-upload {
+            position: relative;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .file-upload:hover {
+            border-color: var(--accent-primary);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .file-upload input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .file-upload-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-upload-text {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .file-upload-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.875rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-card);
+            border-color: var(--accent-primary);
+        }
+
+        /* Status Messages */
+        .status {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-info {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: var(--accent-primary);
+        }
+
+        .status-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--accent-success);
+        }
+
+        .status-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--accent-danger);
+        }
+
+        .status-loading {
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: var(--accent-secondary);
+        }
+
+        /* District Results Table */
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .results-table th {
+            text-align: left;
+            padding: 0.75rem 0.5rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .results-table td {
+            padding: 0.75rem 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .results-table tr:hover td {
+            background: var(--bg-hover);
+        }
+
+        .results-table .district-name {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .results-table .crash-count {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+
+        .results-table .severity-badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .severity-K { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+        .severity-A { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .severity-B { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .severity-C { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .severity-O { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+        .severity-KA { background: rgba(239, 68, 68, 0.25); color: #fca5a5; font-weight: 700; }
+
+        .severity-detail {
+            font-size: 0.65rem;
+            margin-left: 0.25rem;
+            opacity: 0.8;
+        }
+
+        .ped-badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(192, 132, 252, 0.2);
+            color: #c084fc;
+        }
+
+        .bike-badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(45, 212, 191, 0.2);
+            color: #2dd4bf;
+        }
+
+        .text-muted {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        /* District Detail Panel */
+        .detail-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .detail-section {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+
+        .detail-section-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.35rem 0;
+        }
+
+        .detail-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .detail-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .severity-K-text { color: #f87171; }
+        .severity-A-text { color: #fbbf24; }
+        .severity-B-text { color: #60a5fa; }
+        .severity-C-text { color: #34d399; }
+        .severity-O-text { color: #94a3b8; }
+        .ped-text { color: #c084fc; }
+        .bike-text { color: #2dd4bf; }
+
+        .results-table tr {
+            cursor: pointer;
+        }
+
+        .results-table tr.selected td {
+            background: var(--bg-hover);
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        /* Main Content */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #map {
+            flex: 1;
+            min-height: 400px;
+            background: var(--bg-card);
+        }
+
+        /* Summary Bar */
+        .summary-bar {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .summary-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .summary-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .summary-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Map Legend */
+        .map-legend {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            z-index: 1000;
+            font-size: 0.8rem;
+        }
+
+        .legend-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        /* Leaflet customization */
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .leaflet-popup-tip {
+            background: var(--bg-card);
+        }
+
+        .leaflet-popup-content {
+            margin: 12px 16px;
+        }
+
+        .popup-title {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--accent-primary);
+        }
+
+        .popup-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            font-size: 0.85rem;
+        }
+
+        .popup-stat-label {
+            color: var(--text-secondary);
+        }
+
+        .popup-stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* District color indicator */
+        .district-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        /* Filter chips */
+        .filter-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .filter-chip {
+            padding: 0.35rem 0.75rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-chip:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .filter-chip.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: white;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .app-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                max-height: 50vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">📊</div>
+                <span class="logo-text">Crash District Analyzer</span>
+            </div>
+            <div class="header-stats">
+                <div class="header-stat">
+                    <div class="header-stat-value" id="totalCrashes">--</div>
+                    <div class="header-stat-label">Total Crashes</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value" id="totalKA" style="color: #f87171;">--</div>
+                    <div class="header-stat-label">Fatal + Serious (K+A)</div>
+                </div>
+                <div class="header-stat">
+                    <div class="header-stat-value" id="districtsCount">--</div>
+                    <div class="header-stat-label">Districts</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <!-- Jurisdiction Selection -->
+            <div class="panel">
+                <div class="panel-title">Jurisdiction</div>
+                <div class="form-group">
+                    <label for="jurisdictionSelect">Select County/City</label>
+                    <select id="jurisdictionSelect">
+                        <option value="">-- Select Jurisdiction --</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- File Upload -->
+            <div class="panel">
+                <div class="panel-title">Crash Data</div>
+                <div class="form-group">
+                    <div class="file-upload" id="fileUploadZone">
+                        <div class="file-upload-icon">📁</div>
+                        <div class="file-upload-text">Drop CSV file or click to upload</div>
+                        <div class="file-upload-hint">Virginia Roads crash export format</div>
+                        <input type="file" id="csvFile" accept=".csv">
+                    </div>
+                </div>
+                <div id="fileStatus" style="margin-top: 0.75rem; display: none;"></div>
+            </div>
+
+            <!-- Analyze Button -->
+            <button class="btn btn-primary" id="analyzeBtn" disabled>
+                <span>🔍</span>
+                <span>Analyze Crashes</span>
+            </button>
+
+            <!-- Status -->
+            <div id="statusContainer" style="display: none;"></div>
+
+            <!-- Results -->
+            <div class="panel" id="resultsPanel" style="display: none;">
+                <div class="panel-title">Crashes by District</div>
+                <div id="resultsContainer">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📍</div>
+                        <p>Select a jurisdiction and upload crash data to see results</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- District Detail Panel -->
+            <div class="panel" id="districtDetailPanel" style="display: none;">
+                <div class="panel-title">
+                    <span id="detailDistrictName">District Details</span>
+                </div>
+                <div class="detail-grid">
+                    <div class="detail-section">
+                        <div class="detail-section-title">Severity Breakdown</div>
+                        <div class="detail-row">
+                            <span class="detail-label">Fatal (K)</span>
+                            <span class="detail-value severity-K-text" id="detailK">0</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Serious Injury (A)</span>
+                            <span class="detail-value severity-A-text" id="detailA">0</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Minor Injury (B)</span>
+                            <span class="detail-value severity-B-text" id="detailB">0</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Possible Injury (C)</span>
+                            <span class="detail-value severity-C-text" id="detailC">0</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Property Damage (O)</span>
+                            <span class="detail-value severity-O-text" id="detailO">0</span>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-section-title">Vulnerable Users</div>
+                        <div class="detail-row">
+                            <span class="detail-label">🚶 Pedestrian</span>
+                            <span class="detail-value ped-text" id="detailPed">0</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">🚴 Bicycle</span>
+                            <span class="detail-value bike-text" id="detailBike">0</span>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-section-title">Key Metrics</div>
+                        <div class="detail-row">
+                            <span class="detail-label">Total Crashes</span>
+                            <span class="detail-value" id="detailTotal">0</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">K+A Rate</span>
+                            <span class="detail-value" id="detailKARate">0%</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Injury Rate</span>
+                            <span class="detail-value" id="detailInjuryRate">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Severity Filter -->
+            <div class="panel" id="filterPanel" style="display: none;">
+                <div class="panel-title">Filter by Severity</div>
+                <div class="filter-chips">
+                    <div class="filter-chip active" data-severity="all">All</div>
+                    <div class="filter-chip" data-severity="K">Fatal (K)</div>
+                    <div class="filter-chip" data-severity="A">Serious (A)</div>
+                    <div class="filter-chip" data-severity="B">Minor (B)</div>
+                    <div class="filter-chip" data-severity="C">Possible (C)</div>
+                    <div class="filter-chip" data-severity="O">PDO (O)</div>
+                </div>
+                <div class="panel-title" style="margin-top: 1rem;">Filter by Crash Type</div>
+                <div class="filter-chips">
+                    <div class="filter-chip type-chip active" data-type="all">All Types</div>
+                    <div class="filter-chip type-chip" data-type="ped">🚶 Pedestrian</div>
+                    <div class="filter-chip type-chip" data-type="bike">🚴 Bicycle</div>
+                    <div class="filter-chip type-chip" data-type="ka">⚠️ K+A Only</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div id="map"></div>
+            <div class="summary-bar" id="summaryBar" style="display: none;">
+                <div class="summary-item">
+                    <span class="summary-label">Fatal (K)</span>
+                    <span class="summary-value" id="sumK" style="color: #f87171;">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Serious Injury (A)</span>
+                    <span class="summary-value" id="sumA" style="color: #fbbf24;">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Minor Injury (B)</span>
+                    <span class="summary-value" id="sumB" style="color: #60a5fa;">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Possible Injury (C)</span>
+                    <span class="summary-value" id="sumC" style="color: #34d399;">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Property Damage (O)</span>
+                    <span class="summary-value" id="sumO" style="color: #94a3b8;">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Pedestrian Involved</span>
+                    <span class="summary-value" id="sumPed" style="color: #c084fc;">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Bicycle Involved</span>
+                    <span class="summary-value" id="sumBike" style="color: #2dd4bf;">0</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Wait for all scripts to load before initializing
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        async function loadDependencies() {
+            await loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js');
+            initApp();
+        }
+
+        document.addEventListener('DOMContentLoaded', loadDependencies);
+    </script>
+
+    <script>
+        // =====================================================
+        // CONFIGURATION
+        // =====================================================
+        const CONFIG = {
+            tigerweb: {
+                countySubdivisionsUrl: "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer",
+                stateFips: "51",
+                countySubdivisionsLayer: 1
+            },
+            districtColors: [
+                "#ef4444", "#f97316", "#eab308", "#22c55e", 
+                "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899",
+                "#14b8a6", "#f43f5e", "#84cc16", "#a855f7"
+            ]
+        };
+
+        // Virginia Jurisdictions (abbreviated for key ones with magisterial districts)
+        const JURISDICTIONS = {
+            "henrico": { name: "Henrico County", fips: "087", bbox: [-77.6104, 37.3862, -77.1462, 37.7234], center: [37.55, -77.45], zoom: 11 },
+            "chesterfield": { name: "Chesterfield County", fips: "041", bbox: [-77.808, 37.1524, -77.3744, 37.5559], center: [37.38, -77.5], zoom: 10 },
+            "hanover": { name: "Hanover County", fips: "085", bbox: [-77.7551, 37.5679, -77.1941, 37.9853], center: [37.76, -77.48], zoom: 10 },
+            "fairfax_county": { name: "Fairfax County", fips: "059", bbox: [-77.5351, 38.5943, -77.0492, 39.0003], center: [38.83, -77.28], zoom: 10 },
+            "loudoun": { name: "Loudoun County", fips: "107", bbox: [-77.9622, 38.8416, -77.3253, 39.3218], center: [39.08, -77.64], zoom: 10 },
+            "prince_william": { name: "Prince William County", fips: "153", bbox: [-77.7903, 38.5193, -77.285, 38.8824], center: [38.7, -77.48], zoom: 10 },
+            "arlington": { name: "Arlington County", fips: "013", bbox: [-77.1722, 38.8275, -77.032, 38.9341], center: [38.88, -77.1], zoom: 12 },
+            "albemarle": { name: "Albemarle County", fips: "003", bbox: [-78.8399, 37.7273, -78.2637, 38.3034], center: [38.02, -78.56], zoom: 10 },
+            "spotsylvania": { name: "Spotsylvania County", fips: "177", bbox: [-77.8389, 37.979, -77.366, 38.3904], center: [38.18, -77.65], zoom: 10 },
+            "stafford": { name: "Stafford County", fips: "179", bbox: [-77.6582, 38.2602, -77.2842, 38.559], center: [38.42, -77.45], zoom: 10 },
+            "james_city": { name: "James City County", fips: "095", bbox: [-76.9305, 37.1685, -76.5451, 37.4485], center: [37.31, -76.78], zoom: 10 },
+            "york": { name: "York County", fips: "199", bbox: [-76.6992, 37.1009, -76.3817, 37.4154], center: [37.22, -76.54], zoom: 10 },
+            "roanoke_county": { name: "Roanoke County", fips: "161", bbox: [-80.2179, 37.0999, -79.7768, 37.4247], center: [37.28, -80.05], zoom: 10 },
+            "montgomery": { name: "Montgomery County", fips: "121", bbox: [-80.5867, 36.9718, -80.1184, 37.3914], center: [37.18, -80.39], zoom: 10 },
+            "augusta": { name: "Augusta County", fips: "015", bbox: [-79.5431, 37.8873, -78.8617, 38.4767], center: [38.16, -79.13], zoom: 10 },
+            "rockingham": { name: "Rockingham County", fips: "165", bbox: [-79.3377, 38.2024, -78.6603, 38.8128], center: [38.52, -78.88], zoom: 10 },
+            "bedford_county": { name: "Bedford County", fips: "019", bbox: [-79.7888, 37.0341, -79.2507, 37.513], center: [37.31, -79.52], zoom: 10 },
+            "campbell": { name: "Campbell County", fips: "031", bbox: [-79.4361, 36.9684, -78.9035, 37.4249], center: [37.2, -79.09], zoom: 10 },
+            "pittsylvania": { name: "Pittsylvania County", fips: "143", bbox: [-79.7448, 36.5413, -79.0905, 37.0725], center: [36.82, -79.39], zoom: 10 },
+            "franklin_county": { name: "Franklin County", fips: "067", bbox: [-80.1426, 36.742, -79.5912, 37.1818], center: [37.0, -79.89], zoom: 10 },
+            "chesapeake": { name: "Chesapeake City", fips: "550", bbox: [-76.4914, 36.5413, -76.1332, 36.866], center: [36.77, -76.29], zoom: 10 },
+            "virginia_beach": { name: "Virginia Beach City", fips: "810", bbox: [-76.2269, 36.5516, -75.8589, 36.933], center: [36.85, -75.98], zoom: 10 },
+            "norfolk": { name: "Norfolk City", fips: "710", bbox: [-76.345, 36.82, -76.18, 36.97], center: [36.85, -76.29], zoom: 12 },
+            "newport_news": { name: "Newport News City", fips: "700", bbox: [-76.6212, 36.9597, -76.3351, 37.22], center: [37.09, -76.47], zoom: 11 },
+            "hampton": { name: "Hampton City", fips: "650", bbox: [-76.4599, 36.9745, -76.2597, 37.1414], center: [37.03, -76.35], zoom: 12 },
+            "richmond_city": { name: "Richmond City", fips: "760", bbox: [-77.5775, 37.4464, -77.3853, 37.6011], center: [37.54, -77.44], zoom: 12 },
+            "suffolk": { name: "Suffolk City", fips: "800", bbox: [-76.923, 36.5453, -76.4038, 36.9384], center: [36.73, -76.58], zoom: 10 }
+        };
+
+        // =====================================================
+        // STATE
+        // =====================================================
+        let map = null;
+        let crashData = [];
+        let districtData = [];
+        let districtLayers = null;
+        let crashMarkerGroup = null;
+        let selectedJurisdiction = null;
+        let currentSeverityFilter = 'all';
+        let currentTypeFilter = 'all';
+        let analysisResults = {};
+
+        // =====================================================
+        // INITIALIZATION
+        // =====================================================
+        function initApp() {
+            initMap();
+            populateJurisdictions();
+            setupEventListeners();
+        }
+
+        function initMap() {
+            map = L.map('map', {
+                center: [37.55, -77.45],
+                zoom: 10,
+                zoomControl: true
+            });
+
+            // Dark tile layer
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            districtLayers = L.featureGroup().addTo(map);
+            crashMarkerGroup = L.featureGroup().addTo(map);
+        }
+
+        function populateJurisdictions() {
+            const select = document.getElementById('jurisdictionSelect');
+            const sortedJurisdictions = Object.entries(JURISDICTIONS)
+                .sort((a, b) => a[1].name.localeCompare(b[1].name));
+            
+            sortedJurisdictions.forEach(([key, value]) => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = value.name;
+                select.appendChild(option);
+            });
+        }
+
+        function setupEventListeners() {
+            // Jurisdiction selection
+            document.getElementById('jurisdictionSelect').addEventListener('change', (e) => {
+                selectedJurisdiction = e.target.value;
+                updateAnalyzeButton();
+                
+                if (selectedJurisdiction && JURISDICTIONS[selectedJurisdiction]) {
+                    const juris = JURISDICTIONS[selectedJurisdiction];
+                    map.setView(juris.center, juris.zoom);
+                }
+            });
+
+            // File upload
+            const fileInput = document.getElementById('csvFile');
+            const fileZone = document.getElementById('fileUploadZone');
+
+            fileInput.addEventListener('change', handleFileUpload);
+            
+            fileZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileZone.style.borderColor = 'var(--accent-primary)';
+                fileZone.style.background = 'rgba(59, 130, 246, 0.1)';
+            });
+
+            fileZone.addEventListener('dragleave', () => {
+                fileZone.style.borderColor = 'var(--border-color)';
+                fileZone.style.background = 'transparent';
+            });
+
+            fileZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileZone.style.borderColor = 'var(--border-color)';
+                fileZone.style.background = 'transparent';
+                
+                if (e.dataTransfer.files.length) {
+                    fileInput.files = e.dataTransfer.files;
+                    handleFileUpload({ target: fileInput });
+                }
+            });
+
+            // Analyze button
+            document.getElementById('analyzeBtn').addEventListener('click', runAnalysis);
+
+            // Severity filter chips
+            document.querySelectorAll('.filter-chip[data-severity]').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    document.querySelectorAll('.filter-chip[data-severity]').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    currentSeverityFilter = chip.dataset.severity;
+                    updateMapDisplay();
+                });
+            });
+
+            // Type filter chips
+            document.querySelectorAll('.filter-chip.type-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    document.querySelectorAll('.filter-chip.type-chip').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    currentTypeFilter = chip.dataset.type;
+                    updateMapDisplay();
+                });
+            });
+        }
+
+        // =====================================================
+        // FILE HANDLING
+        // =====================================================
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const statusEl = document.getElementById('fileStatus');
+            statusEl.style.display = 'block';
+            statusEl.innerHTML = `<div class="status status-loading"><div class="spinner"></div> Parsing ${file.name}...</div>`;
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    crashData = results.data.filter(row => {
+                        const x = parseFloat(row.x);
+                        const y = parseFloat(row.y);
+                        return !isNaN(x) && !isNaN(y) && x !== 0 && y !== 0;
+                    });
+
+                    statusEl.innerHTML = `
+                        <div class="status status-success">
+                            ✓ Loaded ${crashData.length.toLocaleString()} crashes with valid coordinates
+                        </div>
+                    `;
+                    updateAnalyzeButton();
+                },
+                error: (err) => {
+                    statusEl.innerHTML = `<div class="status status-error">✗ Error: ${err.message}</div>`;
+                    crashData = [];
+                    updateAnalyzeButton();
+                }
+            });
+        }
+
+        function updateAnalyzeButton() {
+            const btn = document.getElementById('analyzeBtn');
+            btn.disabled = !selectedJurisdiction || crashData.length === 0;
+        }
+
+        // =====================================================
+        // ANALYSIS
+        // =====================================================
+        async function runAnalysis() {
+            if (!selectedJurisdiction || crashData.length === 0) return;
+
+            const statusEl = document.getElementById('statusContainer');
+            statusEl.style.display = 'block';
+            statusEl.innerHTML = `<div class="status status-loading"><div class="spinner"></div> Fetching magisterial districts from TigerWeb...</div>`;
+
+            try {
+                // Fetch district boundaries from TigerWeb
+                const districts = await fetchDistrictBoundaries();
+                
+                if (districts.length === 0) {
+                    statusEl.innerHTML = `<div class="status status-error">✗ No county subdivisions found for this jurisdiction</div>`;
+                    return;
+                }
+
+                statusEl.innerHTML = `<div class="status status-loading"><div class="spinner"></div> Analyzing ${crashData.length.toLocaleString()} crashes across ${districts.length} districts...</div>`;
+
+                // Perform point-in-polygon analysis
+                analysisResults = analyzeByDistrict(districts);
+
+                // Display results
+                displayResults(districts);
+                statusEl.innerHTML = `<div class="status status-success">✓ Analysis complete</div>`;
+
+                // Show UI elements
+                document.getElementById('resultsPanel').style.display = 'block';
+                document.getElementById('filterPanel').style.display = 'block';
+                document.getElementById('summaryBar').style.display = 'flex';
+
+            } catch (err) {
+                console.error('Analysis error:', err);
+                statusEl.innerHTML = `<div class="status status-error">✗ Error: ${err.message}</div>`;
+            }
+        }
+
+        async function fetchDistrictBoundaries() {
+            const juris = JURISDICTIONS[selectedJurisdiction];
+            const countyFips = CONFIG.tigerweb.stateFips + juris.fips;
+            
+            // Query TigerWeb for county subdivisions
+            const url = `${CONFIG.tigerweb.countySubdivisionsUrl}/${CONFIG.tigerweb.countySubdivisionsLayer}/query`;
+            
+            const params = new URLSearchParams({
+                where: `STATE='${CONFIG.tigerweb.stateFips}' AND COUNTY='${juris.fips}'`,
+                outFields: '*',
+                returnGeometry: true,
+                geometryPrecision: 6,
+                outSR: 4326,
+                f: 'json'
+            });
+
+            const response = await fetch(`${url}?${params}`);
+            if (!response.ok) throw new Error(`TigerWeb API error: ${response.status}`);
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error.message || 'TigerWeb query failed');
+            }
+
+            return data.features || [];
+        }
+
+        function analyzeByDistrict(districts) {
+            const results = {};
+            
+            // Initialize results for each district
+            districts.forEach((district, idx) => {
+                const name = district.attributes.NAME || district.attributes.BASENAME || `District ${idx + 1}`;
+                results[name] = {
+                    name: name,
+                    geoid: district.attributes.GEOID || '',
+                    total: 0,
+                    K: 0, A: 0, B: 0, C: 0, O: 0,
+                    pedestrian: 0,
+                    bicycle: 0,
+                    crashes: [],
+                    color: CONFIG.districtColors[idx % CONFIG.districtColors.length]
+                };
+            });
+
+            // Add "Unassigned" category for crashes outside all districts
+            results['Unassigned'] = {
+                name: 'Unassigned',
+                geoid: '',
+                total: 0,
+                K: 0, A: 0, B: 0, C: 0, O: 0,
+                pedestrian: 0,
+                bicycle: 0,
+                crashes: [],
+                color: '#6b7280'
+            };
+
+            // Analyze each crash
+            crashData.forEach(crash => {
+                const lng = parseFloat(crash.x);
+                const lat = parseFloat(crash.y);
+                
+                if (isNaN(lng) || isNaN(lat)) return;
+
+                let assigned = false;
+                
+                for (const district of districts) {
+                    if (pointInPolygon([lng, lat], district.geometry)) {
+                        const name = district.attributes.NAME || district.attributes.BASENAME || 'Unknown';
+                        if (results[name]) {
+                            results[name].total++;
+                            results[name].crashes.push(crash);
+                            
+                            // Count by severity
+                            const severity = crash['Crash Severity'];
+                            if (severity && results[name][severity] !== undefined) {
+                                results[name][severity]++;
+                            }
+                            
+                            // Count pedestrian/bicycle
+                            if (crash['Pedestrian?'] === 'Yes') results[name].pedestrian++;
+                            if (crash['Bike?'] === 'Yes') results[name].bicycle++;
+                        }
+                        assigned = true;
+                        break;
+                    }
+                }
+
+                if (!assigned) {
+                    results['Unassigned'].total++;
+                    results['Unassigned'].crashes.push(crash);
+                    
+                    const severity = crash['Crash Severity'];
+                    if (severity && results['Unassigned'][severity] !== undefined) {
+                        results['Unassigned'][severity]++;
+                    }
+                    if (crash['Pedestrian?'] === 'Yes') results['Unassigned'].pedestrian++;
+                    if (crash['Bike?'] === 'Yes') results['Unassigned'].bicycle++;
+                }
+            });
+
+            return results;
+        }
+
+        // Point-in-polygon using ray casting algorithm
+        function pointInPolygon(point, geometry) {
+            if (!geometry) return false;
+            
+            let rings;
+            if (geometry.rings) {
+                rings = geometry.rings;
+            } else if (geometry.coordinates) {
+                rings = geometry.type === 'Polygon' ? geometry.coordinates : 
+                        geometry.type === 'MultiPolygon' ? geometry.coordinates.flat() : null;
+            }
+            
+            if (!rings) return false;
+
+            for (const ring of rings) {
+                if (pointInRing(point, ring)) return true;
+            }
+            return false;
+        }
+
+        function pointInRing(point, ring) {
+            const [x, y] = point;
+            let inside = false;
+            
+            for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                const xi = ring[i][0], yi = ring[i][1];
+                const xj = ring[j][0], yj = ring[j][1];
+                
+                if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+                    inside = !inside;
+                }
+            }
+            
+            return inside;
+        }
+
+        // =====================================================
+        // DISPLAY
+        // =====================================================
+        function displayResults(districts) {
+            // Update header stats
+            const totalCrashes = Object.values(analysisResults).reduce((sum, d) => sum + d.total, 0);
+            const totalKA = Object.values(analysisResults).reduce((sum, d) => sum + d.K + d.A, 0);
+            document.getElementById('totalCrashes').textContent = totalCrashes.toLocaleString();
+            document.getElementById('totalKA').textContent = totalKA.toLocaleString();
+            document.getElementById('districtsCount').textContent = districts.length;
+
+            // Update summary bar
+            let sumK = 0, sumA = 0, sumB = 0, sumC = 0, sumO = 0, sumPed = 0, sumBike = 0;
+            Object.values(analysisResults).forEach(d => {
+                sumK += d.K;
+                sumA += d.A;
+                sumB += d.B;
+                sumC += d.C;
+                sumO += d.O;
+                sumPed += d.pedestrian;
+                sumBike += d.bicycle;
+            });
+            document.getElementById('sumK').textContent = sumK.toLocaleString();
+            document.getElementById('sumA').textContent = sumA.toLocaleString();
+            document.getElementById('sumB').textContent = sumB.toLocaleString();
+            document.getElementById('sumC').textContent = sumC.toLocaleString();
+            document.getElementById('sumO').textContent = sumO.toLocaleString();
+            document.getElementById('sumPed').textContent = sumPed.toLocaleString();
+            document.getElementById('sumBike').textContent = sumBike.toLocaleString();
+
+            // Build results table
+            const resultsContainer = document.getElementById('resultsContainer');
+            const sortedResults = Object.values(analysisResults)
+                .filter(d => d.name !== 'Unassigned' || d.total > 0)
+                .sort((a, b) => b.total - a.total);
+
+            let tableHTML = `
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>District</th>
+                            <th>Total</th>
+                            <th>K+A</th>
+                            <th>Ped</th>
+                            <th>Bike</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            sortedResults.forEach(d => {
+                const kaTotal = d.K + d.A;
+                tableHTML += `
+                    <tr data-district="${d.name}">
+                        <td class="district-name">
+                            <span class="district-color" style="background: ${d.color};"></span>
+                            ${d.name}
+                        </td>
+                        <td class="crash-count">${d.total.toLocaleString()}</td>
+                        <td>
+                            ${kaTotal > 0 ? `<span class="severity-badge severity-KA">${kaTotal}</span>` : '<span class="text-muted">0</span>'}
+                            ${d.K > 0 ? `<span class="severity-detail severity-K" title="Fatal">${d.K}K</span>` : ''}
+                            ${d.A > 0 ? `<span class="severity-detail severity-A" title="Serious Injury">${d.A}A</span>` : ''}
+                        </td>
+                        <td>
+                            ${d.pedestrian > 0 ? `<span class="ped-badge">${d.pedestrian}</span>` : '<span class="text-muted">0</span>'}
+                        </td>
+                        <td>
+                            ${d.bicycle > 0 ? `<span class="bike-badge">${d.bicycle}</span>` : '<span class="text-muted">0</span>'}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</tbody></table>';
+            resultsContainer.innerHTML = tableHTML;
+
+            // Add row hover and click events
+            document.querySelectorAll('.results-table tbody tr').forEach(row => {
+                row.addEventListener('mouseenter', () => {
+                    const districtName = row.dataset.district;
+                    highlightDistrict(districtName);
+                });
+                row.addEventListener('mouseleave', () => {
+                    unhighlightDistrict();
+                });
+                row.addEventListener('click', () => {
+                    const districtName = row.dataset.district;
+                    showDistrictDetails(districtName);
+                    
+                    // Update selected row styling
+                    document.querySelectorAll('.results-table tbody tr').forEach(r => r.classList.remove('selected'));
+                    row.classList.add('selected');
+                });
+            });
+
+            // Draw districts on map
+            drawDistrictsOnMap(districts);
+            updateMapDisplay();
+        }
+
+        function drawDistrictsOnMap(districts) {
+            districtLayers.clearLayers();
+
+            districts.forEach((district, idx) => {
+                const name = district.attributes.NAME || district.attributes.BASENAME || `District ${idx + 1}`;
+                const color = CONFIG.districtColors[idx % CONFIG.districtColors.length];
+                
+                // Save color to analysisResults
+                if (analysisResults[name]) {
+                    analysisResults[name].color = color;
+                }
+
+                // Convert ArcGIS geometry to Leaflet format
+                const coords = convertRingsToLatLng(district.geometry.rings);
+                
+                const polygon = L.polygon(coords, {
+                    color: color,
+                    weight: 2,
+                    fillColor: color,
+                    fillOpacity: 0.15,
+                    className: `district-${name.replace(/\s+/g, '-')}`
+                });
+
+                const result = analysisResults[name] || { total: 0, K: 0, A: 0, B: 0, C: 0, O: 0 };
+                
+                polygon.bindPopup(`
+                    <div class="popup-title">${name}</div>
+                    <div class="popup-stat">
+                        <span class="popup-stat-label">Total Crashes</span>
+                        <span class="popup-stat-value">${result.total.toLocaleString()}</span>
+                    </div>
+                    <div class="popup-stat">
+                        <span class="popup-stat-label">Fatal (K)</span>
+                        <span class="popup-stat-value" style="color: #f87171;">${result.K}</span>
+                    </div>
+                    <div class="popup-stat">
+                        <span class="popup-stat-label">Serious Injury (A)</span>
+                        <span class="popup-stat-value" style="color: #fbbf24;">${result.A}</span>
+                    </div>
+                    <div class="popup-stat">
+                        <span class="popup-stat-label">Minor Injury (B)</span>
+                        <span class="popup-stat-value" style="color: #60a5fa;">${result.B}</span>
+                    </div>
+                    <div class="popup-stat">
+                        <span class="popup-stat-label">Pedestrian</span>
+                        <span class="popup-stat-value" style="color: #c084fc;">${result.pedestrian}</span>
+                    </div>
+                    <div class="popup-stat">
+                        <span class="popup-stat-label">Bicycle</span>
+                        <span class="popup-stat-value" style="color: #2dd4bf;">${result.bicycle}</span>
+                    </div>
+                `, { maxWidth: 300 });
+
+                polygon.districtName = name;
+                districtLayers.addLayer(polygon);
+            });
+
+            // Fit map to districts
+            if (districtLayers.getLayers().length > 0) {
+                try {
+                    const bounds = districtLayers.getBounds();
+                    if (bounds.isValid()) {
+                        map.fitBounds(bounds, { padding: [20, 20] });
+                    }
+                } catch (e) {
+                    console.warn('Could not fit bounds:', e);
+                }
+            }
+        }
+
+        function convertRingsToLatLng(rings) {
+            if (!rings) return [];
+            return rings.map(ring => ring.map(coord => [coord[1], coord[0]]));
+        }
+
+        function updateMapDisplay() {
+            crashMarkerGroup.clearLayers();
+
+            // Get filtered crashes
+            Object.values(analysisResults).forEach(district => {
+                const crashes = district.crashes.filter(crash => {
+                    // Severity filter
+                    if (currentSeverityFilter !== 'all' && crash['Crash Severity'] !== currentSeverityFilter) {
+                        return false;
+                    }
+                    
+                    // Type filter
+                    if (currentTypeFilter === 'ped' && crash['Pedestrian?'] !== 'Yes') {
+                        return false;
+                    }
+                    if (currentTypeFilter === 'bike' && crash['Bike?'] !== 'Yes') {
+                        return false;
+                    }
+                    if (currentTypeFilter === 'ka') {
+                        const sev = crash['Crash Severity'];
+                        if (sev !== 'K' && sev !== 'A') {
+                            return false;
+                        }
+                    }
+                    
+                    return true;
+                });
+
+                crashes.forEach(crash => {
+                    const lat = parseFloat(crash.y);
+                    const lng = parseFloat(crash.x);
+                    
+                    if (isNaN(lat) || isNaN(lng)) return;
+
+                    const severity = crash['Crash Severity'] || 'O';
+                    const color = getSeverityColor(severity);
+                    
+                    const marker = L.circleMarker([lat, lng], {
+                        radius: severity === 'K' ? 6 : severity === 'A' ? 5 : 4,
+                        fillColor: color,
+                        color: '#ffffff',
+                        weight: 1,
+                        fillOpacity: 0.8
+                    });
+
+                    marker.bindPopup(`
+                        <div class="popup-title">${crash['RTE Name'] || 'Unknown Location'}</div>
+                        <div class="popup-stat">
+                            <span class="popup-stat-label">Date</span>
+                            <span class="popup-stat-value">${crash['Crash Date'] ? crash['Crash Date'].split(' ')[0] : 'N/A'}</span>
+                        </div>
+                        <div class="popup-stat">
+                            <span class="popup-stat-label">Severity</span>
+                            <span class="popup-stat-value"><span class="severity-badge severity-${severity}">${severity}</span></span>
+                        </div>
+                        <div class="popup-stat">
+                            <span class="popup-stat-label">Collision Type</span>
+                            <span class="popup-stat-value">${crash['Collision Type'] || 'N/A'}</span>
+                        </div>
+                        <div class="popup-stat">
+                            <span class="popup-stat-label">District</span>
+                            <span class="popup-stat-value">${district.name}</span>
+                        </div>
+                    `, { maxWidth: 300 });
+
+                    crashMarkerGroup.addLayer(marker);
+                });
+            });
+        }
+
+        function getSeverityColor(severity) {
+            const colors = {
+                'K': '#ef4444',
+                'A': '#f59e0b',
+                'B': '#3b82f6',
+                'C': '#10b981',
+                'O': '#6b7280'
+            };
+            return colors[severity] || colors['O'];
+        }
+
+        function highlightDistrict(districtName) {
+            districtLayers.eachLayer(layer => {
+                if (layer.districtName === districtName) {
+                    layer.setStyle({
+                        weight: 4,
+                        fillOpacity: 0.35
+                    });
+                    layer.bringToFront();
+                } else {
+                    layer.setStyle({
+                        weight: 2,
+                        fillOpacity: 0.1
+                    });
+                }
+            });
+        }
+
+        function unhighlightDistrict() {
+            districtLayers.eachLayer(layer => {
+                layer.setStyle({
+                    weight: 2,
+                    fillOpacity: 0.15
+                });
+            });
+        }
+
+        function showDistrictDetails(districtName) {
+            const district = analysisResults[districtName];
+            if (!district) return;
+
+            // Show the detail panel
+            document.getElementById('districtDetailPanel').style.display = 'block';
+
+            // Update panel title with district color
+            const titleEl = document.getElementById('detailDistrictName');
+            titleEl.innerHTML = `<span class="district-color" style="background: ${district.color};"></span> ${district.name}`;
+
+            // Update severity counts
+            document.getElementById('detailK').textContent = district.K;
+            document.getElementById('detailA').textContent = district.A;
+            document.getElementById('detailB').textContent = district.B;
+            document.getElementById('detailC').textContent = district.C;
+            document.getElementById('detailO').textContent = district.O;
+
+            // Update vulnerable users
+            document.getElementById('detailPed').textContent = district.pedestrian;
+            document.getElementById('detailBike').textContent = district.bicycle;
+
+            // Update key metrics
+            document.getElementById('detailTotal').textContent = district.total.toLocaleString();
+            
+            const kaRate = district.total > 0 ? ((district.K + district.A) / district.total * 100).toFixed(1) : 0;
+            document.getElementById('detailKARate').textContent = kaRate + '%';
+            
+            const injuryRate = district.total > 0 ? ((district.K + district.A + district.B + district.C) / district.total * 100).toFixed(1) : 0;
+            document.getElementById('detailInjuryRate').textContent = injuryRate + '%';
+
+            // Zoom to district on map
+            districtLayers.eachLayer(layer => {
+                if (layer.districtName === districtName) {
+                    map.fitBounds(layer.getBounds(), { padding: [50, 50] });
+                }
+            });
+        }
+    </script>
+</body>
+</html>
