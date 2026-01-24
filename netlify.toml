@@ -2,11 +2,19 @@
 
 [build]
   # No build command needed - this is a static HTML site
-  command = "echo 'Static site - no build required'"
+  command = "cd netlify/functions && npm install && cd ../.."
   publish = "."
   base = "."
   # Functions directory for Netlify Functions
   functions = "netlify/functions"
+
+# Node.js 18+ required for native fetch and modern features
+[build.environment]
+  NODE_VERSION = "18"
+
+# Functions configuration
+[functions]
+  node_bundler = "esbuild"
 
 # Redirect /api/* to Netlify Functions (for Qdrant CORS workaround)
 [[redirects]]
