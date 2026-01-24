@@ -1,0 +1,12 @@
+{
+  "name": "virginia-netlify-functions",
+  "version": "1.0.0",
+  "description": "Netlify serverless functions for Virginia Crash Analysis Tool",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  }
+}

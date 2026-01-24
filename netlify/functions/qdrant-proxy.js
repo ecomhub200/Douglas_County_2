@@ -12,6 +12,9 @@
  * - PUT  /collections/{name}/points - Upsert points
  */
 
+// Use node-fetch for Node.js < 18 compatibility
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+
 // Qdrant Cloud configuration
 // In production, move these to Netlify environment variables
 const QDRANT_ENDPOINT = process.env.QDRANT_ENDPOINT || 'https://b6241048-2ec5-4e12-94ee-ceecd2e68b75.us-east4-0.gcp.cloud.qdrant.io:6333';
