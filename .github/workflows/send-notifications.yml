@@ -4,7 +4,7 @@ on:
   schedule:
     # Weekly digest: Every Monday at 9:00 AM ET (14:00 UTC)
     - cron: '0 14 * * 1'
-    # Grant deadline alerts: Daily at 8:00 AM ET (13:00 UTC)
+    # Grant deadline alerts: Daily at 8:00 AM ET (13:00 UTC) - except Mondays at digest time
     - cron: '0 13 * * *'
     # Monthly reports: First day of month at 7:00 AM ET (12:00 UTC)
     - cron: '0 12 1 * *'
@@ -39,27 +39,42 @@ jobs:
 
       - name: Install dependencies
         run: |
+          set -e
           pip install boto3
 
       - name: Determine notification type
         id: determine-type
         run: |
+          set -e
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual trigger - use the input directly
             echo "type=${{ github.event.inputs.notification_type }}" >> $GITHUB_OUTPUT
             echo "test_email=${{ github.event.inputs.test_email }}" >> $GITHUB_OUTPUT
+            echo "Manually triggered: ${{ github.event.inputs.notification_type }}"
           else
-            # Determine based on schedule
-            HOUR=$(date -u +%H)
-            DAY=$(date -u +%d)
-            DOW=$(date -u +%u)
+            # Scheduled trigger - use github.event.schedule to determine which cron fired
+            SCHEDULE="${{ github.event.schedule }}"
+            echo "Triggered by schedule: $SCHEDULE"
 
-            if [ "$DAY" = "01" ] && [ "$HOUR" = "12" ]; then
-              echo "type=reports" >> $GITHUB_OUTPUT
-            elif [ "$DOW" = "1" ] && [ "$HOUR" = "14" ]; then
-              echo "type=digest" >> $GITHUB_OUTPUT
-            else
-              echo "type=grants" >> $GITHUB_OUTPUT
-            fi
+            # Match the cron expression to determine type
+            case "$SCHEDULE" in
+              "0 12 1 * *")
+                echo "type=reports" >> $GITHUB_OUTPUT
+                echo "Detected: Monthly reports (1st of month)"
+                ;;
+              "0 14 * * 1")
+                echo "type=digest" >> $GITHUB_OUTPUT
+                echo "Detected: Weekly digest (Monday)"
+                ;;
+              "0 13 * * *")
+                echo "type=grants" >> $GITHUB_OUTPUT
+                echo "Detected: Daily grant alerts"
+                ;;
+              *)
+                echo "type=grants" >> $GITHUB_OUTPUT
+                echo "Unknown schedule, defaulting to grants"
+                ;;
+            esac
           fi
 
       - name: Send scheduled reports
@@ -67,9 +82,10 @@ jobs:
         env:
           AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
           AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
-          AWS_SES_REGION: ${{ secrets.AWS_SES_REGION || 'us-east-1' }}
+          AWS_SES_REGION: ${{ vars.AWS_SES_REGION || 'us-east-1' }}
           NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
         run: |
+          set -e
           echo "Sending scheduled reports..."
           python send_notifications.py --type reports
 
@@ -78,9 +94,10 @@ jobs:
         env:
           AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
           AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
-          AWS_SES_REGION: ${{ secrets.AWS_SES_REGION || 'us-east-1' }}
+          AWS_SES_REGION: ${{ vars.AWS_SES_REGION || 'us-east-1' }}
           NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
         run: |
+          set -e
           echo "Sending grant deadline alerts..."
           python send_notifications.py --type grants
 
@@ -89,9 +106,10 @@ jobs:
         env:
           AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
           AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
-          AWS_SES_REGION: ${{ secrets.AWS_SES_REGION || 'us-east-1' }}
+          AWS_SES_REGION: ${{ vars.AWS_SES_REGION || 'us-east-1' }}
           NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
         run: |
+          set -e
           echo "Sending weekly digest..."
           python send_notifications.py --type digest
 
@@ -100,9 +118,10 @@ jobs:
         env:
           AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
           AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
-          AWS_SES_REGION: ${{ secrets.AWS_SES_REGION || 'us-east-1' }}
+          AWS_SES_REGION: ${{ vars.AWS_SES_REGION || 'us-east-1' }}
           NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
         run: |
+          set -e
           if [ -z "${{ steps.determine-type.outputs.test_email }}" ]; then
             echo "Error: test_email is required for test notifications"
             exit 1
@@ -111,6 +130,10 @@ jobs:
           python send_notifications.py --type test --email "${{ steps.determine-type.outputs.test_email }}"
 
       - name: Log completion
+        if: always()
         run: |
+          echo "========================================"
           echo "Notification job completed at $(date -u)"
           echo "Type: ${{ steps.determine-type.outputs.type }}"
+          echo "Status: ${{ job.status }}"
+          echo "========================================"
