@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Legal Notice - CRASH LENS</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data/images/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="data/images/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="data/images/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e3a5f">
+  <style>
+    .legal-hero {
+      padding: 8rem 0 3rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .legal-hero h1 {
+      font-size: 2.5rem;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .legal-hero .last-updated {
+      font-size: 0.875rem;
+      color: var(--gray);
+    }
+
+    .legal-content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 5rem;
+    }
+
+    .legal-content h2 {
+      font-size: 1.5rem;
+      color: var(--white);
+      margin: 2.5rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .legal-content h3 {
+      font-size: 1.125rem;
+      color: var(--white);
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    .legal-content p {
+      color: var(--text-dark);
+      margin-bottom: 1rem;
+      line-height: 1.8;
+    }
+
+    .legal-content ul, .legal-content ol {
+      color: var(--text-dark);
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+    }
+
+    .legal-content li {
+      margin-bottom: 0.5rem;
+      line-height: 1.7;
+    }
+
+    .legal-content a {
+      color: #60a5fa;
+    }
+
+    .legal-content a:hover {
+      color: #93c5fd;
+      text-decoration: underline;
+    }
+
+    .highlight-box {
+      background: rgba(30, 64, 175, 0.15);
+      border: 1px solid rgba(30, 64, 175, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .highlight-box h4 {
+      color: #60a5fa;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+    }
+
+    .warning-box {
+      background: rgba(217, 119, 6, 0.15);
+      border: 1px solid rgba(217, 119, 6, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .warning-box h4 {
+      color: #fbbf24;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+    }
+
+    .critical-box {
+      background: rgba(220, 38, 38, 0.15);
+      border: 2px solid rgba(220, 38, 38, 0.5);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .critical-box h4 {
+      color: #f87171;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .critical-box p {
+      color: #fca5a5;
+    }
+
+    .footer {
+      padding: 3rem 1.5rem;
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .footer-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      text-align: center;
+    }
+
+    @media (min-width: 768px) {
+      .footer-content {
+        flex-direction: row;
+        justify-content: space-between;
+        text-align: left;
+      }
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--white);
+      font-weight: 600;
+    }
+
+    .footer-logo img {
+      height: 32px;
+      width: 32px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .footer-links a {
+      color: var(--text-dark);
+      text-decoration: none;
+    }
+
+    .footer-links a:hover {
+      color: var(--white);
+    }
+
+    .footer-copy {
+      color: var(--gray);
+      font-size: 0.875rem;
+    }
+
+    /* Navigation */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1rem 1.5rem;
+      background: rgba(10, 26, 46, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .nav-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--white);
+      text-decoration: none;
+    }
+
+    .nav-logo img {
+      height: 32px;
+      width: 32px;
+    }
+
+    .nav-links {
+      display: none;
+      gap: 2rem;
+    }
+
+    @media (min-width: 768px) {
+      .nav-links {
+        display: flex;
+      }
+    }
+
+    .nav-links a {
+      color: var(--text-dark);
+      text-decoration: none;
+      font-size: 0.875rem;
+    }
+
+    .nav-links a:hover {
+      color: var(--white);
+    }
+
+    .nav-cta {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 767px) {
+      .nav-cta .btn-outline-light {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body class="dark">
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-content">
+      <a href="./" class="nav-logo">
+        <img src="data/images/favicon.svg" alt="CRASH LENS">
+        CRASH LENS
+      </a>
+      <div class="nav-links">
+        <a href="./features.html">Features</a>
+        <a href="./pricing.html">Pricing</a>
+        <a href="./resources.html">Resources</a>
+      </div>
+      <div class="nav-cta">
+        <a href="./login/" class="btn btn-outline-light">Sign In</a>
+        <a href="./login/" class="btn btn-gradient">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="legal-hero">
+    <h1>Legal Notice & Data Disclaimer</h1>
+    <p class="last-updated">Last Updated: January 25, 2026</p>
+  </section>
+
+  <!-- Content -->
+  <div class="legal-content">
+    <p>This page contains important legal notices and disclaimers regarding the use of crash data within CRASH LENS. Please read this information carefully before using the platform.</p>
+
+    <h2>1. Data Source</h2>
+    <p>The crash data used in CRASH LENS is sourced from <a href="https://www.virginiaroads.org" target="_blank" rel="noopener">Virginia Roads</a>, maintained by the Virginia Department of Transportation (VDOT). The primary source of this data is owned and maintained by the Virginia Department of Motor Vehicles (DMV).</p>
+
+    <h2>2. Title 23 USC Section 409 - Federal Protection</h2>
+
+    <div class="critical-box">
+      <h4>Critical Legal Notice</h4>
+      <p>Under <strong>Title 23 United States Code, Section 409</strong>, crash information compiled or collected for highway safety purposes cannot be:</p>
+      <ul style="color: #fca5a5;">
+        <li>Used in discovery in any Federal or State court proceeding</li>
+        <li>Admitted as evidence in any Federal or State court proceeding</li>
+        <li>Considered for other purposes in any action for damages arising from any occurrence at a location mentioned or addressed in such reports, surveys, schedules, lists, or data</li>
+      </ul>
+      <p style="margin-bottom: 0;">This protection applies to all crash data, analysis results, and reports generated by CRASH LENS against VDOT, the Commonwealth of Virginia, or any local jurisdiction.</p>
+    </div>
+
+    <h3>2.1 Purpose of Section 409</h3>
+    <p>This federal law was enacted to encourage states to identify and improve hazardous locations without fear that their efforts to collect safety data would be used against them in litigation. The law ensures that highway safety programs can collect comprehensive data to improve roadway safety.</p>
+
+    <h2>3. Data Accuracy Disclaimer</h2>
+
+    <div class="warning-box">
+      <h4>Important Notice</h4>
+      <p style="margin-bottom: 0;"><strong>VDOT assumes no responsibility for the accuracy and completeness of the data.</strong> In the process of recording and compiling the data, some deletions and/or omissions of data may occur and VDOT is not responsible for any such occurrences. The most recent data contained in any report is preliminary and subject to change.</p>
+    </div>
+
+    <p>Users should be aware that crash data may contain:</p>
+    <ul>
+      <li>Location coding errors</li>
+      <li>Incomplete crash reports</li>
+      <li>Classification inconsistencies</li>
+      <li>Delayed data entry</li>
+      <li>Preliminary data subject to revision</li>
+    </ul>
+
+    <h2>4. User Compliance Requirements</h2>
+    <p>All users shall comply with and be subject to all applicable laws and regulations, whether federal or state, in connection with the receipt and use of DMV data including, but not limited to:</p>
+
+    <ul>
+      <li><strong>The Federal Drivers Privacy Protection Act</strong> (18 U.S.C. § 2721 et seq.) - Restricts disclosure of personal information from motor vehicle records</li>
+      <li><strong>The Government Data Collection and Dissemination Practices Act</strong> (Va. Code § 2.2-3800 et seq.) - Virginia law governing government data handling</li>
+      <li><strong>The Virginia Computer Crimes Act</strong> (Va. Code § 18.2-152.1 et seq.) - Prohibits unauthorized computer access and data manipulation</li>
+      <li><strong>Virginia Code §§ 46.2-208 and 58.1-3</strong> - Additional regulations on DMV data use</li>
+      <li>Any successor rules, regulations, or guidelines adopted by DMV regarding disclosure or dissemination of information obtained from DMV records or files</li>
+    </ul>
+
+    <h2>5. Professional Use Disclaimer</h2>
+
+    <div class="highlight-box">
+      <h4>For Traffic Safety Professionals</h4>
+      <p>CRASH LENS is designed as a professional assistance tool. All analyses, recommendations, and reports generated by this platform:</p>
+      <ul>
+        <li>Are for informational and reference purposes only</li>
+        <li>Do not constitute professional engineering advice</li>
+        <li>Must be independently verified through field investigation</li>
+        <li>Should be reviewed by qualified professionals before implementation</li>
+        <li>Do not replace professional engineering judgment</li>
+      </ul>
+      <p style="margin-bottom: 0;">Users bear sole responsibility for all engineering decisions, recommendations, and actions taken based on data or outputs from this platform.</p>
+    </div>
+
+    <h2>6. AI-Generated Content</h2>
+    <p>CRASH LENS includes AI-powered analysis features. AI-generated recommendations:</p>
+    <ul>
+      <li>May contain errors or inaccuracies</li>
+      <li>Should not be used without professional review</li>
+      <li>Do not represent official VDOT or government recommendations</li>
+      <li>Must be validated against current standards (MUTCD, AASHTO, etc.)</li>
+    </ul>
+
+    <h2>7. No Liability for Road Incidents</h2>
+    <p>CRASH LENS, its owners, operators, and affiliates shall not be liable for any traffic crashes, personal injuries, property damage, or deaths that occur on any roadway, regardless of whether:</p>
+    <ul>
+      <li>The Service was used to analyze that location</li>
+      <li>Recommendations from the Service were implemented or not implemented</li>
+      <li>The Service identified or failed to identify safety concerns</li>
+    </ul>
+
+    <h2>8. Related Documents</h2>
+    <p>Please also review the following documents:</p>
+    <ul>
+      <li><a href="./privacy-policy.html">Privacy Policy</a> - How we handle your data</li>
+      <li><a href="./terms-of-service.html">Terms of Service</a> - Complete terms governing use of CRASH LENS</li>
+      <li><a href="./data-instructions.html">Data Instructions</a> - How to prepare and upload crash data</li>
+    </ul>
+
+    <h2>9. Contact</h2>
+    <div class="highlight-box">
+      <p><strong>CRASH LENS</strong><br>
+      Email: <a href="mailto:aicreatesai08@gmail.com">aicreatesai08@gmail.com</a></p>
+      <p style="margin-bottom: 0;">For questions about data sources, contact <a href="https://www.virginiaroads.org" target="_blank" rel="noopener">Virginia Roads</a> directly.</p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <div class="footer-logo">
+        <img src="data/images/favicon.svg" alt="CRASH LENS">
+        <span>CRASH LENS</span>
+      </div>
+
+      <div class="footer-links">
+        <a href="./features.html">Features</a>
+        <a href="./pricing.html">Pricing</a>
+        <a href="./resources.html">Resources</a>
+        <a href="./privacy-policy.html">Privacy Policy</a>
+        <a href="./terms-of-service.html">Terms of Service</a>
+        <a href="./legal-notice.html">Legal Notice</a>
+      </div>
+
+      <div class="footer-copy">
+        &copy; 2026 CRASH LENS. All rights reserved.
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
