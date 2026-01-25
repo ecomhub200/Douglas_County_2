@@ -24,8 +24,21 @@ from botocore.exceptions import ClientError
 # =============================================================================
 
 AWS_REGION = os.environ.get('AWS_SES_REGION', 'us-east-1')
-FROM_EMAIL = os.environ.get('NOTIFICATION_FROM_EMAIL', 'notifications@example.gov')
+FROM_EMAIL = os.environ.get('NOTIFICATION_FROM_EMAIL')
 CHARSET = 'UTF-8'
+
+def validate_config():
+    """Validate required configuration before sending emails."""
+    if not FROM_EMAIL:
+        print("[ERROR] NOTIFICATION_FROM_EMAIL environment variable not set")
+        print("Please set this to your verified SES sender address (e.g., notifications@aicreatesai.com)")
+        sys.exit(1)
+    if not os.environ.get('AWS_SES_ACCESS_KEY_ID'):
+        print("[ERROR] AWS_SES_ACCESS_KEY_ID environment variable not set")
+        sys.exit(1)
+    if not os.environ.get('AWS_SES_SECRET_ACCESS_KEY'):
+        print("[ERROR] AWS_SES_SECRET_ACCESS_KEY environment variable not set")
+        sys.exit(1)
 
 # Paths
 BASE_DIR = Path(__file__).parent
@@ -68,6 +81,8 @@ def get_report_subscribers():
     return [
         s for s in data.get('subscribers', [])
         if s.get('reports', {}).get('enabled', False)
+        and s.get('verified', False)  # Only send to verified subscribers
+        and s.get('email')  # Must have valid email
     ]
 
 def get_grant_subscribers():
@@ -76,6 +91,8 @@ def get_grant_subscribers():
     return [
         s for s in data.get('subscribers', [])
         if s.get('grants', {}).get('enabled', False)
+        and s.get('verified', False)  # Only send to verified subscribers
+        and s.get('email')  # Must have valid email
     ]
 
 # =============================================================================
@@ -565,8 +582,12 @@ def send_scheduled_reports():
 
     success_count = 0
     for sub in subscribers:
+        subscriber_email = sub.get('email')
+        if not subscriber_email:
+            print(f"[WARN] Skipping subscriber with missing email: {sub.get('id', 'unknown')}")
+            continue
         email_content = generate_report_email(sub, crash_summary)
-        if send_email(sub['email'], email_content['subject'],
+        if send_email(subscriber_email, email_content['subject'],
                      email_content['html'], email_content['text']):
             success_count += 1
 
@@ -597,9 +618,14 @@ def send_grant_alerts():
         if not sub.get('grants', {}).get('deadlineAlerts', False):
             continue
 
+        subscriber_email = sub.get('email')
+        if not subscriber_email:
+            print(f"[WARN] Skipping subscriber with missing email: {sub.get('id', 'unknown')}")
+            continue
+
         email_content = generate_grant_alert_email(sub, upcoming_grants)
         if email_content:
-            if send_email(sub['email'], email_content['subject'],
+            if send_email(subscriber_email, email_content['subject'],
                          email_content['html'], email_content['text']):
                 success_count += 1
 
@@ -625,8 +651,12 @@ def send_weekly_digest():
 
     success_count = 0
     for sub in subscribers:
+        subscriber_email = sub.get('email')
+        if not subscriber_email:
+            print(f"[WARN] Skipping subscriber with missing email: {sub.get('id', 'unknown')}")
+            continue
         email_content = generate_weekly_digest_email(sub, crash_summary, upcoming_grants)
-        if send_email(sub['email'], email_content['subject'],
+        if send_email(subscriber_email, email_content['subject'],
                      email_content['html'], email_content['text']):
             success_count += 1
 
@@ -671,13 +701,8 @@ Examples:
 
     args = parser.parse_args()
 
-    # Validate AWS credentials
-    if not os.environ.get('AWS_SES_ACCESS_KEY_ID'):
-        print("[ERROR] AWS_SES_ACCESS_KEY_ID environment variable not set")
-        sys.exit(1)
-    if not os.environ.get('AWS_SES_SECRET_ACCESS_KEY'):
-        print("[ERROR] AWS_SES_SECRET_ACCESS_KEY environment variable not set")
-        sys.exit(1)
+    # Validate configuration (AWS credentials and FROM_EMAIL)
+    validate_config()
 
     # Execute based on type
     if args.type == 'reports':
