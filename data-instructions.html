@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Instructions - CRASH LENS</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data/images/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="data/images/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="data/images/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e3a5f">
+  <style>
+    .legal-hero {
+      padding: 8rem 0 3rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .legal-hero h1 {
+      font-size: 2.5rem;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .legal-hero .last-updated {
+      font-size: 0.875rem;
+      color: var(--gray);
+    }
+
+    .legal-content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 5rem;
+    }
+
+    .legal-content h2 {
+      font-size: 1.5rem;
+      color: var(--white);
+      margin: 2.5rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .legal-content h3 {
+      font-size: 1.125rem;
+      color: var(--white);
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    .legal-content p {
+      color: var(--text-dark);
+      margin-bottom: 1rem;
+      line-height: 1.8;
+    }
+
+    .legal-content ul, .legal-content ol {
+      color: var(--text-dark);
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+    }
+
+    .legal-content li {
+      margin-bottom: 0.5rem;
+      line-height: 1.7;
+    }
+
+    .legal-content a {
+      color: #60a5fa;
+    }
+
+    .legal-content a:hover {
+      color: #93c5fd;
+      text-decoration: underline;
+    }
+
+    .highlight-box {
+      background: rgba(30, 64, 175, 0.15);
+      border: 1px solid rgba(30, 64, 175, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .highlight-box h4 {
+      color: #60a5fa;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+    }
+
+    .step-box {
+      background: rgba(30, 64, 175, 0.1);
+      border: 1px solid rgba(30, 64, 175, 0.2);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin: 1rem 0;
+    }
+
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #1e40af, #3b82f6);
+      color: white;
+      border-radius: 50%;
+      font-weight: 700;
+      margin-right: 0.75rem;
+    }
+
+    .step-title {
+      color: var(--white);
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+
+    .warning-box {
+      background: rgba(217, 119, 6, 0.15);
+      border: 1px solid rgba(217, 119, 6, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .warning-box h4 {
+      color: #fbbf24;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+    }
+
+    .tip-box {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .tip-box h4 {
+      color: #4ade80;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+    }
+
+    .footer {
+      padding: 3rem 1.5rem;
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .footer-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      text-align: center;
+    }
+
+    @media (min-width: 768px) {
+      .footer-content {
+        flex-direction: row;
+        justify-content: space-between;
+        text-align: left;
+      }
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--white);
+      font-weight: 600;
+    }
+
+    .footer-logo img {
+      height: 32px;
+      width: 32px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .footer-links a {
+      color: var(--text-dark);
+      text-decoration: none;
+    }
+
+    .footer-links a:hover {
+      color: var(--white);
+    }
+
+    .footer-copy {
+      color: var(--gray);
+      font-size: 0.875rem;
+    }
+
+    /* Navigation */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1rem 1.5rem;
+      background: rgba(10, 26, 46, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .nav-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--white);
+      text-decoration: none;
+    }
+
+    .nav-logo img {
+      height: 32px;
+      width: 32px;
+    }
+
+    .nav-links {
+      display: none;
+      gap: 2rem;
+    }
+
+    @media (min-width: 768px) {
+      .nav-links {
+        display: flex;
+      }
+    }
+
+    .nav-links a {
+      color: var(--text-dark);
+      text-decoration: none;
+      font-size: 0.875rem;
+    }
+
+    .nav-links a:hover {
+      color: var(--white);
+    }
+
+    .nav-cta {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 767px) {
+      .nav-cta .btn-outline-light {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body class="dark">
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-content">
+      <a href="./" class="nav-logo">
+        <img src="data/images/favicon.svg" alt="CRASH LENS">
+        CRASH LENS
+      </a>
+      <div class="nav-links">
+        <a href="./features.html">Features</a>
+        <a href="./pricing.html">Pricing</a>
+        <a href="./resources.html">Resources</a>
+      </div>
+      <div class="nav-cta">
+        <a href="./login/" class="btn btn-outline-light">Sign In</a>
+        <a href="./login/" class="btn btn-gradient">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="legal-hero">
+    <h1>Data Preparation Instructions</h1>
+    <p class="last-updated">How to download and prepare your crash data</p>
+  </section>
+
+  <!-- Content -->
+  <div class="legal-content">
+    <p>This guide explains how to download crash data from Virginia Roads and prepare it for use with CRASH LENS. Following these steps ensures your data is properly formatted for analysis.</p>
+
+    <h2>Virginia Roads Data Download</h2>
+
+    <div class="step-box">
+      <p><span class="step-number">1</span><span class="step-title">Access Virginia Roads</span></p>
+      <p style="margin-left: 44px; margin-top: 0.75rem;">Visit <a href="https://www.virginiaroads.org" target="_blank" rel="noopener">virginiaroads.org</a> and log in with your agency credentials. You must have an authorized account to access crash data.</p>
+    </div>
+
+    <div class="step-box">
+      <p><span class="step-number">2</span><span class="step-title">Navigate to Crash Data</span></p>
+      <p style="margin-left: 44px; margin-top: 0.75rem;">Find the Crash Data Download section. Look for "Crash Query" or "Data Download" in the navigation menu.</p>
+    </div>
+
+    <div class="step-box">
+      <p><span class="step-number">3</span><span class="step-title">Select Date Range</span></p>
+      <p style="margin-left: 44px; margin-top: 0.75rem;">Choose your desired time period. We recommend <strong>5 years of data</strong> for meaningful trend analysis and pattern identification.</p>
+    </div>
+
+    <div class="step-box">
+      <p><span class="step-number">4</span><span class="step-title">Download as CSV</span></p>
+      <p style="margin-left: 44px; margin-top: 0.75rem;">Export the data as a CSV file. This is the format CRASH LENS accepts for upload.</p>
+    </div>
+
+    <div class="step-box">
+      <p><span class="step-number">5</span><span class="step-title">Filter Your Data (Optional)</span></p>
+      <p style="margin-left: 44px; margin-top: 0.75rem;">Open the CSV in Excel and filter by:</p>
+      <ul style="margin-left: 44px;">
+        <li><strong>Column BC (Physical Juris Name):</strong> Select your jurisdiction</li>
+        <li><strong>Column BG (System):</strong> Select 'Non-VDOT' for local roads only, or keep all for comprehensive analysis</li>
+      </ul>
+    </div>
+
+    <div class="step-box">
+      <p><span class="step-number">6</span><span class="step-title">Save as New CSV</span></p>
+      <p style="margin-left: 44px; margin-top: 0.75rem;">Copy filtered data to a new file and save as CSV. This is the file you'll upload to CRASH LENS.</p>
+    </div>
+
+    <div class="tip-box">
+      <h4>Pro Tips</h4>
+      <ul>
+        <li>Keep both VDOT and Non-VDOT roads if you want to analyze state routes within your jurisdiction</li>
+        <li>CRASH LENS can handle large files with millions of rows</li>
+        <li>All processing happens in your browser - your data is never uploaded to our servers</li>
+      </ul>
+    </div>
+
+    <h2>Supported Data Format</h2>
+    <p>CRASH LENS is optimized for the Virginia Roads crash data format. The system automatically recognizes standard VDOT column headers including:</p>
+    <ul>
+      <li>Crash Date and Time</li>
+      <li>Location (Route, Node, Coordinates)</li>
+      <li>Severity (K, A, B, C, O)</li>
+      <li>Collision Type</li>
+      <li>Weather and Light Conditions</li>
+      <li>Contributing Factors</li>
+      <li>Vehicle and Person Information</li>
+    </ul>
+
+    <div class="warning-box">
+      <h4>Data Privacy</h4>
+      <p style="margin-bottom: 0;">Virginia crash data may contain sensitive information. Ensure you have proper authorization to access and analyze this data. Consider redacting personally identifiable information (PII) if sharing reports externally. See our <a href="./legal-notice.html">Legal Notice</a> for compliance requirements.</p>
+    </div>
+
+    <h2>Troubleshooting</h2>
+
+    <h3>Common Issues</h3>
+    <ul>
+      <li><strong>File won't upload:</strong> Ensure the file is saved as CSV (not XLSX)</li>
+      <li><strong>Missing data:</strong> Check that required columns are present in your export</li>
+      <li><strong>Wrong jurisdiction:</strong> Verify the jurisdiction filter in the app matches your data</li>
+      <li><strong>Slow processing:</strong> Large files (500K+ rows) may take a minute to process</li>
+    </ul>
+
+    <h2>Need Help?</h2>
+    <div class="highlight-box">
+      <p><strong>Contact Support</strong><br>
+      Email: <a href="mailto:aicreatesai08@gmail.com">aicreatesai08@gmail.com</a></p>
+      <p style="margin-bottom: 0;">For Virginia Roads access issues, contact VDOT directly at <a href="https://www.virginiaroads.org" target="_blank" rel="noopener">virginiaroads.org</a>.</p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <div class="footer-logo">
+        <img src="data/images/favicon.svg" alt="CRASH LENS">
+        <span>CRASH LENS</span>
+      </div>
+
+      <div class="footer-links">
+        <a href="./features.html">Features</a>
+        <a href="./pricing.html">Pricing</a>
+        <a href="./resources.html">Resources</a>
+        <a href="./privacy-policy.html">Privacy Policy</a>
+        <a href="./terms-of-service.html">Terms of Service</a>
+        <a href="./legal-notice.html">Legal Notice</a>
+      </div>
+
+      <div class="footer-copy">
+        &copy; 2026 CRASH LENS. All rights reserved.
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
