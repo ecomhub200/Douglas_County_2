@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-01-25T00:00:00Z",
+  "description": "CRASH LENS email notification subscribers. Add subscribers manually or via API.",
+  "subscribers": [
+    {
+      "id": "example-001",
+      "email": "example@agency.gov",
+      "name": "Traffic Safety Engineer",
+      "agency": "Example County",
+      "addedAt": "2026-01-25T00:00:00Z",
+      "verified": false,
+      "reports": {
+        "enabled": false,
+        "frequency": "monthly",
+        "dayOfWeek": 1,
+        "dayOfMonth": 1,
+        "time": "08:00",
+        "timezone": "America/New_York",
+        "reportTypes": ["comprehensive", "systemwide"],
+        "format": "pdf"
+      },
+      "grants": {
+        "enabled": false,
+        "deadlineAlerts": true,
+        "daysBeforeDeadline": [7, 14, 30],
+        "newGrantAlerts": true,
+        "weeklyDigest": false,
+        "digestDay": 1,
+        "digestTime": "09:00"
+      }
+    }
+  ],
+  "configuration": {
+    "emailProvider": "aws-ses",
+    "region": "us-east-1",
+    "fromEmail": "notifications@youragency.gov",
+    "replyToEmail": "support@youragency.gov",
+    "unsubscribeUrl": "https://yourdomain.com/unsubscribe",
+    "preferencesUrl": "https://yourdomain.com/preferences"
+  },
+  "templates": {
+    "reports": {
+      "subjectPrefix": "[CRASH LENS]",
+      "includeAttachment": true,
+      "maxAttachmentSizeMB": 10
+    },
+    "grants": {
+      "subjectPrefix": "[CRASH LENS]",
+      "urgencyThresholds": {
+        "critical": 7,
+        "warning": 14,
+        "normal": 30
+      }
+    }
+  }
+}

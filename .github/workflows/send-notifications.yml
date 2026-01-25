@@ -1,0 +1,116 @@
+name: Send Email Notifications
+
+on:
+  schedule:
+    # Weekly digest: Every Monday at 9:00 AM ET (14:00 UTC)
+    - cron: '0 14 * * 1'
+    # Grant deadline alerts: Daily at 8:00 AM ET (13:00 UTC)
+    - cron: '0 13 * * *'
+    # Monthly reports: First day of month at 7:00 AM ET (12:00 UTC)
+    - cron: '0 12 1 * *'
+
+  workflow_dispatch:
+    inputs:
+      notification_type:
+        description: 'Type of notification to send'
+        required: true
+        type: choice
+        options:
+          - reports
+          - grants
+          - digest
+          - test
+      test_email:
+        description: 'Email address for test (only for test type)'
+        required: false
+
+jobs:
+  send-notifications:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install boto3
+
+      - name: Determine notification type
+        id: determine-type
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "type=${{ github.event.inputs.notification_type }}" >> $GITHUB_OUTPUT
+            echo "test_email=${{ github.event.inputs.test_email }}" >> $GITHUB_OUTPUT
+          else
+            # Determine based on schedule
+            HOUR=$(date -u +%H)
+            DAY=$(date -u +%d)
+            DOW=$(date -u +%u)
+
+            if [ "$DAY" = "01" ] && [ "$HOUR" = "12" ]; then
+              echo "type=reports" >> $GITHUB_OUTPUT
+            elif [ "$DOW" = "1" ] && [ "$HOUR" = "14" ]; then
+              echo "type=digest" >> $GITHUB_OUTPUT
+            else
+              echo "type=grants" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Send scheduled reports
+        if: steps.determine-type.outputs.type == 'reports'
+        env:
+          AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
+          AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
+          AWS_SES_REGION: ${{ secrets.AWS_SES_REGION || 'us-east-1' }}
+          NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
+        run: |
+          echo "Sending scheduled reports..."
+          python send_notifications.py --type reports
+
+      - name: Send grant alerts
+        if: steps.determine-type.outputs.type == 'grants'
+        env:
+          AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
+          AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
+          AWS_SES_REGION: ${{ secrets.AWS_SES_REGION || 'us-east-1' }}
+          NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
+        run: |
+          echo "Sending grant deadline alerts..."
+          python send_notifications.py --type grants
+
+      - name: Send weekly digest
+        if: steps.determine-type.outputs.type == 'digest'
+        env:
+          AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
+          AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
+          AWS_SES_REGION: ${{ secrets.AWS_SES_REGION || 'us-east-1' }}
+          NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
+        run: |
+          echo "Sending weekly digest..."
+          python send_notifications.py --type digest
+
+      - name: Send test email
+        if: steps.determine-type.outputs.type == 'test'
+        env:
+          AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
+          AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
+          AWS_SES_REGION: ${{ secrets.AWS_SES_REGION || 'us-east-1' }}
+          NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
+        run: |
+          if [ -z "${{ steps.determine-type.outputs.test_email }}" ]; then
+            echo "Error: test_email is required for test notifications"
+            exit 1
+          fi
+          echo "Sending test email to ${{ steps.determine-type.outputs.test_email }}..."
+          python send_notifications.py --type test --email "${{ steps.determine-type.outputs.test_email }}"
+
+      - name: Log completion
+        run: |
+          echo "Notification job completed at $(date -u)"
+          echo "Type: ${{ steps.determine-type.outputs.type }}"
