@@ -1,0 +1,275 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "lastUpdated": "2026-01-26",
+    "source": "VDOT Virginia Roads / FR300 Manual / TREDS",
+    "contact": "TREDS.SAVESLIVES@DMV.Virginia.Gov",
+    "dataPortal": "https://virginiaroads.org"
+  },
+
+  "severity": {
+    "valid": ["K", "A", "B", "C", "O"],
+    "descriptions": {
+      "K": "Fatal Injury",
+      "A": "Serious Injury (Incapacitating)",
+      "B": "Minor Injury (Non-Incapacitating)",
+      "C": "Possible Injury",
+      "O": "Property Damage Only"
+    },
+    "epdoWeights": {
+      "K": 462,
+      "A": 62,
+      "B": 12,
+      "C": 5,
+      "O": 1
+    }
+  },
+
+  "collisionTypes": {
+    "valid": [
+      "1. Rear End",
+      "2. Angle",
+      "3. Head On",
+      "4. Sideswipe - Same Direction",
+      "5. Sideswipe - Opposite Direction",
+      "6. Fixed Object in Road",
+      "7. Train",
+      "8. Non-Collision",
+      "9. Fixed Object - Off Road",
+      "10. Deer",
+      "11. Other Animal",
+      "12. Ped",
+      "13. Bicyclist",
+      "14. Motorcyclist",
+      "15. Backed Into",
+      "16. Other"
+    ],
+    "categories": {
+      "pedestrian": ["12. Ped"],
+      "bicycle": ["13. Bicyclist"],
+      "motorcycle": ["14. Motorcyclist"],
+      "animal": ["10. Deer", "11. Other Animal"],
+      "fixedObject": ["6. Fixed Object in Road", "9. Fixed Object - Off Road"],
+      "rearEnd": ["1. Rear End"],
+      "angle": ["2. Angle"],
+      "headOn": ["3. Head On"],
+      "sideswipe": ["4. Sideswipe - Same Direction", "5. Sideswipe - Opposite Direction"]
+    }
+  },
+
+  "weatherConditions": {
+    "valid": [
+      "1. No Adverse Condition (Clear/Cloudy)",
+      "2. Fog",
+      "3. Mist",
+      "4. Rain",
+      "5. Snow",
+      "6. Sleet/Hail",
+      "7. Smoke/Dust",
+      "8. Severe Crosswinds",
+      "9. Other",
+      "10. Blowing Sand",
+      "11. Unknown"
+    ],
+    "categories": {
+      "clear": ["1. No Adverse Condition (Clear/Cloudy)"],
+      "adverse": ["2. Fog", "3. Mist", "4. Rain", "5. Snow", "6. Sleet/Hail", "7. Smoke/Dust", "8. Severe Crosswinds", "10. Blowing Sand"],
+      "precipitation": ["4. Rain", "5. Snow", "6. Sleet/Hail"],
+      "visibility": ["2. Fog", "3. Mist", "7. Smoke/Dust", "10. Blowing Sand"],
+      "unknown": ["9. Other", "11. Unknown"]
+    }
+  },
+
+  "lightConditions": {
+    "valid": [
+      "1. Dawn",
+      "2. Daylight",
+      "3. Dusk",
+      "4. Darkness - Road Lighted",
+      "5. Darkness - Road Not Lighted",
+      "6. Darkness - Unknown Road Lighting",
+      "7. Unknown"
+    ],
+    "categories": {
+      "daylight": ["1. Dawn", "2. Daylight", "3. Dusk"],
+      "darkness": ["4. Darkness - Road Lighted", "5. Darkness - Road Not Lighted", "6. Darkness - Unknown Road Lighting"],
+      "darknessLighted": ["4. Darkness - Road Lighted"],
+      "darknessUnlighted": ["5. Darkness - Road Not Lighted", "6. Darkness - Unknown Road Lighting"],
+      "unknown": ["7. Unknown"]
+    }
+  },
+
+  "surfaceConditions": {
+    "valid": [
+      "1. Dry",
+      "2. Wet",
+      "3. Water (Standing/Moving)",
+      "4. Ice",
+      "5. Snow",
+      "6. Mud/Dirt/Gravel",
+      "7. Slush",
+      "8. Oil",
+      "9. Sand",
+      "10. Other",
+      "11. Unknown"
+    ],
+    "categories": {
+      "dry": ["1. Dry"],
+      "wet": ["2. Wet", "3. Water (Standing/Moving)"],
+      "winter": ["4. Ice", "5. Snow", "7. Slush"],
+      "debris": ["6. Mud/Dirt/Gravel", "8. Oil", "9. Sand"]
+    }
+  },
+
+  "intersectionTypes": {
+    "valid": [
+      "1. Not at Intersection",
+      "2. Two-Way Stop",
+      "3. Four-Way Stop",
+      "4. Yield Sign",
+      "5. Traffic Signal",
+      "6. Flashing Signal",
+      "7. Railway Crossing",
+      "8. Roundabout",
+      "9. Other",
+      "10. Unknown"
+    ],
+    "categories": {
+      "signalized": ["5. Traffic Signal", "6. Flashing Signal"],
+      "stopControlled": ["2. Two-Way Stop", "3. Four-Way Stop"],
+      "yieldControlled": ["4. Yield Sign"],
+      "uncontrolled": ["1. Not at Intersection"],
+      "roundabout": ["8. Roundabout"],
+      "railroad": ["7. Railway Crossing"]
+    }
+  },
+
+  "trafficControlTypes": {
+    "valid": [
+      "1. No Control",
+      "2. Officer/Flagman",
+      "3. Traffic Signal",
+      "4. Flashing Signal",
+      "5. Stop Sign",
+      "6. Yield Sign",
+      "7. Warning Sign",
+      "8. RR Crossing Device",
+      "9. Other",
+      "10. Unknown"
+    ]
+  },
+
+  "roadwayAlignments": {
+    "valid": [
+      "1. Straight - Level",
+      "2. Straight - Grade",
+      "3. Straight - Hillcrest",
+      "4. Curve - Level",
+      "5. Curve - Grade",
+      "6. Curve - Hillcrest",
+      "7. Unknown"
+    ],
+    "categories": {
+      "straight": ["1. Straight - Level", "2. Straight - Grade", "3. Straight - Hillcrest"],
+      "curve": ["4. Curve - Level", "5. Curve - Grade", "6. Curve - Hillcrest"],
+      "level": ["1. Straight - Level", "4. Curve - Level"],
+      "grade": ["2. Straight - Grade", "5. Curve - Grade"],
+      "hillcrest": ["3. Straight - Hillcrest", "6. Curve - Hillcrest"]
+    }
+  },
+
+  "roadwayDescriptions": {
+    "valid": [
+      "1. Two-Way, Not Divided",
+      "2. Two-Way, Divided, Unprotected Median",
+      "3. Two-Way, Divided, Positive Barrier",
+      "4. One-Way",
+      "5. Unknown"
+    ]
+  },
+
+  "functionalClasses": {
+    "valid": [
+      "1. Interstate",
+      "2. Other Freeways and Expressways",
+      "3. Other Principal Arterial",
+      "4. Minor Arterial",
+      "5. Major Collector",
+      "6. Minor Collector",
+      "7. Local"
+    ]
+  },
+
+  "areaTypes": {
+    "valid": [
+      "1. Urban",
+      "2. Rural"
+    ]
+  },
+
+  "booleanFields": {
+    "valid": ["Yes", "No", "Unknown", ""],
+    "trueValues": ["Yes", "Y", "1", "TRUE", "true", "yes"],
+    "falseValues": ["No", "N", "0", "FALSE", "false", "no", ""],
+    "fieldNames": [
+      "Alcohol?",
+      "Bike?",
+      "Pedestrian?",
+      "Speed?",
+      "Distracted?",
+      "Drowsy?",
+      "Hitrun?",
+      "Senior?",
+      "Young?",
+      "Night?",
+      "Unrestrained?",
+      "Motorcycle?",
+      "Drug Related?",
+      "Guardrail Related?",
+      "Lgtruck?",
+      "Work Zone Related",
+      "School Zone"
+    ]
+  },
+
+  "stateBounds": {
+    "virginia": {
+      "minLat": 36.541,
+      "maxLat": 39.466,
+      "minLon": -83.675,
+      "maxLon": -75.242,
+      "center": {
+        "lat": 37.4316,
+        "lon": -78.6569
+      }
+    }
+  },
+
+  "dateConstraints": {
+    "minYear": 2015,
+    "maxYear": null,
+    "preliminaryDays": 30,
+    "dateFormats": [
+      "MM/DD/YYYY",
+      "YYYY-MM-DD",
+      "M/D/YYYY"
+    ]
+  },
+
+  "documentNumberPatterns": {
+    "pattern": "^[A-Z0-9\\-]{6,25}$",
+    "examples": [
+      "VA2024001234",
+      "240001234",
+      "2024-001234"
+    ]
+  },
+
+  "coordinatePrecision": {
+    "minDecimals": 4,
+    "maxDecimals": 8,
+    "snapToRoadThreshold": 50,
+    "flagThreshold": 100,
+    "offRoadThreshold": 200
+  }
+}
