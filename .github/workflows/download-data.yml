@@ -295,10 +295,9 @@ jobs:
           echo "Validation started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
 
-          # Run validation with auto-correction
+          # Run validation with auto-correction (enabled by default)
           python validation/run_validation.py \
-            --jurisdiction "$JURISDICTION" \
-            --auto-correct
+            --jurisdiction "$JURISDICTION"
 
           echo "=========================================="
           echo "Validation complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"

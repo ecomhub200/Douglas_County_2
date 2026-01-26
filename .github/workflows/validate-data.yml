@@ -83,7 +83,7 @@ jobs:
           echo "=========================================="
 
           # Build command
-          CMD="python validation/run_validation.py --jurisdiction $JURISDICTION --auto-correct"
+          CMD="python validation/run_validation.py --jurisdiction $JURISDICTION"
 
           if [ "${{ github.event.inputs.full_validation }}" = "true" ]; then
             CMD="$CMD --full"
