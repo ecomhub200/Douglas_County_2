@@ -357,12 +357,15 @@ jobs:
 
           if [ -f "data/.validation/latest_report.json" ]; then
             SUMMARY=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['summary'])")
-            COMMIT_MSG="$COMMIT_MSG
+            git commit -m "$(cat <<EOF
+$COMMIT_MSG
 
-Validation: $SUMMARY"
+Validation: $SUMMARY
+EOF
+)"
+          else
+            git commit -m "$COMMIT_MSG"
           fi
-
-          git commit -m "$COMMIT_MSG"
 
           # Push with retry logic to handle race conditions with grants job
           MAX_RETRIES=4
