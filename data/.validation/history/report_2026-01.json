@@ -1,0 +1,376 @@
+{
+  "metadata": {
+    "generatedAt": "2026-01-26T16:25:48.595387Z",
+    "jurisdiction": "henrico",
+    "validationVersion": "1.1.0",
+    "runType": "full"
+  },
+  "summary": "Validated 48074 new records. 0 auto-corrected, 70032 flagged, 14 duplicates, -21958 clean.",
+  "totalRecords": 48074,
+  "newRecords": 48074,
+  "autoCorrections": 0,
+  "flagged": 70032,
+  "errors": 0,
+  "duplicates": 14,
+  "cleanRate": -45.68,
+  "errorRate": 0.0,
+  "issuesByCategory": {
+    "potential_duplicate": 14,
+    "unknown_category": 67225,
+    "outside_jurisdiction_bounds": 2792,
+    "invalid_category": 1
+  },
+  "correctionsByField": {},
+  "flaggedRecords": [
+    {
+      "documentNbr": "173285125",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "243385246",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "183455477",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "233445021",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "190675347",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "240605313",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "190745271",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171165092",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "221815351",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "211895344",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "192265440",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "212695032",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "242695453",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "172745063",
+      "issues": [
+        "Potential duplicate - same date, location, and severity as another record"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "173095004",
+      "issues": [
+        "Unknown Weather Condition: 5. Rain"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "172155126",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "170165225",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171815290",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171055109",
+      "issues": [
+        "Unknown Traffic Control Type: 1. No Traffic Control"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171025043",
+      "issues": [
+        "Unknown Intersection Type: 4. Four Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "173205216",
+      "issues": [
+        "Unknown Intersection Type: 2. Two Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171945336",
+      "issues": [
+        "Unknown Intersection Type: 3. Three Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "173395394",
+      "issues": [
+        "Unknown Weather Condition: 5. Rain"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "170425148",
+      "issues": [
+        "Unknown Intersection Type: 3. Three Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "172365248",
+      "issues": [
+        "Unknown Weather Condition: 5. Rain"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171095276",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "172175072",
+      "issues": [
+        "Unknown Intersection Type: 4. Four Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171605324",
+      "issues": [
+        "Unknown Intersection Type: 4. Four Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171305398",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "170765306",
+      "issues": [
+        "Unknown Intersection Type: 4. Four Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "170645222",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "172755303",
+      "issues": [
+        "Unknown Intersection Type: 3. Three Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171865455",
+      "issues": [
+        "Unknown Weather Condition: 5. Rain"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "173115445",
+      "issues": [
+        "Unknown Intersection Type: 3. Three Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171315325",
+      "issues": [
+        "Unknown Intersection Type: 4. Four Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "172915183",
+      "issues": [
+        "Unknown Intersection Type: 4. Four Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171905076",
+      "issues": [
+        "Unknown Intersection Type: 4. Four Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "170275378",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "172825464",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "172475005",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "173505030",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171165113",
+      "issues": [
+        "Unknown Intersection Type: 4. Four Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "172685377",
+      "issues": [
+        "Unknown Intersection Type: 4. Four Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "172035049",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "173535023",
+      "issues": [
+        "Unknown Intersection Type: 4. Four Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171156388",
+      "issues": [
+        "Unknown Weather Condition: 5. Rain"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "173065337",
+      "issues": [
+        "Unknown Intersection Type: 4. Four Approaches"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "171315215",
+      "issues": [
+        "Unknown Weather Condition: 5. Rain"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "170805093",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "172565031",
+      "issues": [
+        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+      ],
+      "severity": "warning"
+    }
+  ]
+}
