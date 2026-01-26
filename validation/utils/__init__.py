@@ -23,6 +23,11 @@ from .spatial_validator import (
     CrashSpatialProcessor,
     geocode_and_validate
 )
+from .vdot_lrs_client import (
+    VDOTLRSClient,
+    VDOTMilepostLookup,
+    geocode_with_vdot_lrs
+)
 
 __all__ = [
     "ConfigLoader",
@@ -34,5 +39,8 @@ __all__ = [
     "geocode_missing_coordinates",
     "SpatialValidator",
     "CrashSpatialProcessor",
-    "geocode_and_validate"
+    "geocode_and_validate",
+    "VDOTLRSClient",
+    "VDOTMilepostLookup",
+    "geocode_with_vdot_lrs"
 ]

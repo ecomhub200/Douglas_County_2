@@ -4,11 +4,13 @@ Geocoding utilities for Virginia Crash Data Validation.
 
 Priority order for missing coordinates:
 1. Node Lookup (instant, free) - uses pre-computed node coordinates
-2. Mapbox Geocoding (API) - for records without Node
-3. Flag for manual review
+2. VDOT LRS/Milepost Lookup (instant, free) - uses route + milepost from local table
+3. VDOT LRS API (free, slower) - queries VDOT's official LRS service
+4. Mapbox Geocoding (API, fallback) - for records without VDOT data
+5. Flag for manual review
 
 Author: CRASH LENS Team
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import json
@@ -214,48 +216,117 @@ class CrashDataGeocoder:
     """
     Main geocoder for crash data validation.
     Implements priority-based geocoding strategy.
+
+    Priority:
+    1. Node Lookup (instant, free) - pre-computed from existing data
+    2. VDOT LRS/MP Lookup (instant, free) - pre-computed from existing data
+    3. VDOT LRS API (free, slower) - official VDOT service
+    4. Mapbox Geocoding (API, fallback) - address-based
     """
 
-    def __init__(self):
+    def __init__(self, use_vdot_api: bool = False):
+        """
+        Initialize geocoder.
+
+        Args:
+            use_vdot_api: Whether to enable VDOT LRS API calls (slower but more complete)
+        """
         self.node_lookup = NodeLookupTable()
         self.mapbox = MapboxGeocoder()
+        self.use_vdot_api = use_vdot_api
+
+        # VDOT LRS components (lazy load to avoid import errors)
+        self.vdot_milepost_lookup = None
+        self.vdot_lrs_client = None
+
         self.stats = {
             'total_processed': 0,
             'node_lookup_success': 0,
+            'vdot_milepost_success': 0,
+            'vdot_api_success': 0,
             'mapbox_success': 0,
             'failed': 0
         }
 
+    def _init_vdot(self):
+        """Initialize VDOT LRS components (lazy load)."""
+        if self.vdot_milepost_lookup is None:
+            try:
+                from .vdot_lrs_client import VDOTMilepostLookup, VDOTLRSClient
+                self.vdot_milepost_lookup = VDOTMilepostLookup()
+                if self.use_vdot_api:
+                    self.vdot_lrs_client = VDOTLRSClient()
+            except ImportError as e:
+                logger.warning(f"VDOT LRS module not available: {e}")
+
     def build_node_lookup(self, df: pd.DataFrame):
         """Build node lookup table from existing data."""
         self.node_lookup.build_from_dataframe(df)
+
+    def build_vdot_lookup(self, df: pd.DataFrame):
+        """Build VDOT milepost lookup table from existing data."""
+        self._init_vdot()
+        if self.vdot_milepost_lookup is not None:
+            self.vdot_milepost_lookup.build_from_dataframe(df)
+
+    def build_lookups(self, df: pd.DataFrame):
+        """Build all lookup tables from existing data."""
+        self.build_node_lookup(df)
+        self.build_vdot_lookup(df)
 
     def geocode_record(self, record: pd.Series) -> Optional[Tuple[float, float]]:
         """
         Geocode a single record using priority strategy.
 
         Priority:
-        1. Node lookup (if Node field populated)
-        2. Mapbox geocoding (if address/route available)
+        1. Node lookup (if Node field populated) - instant, free
+        2. VDOT LRS/MP lookup (if RTE Name + RNS MP available) - instant, free
+        3. VDOT LRS API (if enabled and route data available) - free, slower
+        4. Mapbox geocoding (if address available) - API fallback
 
         Returns (longitude, latitude) or None.
         """
         self.stats['total_processed'] += 1
 
-        # Priority 1: Node Lookup
+        # Initialize VDOT components if needed
+        self._init_vdot()
+
+        # Priority 1: Node Lookup (instant, free)
         if 'Node' in record.index and pd.notna(record.get('Node')):
             coords = self.node_lookup.lookup(record['Node'])
             if coords:
                 self.stats['node_lookup_success'] += 1
                 return coords
 
-        # Priority 2: Mapbox Geocoding
-        # Try to build an address from available fields
+        # Priority 2: VDOT Milepost Lookup (instant, free)
+        route_name = record.get('RTE Name') if 'RTE Name' in record.index else None
+        milepost = record.get('RNS MP') if 'RNS MP' in record.index else None
+
+        if self.vdot_milepost_lookup and route_name and pd.notna(route_name) and pd.notna(milepost):
+            try:
+                coords = self.vdot_milepost_lookup.lookup(str(route_name), float(milepost))
+                if coords:
+                    self.stats['vdot_milepost_success'] += 1
+                    return coords
+            except (ValueError, TypeError):
+                pass
+
+        # Priority 3: VDOT LRS API (free, but slower)
+        if self.vdot_lrs_client and route_name and pd.notna(route_name) and pd.notna(milepost):
+            try:
+                coords = self.vdot_lrs_client.geocode_milepost(str(route_name), float(milepost))
+                if coords:
+                    self.stats['vdot_api_success'] += 1
+                    return coords
+            except (ValueError, TypeError):
+                pass
+
+        # Priority 4: Mapbox Geocoding (API fallback)
         address_parts = []
 
         # Use route name if available
-        if 'RTE Name' in record.index and pd.notna(record.get('RTE Name')):
-            route = str(record['RTE Name'])
+        if route_name and pd.notna(route_name):
+            route = str(route_name)
             # Clean up route name (e.g., "S-VA043NP NUCKOLS RD" → "Nuckols Rd")
             if ' ' in route:
                 address_parts.append(route.split(' ', 1)[1])
@@ -289,9 +360,13 @@ class CrashDataGeocoder:
         """
         df = df.copy()
 
-        # Build node lookup from records that have coordinates
+        # Build lookup tables from records that have coordinates
         if 'Node' in df.columns:
             self.build_node_lookup(df)
+
+        # Build VDOT milepost lookup
+        if 'RTE Name' in df.columns and 'RNS MP' in df.columns:
+            self.build_vdot_lookup(df)
 
         # Find records needing geocoding
         if only_missing:
@@ -314,11 +389,19 @@ class CrashDataGeocoder:
 
     def get_stats(self) -> dict:
         """Get geocoding statistics."""
-        return {
+        stats = {
             **self.stats,
             'node_lookup_size': len(self.node_lookup),
             'mapbox_cache_size': len(self.mapbox.cache)
         }
+
+        # Add VDOT stats if available
+        if self.vdot_milepost_lookup is not None:
+            stats['vdot_milepost_lookup_size'] = len(self.vdot_milepost_lookup)
+        if self.vdot_lrs_client is not None:
+            stats['vdot_api_enabled'] = True
+
+        return stats
 
 
 def geocode_missing_coordinates(df: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
