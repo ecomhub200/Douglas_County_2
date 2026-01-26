@@ -1,0 +1,424 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "lastUpdated": "2026-01-26",
+    "description": "Auto-correction rules for Virginia crash data validation"
+  },
+
+  "confidenceThresholds": {
+    "autoApply": 85,
+    "suggest": 50,
+    "flagOnly": 0,
+    "description": {
+      "100": "Certain - formatting fixes, no interpretation needed",
+      "95-99": "Very High - clear mapping, minimal ambiguity",
+      "85-94": "High - confident match, apply with logging",
+      "50-84": "Medium - suggest but don't apply automatically",
+      "0-49": "Low - flag for manual review only"
+    }
+  },
+
+  "categoryCorrections": {
+    "Light Condition": {
+      "Soil": {
+        "correctTo": "3. Dusk",
+        "confidence": 85,
+        "reason": "OCR/data entry error - phonetically similar to 'Dusk'"
+      },
+      "Not Applicable": {
+        "correctTo": null,
+        "confidence": 0,
+        "flag": true,
+        "reason": "Invalid category - requires manual review"
+      },
+      "Daylight": {
+        "correctTo": "2. Daylight",
+        "confidence": 100,
+        "reason": "Missing numeric prefix"
+      },
+      "Dawn": {
+        "correctTo": "1. Dawn",
+        "confidence": 100,
+        "reason": "Missing numeric prefix"
+      },
+      "Dusk": {
+        "correctTo": "3. Dusk",
+        "confidence": 100,
+        "reason": "Missing numeric prefix"
+      },
+      "Dark": {
+        "correctTo": "5. Darkness - Road Not Lighted",
+        "confidence": 75,
+        "reason": "Abbreviated - assumed unlit"
+      },
+      "Unknown": {
+        "correctTo": "7. Unknown",
+        "confidence": 100,
+        "reason": "Missing numeric prefix"
+      }
+    },
+
+    "Weather Condition": {
+      "\"10. Blowing Sand": {
+        "correctTo": "10. Blowing Sand",
+        "confidence": 100,
+        "reason": "Quote parsing error - remove leading quote"
+      },
+      "Clear": {
+        "correctTo": "1. No Adverse Condition (Clear/Cloudy)",
+        "confidence": 95,
+        "reason": "Abbreviated category name"
+      },
+      "Cloudy": {
+        "correctTo": "1. No Adverse Condition (Clear/Cloudy)",
+        "confidence": 95,
+        "reason": "Abbreviated category name"
+      },
+      "Rainy": {
+        "correctTo": "4. Rain",
+        "confidence": 95,
+        "reason": "Alternative spelling"
+      },
+      "Snowy": {
+        "correctTo": "5. Snow",
+        "confidence": 95,
+        "reason": "Alternative spelling"
+      },
+      "Foggy": {
+        "correctTo": "2. Fog",
+        "confidence": 95,
+        "reason": "Alternative spelling"
+      },
+      "Unknown": {
+        "correctTo": "11. Unknown",
+        "confidence": 100,
+        "reason": "Missing numeric prefix"
+      }
+    },
+
+    "Collision Type": {
+      "Pedestrian": {
+        "correctTo": "12. Ped",
+        "confidence": 95,
+        "reason": "Alternative spelling"
+      },
+      "Bicycle": {
+        "correctTo": "13. Bicyclist",
+        "confidence": 95,
+        "reason": "Alternative spelling"
+      },
+      "Bike": {
+        "correctTo": "13. Bicyclist",
+        "confidence": 95,
+        "reason": "Abbreviated term"
+      },
+      "Rear-End": {
+        "correctTo": "1. Rear End",
+        "confidence": 100,
+        "reason": "Hyphenated variant"
+      },
+      "Head-On": {
+        "correctTo": "3. Head On",
+        "confidence": 100,
+        "reason": "Hyphenated variant"
+      },
+      "Fixed Object": {
+        "correctTo": "9. Fixed Object - Off Road",
+        "confidence": 75,
+        "reason": "Ambiguous - defaulting to off-road (more common)"
+      }
+    },
+
+    "Crash Severity": {
+      "F": {
+        "correctTo": "K",
+        "confidence": 95,
+        "reason": "F (Fatal) maps to K in KABCO"
+      },
+      "I": {
+        "correctTo": "A",
+        "confidence": 75,
+        "reason": "I (Injury) assumed serious - needs verification"
+      },
+      "P": {
+        "correctTo": "O",
+        "confidence": 95,
+        "reason": "P (Property) maps to O (PDO)"
+      },
+      "N": {
+        "correctTo": "O",
+        "confidence": 90,
+        "reason": "N (No injury) maps to O (PDO)"
+      },
+      "k": {
+        "correctTo": "K",
+        "confidence": 100,
+        "reason": "Lowercase - normalize to uppercase"
+      },
+      "a": {
+        "correctTo": "A",
+        "confidence": 100,
+        "reason": "Lowercase - normalize to uppercase"
+      },
+      "b": {
+        "correctTo": "B",
+        "confidence": 100,
+        "reason": "Lowercase - normalize to uppercase"
+      },
+      "c": {
+        "correctTo": "C",
+        "confidence": 100,
+        "reason": "Lowercase - normalize to uppercase"
+      },
+      "o": {
+        "correctTo": "O",
+        "confidence": 100,
+        "reason": "Lowercase - normalize to uppercase"
+      }
+    },
+
+    "Roadway Surface Condition": {
+      "Wet/Water": {
+        "correctTo": "2. Wet",
+        "confidence": 90,
+        "reason": "Combined category - map to primary"
+      },
+      "Ice/Snow": {
+        "correctTo": "4. Ice",
+        "confidence": 75,
+        "reason": "Combined category - map to primary (ice more severe)"
+      },
+      "Dry": {
+        "correctTo": "1. Dry",
+        "confidence": 100,
+        "reason": "Missing numeric prefix"
+      }
+    }
+  },
+
+  "consistencyCorrections": {
+    "pedestrianFlagMismatch": {
+      "condition": {
+        "field": "Collision Type",
+        "value": "12. Ped"
+      },
+      "expectedFlag": {
+        "field": "Pedestrian?",
+        "value": "Yes"
+      },
+      "correction": {
+        "field": "Pedestrian?",
+        "value": "Yes"
+      },
+      "confidence": 98,
+      "reason": "Pedestrian collision should have Pedestrian flag = Yes"
+    },
+
+    "bicycleFlagMismatch": {
+      "condition": {
+        "field": "Collision Type",
+        "value": "13. Bicyclist"
+      },
+      "expectedFlag": {
+        "field": "Bike?",
+        "value": "Yes"
+      },
+      "correction": {
+        "field": "Bike?",
+        "value": "Yes"
+      },
+      "confidence": 98,
+      "reason": "Bicycle collision should have Bike flag = Yes"
+    },
+
+    "motorcycleFlagMismatch": {
+      "condition": {
+        "field": "Collision Type",
+        "value": "14. Motorcyclist"
+      },
+      "expectedFlag": {
+        "field": "Motorcycle?",
+        "value": "Yes"
+      },
+      "correction": {
+        "field": "Motorcycle?",
+        "value": "Yes"
+      },
+      "confidence": 98,
+      "reason": "Motorcycle collision should have Motorcycle flag = Yes"
+    },
+
+    "nightFlagMismatch": {
+      "condition": {
+        "field": "Light Condition",
+        "values": [
+          "4. Darkness - Road Lighted",
+          "5. Darkness - Road Not Lighted",
+          "6. Darkness - Unknown Road Lighting"
+        ]
+      },
+      "expectedFlag": {
+        "field": "Night?",
+        "value": "Yes"
+      },
+      "correction": {
+        "field": "Night?",
+        "value": "Yes"
+      },
+      "confidence": 95,
+      "reason": "Darkness light condition should have Night flag = Yes"
+    }
+  },
+
+  "coordinateCorrections": {
+    "outsideVirginia": {
+      "check": "coordinates outside Virginia state bounds",
+      "action": "flag",
+      "confidence": 0,
+      "severity": "error",
+      "reason": "Coordinate outside Virginia state bounds - likely data entry error"
+    },
+
+    "outsideJurisdiction": {
+      "check": "coordinates outside stated jurisdiction bbox",
+      "action": "flag",
+      "confidence": 0,
+      "severity": "warning",
+      "reason": "Coordinate outside stated jurisdiction bounds - may be boundary crash"
+    },
+
+    "nullCoordinatesWithNode": {
+      "check": "coordinates null but Node field populated",
+      "action": "lookup",
+      "source": "node_coordinates_table",
+      "confidence": 90,
+      "reason": "Can potentially recover coordinates from Node ID lookup"
+    },
+
+    "offRoadCoordinate": {
+      "check": "coordinate > 50m from nearest road",
+      "action": "snap",
+      "maxDistance": 50,
+      "confidence": 85,
+      "reason": "Snap to nearest road within 50m threshold"
+    },
+
+    "farFromRoad": {
+      "check": "coordinate > 100m from nearest road",
+      "action": "flag",
+      "confidence": 0,
+      "severity": "warning",
+      "reason": "Coordinate far from any road - needs manual review"
+    },
+
+    "transposedLatLon": {
+      "check": "latitude in longitude range or vice versa",
+      "action": "swap",
+      "confidence": 95,
+      "reason": "Lat/Lon appear to be transposed based on Virginia bounds"
+    }
+  },
+
+  "formatCorrections": {
+    "trimWhitespace": {
+      "apply": "all_string_fields",
+      "pattern": "^\\s+|\\s+$",
+      "replacement": "",
+      "confidence": 100,
+      "reason": "Remove leading/trailing whitespace"
+    },
+
+    "removeQuotes": {
+      "apply": "all_string_fields",
+      "pattern": "^[\"']|[\"']$",
+      "replacement": "",
+      "confidence": 100,
+      "reason": "Remove enclosing quotes"
+    },
+
+    "normalizeBoolean": {
+      "apply": "boolean_fields",
+      "mappings": {
+        "Y": "Yes",
+        "N": "No",
+        "1": "Yes",
+        "0": "No",
+        "TRUE": "Yes",
+        "FALSE": "No",
+        "true": "Yes",
+        "false": "No",
+        "yes": "Yes",
+        "no": "No"
+      },
+      "confidence": 100,
+      "reason": "Normalize boolean values to Yes/No"
+    },
+
+    "uppercaseSeverity": {
+      "apply": ["Crash Severity"],
+      "transform": "uppercase",
+      "confidence": 100,
+      "reason": "Severity should be uppercase K/A/B/C/O"
+    },
+
+    "integerInjuryCounts": {
+      "apply": ["K_People", "A_People", "B_People", "C_People", "Persons Injured", "Pedestrians Killed", "Pedestrians Injured"],
+      "transform": "integer",
+      "default": 0,
+      "confidence": 100,
+      "reason": "Injury counts should be integers, default to 0 if missing"
+    }
+  },
+
+  "duplicateHandling": {
+    "exactDuplicate": {
+      "action": "keep_first",
+      "confidence": 100,
+      "reason": "Exact duplicate rows - keep first occurrence"
+    },
+
+    "duplicateDocumentNbr": {
+      "action": "keep_first",
+      "confidence": 100,
+      "reason": "Duplicate Document Number - keep first occurrence, log discrepancy"
+    },
+
+    "potentialDuplicate": {
+      "criteria": {
+        "sameFields": ["Crash Date", "x", "y", "Crash Severity"],
+        "tolerances": {
+          "x": 0.0001,
+          "y": 0.0001
+        }
+      },
+      "action": "flag",
+      "confidence": 0,
+      "reason": "Potential duplicate - same location/date/severity - needs review"
+    }
+  },
+
+  "severityConsistency": {
+    "fatalWithNoKPeople": {
+      "condition": {
+        "severity": "K",
+        "K_People": 0
+      },
+      "action": "flag",
+      "confidence": 0,
+      "severity": "error",
+      "reason": "Fatal crash (K) should have K_People > 0"
+    },
+
+    "seriousInjuryWithNoAPeople": {
+      "condition": {
+        "severity": "A",
+        "A_People": 0,
+        "totalInjured": 0
+      },
+      "action": "flag",
+      "confidence": 0,
+      "severity": "warning",
+      "reason": "Serious injury crash (A) should have A_People > 0 or injuries recorded"
+    }
+  }
+}
