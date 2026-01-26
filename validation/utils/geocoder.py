@@ -88,7 +88,10 @@ class NodeLookupTable:
         # Update lookup table
         new_count = 0
         for _, row in node_means.iterrows():
-            node_id = str(int(row['Node']))
+            try:
+                node_id = str(int(float(row['Node'])))
+            except (ValueError, TypeError):
+                continue
             if node_id not in self.node_coords:
                 new_count += 1
             self.node_coords[node_id] = (row['x'], row['y'])
@@ -103,7 +106,10 @@ class NodeLookupTable:
         """
         if pd.isna(node_id):
             return None
-        node_str = str(int(float(node_id)))
+        try:
+            node_str = str(int(float(node_id)))
+        except (ValueError, TypeError):
+            return None
         return self.node_coords.get(node_str)
 
     def __len__(self):

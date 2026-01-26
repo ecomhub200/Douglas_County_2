@@ -190,10 +190,15 @@ class VDOTLRSClient:
         # Build query for route master layer
         layer_url = f"{self.FEATURE_SERVER}/{self.LAYERS['route_master']}/query"
 
+        # Sanitize route components to prevent injection
+        route_type = re.sub(r'[^A-Z0-9]', '', str(parsed['route_type']))
+        route_number = re.sub(r'[^0-9]', '', str(parsed['route_number']))
+        safe_milepost = float(milepost)  # Ensure numeric
+
         # Query routes containing the milepost
         where_clause = (
-            f"RTE_NM LIKE '%{parsed['route_type']}%{parsed['route_number']}%' "
-            f"AND RTE_FROM_MSR <= {milepost} AND RTE_TO_MSR >= {milepost}"
+            f"RTE_NM LIKE '%{route_type}%{route_number}%' "
+            f"AND RTE_FROM_MSR <= {safe_milepost} AND RTE_TO_MSR >= {safe_milepost}"
         )
 
         params = {
@@ -320,9 +325,11 @@ class VDOTLRSClient:
         coords = self.interpolate_milepost(geometry, from_mp, to_mp, milepost)
 
         if coords:
-            # Cache result
+            # Cache result (save periodically, not every time)
             self.milepost_cache[cache_key] = coords
-            self._save_caches()
+            # Save cache every 50 new entries to reduce I/O
+            if len(self.milepost_cache) % 50 == 0:
+                self._save_caches()
 
         return coords
 
@@ -332,6 +339,10 @@ class VDOTLRSClient:
             'milepost_cache_size': len(self.milepost_cache),
             'route_cache_size': len(self.route_cache)
         }
+
+    def finalize(self):
+        """Save caches after batch processing. Call this when done."""
+        self._save_caches()
 
 
 class VDOTMilepostLookup:
@@ -365,10 +376,15 @@ class VDOTMilepostLookup:
             json.dump(self.milepost_coords, f)
         logger.info(f"Saved {len(self.milepost_coords)} milepost coordinates to cache")
 
-    def _make_key(self, route_name: str, milepost: float) -> str:
+    def _make_key(self, route_name: str, milepost: float) -> Optional[str]:
         """Create lookup key from route and milepost."""
+        if route_name is None or milepost is None:
+            return None
         # Round milepost to 2 decimal places for fuzzy matching
-        mp_rounded = round(milepost, 2)
+        try:
+            mp_rounded = round(float(milepost), 2)
+        except (ValueError, TypeError):
+            return None
         return f"{route_name}|{mp_rounded}"
 
     def build_from_dataframe(self, df):
@@ -439,6 +455,8 @@ class VDOTMilepostLookup:
 
         # Try exact match first
         key = self._make_key(route_name, mp)
+        if key is None:
+            return None
         if key in self.milepost_coords:
             return self.milepost_coords[key]
 
