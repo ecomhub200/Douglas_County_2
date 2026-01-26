@@ -1,6 +1,11 @@
 name: Validate Crash Data
 
 on:
+  # Automatic: 1st Monday of every month at 6 AM UTC (1-2 AM EST)
+  schedule:
+    - cron: '0 6 1-7 * 1'
+
+  # Manual trigger
   workflow_dispatch:
     inputs:
       jurisdiction:
@@ -30,6 +35,16 @@ on:
         required: false
         type: boolean
         default: false
+      enable_geocoding:
+        description: 'Enable geocoding for missing coordinates'
+        required: false
+        type: boolean
+        default: true
+      spatial_validate_pct:
+        description: 'Validate X% of coordinates against road network (0-100)'
+        required: false
+        type: number
+        default: 10
 
 permissions:
   contents: write
@@ -85,16 +100,39 @@ jobs:
           # Build command
           CMD="python validation/run_validation.py --jurisdiction $JURISDICTION"
 
-          if [ "${{ github.event.inputs.full_validation }}" = "true" ]; then
-            CMD="$CMD --full"
-            echo "Mode: Full re-validation"
+          # Check if this is a scheduled run (1st Monday auto-run)
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "Mode: Scheduled (1st Monday of month)"
+            echo "  - Incremental validation"
+            echo "  - Geocoding enabled"
+            echo "  - Spatial validation: 10%"
+            CMD="$CMD --geocode --spatial-validate 10"
           else
-            echo "Mode: Incremental validation"
-          fi
+            # Manual run - use input parameters
+            if [ "${{ github.event.inputs.full_validation }}" = "true" ]; then
+              CMD="$CMD --full"
+              echo "Mode: Full re-validation"
+            else
+              echo "Mode: Incremental validation"
+            fi
 
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-            CMD="$CMD --dry-run"
-            echo "Mode: Dry run (no changes)"
+            if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+              CMD="$CMD --dry-run"
+              echo "Mode: Dry run (no changes)"
+            fi
+
+            # Geocoding option
+            if [ "${{ github.event.inputs.enable_geocoding }}" = "true" ]; then
+              CMD="$CMD --geocode"
+              echo "Geocoding: Enabled"
+            fi
+
+            # Spatial validation percentage
+            SPATIAL_PCT="${{ github.event.inputs.spatial_validate_pct }}"
+            if [ -n "$SPATIAL_PCT" ] && [ "$SPATIAL_PCT" != "0" ]; then
+              CMD="$CMD --spatial-validate $SPATIAL_PCT"
+              echo "Spatial validation: ${SPATIAL_PCT}%"
+            fi
           fi
 
           echo "Running: $CMD"
@@ -128,9 +166,22 @@ jobs:
             echo "| New Records | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['newRecords'])") |" >> $GITHUB_STEP_SUMMARY
             echo "| Auto-Corrected | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['autoCorrections'])") |" >> $GITHUB_STEP_SUMMARY
             echo "| Flagged | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['flaggedRecords'])") |" >> $GITHUB_STEP_SUMMARY
-            echo "| Duplicates | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json')).get('duplicates', 0))") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Duplicates | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json')).get('deduplicated', 0))") |" >> $GITHUB_STEP_SUMMARY
             echo "| Clean Rate | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['cleanRate'])")% |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Show spatial processing stats if available
+            SPATIAL_STATS=$(python -c "import json; r=json.load(open('data/.validation/latest_report.json')); print('yes' if r.get('spatialProcessing') else 'no')" 2>/dev/null || echo "no")
+            if [ "$SPATIAL_STATS" = "yes" ]; then
+              echo "### Spatial Processing" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+              echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| Records Processed | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['spatialProcessing'].get('records_processed', 0))") |" >> $GITHUB_STEP_SUMMARY
+              echo "| Records Skipped | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['spatialProcessing'].get('records_skipped', 0))") |" >> $GITHUB_STEP_SUMMARY
+              echo "| Coords Corrected | $(python -c "import json; print(len(json.load(open('data/.validation/latest_report.json'))['spatialProcessing'].get('corrections_made', [])))") |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
 
             # Show flagged records if any
             FLAGGED=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['flaggedRecords'])")
@@ -158,7 +209,11 @@ jobs:
           fi
 
           JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
-          git commit -m "Validate: $JURISDICTION crash data - $(date +'%Y-%m-%d') [manual]"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            git commit -m "Validate: $JURISDICTION crash data - $(date +'%Y-%m-%d') [scheduled-monthly]"
+          else
+            git commit -m "Validate: $JURISDICTION crash data - $(date +'%Y-%m-%d') [manual]"
+          fi
 
           # Push with retry logic
           MAX_RETRIES=4
