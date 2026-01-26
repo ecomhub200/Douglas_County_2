@@ -1,5 +1,5 @@
 {
-  "lastRun": "2026-01-26T16:25:49.877211Z",
+  "lastRun": "2026-01-26T17:15:57.052041Z",
   "runType": "full",
   "jurisdiction": "henrico",
   "validationRulesVersion": "1.0.0",
@@ -9,8 +9,9 @@
     "new_records": 48074,
     "validated": 48074,
     "auto_corrected": 0,
-    "flagged": 70032,
+    "flagged": 3355,
     "errors": 0,
+    "total_issues": 3355,
     "duplicates": 14
   },
   "filesValidated": [
