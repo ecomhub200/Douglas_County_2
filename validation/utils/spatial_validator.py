@@ -2,30 +2,38 @@
 """
 Spatial Validation for Virginia Crash Data.
 
-Combines Overpass API (OSM) for validation and Geocoder for missing coordinates.
+Combines Overpass API (OSM) for validation and VDOT LRS for FREE correction.
 
-Validation Capabilities (Overpass):
+Validation Capabilities (Overpass - FREE):
 1. Coordinate-on-road validation - Is GPS point actually on a road?
 2. Intersection validation - Does location match intersection type?
 3. Route name validation - Is crash on the expected road?
 
-Geocoding Capabilities (Node Lookup + Mapbox):
+Correction Capabilities (VDOT - FREE, no Mapbox):
 1. Node lookup - Free, instant coordinate lookup from pre-built table
-2. Mapbox geocoding - API-based for records without Node
-3. Flag for manual review - When both fail
+2. VDOT LRS/MP lookup - Free, route + milepost to coordinates
+3. VDOT LRS API - Free, official VDOT service
+4. Flag for manual review - When all free methods fail
 
 Author: CRASH LENS Team
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 
 from .geocoder import CrashDataGeocoder, NodeLookupTable
 from .overpass_client import OverpassClient
+
+# Import VDOT LRS for free coordinate correction
+try:
+    from .vdot_lrs_client import VDOTMilepostLookup, VDOTLRSClient
+    VDOT_AVAILABLE = True
+except ImportError:
+    VDOT_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -251,28 +259,131 @@ class SpatialValidator:
         return self.stats.copy()
 
 
+class CoordinateCorrector:
+    """
+    Corrects bad coordinates using FREE VDOT data sources.
+
+    NO Mapbox - uses only:
+    1. Node Lookup (pre-built from existing data)
+    2. VDOT LRS/MP Lookup (pre-built from existing data)
+    3. VDOT LRS API (official free service)
+    """
+
+    def __init__(self, use_vdot_api: bool = False):
+        """
+        Initialize coordinate corrector.
+
+        Args:
+            use_vdot_api: Enable VDOT LRS API calls (slower but more complete)
+        """
+        self.node_lookup = NodeLookupTable()
+        self.vdot_milepost_lookup = None
+        self.vdot_lrs_client = None
+        self.use_vdot_api = use_vdot_api
+
+        if VDOT_AVAILABLE:
+            self.vdot_milepost_lookup = VDOTMilepostLookup()
+            if use_vdot_api:
+                self.vdot_lrs_client = VDOTLRSClient()
+
+        self.stats = {
+            'total_bad_coords': 0,
+            'corrected_via_node': 0,
+            'corrected_via_vdot_mp': 0,
+            'corrected_via_vdot_api': 0,
+            'flagged_for_review': 0
+        }
+
+    def build_lookups(self, df: pd.DataFrame):
+        """Build lookup tables from existing data with valid coordinates."""
+        # Build node lookup
+        self.node_lookup.build_from_dataframe(df)
+
+        # Build VDOT milepost lookup
+        if self.vdot_milepost_lookup is not None:
+            self.vdot_milepost_lookup.build_from_dataframe(df)
+
+    def correct_coordinate(self, record: pd.Series) -> Optional[Tuple[float, float]]:
+        """
+        Attempt to correct a bad coordinate using FREE VDOT data.
+
+        Priority:
+        1. Node Lookup (instant, free)
+        2. VDOT LRS/MP Lookup (instant, free)
+        3. VDOT LRS API (free, slower)
+
+        Returns:
+            (longitude, latitude) or None if cannot correct
+        """
+        self.stats['total_bad_coords'] += 1
+
+        # Priority 1: Node Lookup
+        if 'Node' in record.index and pd.notna(record.get('Node')):
+            coords = self.node_lookup.lookup(record['Node'])
+            if coords:
+                self.stats['corrected_via_node'] += 1
+                return coords
+
+        # Priority 2: VDOT Milepost Lookup
+        route_name = record.get('RTE Name') if 'RTE Name' in record.index else None
+        milepost = record.get('RNS MP') if 'RNS MP' in record.index else None
+
+        if self.vdot_milepost_lookup and route_name and pd.notna(route_name) and pd.notna(milepost):
+            try:
+                coords = self.vdot_milepost_lookup.lookup(str(route_name), float(milepost))
+                if coords:
+                    self.stats['corrected_via_vdot_mp'] += 1
+                    return coords
+            except (ValueError, TypeError):
+                pass
+
+        # Priority 3: VDOT LRS API (if enabled)
+        if self.vdot_lrs_client and route_name and pd.notna(route_name) and pd.notna(milepost):
+            try:
+                coords = self.vdot_lrs_client.geocode_milepost(str(route_name), float(milepost))
+                if coords:
+                    self.stats['corrected_via_vdot_api'] += 1
+                    return coords
+            except (ValueError, TypeError):
+                pass
+
+        # Cannot correct - flag for manual review
+        self.stats['flagged_for_review'] += 1
+        return None
+
+    def get_stats(self) -> Dict:
+        """Get correction statistics."""
+        return self.stats.copy()
+
+
 class CrashSpatialProcessor:
     """
-    Combined spatial processing: validation + geocoding.
+    Combined spatial processing: validation + correction + geocoding.
 
-    Workflow:
+    Workflow (incremental - only processes NEW records):
     1. Geocode records with missing coordinates
-    2. Validate coordinates against road network
+    2. Validate coordinates against road network (Overpass - FREE)
+    3. Auto-correct bad coordinates using VDOT data (FREE - no Mapbox)
     """
 
     def __init__(self, enable_geocoding: bool = True,
                  enable_validation: bool = True,
-                 enable_route_validation: bool = False):
+                 enable_correction: bool = True,
+                 enable_route_validation: bool = False,
+                 use_vdot_api: bool = False):
         """
         Initialize spatial processor.
 
         Args:
             enable_geocoding: Enable geocoding for missing coordinates
             enable_validation: Enable Overpass validation
+            enable_correction: Enable auto-correction of bad coordinates
             enable_route_validation: Enable route name validation (slower)
+            use_vdot_api: Enable VDOT LRS API for correction (slower but more complete)
         """
         self.enable_geocoding = enable_geocoding
         self.enable_validation = enable_validation
+        self.enable_correction = enable_correction
 
         if enable_geocoding:
             self.geocoder = CrashDataGeocoder()
@@ -284,16 +395,27 @@ class CrashSpatialProcessor:
         else:
             self.validator = None
 
+        if enable_correction:
+            self.corrector = CoordinateCorrector(use_vdot_api=use_vdot_api)
+        else:
+            self.corrector = None
+
     def process_dataframe(self, df: pd.DataFrame,
                           geocode_missing: bool = True,
-                          validate_sample_pct: float = 0.0) -> Tuple[pd.DataFrame, Dict]:
+                          validate_sample_pct: float = 0.0,
+                          correct_bad_coords: bool = True,
+                          validated_ids: Optional[set] = None) -> Tuple[pd.DataFrame, Dict]:
         """
-        Process dataframe with geocoding and validation.
+        Process dataframe with geocoding, validation, and correction.
+
+        INCREMENTAL: Only processes new records when validated_ids provided.
 
         Args:
             df: DataFrame with crash records
             geocode_missing: Whether to geocode records missing coordinates
-            validate_sample_pct: Percentage of records to validate (0-100, 0=none)
+            validate_sample_pct: Percentage of NEW records to validate (0-100, 0=none)
+            correct_bad_coords: Whether to auto-correct bad coordinates
+            validated_ids: Set of already-validated Document Numbers (for incremental)
 
         Returns:
             Tuple of (processed DataFrame, stats dict)
@@ -301,44 +423,112 @@ class CrashSpatialProcessor:
         stats = {
             'geocoding': {},
             'validation': {},
-            'issues': []
+            'correction': {},
+            'issues': [],
+            'records_processed': 0,
+            'records_skipped': 0
         }
 
-        # Step 1: Geocode missing coordinates
+        df = df.copy()
+
+        # Filter to new records only (incremental processing)
+        if validated_ids and 'Document Nbr' in df.columns:
+            new_mask = ~df['Document Nbr'].astype(str).isin(validated_ids)
+            new_df = df[new_mask]
+            stats['records_processed'] = len(new_df)
+            stats['records_skipped'] = len(df) - len(new_df)
+            logger.info(f"Incremental mode: processing {len(new_df)} new records, skipping {stats['records_skipped']}")
+        else:
+            new_df = df
+            stats['records_processed'] = len(new_df)
+            logger.info(f"Full mode: processing all {len(new_df)} records")
+
+        if len(new_df) == 0:
+            logger.info("No new records to process")
+            return df, stats
+
+        # Build lookup tables from ALL data (including existing validated)
+        if self.geocoder:
+            self.geocoder.build_lookups(df)
+        if self.corrector:
+            self.corrector.build_lookups(df)
+
+        # Step 1: Geocode missing coordinates (new records only)
         if self.enable_geocoding and geocode_missing:
-            logger.info("Geocoding records with missing coordinates...")
+            missing_coords = new_df[new_df['x'].isna() | new_df['y'].isna()]
+            if len(missing_coords) > 0:
+                logger.info(f"Geocoding {len(missing_coords)} records with missing coordinates...")
 
-            # Build node lookup from existing data
-            self.geocoder.build_node_lookup(df)
+                for idx in missing_coords.index:
+                    coords = self.geocoder.geocode_record(df.loc[idx])
+                    if coords:
+                        df.at[idx, 'x'] = coords[0]
+                        df.at[idx, 'y'] = coords[1]
 
-            # Geocode
-            df = self.geocoder.geocode_dataframe(df, only_missing=True)
-            stats['geocoding'] = self.geocoder.get_stats()
+                stats['geocoding'] = self.geocoder.get_stats()
+                logger.info(f"Geocoding complete: {stats['geocoding']}")
+            else:
+                logger.info("No records with missing coordinates")
 
-            logger.info(f"Geocoding complete: {stats['geocoding']}")
-
-        # Step 2: Validate coordinates
+        # Step 2: Validate and correct coordinates (new records only)
         if self.enable_validation and validate_sample_pct > 0:
-            logger.info(f"Validating {validate_sample_pct}% of coordinates...")
+            # Determine records to validate
+            if validate_sample_pct >= 100:
+                records_to_validate = new_df
+            else:
+                sample_size = max(1, int(len(new_df) * validate_sample_pct / 100))
+                records_to_validate = new_df.sample(n=min(sample_size, len(new_df)), random_state=42)
 
-            # Sample records for validation (full validation is slow)
-            records_to_validate = df.sample(
-                frac=validate_sample_pct / 100,
-                random_state=42
-            )
+            logger.info(f"Validating {len(records_to_validate)} coordinates against road network...")
 
             validation_issues = []
+            corrections_made = []
+
             for idx, row in records_to_validate.iterrows():
+                # Validate coordinate
                 issues = self.validator.validate_record(row)
+
                 for issue in issues:
                     issue['row'] = idx
                     issue['document_nbr'] = str(row.get('Document Nbr', f'row_{idx}'))
+
+                # If coordinate is bad and correction is enabled, try to fix it
+                if issues and self.enable_correction and correct_bad_coords:
+                    # Check if any issue is coordinate-related
+                    coord_issues = [i for i in issues if i.get('issue') in
+                                    ['coordinate_off_road', 'outside_bounds', 'outside_state_bounds']]
+
+                    if coord_issues:
+                        # Try to correct using VDOT data (FREE)
+                        new_coords = self.corrector.correct_coordinate(row)
+
+                        if new_coords:
+                            old_x, old_y = row.get('x'), row.get('y')
+                            df.at[idx, 'x'] = new_coords[0]
+                            df.at[idx, 'y'] = new_coords[1]
+
+                            corrections_made.append({
+                                'document_nbr': str(row.get('Document Nbr', f'row_{idx}')),
+                                'old_coords': (old_x, old_y),
+                                'new_coords': new_coords,
+                                'issue': coord_issues[0]['issue']
+                            })
+
+                            # Update issue to show it was corrected
+                            for issue in coord_issues:
+                                issue['corrected'] = True
+                                issue['new_coords'] = new_coords
+
                 validation_issues.extend(issues)
 
             stats['validation'] = self.validator.get_stats()
+            stats['correction'] = self.corrector.get_stats() if self.corrector else {}
+            stats['corrections_made'] = corrections_made
             stats['issues'] = validation_issues
 
             logger.info(f"Validation complete: {stats['validation']}")
+            if corrections_made:
+                logger.info(f"Auto-corrected {len(corrections_made)} coordinates using VDOT data")
 
         return df, stats
 

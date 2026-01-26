@@ -990,20 +990,25 @@ def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
             validated_ids=validated_ids
         )
 
-        # Spatial processing (geocoding + validation)
+        # Spatial processing (geocoding + validation + correction)
         spatial_stats = {}
         if SPATIAL_AVAILABLE and (geocode or spatial_validate_pct > 0):
-            logger.info("Running spatial processing...")
+            logger.info("Running spatial processing (incremental - new records only)...")
             spatial_processor = CrashSpatialProcessor(
                 enable_geocoding=geocode,
-                enable_validation=spatial_validate_pct > 0
+                enable_validation=spatial_validate_pct > 0,
+                enable_correction=True  # Auto-correct bad coords using FREE VDOT data
             )
             corrected_df, spatial_stats = spatial_processor.process_dataframe(
                 corrected_df,
                 geocode_missing=geocode,
-                validate_sample_pct=spatial_validate_pct
+                validate_sample_pct=spatial_validate_pct,
+                correct_bad_coords=True,
+                validated_ids=validated_ids  # Incremental: skip already-validated records
             )
             logger.info(f"Spatial processing complete: {spatial_stats.get('geocoding', {})}")
+            if spatial_stats.get('corrections_made'):
+                logger.info(f"Auto-corrected {len(spatial_stats['corrections_made'])} coordinates")
 
         # Generate report
         report = validator.get_report()

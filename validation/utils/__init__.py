@@ -20,6 +20,7 @@ from .geocoder import (
 )
 from .spatial_validator import (
     SpatialValidator,
+    CoordinateCorrector,
     CrashSpatialProcessor,
     geocode_and_validate
 )
@@ -38,6 +39,7 @@ __all__ = [
     "CrashDataGeocoder",
     "geocode_missing_coordinates",
     "SpatialValidator",
+    "CoordinateCorrector",
     "CrashSpatialProcessor",
     "geocode_and_validate",
     "VDOTLRSClient",
