@@ -9,5 +9,6 @@ Modules:
 
 from .config_loader import ConfigLoader
 from .file_handler import FileHandler
+from .overpass_client import OverpassClient
 
-__all__ = ["ConfigLoader", "FileHandler"]
+__all__ = ["ConfigLoader", "FileHandler", "OverpassClient"]
