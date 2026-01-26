@@ -572,7 +572,8 @@ class CrashDataValidator:
         dup_cols = ['Crash Date', 'x', 'y', 'Collision Type']
         existing_cols = [c for c in dup_cols if c in df.columns]
 
-        if len(existing_cols) >= 3 and 'x' in existing_cols and 'y' in existing_cols:
+        # Require all 4 columns for duplicate detection (date + GPS + collision type)
+        if len(existing_cols) >= 4 and all(c in existing_cols for c in ['Crash Date', 'x', 'y', 'Collision Type']):
             df_clean = df.dropna(subset=['x', 'y'])  # Only check records with coordinates
             if len(df_clean) > 0:
                 duplicates = df_clean[df_clean.duplicated(subset=existing_cols, keep=False)]
@@ -615,8 +616,8 @@ class CrashDataValidator:
         df = self._apply_format_corrections(df)
 
         if incremental and validated_ids:
-            # Filter to new records only
-            new_mask = ~df['Document Nbr'].isin(validated_ids)
+            # Filter to new records only (convert to string for consistent comparison)
+            new_mask = ~df['Document Nbr'].astype(str).str.strip().isin(validated_ids)
             new_df = df[new_mask].copy()
             existing_df = df[~new_mask].copy()
             self.stats['new_records'] = len(new_df)
@@ -960,7 +961,9 @@ def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
         if SPATIAL_AVAILABLE:
             logger.info(f"Spatial processing enabled: geocode={geocode}, validate={spatial_validate_pct}%")
         else:
-            logger.warning("Spatial processing requested but modules not available")
+            logger.warning("Spatial processing requested but modules not available. "
+                          "Skipping geocoding and spatial validation. "
+                          "Install spatial dependencies: pip install -r validation/requirements.txt")
 
     validator = CrashDataValidator(jurisdiction, config)
     data_files = get_data_files(jurisdiction, config)
@@ -1028,8 +1031,9 @@ def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
                 corrected_df.to_csv(filepath, index=False)
                 logger.info(f"Saved validated data to {filepath}")
 
-                # Update validated IDs
-                all_ids = validated_ids | set(corrected_df['Document Nbr'].dropna().astype(str))
+                # Update validated IDs (normalize format)
+                new_ids = set(corrected_df['Document Nbr'].dropna().astype(str).str.strip())
+                all_ids = validated_ids | new_ids
                 save_validated_ids(jurisdiction, filter_type, all_ids)
 
                 # Save corrections log

@@ -209,16 +209,13 @@ out tags center;
         if len(roads) == 0:
             return False, {'message': f'No roads within {max_distance}m'}
 
-        # Find road with matching tags
-        for road in roads:
-            tags = road.get('tags', {})
-            return True, {
-                'highway_type': tags.get('highway'),
-                'name': tags.get('name', tags.get('ref', 'Unnamed')),
-                'road_count': len(roads)
-            }
-
-        return True, {'road_count': len(roads)}
+        # Return info about the nearest road
+        tags = roads[0].get('tags', {})
+        return True, {
+            'highway_type': tags.get('highway'),
+            'name': tags.get('name', tags.get('ref', 'Unnamed')),
+            'road_count': len(roads)
+        }
 
     def validate_route_name(self, lat: float, lon: float, expected_route: str,
                             radius: int = 50) -> Tuple[bool, Optional[str]]:

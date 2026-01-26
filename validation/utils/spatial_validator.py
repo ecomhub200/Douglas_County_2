@@ -433,7 +433,7 @@ class CrashSpatialProcessor:
 
         # Filter to new records only (incremental processing)
         if validated_ids and 'Document Nbr' in df.columns:
-            new_mask = ~df['Document Nbr'].astype(str).isin(validated_ids)
+            new_mask = ~df['Document Nbr'].astype(str).str.strip().isin(validated_ids)
             new_df = df[new_mask]
             stats['records_processed'] = len(new_df)
             stats['records_skipped'] = len(df) - len(new_df)
