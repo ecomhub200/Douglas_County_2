@@ -60,23 +60,24 @@
   "weatherConditions": {
     "valid": [
       "1. No Adverse Condition (Clear/Cloudy)",
-      "2. Fog",
-      "3. Mist",
-      "4. Rain",
-      "5. Snow",
-      "6. Sleet/Hail",
-      "7. Smoke/Dust",
-      "8. Severe Crosswinds",
+      "3. Fog",
+      "4. Mist",
+      "5. Rain",
+      "6. Snow",
+      "7. Sleet/Hail",
+      "8. Smoke/Dust",
       "9. Other",
-      "10. Blowing Sand",
-      "11. Unknown"
+      "10. Blowing Sand, Soil, Dirt, or Snow",
+      "11. Severe Crosswinds",
+      "Unknown",
+      "Not Applicable"
     ],
     "categories": {
       "clear": ["1. No Adverse Condition (Clear/Cloudy)"],
-      "adverse": ["2. Fog", "3. Mist", "4. Rain", "5. Snow", "6. Sleet/Hail", "7. Smoke/Dust", "8. Severe Crosswinds", "10. Blowing Sand"],
-      "precipitation": ["4. Rain", "5. Snow", "6. Sleet/Hail"],
-      "visibility": ["2. Fog", "3. Mist", "7. Smoke/Dust", "10. Blowing Sand"],
-      "unknown": ["9. Other", "11. Unknown"]
+      "adverse": ["3. Fog", "4. Mist", "5. Rain", "6. Snow", "7. Sleet/Hail", "8. Smoke/Dust", "10. Blowing Sand, Soil, Dirt, or Snow", "11. Severe Crosswinds"],
+      "precipitation": ["5. Rain", "6. Snow", "7. Sleet/Hail"],
+      "visibility": ["3. Fog", "4. Mist", "8. Smoke/Dust", "10. Blowing Sand, Soil, Dirt, or Snow"],
+      "unknown": ["9. Other", "Unknown", "Not Applicable"]
     }
   },
 
@@ -88,14 +89,15 @@
       "4. Darkness - Road Lighted",
       "5. Darkness - Road Not Lighted",
       "6. Darkness - Unknown Road Lighting",
-      "7. Unknown"
+      "7. Unknown",
+      "Not Applicable"
     ],
     "categories": {
       "daylight": ["1. Dawn", "2. Daylight", "3. Dusk"],
       "darkness": ["4. Darkness - Road Lighted", "5. Darkness - Road Not Lighted", "6. Darkness - Unknown Road Lighting"],
       "darknessLighted": ["4. Darkness - Road Lighted"],
       "darknessUnlighted": ["5. Darkness - Road Not Lighted", "6. Darkness - Unknown Road Lighting"],
-      "unknown": ["7. Unknown"]
+      "unknown": ["7. Unknown", "Not Applicable"]
     }
   },
 
@@ -103,78 +105,99 @@
     "valid": [
       "1. Dry",
       "2. Wet",
-      "3. Water (Standing/Moving)",
-      "4. Ice",
-      "5. Snow",
-      "6. Mud/Dirt/Gravel",
-      "7. Slush",
-      "8. Oil",
-      "9. Sand",
-      "10. Other",
-      "11. Unknown"
+      "3. Snowy",
+      "4. Icy",
+      "5. Muddy",
+      "6. Oil/Other Fluids",
+      "7. Other",
+      "8. Natural Debris",
+      "9. Water (Standing, Moving)",
+      "10. Slush",
+      "11. Sand, Dirt, Gravel",
+      "Not Applicable"
     ],
     "categories": {
       "dry": ["1. Dry"],
-      "wet": ["2. Wet", "3. Water (Standing/Moving)"],
-      "winter": ["4. Ice", "5. Snow", "7. Slush"],
-      "debris": ["6. Mud/Dirt/Gravel", "8. Oil", "9. Sand"]
+      "wet": ["2. Wet", "9. Water (Standing, Moving)"],
+      "winter": ["3. Snowy", "4. Icy", "10. Slush"],
+      "debris": ["5. Muddy", "6. Oil/Other Fluids", "8. Natural Debris", "11. Sand, Dirt, Gravel"],
+      "unknown": ["7. Other", "Not Applicable"]
     }
   },
 
   "intersectionTypes": {
     "valid": [
       "1. Not at Intersection",
-      "2. Two-Way Stop",
-      "3. Four-Way Stop",
-      "4. Yield Sign",
-      "5. Traffic Signal",
-      "6. Flashing Signal",
-      "7. Railway Crossing",
-      "8. Roundabout",
-      "9. Other",
-      "10. Unknown"
+      "2. Two Approaches",
+      "3. Three Approaches",
+      "4. Four Approaches",
+      "5. Five-Point, or More",
+      "6. Roundabout",
+      "Not Applicable"
     ],
     "categories": {
-      "signalized": ["5. Traffic Signal", "6. Flashing Signal"],
-      "stopControlled": ["2. Two-Way Stop", "3. Four-Way Stop"],
-      "yieldControlled": ["4. Yield Sign"],
-      "uncontrolled": ["1. Not at Intersection"],
-      "roundabout": ["8. Roundabout"],
-      "railroad": ["7. Railway Crossing"]
+      "notIntersection": ["1. Not at Intersection", "Not Applicable"],
+      "intersection": ["2. Two Approaches", "3. Three Approaches", "4. Four Approaches", "5. Five-Point, or More"],
+      "roundabout": ["6. Roundabout"],
+      "threeWay": ["3. Three Approaches"],
+      "fourWay": ["4. Four Approaches"],
+      "complex": ["5. Five-Point, or More"]
     }
   },
 
   "trafficControlTypes": {
     "valid": [
-      "1. No Control",
-      "2. Officer/Flagman",
+      "1. No Traffic Control",
+      "2. Officer or Flagger",
       "3. Traffic Signal",
-      "4. Flashing Signal",
-      "5. Stop Sign",
-      "6. Yield Sign",
-      "7. Warning Sign",
-      "8. RR Crossing Device",
-      "9. Other",
-      "10. Unknown"
-    ]
+      "4. Stop Sign",
+      "5. Slow or Warning Sign",
+      "6. Traffic Lanes Marked",
+      "7. No Passing Lines",
+      "8. Yield Sign",
+      "9. One Way Road or Street",
+      "10. Railroad Crossing With Markings and Signs",
+      "11. Railroad Crossing With Signals",
+      "12. Railroad Crossing With Gate and Signals",
+      "13. Other",
+      "14. Ped Crosswalk",
+      "15. Reduced Speed - School Zone",
+      "16. Reduced Speed - Work Zone",
+      "Not Applicable"
+    ],
+    "categories": {
+      "signalized": ["3. Traffic Signal"],
+      "stopControlled": ["4. Stop Sign"],
+      "yieldControlled": ["8. Yield Sign"],
+      "uncontrolled": ["1. No Traffic Control"],
+      "railroad": ["10. Railroad Crossing With Markings and Signs", "11. Railroad Crossing With Signals", "12. Railroad Crossing With Gate and Signals"],
+      "specialZone": ["15. Reduced Speed - School Zone", "16. Reduced Speed - Work Zone"],
+      "marking": ["6. Traffic Lanes Marked", "7. No Passing Lines", "14. Ped Crosswalk"]
+    }
   },
 
   "roadwayAlignments": {
     "valid": [
       "1. Straight - Level",
-      "2. Straight - Grade",
-      "3. Straight - Hillcrest",
-      "4. Curve - Level",
-      "5. Curve - Grade",
-      "6. Curve - Hillcrest",
-      "7. Unknown"
+      "2. Curve - Level",
+      "3. Grade - Straight",
+      "4. Grade - Curve",
+      "5. Hillcrest - Straight",
+      "6. Hillcrest - Curve",
+      "7. Dip - Straight",
+      "8. Dip - Curve",
+      "9. Other",
+      "10. On/Off Ramp",
+      "Not Applicable"
     ],
     "categories": {
-      "straight": ["1. Straight - Level", "2. Straight - Grade", "3. Straight - Hillcrest"],
-      "curve": ["4. Curve - Level", "5. Curve - Grade", "6. Curve - Hillcrest"],
-      "level": ["1. Straight - Level", "4. Curve - Level"],
-      "grade": ["2. Straight - Grade", "5. Curve - Grade"],
-      "hillcrest": ["3. Straight - Hillcrest", "6. Curve - Hillcrest"]
+      "straight": ["1. Straight - Level", "3. Grade - Straight", "5. Hillcrest - Straight", "7. Dip - Straight"],
+      "curve": ["2. Curve - Level", "4. Grade - Curve", "6. Hillcrest - Curve", "8. Dip - Curve"],
+      "level": ["1. Straight - Level", "2. Curve - Level"],
+      "grade": ["3. Grade - Straight", "4. Grade - Curve"],
+      "hillcrest": ["5. Hillcrest - Straight", "6. Hillcrest - Curve"],
+      "dip": ["7. Dip - Straight", "8. Dip - Curve"],
+      "ramp": ["10. On/Off Ramp"]
     }
   },
 
@@ -182,9 +205,11 @@
     "valid": [
       "1. Two-Way, Not Divided",
       "2. Two-Way, Divided, Unprotected Median",
-      "3. Two-Way, Divided, Positive Barrier",
-      "4. One-Way",
-      "5. Unknown"
+      "3. Two-Way, Divided, Positive Median Barrier",
+      "4. One-Way, Not Divided",
+      "5. Unknown",
+      "Not Applicable",
+      "Not Provided"
     ]
   },
 

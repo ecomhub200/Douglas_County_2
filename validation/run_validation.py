@@ -645,11 +645,23 @@ class CrashDataValidator:
         # Apply corrections
         corrected_df = self._apply_corrections(new_df, all_corrections)
 
-        # Update stats
+        # Update stats - count unique RECORDS with issues, not total issues
         self.stats['validated'] = len(new_df)
         self.stats['auto_corrected'] = len([c for c in all_corrections if c.get('auto_applied')])
-        self.stats['flagged'] = len([i for i in all_issues if i['severity'] in ['error', 'warning']])
-        self.stats['errors'] = len([i for i in all_issues if i['severity'] == 'error'])
+
+        # Count unique records with errors/warnings (not total issues)
+        flagged_records = set()
+        error_records = set()
+        for issue in all_issues:
+            record_key = issue.get('document_nbr', f"row_{issue.get('row', 0)}")
+            if issue['severity'] in ['error', 'warning']:
+                flagged_records.add(record_key)
+            if issue['severity'] == 'error':
+                error_records.add(record_key)
+
+        self.stats['flagged'] = len(flagged_records)
+        self.stats['errors'] = len(error_records)
+        self.stats['total_issues'] = len([i for i in all_issues if i['severity'] in ['error', 'warning']])
         self.stats['duplicates'] = len([i for i in all_issues if 'duplicate' in i.get('issue', '')])
 
         # Merge with existing validated data
@@ -720,29 +732,34 @@ class CrashDataValidator:
     def get_report(self) -> dict:
         """Generate validation report."""
         duplicates = self.stats.get('duplicates', 0)
+        total_issues = self.stats.get('total_issues', 0)
+        clean_records = self.stats['validated'] - self.stats['flagged']
+        clean_rate = round((clean_records / max(self.stats['new_records'], 1)) * 100, 2)
+
         return {
             'metadata': {
                 'generatedAt': datetime.utcnow().isoformat() + 'Z',
                 'jurisdiction': self.jurisdiction,
-                'validationVersion': '1.1.0',
+                'validationVersion': '1.2.0',
                 'runType': 'incremental' if self.stats['new_records'] < self.stats['total_records'] else 'full'
             },
-            'summary': (f"Validated {self.stats['new_records']} new records. "
-                        f"{self.stats['auto_corrected']} auto-corrected, "
-                        f"{self.stats['flagged']} flagged, "
-                        f"{duplicates} duplicates, "
-                        f"{self.stats['validated'] - self.stats['auto_corrected'] - self.stats['flagged']} clean."),
+            'summary': (f"Validated {self.stats['new_records']} records. "
+                        f"{clean_records} clean ({clean_rate}%), "
+                        f"{self.stats['flagged']} records flagged ({total_issues} total issues), "
+                        f"{self.stats['auto_corrected']} auto-corrected."),
             'totalRecords': self.stats['total_records'],
             'newRecords': self.stats['new_records'],
             'autoCorrections': self.stats['auto_corrected'],
-            'flagged': self.stats['flagged'],
+            'flaggedRecords': self.stats['flagged'],
+            'totalIssues': total_issues,
             'errors': self.stats['errors'],
             'duplicates': duplicates,
-            'cleanRate': round((1 - self.stats['flagged'] / max(self.stats['new_records'], 1)) * 100, 2),
+            'cleanRecords': clean_records,
+            'cleanRate': clean_rate,
             'errorRate': round(self.stats['errors'] / max(self.stats['new_records'], 1) * 100, 2),
             'issuesByCategory': self._count_issues_by_category(),
             'correctionsByField': self._count_corrections_by_field(),
-            'flaggedRecords': self._get_flagged_records()
+            'flaggedRecordsList': self._get_flagged_records()
         }
 
     def _count_issues_by_category(self) -> dict:
@@ -955,7 +972,7 @@ def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
 
         if dry_run:
             logger.info(f"DRY RUN - Would make {report['autoCorrections']} corrections")
-            logger.info(f"DRY RUN - Would flag {report['flagged']} records")
+            logger.info(f"DRY RUN - Would flag {report['flaggedRecords']} records")
         else:
             if auto_correct:
                 # Save corrected data
@@ -972,7 +989,7 @@ def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
         files_validated.append(filename)
 
         logger.info(f"Results: {report['autoCorrections']} corrected, "
-                    f"{report['flagged']} flagged, {report['errors']} errors")
+                    f"{report['flaggedRecords']} flagged, {report['errors']} errors")
 
     if not dry_run and combined_report:
         # Save report and manifest
