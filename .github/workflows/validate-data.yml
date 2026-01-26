@@ -158,9 +158,12 @@ jobs:
           fi
 
           JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
-          git commit -m "Validate: $JURISDICTION crash data - $(date +'%Y-%m-%d')
+          git commit -m "$(cat <<EOF
+Validate: $JURISDICTION crash data - $(date +'%Y-%m-%d')
 
-Triggered manually via workflow_dispatch"
+Triggered manually via workflow_dispatch
+EOF
+)"
 
           # Push with retry logic
           MAX_RETRIES=4
