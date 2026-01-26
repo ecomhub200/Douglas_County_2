@@ -29,6 +29,17 @@ import pandas as pd
 from dateutil import parser as date_parser
 from tqdm import tqdm
 
+# Spatial processing imports (optional - only if modules exist)
+try:
+    from validation.utils.spatial_validator import CrashSpatialProcessor
+    SPATIAL_AVAILABLE = True
+except ImportError:
+    try:
+        from utils.spatial_validator import CrashSpatialProcessor
+        SPATIAL_AVAILABLE = True
+    except ImportError:
+        SPATIAL_AVAILABLE = False
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -926,7 +937,8 @@ def get_data_files(jurisdiction: str, config: dict) -> List[Tuple[str, str]]:
 
 
 def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
-                          dry_run: bool = False, auto_correct: bool = True) -> dict:
+                          dry_run: bool = False, auto_correct: bool = True,
+                          geocode: bool = False, spatial_validate_pct: float = 0) -> dict:
     """
     Validate all data files for a jurisdiction.
 
@@ -943,6 +955,12 @@ def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
     logger.info(f"=" * 60)
     logger.info(f"Validating jurisdiction: {jurisdiction}")
     logger.info(f"=" * 60)
+
+    if geocode or spatial_validate_pct > 0:
+        if SPATIAL_AVAILABLE:
+            logger.info(f"Spatial processing enabled: geocode={geocode}, validate={spatial_validate_pct}%")
+        else:
+            logger.warning("Spatial processing requested but modules not available")
 
     validator = CrashDataValidator(jurisdiction, config)
     data_files = get_data_files(jurisdiction, config)
@@ -972,8 +990,33 @@ def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
             validated_ids=validated_ids
         )
 
+        # Spatial processing (geocoding + validation + correction)
+        spatial_stats = {}
+        if SPATIAL_AVAILABLE and (geocode or spatial_validate_pct > 0):
+            logger.info("Running spatial processing (incremental - new records only)...")
+            spatial_processor = CrashSpatialProcessor(
+                enable_geocoding=geocode,
+                enable_validation=spatial_validate_pct > 0,
+                enable_correction=True  # Auto-correct bad coords using FREE VDOT data
+            )
+            corrected_df, spatial_stats = spatial_processor.process_dataframe(
+                corrected_df,
+                geocode_missing=geocode,
+                validate_sample_pct=spatial_validate_pct,
+                correct_bad_coords=True,
+                validated_ids=validated_ids  # Incremental: skip already-validated records
+            )
+            logger.info(f"Spatial processing complete: {spatial_stats.get('geocoding', {})}")
+            if spatial_stats.get('corrections_made'):
+                logger.info(f"Auto-corrected {len(spatial_stats['corrections_made'])} coordinates")
+
         # Generate report
         report = validator.get_report()
+
+        # Add spatial stats to report
+        if spatial_stats:
+            report['spatialProcessing'] = spatial_stats
+
         combined_report = report  # Use last report as combined (could merge)
 
         if dry_run:
@@ -1065,6 +1108,20 @@ Examples:
         help='Enable verbose logging'
     )
 
+    parser.add_argument(
+        '--geocode',
+        action='store_true',
+        help='Enable geocoding for records with missing coordinates'
+    )
+
+    parser.add_argument(
+        '--spatial-validate',
+        type=float,
+        default=0,
+        metavar='PCT',
+        help='Validate PCT%% of records against OSM road network (0-100, 0=disabled)'
+    )
+
     return parser.parse_args()
 
 
@@ -1097,7 +1154,9 @@ def main():
                 config=config,
                 full=args.full,
                 dry_run=args.dry_run,
-                auto_correct=not args.no_auto_correct
+                auto_correct=not args.no_auto_correct,
+                geocode=args.geocode,
+                spatial_validate_pct=args.spatial_validate
             )
             all_reports[jurisdiction] = report
 
