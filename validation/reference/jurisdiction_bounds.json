@@ -1,0 +1,2274 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "source": "config.json",
+    "lastUpdated": "2026-01-26",
+    "totalJurisdictions": 133,
+    "countyCount": 95,
+    "cityCount": 38,
+    "maintainsOwnRoadsCount": 2
+  },
+  "jurisdictions": {
+    "accomack": {
+      "name": "Accomack County",
+      "type": "county",
+      "fips": "001",
+      "jurisCode": "1",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.0533,
+        37.2918,
+        -75.2429,
+        38.0274
+      ],
+      "mapCenter": [
+        37.76,
+        -75.66
+      ]
+    },
+    "albemarle": {
+      "name": "Albemarle County",
+      "type": "county",
+      "fips": "003",
+      "jurisCode": "2",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.8399,
+        37.7273,
+        -78.2637,
+        38.3034
+      ],
+      "mapCenter": [
+        38.02,
+        -78.56
+      ]
+    },
+    "alleghany": {
+      "name": "Alleghany County",
+      "type": "county",
+      "fips": "005",
+      "jurisCode": "3",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.2213,
+        37.5672,
+        -79.6473,
+        38.0134
+      ],
+      "mapCenter": [
+        37.79,
+        -79.95
+      ]
+    },
+    "amelia": {
+      "name": "Amelia County",
+      "type": "county",
+      "fips": "007",
+      "jurisCode": "4",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.1777,
+        37.1458,
+        -77.6553,
+        37.4678
+      ],
+      "mapCenter": [
+        37.34,
+        -77.98
+      ]
+    },
+    "amherst": {
+      "name": "Amherst County",
+      "type": "county",
+      "fips": "009",
+      "jurisCode": "5",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.4745,
+        37.3962,
+        -78.8591,
+        37.806
+      ],
+      "mapCenter": [
+        37.6,
+        -79.14
+      ]
+    },
+    "appomattox": {
+      "name": "Appomattox County",
+      "type": "county",
+      "fips": "011",
+      "jurisCode": "6",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.0929,
+        37.2061,
+        -78.5716,
+        37.5494
+      ],
+      "mapCenter": [
+        37.37,
+        -78.81
+      ]
+    },
+    "arlington": {
+      "name": "Arlington County",
+      "type": "county",
+      "fips": "013",
+      "jurisCode": "7",
+      "maintainsOwnRoads": true,
+      "bbox": [
+        -77.1722,
+        38.8275,
+        -77.032,
+        38.9341
+      ],
+      "mapCenter": [
+        38.88,
+        -77.1
+      ]
+    },
+    "augusta": {
+      "name": "Augusta County",
+      "type": "county",
+      "fips": "015",
+      "jurisCode": "8",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.5431,
+        37.8873,
+        -78.8617,
+        38.4767
+      ],
+      "mapCenter": [
+        38.16,
+        -79.13
+      ]
+    },
+    "bath": {
+      "name": "Bath County",
+      "type": "county",
+      "fips": "017",
+      "jurisCode": "9",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.0564,
+        37.8573,
+        -79.4479,
+        38.3947
+      ],
+      "mapCenter": [
+        38.07,
+        -79.73
+      ]
+    },
+    "bedford_county": {
+      "name": "Bedford County",
+      "type": "county",
+      "fips": "019",
+      "jurisCode": "10",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.7888,
+        37.0341,
+        -79.2507,
+        37.513
+      ],
+      "mapCenter": [
+        37.31,
+        -79.52
+      ]
+    },
+    "bland": {
+      "name": "Bland County",
+      "type": "county",
+      "fips": "021",
+      "jurisCode": "11",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -81.3447,
+        36.9649,
+        -80.8546,
+        37.2462
+      ],
+      "mapCenter": [
+        37.1,
+        -81.12
+      ]
+    },
+    "botetourt": {
+      "name": "Botetourt County",
+      "type": "county",
+      "fips": "023",
+      "jurisCode": "12",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.0746,
+        37.2621,
+        -79.5384,
+        37.7892
+      ],
+      "mapCenter": [
+        37.55,
+        -79.81
+      ]
+    },
+    "brunswick": {
+      "name": "Brunswick County",
+      "type": "county",
+      "fips": "025",
+      "jurisCode": "13",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.0045,
+        36.5437,
+        -77.3991,
+        36.9601
+      ],
+      "mapCenter": [
+        36.76,
+        -77.85
+      ]
+    },
+    "buchanan": {
+      "name": "Buchanan County",
+      "type": "county",
+      "fips": "027",
+      "jurisCode": "14",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -82.3145,
+        37.0199,
+        -81.7292,
+        37.5137
+      ],
+      "mapCenter": [
+        37.27,
+        -82.03
+      ]
+    },
+    "buckingham": {
+      "name": "Buckingham County",
+      "type": "county",
+      "fips": "029",
+      "jurisCode": "15",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.8693,
+        37.3051,
+        -78.2554,
+        37.7318
+      ],
+      "mapCenter": [
+        37.55,
+        -78.55
+      ]
+    },
+    "campbell": {
+      "name": "Campbell County",
+      "type": "county",
+      "fips": "031",
+      "jurisCode": "16",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.4361,
+        36.9684,
+        -78.9035,
+        37.4249
+      ],
+      "mapCenter": [
+        37.2,
+        -79.09
+      ]
+    },
+    "caroline": {
+      "name": "Caroline County",
+      "type": "county",
+      "fips": "033",
+      "jurisCode": "17",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.6421,
+        37.7538,
+        -76.9722,
+        38.241
+      ],
+      "mapCenter": [
+        38.03,
+        -77.35
+      ]
+    },
+    "carroll": {
+      "name": "Carroll County",
+      "type": "county",
+      "fips": "035",
+      "jurisCode": "18",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.9618,
+        36.5454,
+        -80.4409,
+        36.9417
+      ],
+      "mapCenter": [
+        36.73,
+        -80.73
+      ]
+    },
+    "charles_city": {
+      "name": "Charles City County",
+      "type": "county",
+      "fips": "036",
+      "jurisCode": "19",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.3504,
+        37.2247,
+        -76.8551,
+        37.4756
+      ],
+      "mapCenter": [
+        37.36,
+        -77.06
+      ]
+    },
+    "charlotte": {
+      "name": "Charlotte County",
+      "type": "county",
+      "fips": "037",
+      "jurisCode": "20",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.0418,
+        36.8483,
+        -78.4394,
+        37.241
+      ],
+      "mapCenter": [
+        37.01,
+        -78.66
+      ]
+    },
+    "chesterfield": {
+      "name": "Chesterfield County",
+      "type": "county",
+      "fips": "041",
+      "jurisCode": "21",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.808,
+        37.1524,
+        -77.3744,
+        37.5559
+      ],
+      "mapCenter": [
+        37.38,
+        -77.5
+      ]
+    },
+    "clarke": {
+      "name": "Clarke County",
+      "type": "county",
+      "fips": "043",
+      "jurisCode": "22",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.1355,
+        39.0059,
+        -77.8276,
+        39.2321
+      ],
+      "mapCenter": [
+        39.11,
+        -77.99
+      ]
+    },
+    "craig": {
+      "name": "Craig County",
+      "type": "county",
+      "fips": "045",
+      "jurisCode": "23",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.4591,
+        37.2311,
+        -79.9754,
+        37.5958
+      ],
+      "mapCenter": [
+        37.47,
+        -80.23
+      ]
+    },
+    "culpeper": {
+      "name": "Culpeper County",
+      "type": "county",
+      "fips": "047",
+      "jurisCode": "24",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.1631,
+        38.2803,
+        -77.6158,
+        38.7127
+      ],
+      "mapCenter": [
+        38.49,
+        -77.96
+      ]
+    },
+    "cumberland": {
+      "name": "Cumberland County",
+      "type": "county",
+      "fips": "049",
+      "jurisCode": "25",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.4641,
+        37.2972,
+        -78.0659,
+        37.6791
+      ],
+      "mapCenter": [
+        37.51,
+        -78.24
+      ]
+    },
+    "dickenson": {
+      "name": "Dickenson County",
+      "type": "county",
+      "fips": "051",
+      "jurisCode": "26",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -82.5638,
+        36.963,
+        -82.0936,
+        37.3028
+      ],
+      "mapCenter": [
+        37.12,
+        -82.35
+      ]
+    },
+    "dinwiddie": {
+      "name": "Dinwiddie County",
+      "type": "county",
+      "fips": "053",
+      "jurisCode": "27",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.8651,
+        36.8633,
+        -77.3139,
+        37.2789
+      ],
+      "mapCenter": [
+        37.08,
+        -77.58
+      ]
+    },
+    "essex": {
+      "name": "Essex County",
+      "type": "county",
+      "fips": "057",
+      "jurisCode": "28",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.1551,
+        37.7641,
+        -76.708,
+        38.0844
+      ],
+      "mapCenter": [
+        37.94,
+        -76.94
+      ]
+    },
+    "fairfax_county": {
+      "name": "Fairfax County",
+      "type": "county",
+      "fips": "059",
+      "jurisCode": "29",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.5351,
+        38.5943,
+        -77.0492,
+        39.0003
+      ],
+      "mapCenter": [
+        38.83,
+        -77.28
+      ]
+    },
+    "fauquier": {
+      "name": "Fauquier County",
+      "type": "county",
+      "fips": "061",
+      "jurisCode": "30",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.0057,
+        38.4541,
+        -77.5286,
+        38.9303
+      ],
+      "mapCenter": [
+        38.72,
+        -77.81
+      ]
+    },
+    "floyd": {
+      "name": "Floyd County",
+      "type": "county",
+      "fips": "063",
+      "jurisCode": "31",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.5399,
+        36.7413,
+        -80.1345,
+        37.1089
+      ],
+      "mapCenter": [
+        36.93,
+        -80.36
+      ]
+    },
+    "fluvanna": {
+      "name": "Fluvanna County",
+      "type": "county",
+      "fips": "065",
+      "jurisCode": "32",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.531,
+        37.7032,
+        -78.1074,
+        38.0281
+      ],
+      "mapCenter": [
+        37.84,
+        -78.28
+      ]
+    },
+    "franklin_county": {
+      "name": "Franklin County",
+      "type": "county",
+      "fips": "067",
+      "jurisCode": "33",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.1426,
+        36.742,
+        -79.5912,
+        37.1818
+      ],
+      "mapCenter": [
+        37.0,
+        -79.89
+      ]
+    },
+    "frederick": {
+      "name": "Frederick County",
+      "type": "county",
+      "fips": "069",
+      "jurisCode": "34",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.5259,
+        39.0585,
+        -78.0039,
+        39.466
+      ],
+      "mapCenter": [
+        39.28,
+        -78.27
+      ]
+    },
+    "giles": {
+      "name": "Giles County",
+      "type": "county",
+      "fips": "071",
+      "jurisCode": "35",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.8632,
+        37.1159,
+        -80.359,
+        37.4871
+      ],
+      "mapCenter": [
+        37.32,
+        -80.66
+      ]
+    },
+    "gloucester": {
+      "name": "Gloucester County",
+      "type": "county",
+      "fips": "073",
+      "jurisCode": "36",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.7568,
+        37.2188,
+        -76.3505,
+        37.5575
+      ],
+      "mapCenter": [
+        37.41,
+        -76.52
+      ]
+    },
+    "goochland": {
+      "name": "Goochland County",
+      "type": "county",
+      "fips": "075",
+      "jurisCode": "37",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.1058,
+        37.5484,
+        -77.6555,
+        37.898
+      ],
+      "mapCenter": [
+        37.72,
+        -77.93
+      ]
+    },
+    "grayson": {
+      "name": "Grayson County",
+      "type": "county",
+      "fips": "077",
+      "jurisCode": "38",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -81.5319,
+        36.538,
+        -80.9013,
+        36.8579
+      ],
+      "mapCenter": [
+        36.66,
+        -81.22
+      ]
+    },
+    "greene": {
+      "name": "Greene County",
+      "type": "county",
+      "fips": "079",
+      "jurisCode": "39",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.6421,
+        38.1407,
+        -78.3229,
+        38.4529
+      ],
+      "mapCenter": [
+        38.3,
+        -78.47
+      ]
+    },
+    "greensville": {
+      "name": "Greensville County",
+      "type": "county",
+      "fips": "081",
+      "jurisCode": "40",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.7425,
+        36.5443,
+        -77.3553,
+        36.8526
+      ],
+      "mapCenter": [
+        36.68,
+        -77.56
+      ]
+    },
+    "halifax": {
+      "name": "Halifax County",
+      "type": "county",
+      "fips": "083",
+      "jurisCode": "41",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.2234,
+        36.5413,
+        -78.6479,
+        37.0302
+      ],
+      "mapCenter": [
+        36.77,
+        -78.93
+      ]
+    },
+    "hanover": {
+      "name": "Hanover County",
+      "type": "county",
+      "fips": "085",
+      "jurisCode": "42",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.7551,
+        37.5679,
+        -77.1941,
+        37.9853
+      ],
+      "mapCenter": [
+        37.76,
+        -77.48
+      ]
+    },
+    "henrico": {
+      "name": "Henrico County",
+      "type": "county",
+      "fips": "087",
+      "jurisCode": "43",
+      "maintainsOwnRoads": true,
+      "bbox": [
+        -77.6104,
+        37.3862,
+        -77.1462,
+        37.7234
+      ],
+      "mapCenter": [
+        37.55,
+        -77.45
+      ]
+    },
+    "henry": {
+      "name": "Henry County",
+      "type": "county",
+      "fips": "089",
+      "jurisCode": "44",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.1432,
+        36.5407,
+        -79.5969,
+        36.9396
+      ],
+      "mapCenter": [
+        36.68,
+        -79.87
+      ]
+    },
+    "highland": {
+      "name": "Highland County",
+      "type": "county",
+      "fips": "091",
+      "jurisCode": "45",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.8929,
+        38.1456,
+        -79.3181,
+        38.666
+      ],
+      "mapCenter": [
+        38.37,
+        -79.56
+      ]
+    },
+    "isle_of_wight": {
+      "name": "Isle of Wight County",
+      "type": "county",
+      "fips": "093",
+      "jurisCode": "46",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.9361,
+        36.7049,
+        -76.431,
+        37.1191
+      ],
+      "mapCenter": [
+        36.9,
+        -76.71
+      ]
+    },
+    "james_city": {
+      "name": "James City County",
+      "type": "county",
+      "fips": "095",
+      "jurisCode": "47",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.9305,
+        37.1685,
+        -76.5451,
+        37.4485
+      ],
+      "mapCenter": [
+        37.31,
+        -76.78
+      ]
+    },
+    "king_and_queen": {
+      "name": "King and Queen County",
+      "type": "county",
+      "fips": "097",
+      "jurisCode": "48",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.1684,
+        37.5453,
+        -76.7006,
+        37.9027
+      ],
+      "mapCenter": [
+        37.72,
+        -76.88
+      ]
+    },
+    "king_george": {
+      "name": "King George County",
+      "type": "county",
+      "fips": "099",
+      "jurisCode": "49",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.3689,
+        38.1634,
+        -76.9934,
+        38.4512
+      ],
+      "mapCenter": [
+        38.27,
+        -77.16
+      ]
+    },
+    "king_william": {
+      "name": "King William County",
+      "type": "county",
+      "fips": "101",
+      "jurisCode": "50",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.3271,
+        37.5423,
+        -76.8961,
+        37.901
+      ],
+      "mapCenter": [
+        37.7,
+        -77.08
+      ]
+    },
+    "lancaster": {
+      "name": "Lancaster County",
+      "type": "county",
+      "fips": "103",
+      "jurisCode": "51",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.6048,
+        37.5893,
+        -76.2782,
+        37.8506
+      ],
+      "mapCenter": [
+        37.7,
+        -76.46
+      ]
+    },
+    "lee": {
+      "name": "Lee County",
+      "type": "county",
+      "fips": "105",
+      "jurisCode": "52",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -83.4754,
+        36.5404,
+        -82.7318,
+        36.8935
+      ],
+      "mapCenter": [
+        36.7,
+        -83.12
+      ]
+    },
+    "loudoun": {
+      "name": "Loudoun County",
+      "type": "county",
+      "fips": "107",
+      "jurisCode": "53",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.9622,
+        38.8416,
+        -77.3253,
+        39.3218
+      ],
+      "mapCenter": [
+        39.08,
+        -77.64
+      ]
+    },
+    "louisa": {
+      "name": "Louisa County",
+      "type": "county",
+      "fips": "109",
+      "jurisCode": "54",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.2012,
+        37.7918,
+        -77.6586,
+        38.1958
+      ],
+      "mapCenter": [
+        38.0,
+        -78.0
+      ]
+    },
+    "lunenburg": {
+      "name": "Lunenburg County",
+      "type": "county",
+      "fips": "111",
+      "jurisCode": "55",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.5518,
+        36.7891,
+        -78.0337,
+        37.1497
+      ],
+      "mapCenter": [
+        36.95,
+        -78.26
+      ]
+    },
+    "madison": {
+      "name": "Madison County",
+      "type": "county",
+      "fips": "113",
+      "jurisCode": "56",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.5416,
+        38.2169,
+        -78.1528,
+        38.5316
+      ],
+      "mapCenter": [
+        38.41,
+        -78.28
+      ]
+    },
+    "mathews": {
+      "name": "Mathews County",
+      "type": "county",
+      "fips": "115",
+      "jurisCode": "57",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.4665,
+        37.2818,
+        -76.2155,
+        37.5237
+      ],
+      "mapCenter": [
+        37.43,
+        -76.32
+      ]
+    },
+    "mecklenburg": {
+      "name": "Mecklenburg County",
+      "type": "county",
+      "fips": "117",
+      "jurisCode": "58",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.6531,
+        36.5414,
+        -78.0275,
+        36.9606
+      ],
+      "mapCenter": [
+        36.68,
+        -78.37
+      ]
+    },
+    "middlesex": {
+      "name": "Middlesex County",
+      "type": "county",
+      "fips": "119",
+      "jurisCode": "59",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.7098,
+        37.4643,
+        -76.2919,
+        37.7337
+      ],
+      "mapCenter": [
+        37.61,
+        -76.55
+      ]
+    },
+    "montgomery": {
+      "name": "Montgomery County",
+      "type": "county",
+      "fips": "121",
+      "jurisCode": "60",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.5867,
+        36.9718,
+        -80.1184,
+        37.3914
+      ],
+      "mapCenter": [
+        37.18,
+        -80.39
+      ]
+    },
+    "nelson": {
+      "name": "Nelson County",
+      "type": "county",
+      "fips": "125",
+      "jurisCode": "61",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.2247,
+        37.5678,
+        -78.6433,
+        37.9992
+      ],
+      "mapCenter": [
+        37.79,
+        -78.88
+      ]
+    },
+    "new_kent": {
+      "name": "New Kent County",
+      "type": "county",
+      "fips": "127",
+      "jurisCode": "62",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.213,
+        37.3288,
+        -76.7552,
+        37.6295
+      ],
+      "mapCenter": [
+        37.52,
+        -76.98
+      ]
+    },
+    "northampton": {
+      "name": "Northampton County",
+      "type": "county",
+      "fips": "131",
+      "jurisCode": "63",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.1716,
+        37.0541,
+        -75.7659,
+        37.4714
+      ],
+      "mapCenter": [
+        37.3,
+        -75.93
+      ]
+    },
+    "northumberland": {
+      "name": "Northumberland County",
+      "type": "county",
+      "fips": "133",
+      "jurisCode": "64",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.6094,
+        37.764,
+        -76.2527,
+        38.0688
+      ],
+      "mapCenter": [
+        37.87,
+        -76.43
+      ]
+    },
+    "nottoway": {
+      "name": "Nottoway County",
+      "type": "county",
+      "fips": "135",
+      "jurisCode": "65",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.267,
+        36.947,
+        -77.8561,
+        37.2634
+      ],
+      "mapCenter": [
+        37.14,
+        -78.05
+      ]
+    },
+    "orange": {
+      "name": "Orange County",
+      "type": "county",
+      "fips": "137",
+      "jurisCode": "66",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.3831,
+        38.074,
+        -77.8684,
+        38.4453
+      ],
+      "mapCenter": [
+        38.24,
+        -78.01
+      ]
+    },
+    "page": {
+      "name": "Page County",
+      "type": "county",
+      "fips": "139",
+      "jurisCode": "67",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.6817,
+        38.4416,
+        -78.2908,
+        38.8225
+      ],
+      "mapCenter": [
+        38.62,
+        -78.47
+      ]
+    },
+    "patrick": {
+      "name": "Patrick County",
+      "type": "county",
+      "fips": "141",
+      "jurisCode": "68",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.4623,
+        36.5407,
+        -79.9991,
+        36.8503
+      ],
+      "mapCenter": [
+        36.68,
+        -80.28
+      ]
+    },
+    "pittsylvania": {
+      "name": "Pittsylvania County",
+      "type": "county",
+      "fips": "143",
+      "jurisCode": "69",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.7448,
+        36.5413,
+        -79.0905,
+        37.0725
+      ],
+      "mapCenter": [
+        36.82,
+        -79.39
+      ]
+    },
+    "powhatan": {
+      "name": "Powhatan County",
+      "type": "county",
+      "fips": "145",
+      "jurisCode": "70",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.0212,
+        37.3789,
+        -77.6353,
+        37.6749
+      ],
+      "mapCenter": [
+        37.55,
+        -77.92
+      ]
+    },
+    "prince_edward": {
+      "name": "Prince Edward County",
+      "type": "county",
+      "fips": "147",
+      "jurisCode": "71",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.6825,
+        36.9928,
+        -78.2324,
+        37.3519
+      ],
+      "mapCenter": [
+        37.23,
+        -78.44
+      ]
+    },
+    "prince_george": {
+      "name": "Prince George County",
+      "type": "county",
+      "fips": "149",
+      "jurisCode": "72",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.4321,
+        36.9881,
+        -76.9171,
+        37.3412
+      ],
+      "mapCenter": [
+        37.19,
+        -77.22
+      ]
+    },
+    "prince_william": {
+      "name": "Prince William County",
+      "type": "county",
+      "fips": "153",
+      "jurisCode": "73",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.7903,
+        38.5193,
+        -77.285,
+        38.8824
+      ],
+      "mapCenter": [
+        38.7,
+        -77.48
+      ]
+    },
+    "pulaski": {
+      "name": "Pulaski County",
+      "type": "county",
+      "fips": "155",
+      "jurisCode": "74",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.8855,
+        36.9352,
+        -80.4493,
+        37.2352
+      ],
+      "mapCenter": [
+        37.06,
+        -80.72
+      ]
+    },
+    "rappahannock": {
+      "name": "Rappahannock County",
+      "type": "county",
+      "fips": "157",
+      "jurisCode": "75",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.3816,
+        38.4816,
+        -77.9796,
+        38.8102
+      ],
+      "mapCenter": [
+        38.68,
+        -78.16
+      ]
+    },
+    "richmond_county": {
+      "name": "Richmond County",
+      "type": "county",
+      "fips": "159",
+      "jurisCode": "76",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.0159,
+        37.7959,
+        -76.6448,
+        38.0986
+      ],
+      "mapCenter": [
+        37.94,
+        -76.73
+      ]
+    },
+    "roanoke_county": {
+      "name": "Roanoke County",
+      "type": "county",
+      "fips": "161",
+      "jurisCode": "77",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.2179,
+        37.0999,
+        -79.7768,
+        37.4247
+      ],
+      "mapCenter": [
+        37.28,
+        -80.05
+      ]
+    },
+    "rockbridge": {
+      "name": "Rockbridge County",
+      "type": "county",
+      "fips": "163",
+      "jurisCode": "78",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.8282,
+        37.5341,
+        -79.25,
+        38.0142
+      ],
+      "mapCenter": [
+        37.81,
+        -79.45
+      ]
+    },
+    "rockingham": {
+      "name": "Rockingham County",
+      "type": "county",
+      "fips": "165",
+      "jurisCode": "79",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.3377,
+        38.2024,
+        -78.6603,
+        38.8128
+      ],
+      "mapCenter": [
+        38.52,
+        -78.88
+      ]
+    },
+    "russell": {
+      "name": "Russell County",
+      "type": "county",
+      "fips": "167",
+      "jurisCode": "80",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -82.3508,
+        36.7946,
+        -81.7422,
+        37.1537
+      ],
+      "mapCenter": [
+        36.93,
+        -82.1
+      ]
+    },
+    "scott": {
+      "name": "Scott County",
+      "type": "county",
+      "fips": "169",
+      "jurisCode": "81",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -83.0936,
+        36.5944,
+        -82.4581,
+        36.9024
+      ],
+      "mapCenter": [
+        36.71,
+        -82.61
+      ]
+    },
+    "shenandoah": {
+      "name": "Shenandoah County",
+      "type": "county",
+      "fips": "171",
+      "jurisCode": "82",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.8293,
+        38.6566,
+        -78.4681,
+        39.1178
+      ],
+      "mapCenter": [
+        38.86,
+        -78.57
+      ]
+    },
+    "smyth": {
+      "name": "Smyth County",
+      "type": "county",
+      "fips": "173",
+      "jurisCode": "83",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -81.8504,
+        36.7056,
+        -81.2617,
+        37.0053
+      ],
+      "mapCenter": [
+        36.85,
+        -81.54
+      ]
+    },
+    "southampton": {
+      "name": "Southampton County",
+      "type": "county",
+      "fips": "175",
+      "jurisCode": "84",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.4304,
+        36.5449,
+        -76.7696,
+        36.9574
+      ],
+      "mapCenter": [
+        36.72,
+        -77.1
+      ]
+    },
+    "spotsylvania": {
+      "name": "Spotsylvania County",
+      "type": "county",
+      "fips": "177",
+      "jurisCode": "85",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.8389,
+        37.979,
+        -77.366,
+        38.3904
+      ],
+      "mapCenter": [
+        38.18,
+        -77.65
+      ]
+    },
+    "stafford": {
+      "name": "Stafford County",
+      "type": "county",
+      "fips": "179",
+      "jurisCode": "86",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.6582,
+        38.2602,
+        -77.2842,
+        38.559
+      ],
+      "mapCenter": [
+        38.42,
+        -77.45
+      ]
+    },
+    "surry": {
+      "name": "Surry County",
+      "type": "county",
+      "fips": "181",
+      "jurisCode": "87",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.1678,
+        36.8979,
+        -76.6375,
+        37.2714
+      ],
+      "mapCenter": [
+        37.12,
+        -76.88
+      ]
+    },
+    "sussex": {
+      "name": "Sussex County",
+      "type": "county",
+      "fips": "183",
+      "jurisCode": "88",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.5269,
+        36.7085,
+        -76.9319,
+        37.1173
+      ],
+      "mapCenter": [
+        36.92,
+        -77.27
+      ]
+    },
+    "tazewell": {
+      "name": "Tazewell County",
+      "type": "county",
+      "fips": "185",
+      "jurisCode": "89",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -81.8019,
+        36.8786,
+        -81.2139,
+        37.3024
+      ],
+      "mapCenter": [
+        37.12,
+        -81.52
+      ]
+    },
+    "warren": {
+      "name": "Warren County",
+      "type": "county",
+      "fips": "187",
+      "jurisCode": "90",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.4148,
+        38.8102,
+        -78.0468,
+        39.1127
+      ],
+      "mapCenter": [
+        38.91,
+        -78.21
+      ]
+    },
+    "washington": {
+      "name": "Washington County",
+      "type": "county",
+      "fips": "191",
+      "jurisCode": "91",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -82.3155,
+        36.5943,
+        -81.6462,
+        37.0133
+      ],
+      "mapCenter": [
+        36.75,
+        -81.95
+      ]
+    },
+    "westmoreland": {
+      "name": "Westmoreland County",
+      "type": "county",
+      "fips": "193",
+      "jurisCode": "92",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.1053,
+        37.9651,
+        -76.5167,
+        38.2655
+      ],
+      "mapCenter": [
+        38.11,
+        -76.8
+      ]
+    },
+    "wise": {
+      "name": "Wise County",
+      "type": "county",
+      "fips": "195",
+      "jurisCode": "93",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -82.9515,
+        36.8541,
+        -82.3498,
+        37.1872
+      ],
+      "mapCenter": [
+        36.97,
+        -82.62
+      ]
+    },
+    "wythe": {
+      "name": "Wythe County",
+      "type": "county",
+      "fips": "197",
+      "jurisCode": "94",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -81.3556,
+        36.7544,
+        -80.855,
+        37.1051
+      ],
+      "mapCenter": [
+        36.92,
+        -81.08
+      ]
+    },
+    "york": {
+      "name": "York County",
+      "type": "county",
+      "fips": "199",
+      "jurisCode": "95",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.6992,
+        37.1009,
+        -76.3817,
+        37.4154
+      ],
+      "mapCenter": [
+        37.22,
+        -76.54
+      ]
+    },
+    "alexandria": {
+      "name": "Alexandria City",
+      "type": "city",
+      "fips": "510",
+      "jurisCode": "96",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.1445,
+        38.7852,
+        -77.0381,
+        38.8452
+      ],
+      "mapCenter": [
+        38.82,
+        -77.08
+      ]
+    },
+    "bristol": {
+      "name": "Bristol City",
+      "type": "city",
+      "fips": "520",
+      "jurisCode": "97",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -82.2218,
+        36.5612,
+        -82.1109,
+        36.6338
+      ],
+      "mapCenter": [
+        36.6,
+        -82.19
+      ]
+    },
+    "buena_vista": {
+      "name": "Buena Vista City",
+      "type": "city",
+      "fips": "530",
+      "jurisCode": "98",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.3796,
+        37.7062,
+        -79.332,
+        37.7573
+      ],
+      "mapCenter": [
+        37.73,
+        -79.35
+      ]
+    },
+    "charlottesville": {
+      "name": "Charlottesville City",
+      "type": "city",
+      "fips": "540",
+      "jurisCode": "99",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.5228,
+        38.0007,
+        -78.4475,
+        38.0653
+      ],
+      "mapCenter": [
+        38.03,
+        -78.48
+      ]
+    },
+    "chesapeake": {
+      "name": "Chesapeake City",
+      "type": "city",
+      "fips": "550",
+      "jurisCode": "100",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.4914,
+        36.5413,
+        -76.1332,
+        36.866
+      ],
+      "mapCenter": [
+        36.77,
+        -76.29
+      ]
+    },
+    "colonial_heights": {
+      "name": "Colonial Heights City",
+      "type": "city",
+      "fips": "570",
+      "jurisCode": "101",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.4381,
+        37.2245,
+        -77.3666,
+        37.2819
+      ],
+      "mapCenter": [
+        37.26,
+        -77.4
+      ]
+    },
+    "covington": {
+      "name": "Covington City",
+      "type": "city",
+      "fips": "580",
+      "jurisCode": "102",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.0175,
+        37.7633,
+        -79.9567,
+        37.8078
+      ],
+      "mapCenter": [
+        37.79,
+        -79.99
+      ]
+    },
+    "danville": {
+      "name": "Danville City",
+      "type": "city",
+      "fips": "590",
+      "jurisCode": "103",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.4691,
+        36.5556,
+        -79.3358,
+        36.6404
+      ],
+      "mapCenter": [
+        36.59,
+        -79.39
+      ]
+    },
+    "emporia": {
+      "name": "Emporia City",
+      "type": "city",
+      "fips": "595",
+      "jurisCode": "104",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.5628,
+        36.6739,
+        -77.511,
+        36.7185
+      ],
+      "mapCenter": [
+        36.69,
+        -77.54
+      ]
+    },
+    "fairfax_city": {
+      "name": "Fairfax City",
+      "type": "city",
+      "fips": "600",
+      "jurisCode": "105",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.3309,
+        38.8274,
+        -77.2672,
+        38.8726
+      ],
+      "mapCenter": [
+        38.85,
+        -77.3
+      ]
+    },
+    "falls_church": {
+      "name": "Falls Church City",
+      "type": "city",
+      "fips": "610",
+      "jurisCode": "106",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.2063,
+        38.8631,
+        -77.1561,
+        38.892
+      ],
+      "mapCenter": [
+        38.88,
+        -77.17
+      ]
+    },
+    "franklin_city": {
+      "name": "Franklin City",
+      "type": "city",
+      "fips": "620",
+      "jurisCode": "107",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.9566,
+        36.6545,
+        -76.895,
+        36.7002
+      ],
+      "mapCenter": [
+        36.68,
+        -76.92
+      ]
+    },
+    "fredericksburg": {
+      "name": "Fredericksburg City",
+      "type": "city",
+      "fips": "630",
+      "jurisCode": "108",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.514,
+        38.2803,
+        -77.423,
+        38.3383
+      ],
+      "mapCenter": [
+        38.3,
+        -77.46
+      ]
+    },
+    "galax": {
+      "name": "Galax City",
+      "type": "city",
+      "fips": "640",
+      "jurisCode": "109",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.9432,
+        36.6389,
+        -80.8871,
+        36.6839
+      ],
+      "mapCenter": [
+        36.66,
+        -80.92
+      ]
+    },
+    "hampton": {
+      "name": "Hampton City",
+      "type": "city",
+      "fips": "650",
+      "jurisCode": "110",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.4599,
+        36.9745,
+        -76.2597,
+        37.1414
+      ],
+      "mapCenter": [
+        37.03,
+        -76.35
+      ]
+    },
+    "harrisonburg": {
+      "name": "Harrisonburg City",
+      "type": "city",
+      "fips": "660",
+      "jurisCode": "111",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.9268,
+        38.3979,
+        -78.8248,
+        38.4806
+      ],
+      "mapCenter": [
+        38.45,
+        -78.87
+      ]
+    },
+    "hopewell": {
+      "name": "Hopewell City",
+      "type": "city",
+      "fips": "670",
+      "jurisCode": "112",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.3346,
+        37.2658,
+        -77.2607,
+        37.3307
+      ],
+      "mapCenter": [
+        37.3,
+        -77.29
+      ]
+    },
+    "lexington": {
+      "name": "Lexington City",
+      "type": "city",
+      "fips": "678",
+      "jurisCode": "113",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.4621,
+        37.7657,
+        -79.4266,
+        37.7994
+      ],
+      "mapCenter": [
+        37.78,
+        -79.44
+      ]
+    },
+    "lynchburg": {
+      "name": "Lynchburg City",
+      "type": "city",
+      "fips": "680",
+      "jurisCode": "114",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.2574,
+        37.3505,
+        -79.0831,
+        37.4679
+      ],
+      "mapCenter": [
+        37.41,
+        -79.14
+      ]
+    },
+    "manassas": {
+      "name": "Manassas City",
+      "type": "city",
+      "fips": "683",
+      "jurisCode": "115",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.5132,
+        38.7218,
+        -77.4456,
+        38.7816
+      ],
+      "mapCenter": [
+        38.75,
+        -77.47
+      ]
+    },
+    "manassas_park": {
+      "name": "Manassas Park City",
+      "type": "city",
+      "fips": "685",
+      "jurisCode": "116",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.4813,
+        38.7588,
+        -77.4382,
+        38.7885
+      ],
+      "mapCenter": [
+        38.77,
+        -77.47
+      ]
+    },
+    "martinsville": {
+      "name": "Martinsville City",
+      "type": "city",
+      "fips": "690",
+      "jurisCode": "117",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.9095,
+        36.6526,
+        -79.8296,
+        36.7211
+      ],
+      "mapCenter": [
+        36.69,
+        -79.87
+      ]
+    },
+    "newport_news": {
+      "name": "Newport News City",
+      "type": "city",
+      "fips": "700",
+      "jurisCode": "118",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.6212,
+        36.9597,
+        -76.3351,
+        37.22
+      ],
+      "mapCenter": [
+        37.09,
+        -76.47
+      ]
+    },
+    "norfolk": {
+      "name": "Norfolk City",
+      "type": "city",
+      "fips": "710",
+      "jurisCode": "119",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.345,
+        36.82,
+        -76.18,
+        36.97
+      ],
+      "mapCenter": [
+        36.85,
+        -76.29
+      ]
+    },
+    "norton": {
+      "name": "Norton City",
+      "type": "city",
+      "fips": "720",
+      "jurisCode": "120",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -82.6547,
+        36.907,
+        -82.6036,
+        36.9498
+      ],
+      "mapCenter": [
+        36.93,
+        -82.63
+      ]
+    },
+    "petersburg": {
+      "name": "Petersburg City",
+      "type": "city",
+      "fips": "730",
+      "jurisCode": "121",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.4529,
+        37.1879,
+        -77.3481,
+        37.252
+      ],
+      "mapCenter": [
+        37.23,
+        -77.4
+      ]
+    },
+    "poquoson": {
+      "name": "Poquoson City",
+      "type": "city",
+      "fips": "735",
+      "jurisCode": "122",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.4087,
+        37.0959,
+        -76.2816,
+        37.1781
+      ],
+      "mapCenter": [
+        37.12,
+        -76.35
+      ]
+    },
+    "portsmouth": {
+      "name": "Portsmouth City",
+      "type": "city",
+      "fips": "740",
+      "jurisCode": "123",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.4203,
+        36.7879,
+        -76.2931,
+        36.8918
+      ],
+      "mapCenter": [
+        36.84,
+        -76.35
+      ]
+    },
+    "radford": {
+      "name": "Radford City",
+      "type": "city",
+      "fips": "750",
+      "jurisCode": "124",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.6076,
+        37.1063,
+        -80.5225,
+        37.1633
+      ],
+      "mapCenter": [
+        37.13,
+        -80.58
+      ]
+    },
+    "richmond_city": {
+      "name": "Richmond City",
+      "type": "city",
+      "fips": "760",
+      "jurisCode": "125",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -77.5775,
+        37.4464,
+        -77.3853,
+        37.6011
+      ],
+      "mapCenter": [
+        37.54,
+        -77.44
+      ]
+    },
+    "roanoke_city": {
+      "name": "Roanoke City",
+      "type": "city",
+      "fips": "770",
+      "jurisCode": "126",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.0203,
+        37.2259,
+        -79.8797,
+        37.3246
+      ],
+      "mapCenter": [
+        37.27,
+        -79.94
+      ]
+    },
+    "salem": {
+      "name": "Salem City",
+      "type": "city",
+      "fips": "775",
+      "jurisCode": "127",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -80.1085,
+        37.2579,
+        -80.0053,
+        37.3285
+      ],
+      "mapCenter": [
+        37.29,
+        -80.05
+      ]
+    },
+    "staunton": {
+      "name": "Staunton City",
+      "type": "city",
+      "fips": "790",
+      "jurisCode": "128",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -79.1073,
+        38.1097,
+        -79.02,
+        38.1839
+      ],
+      "mapCenter": [
+        38.15,
+        -79.07
+      ]
+    },
+    "suffolk": {
+      "name": "Suffolk City",
+      "type": "city",
+      "fips": "800",
+      "jurisCode": "129",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.923,
+        36.5453,
+        -76.4038,
+        36.9384
+      ],
+      "mapCenter": [
+        36.73,
+        -76.58
+      ]
+    },
+    "virginia_beach": {
+      "name": "Virginia Beach City",
+      "type": "city",
+      "fips": "810",
+      "jurisCode": "130",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.2269,
+        36.5516,
+        -75.8589,
+        36.933
+      ],
+      "mapCenter": [
+        36.85,
+        -75.98
+      ]
+    },
+    "waynesboro": {
+      "name": "Waynesboro City",
+      "type": "city",
+      "fips": "820",
+      "jurisCode": "131",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.9409,
+        38.0412,
+        -78.8546,
+        38.1003
+      ],
+      "mapCenter": [
+        38.07,
+        -78.89
+      ]
+    },
+    "williamsburg": {
+      "name": "Williamsburg City",
+      "type": "city",
+      "fips": "830",
+      "jurisCode": "132",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -76.7421,
+        37.2498,
+        -76.683,
+        37.2972
+      ],
+      "mapCenter": [
+        37.27,
+        -76.71
+      ]
+    },
+    "winchester": {
+      "name": "Winchester City",
+      "type": "city",
+      "fips": "840",
+      "jurisCode": "133",
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -78.2074,
+        39.1383,
+        -78.1252,
+        39.213
+      ],
+      "mapCenter": [
+        39.19,
+        -78.17
+      ]
+    }
+  }
+}

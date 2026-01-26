@@ -282,6 +282,63 @@ jobs:
 
           echo "=========================================="
 
+      - name: Install validation dependencies
+        run: |
+          pip install -r validation/requirements.txt
+
+      - name: Validate and correct crash data
+        id: validate
+        run: |
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+          echo "=========================================="
+          echo "Validating Crash Data for: $JURISDICTION"
+          echo "Validation started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+          # Run validation with auto-correction (enabled by default)
+          python validation/run_validation.py \
+            --jurisdiction "$JURISDICTION"
+
+          echo "=========================================="
+          echo "Validation complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+          # Capture validation stats for summary
+          if [ -f "data/.validation/latest_report.json" ]; then
+            echo "Validation Report:"
+            cat data/.validation/latest_report.json | python -m json.tool
+
+            # Extract key metrics
+            TOTAL=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['totalRecords'])")
+            NEW=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['newRecords'])")
+            CORRECTED=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['autoCorrections'])")
+            FLAGGED=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['flagged'])")
+
+            echo "total_records=$TOTAL" >> $GITHUB_OUTPUT
+            echo "new_records=$NEW" >> $GITHUB_OUTPUT
+            echo "auto_corrections=$CORRECTED" >> $GITHUB_OUTPUT
+            echo "flagged=$FLAGGED" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for critical validation issues
+        run: |
+          # Stop if error rate > 10%
+          if [ -f "data/.validation/latest_report.json" ]; then
+            ERROR_RATE=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json')).get('errorRate', 0))")
+            if (( $(echo "$ERROR_RATE > 10" | bc -l) )); then
+              echo "::error::Error rate exceeds 10% ($ERROR_RATE%). Manual review required."
+              exit 1
+            fi
+            echo "Error rate ($ERROR_RATE%) is within acceptable limits."
+          fi
+
+      - name: Update crashes.csv with validated data
+        run: |
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+          # Copy validated county roads to crashes.csv
+          cp "data/${JURISDICTION}_county_roads.csv" "data/crashes.csv"
+          echo "Updated crashes.csv with validated data"
+
       - name: Commit and push crash data changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -294,7 +351,18 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Auto-update: Crash data - $(date +'%Y-%m-%d')"
+          # Create commit message with validation summary
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+          COMMIT_MSG="Auto-update: Crash data ($JURISDICTION) - $(date +'%Y-%m-%d')"
+
+          if [ -f "data/.validation/latest_report.json" ]; then
+            SUMMARY=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['summary'])")
+            COMMIT_MSG="$COMMIT_MSG
+
+Validation: $SUMMARY"
+          fi
+
+          git commit -m "$COMMIT_MSG"
 
           # Push with retry logic to handle race conditions with grants job
           MAX_RETRIES=4
@@ -539,12 +607,21 @@ jobs:
           to: ${{ env.NOTIFICATION_EMAIL }}
           from: "CRASH LENS Bot <noreply@crashlens.local>"
           body: |
-            The monthly crash data download has completed successfully.
+            The monthly crash data download and validation has completed successfully.
 
             Repository: ${{ github.repository }}
             Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            Crash Records Downloaded: ${{ needs.download-crash-data.outputs.crash_records || 'N/A' }}
+            === CRASH DATA ===
+            Records Downloaded: ${{ needs.download-crash-data.outputs.crash_records || 'N/A' }}
+
+            === VALIDATION ===
+            Total Records: ${{ needs.download-crash-data.outputs.total_records || 'N/A' }}
+            New Records: ${{ needs.download-crash-data.outputs.new_records || 'N/A' }}
+            Auto-Corrected: ${{ needs.download-crash-data.outputs.auto_corrections || 'N/A' }}
+            Flagged for Review: ${{ needs.download-crash-data.outputs.flagged || 'N/A' }}
+
+            === GRANTS ===
             Grants Updated: ${{ needs.download-grants-data.outputs.grants_count || 'N/A' }}
 
             Data Source: Virginia Roads (VDOT)

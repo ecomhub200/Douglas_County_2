@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
+from dateutil import parser as date_parser
 from tqdm import tqdm
 
 # Configure logging
@@ -109,36 +110,39 @@ class CrashDataValidator:
         issues = []
         corrections = []
 
+        # Get Document Nbr for tracking
+        doc_nbr = str(record.get('Document Nbr', '')).strip()
+
         # 1. Schema validation
-        issues.extend(self._validate_schema(record, row_idx))
+        issues.extend(self._validate_schema(record, row_idx, doc_nbr))
 
         # 2. Bounds validation
-        issues.extend(self._validate_bounds(record, row_idx))
+        issues.extend(self._validate_bounds(record, row_idx, doc_nbr))
 
         # 3. Category validation
-        cat_issues, cat_corrections = self._validate_categories(record, row_idx)
+        cat_issues, cat_corrections = self._validate_categories(record, row_idx, doc_nbr)
         issues.extend(cat_issues)
         corrections.extend(cat_corrections)
 
         # 4. Consistency validation
-        con_issues, con_corrections = self._validate_consistency(record, row_idx)
+        con_issues, con_corrections = self._validate_consistency(record, row_idx, doc_nbr)
         issues.extend(con_issues)
         corrections.extend(con_corrections)
 
         # 5. Completeness validation
-        issues.extend(self._validate_completeness(record, row_idx))
+        issues.extend(self._validate_completeness(record, row_idx, doc_nbr))
 
         return issues, corrections
 
-    def _validate_schema(self, record: pd.Series, row_idx: int) -> List[dict]:
+    def _validate_schema(self, record: pd.Series, row_idx: int, doc_nbr: str) -> List[dict]:
         """Validate data types and required fields."""
         issues = []
 
         # Check Document Nbr
-        doc_nbr = record.get('Document Nbr', '')
-        if pd.isna(doc_nbr) or str(doc_nbr).strip() == '':
+        if pd.isna(record.get('Document Nbr', '')) or doc_nbr == '':
             issues.append({
                 'row': row_idx,
+                'document_nbr': doc_nbr or f'row_{row_idx}',
                 'field': 'Document Nbr',
                 'issue': 'missing_required',
                 'severity': 'error',
@@ -154,6 +158,7 @@ class CrashDataValidator:
                 if year < 2015 or year > current_year:
                     issues.append({
                         'row': row_idx,
+                        'document_nbr': doc_nbr or f'row_{row_idx}',
                         'field': 'Crash Year',
                         'issue': 'out_of_range',
                         'severity': 'error',
@@ -163,6 +168,7 @@ class CrashDataValidator:
             except (ValueError, TypeError):
                 issues.append({
                     'row': row_idx,
+                    'document_nbr': doc_nbr or f'row_{row_idx}',
                     'field': 'Crash Year',
                     'issue': 'invalid_type',
                     'severity': 'error',
@@ -170,22 +176,76 @@ class CrashDataValidator:
                     'message': 'Crash Year must be an integer'
                 })
 
-        # Check Severity
-        severity = str(record.get('Crash Severity', '')).strip().upper()
+        # Check Severity - also check for corrections
+        severity_raw = str(record.get('Crash Severity', '')).strip()
+        severity = severity_raw.upper()
         valid_severities = self.valid_values.get('severity', {}).get('valid', ['K', 'A', 'B', 'C', 'O'])
-        if severity and severity not in valid_severities:
-            issues.append({
-                'row': row_idx,
-                'field': 'Crash Severity',
-                'issue': 'invalid_value',
-                'severity': 'error',
-                'value': severity,
-                'message': f'Invalid severity: {severity}'
-            })
+        if severity_raw and severity not in valid_severities:
+            # Check for correction rule
+            sev_corrections = self.correction_rules.get('categoryCorrections', {}).get('Crash Severity', {})
+            if severity_raw in sev_corrections:
+                rule = sev_corrections[severity_raw]
+                # Will be handled in _validate_categories
+                pass
+            else:
+                issues.append({
+                    'row': row_idx,
+                    'document_nbr': doc_nbr or f'row_{row_idx}',
+                    'field': 'Crash Severity',
+                    'issue': 'invalid_value',
+                    'severity': 'error',
+                    'value': severity_raw,
+                    'message': f'Invalid severity: {severity_raw}'
+                })
+
+        # Check Crash Date format
+        crash_date = record.get('Crash Date')
+        if pd.notna(crash_date) and str(crash_date).strip():
+            date_str = str(crash_date).strip()
+            valid_date = False
+            try:
+                # Try common formats
+                parsed_date = date_parser.parse(date_str)
+                valid_date = True
+
+                # Check date is not in the future
+                if parsed_date.date() > datetime.now().date():
+                    issues.append({
+                        'row': row_idx,
+                        'document_nbr': doc_nbr or f'row_{row_idx}',
+                        'field': 'Crash Date',
+                        'issue': 'future_date',
+                        'severity': 'error',
+                        'value': date_str,
+                        'message': f'Crash Date {date_str} is in the future'
+                    })
+
+                # Check date is not too old
+                min_year = self.valid_values.get('dateConstraints', {}).get('minYear', 2015)
+                if parsed_date.year < min_year:
+                    issues.append({
+                        'row': row_idx,
+                        'document_nbr': doc_nbr or f'row_{row_idx}',
+                        'field': 'Crash Date',
+                        'issue': 'date_too_old',
+                        'severity': 'warning',
+                        'value': date_str,
+                        'message': f'Crash Date {date_str} is before {min_year}'
+                    })
+            except (ValueError, TypeError):
+                issues.append({
+                    'row': row_idx,
+                    'document_nbr': doc_nbr or f'row_{row_idx}',
+                    'field': 'Crash Date',
+                    'issue': 'invalid_date_format',
+                    'severity': 'error',
+                    'value': date_str,
+                    'message': f'Invalid date format: {date_str}'
+                })
 
         return issues
 
-    def _validate_bounds(self, record: pd.Series, row_idx: int) -> List[dict]:
+    def _validate_bounds(self, record: pd.Series, row_idx: int, doc_nbr: str) -> List[dict]:
         """Validate geographic coordinates."""
         issues = []
 
@@ -202,6 +262,7 @@ class CrashDataValidator:
         except (ValueError, TypeError):
             issues.append({
                 'row': row_idx,
+                'document_nbr': doc_nbr or f'row_{row_idx}',
                 'field': 'coordinates',
                 'issue': 'invalid_type',
                 'severity': 'error',
@@ -209,12 +270,26 @@ class CrashDataValidator:
             })
             return issues
 
-        # Check Virginia state bounds
+        # Check for transposed lat/lon (latitude in longitude range)
         state_bounds = self.valid_values.get('stateBounds', {}).get('virginia', {})
         if state_bounds:
+            # Check if lat/lon might be swapped
+            if (state_bounds.get('minLat', 36) <= lon <= state_bounds.get('maxLat', 40) and
+                state_bounds.get('minLon', -84) <= lat <= state_bounds.get('maxLon', -75)):
+                issues.append({
+                    'row': row_idx,
+                    'document_nbr': doc_nbr or f'row_{row_idx}',
+                    'field': 'coordinates',
+                    'issue': 'transposed_lat_lon',
+                    'severity': 'warning',
+                    'value': f'x={lon}, y={lat}',
+                    'message': 'Latitude and longitude may be transposed'
+                })
+
             if not (state_bounds.get('minLon', -84) <= lon <= state_bounds.get('maxLon', -75)):
                 issues.append({
                     'row': row_idx,
+                    'document_nbr': doc_nbr or f'row_{row_idx}',
                     'field': 'x',
                     'issue': 'outside_state_bounds',
                     'severity': 'error',
@@ -225,6 +300,7 @@ class CrashDataValidator:
             if not (state_bounds.get('minLat', 36) <= lat <= state_bounds.get('maxLat', 40)):
                 issues.append({
                     'row': row_idx,
+                    'document_nbr': doc_nbr or f'row_{row_idx}',
                     'field': 'y',
                     'issue': 'outside_state_bounds',
                     'severity': 'error',
@@ -238,6 +314,7 @@ class CrashDataValidator:
             if not (juris_bounds['minLon'] <= lon <= juris_bounds['maxLon']):
                 issues.append({
                     'row': row_idx,
+                    'document_nbr': doc_nbr or f'row_{row_idx}',
                     'field': 'x',
                     'issue': 'outside_jurisdiction_bounds',
                     'severity': 'warning',
@@ -248,6 +325,7 @@ class CrashDataValidator:
             if not (juris_bounds['minLat'] <= lat <= juris_bounds['maxLat']):
                 issues.append({
                     'row': row_idx,
+                    'document_nbr': doc_nbr or f'row_{row_idx}',
                     'field': 'y',
                     'issue': 'outside_jurisdiction_bounds',
                     'severity': 'warning',
@@ -257,7 +335,7 @@ class CrashDataValidator:
 
         return issues
 
-    def _validate_categories(self, record: pd.Series, row_idx: int) -> Tuple[List[dict], List[dict]]:
+    def _validate_categories(self, record: pd.Series, row_idx: int, doc_nbr: str) -> Tuple[List[dict], List[dict]]:
         """Validate category fields against valid values."""
         issues = []
         corrections = []
@@ -268,7 +346,8 @@ class CrashDataValidator:
             'Light Condition': 'lightConditions',
             'Roadway Surface Condition': 'surfaceConditions',
             'Intersection Type': 'intersectionTypes',
-            'Traffic Control Type': 'trafficControlTypes'
+            'Traffic Control Type': 'trafficControlTypes',
+            'Crash Severity': 'severity'
         }
 
         for field, ref_key in category_fields.items():
@@ -287,6 +366,7 @@ class CrashDataValidator:
                     if rule.get('correctTo') and confidence >= 85:
                         corrections.append({
                             'row': row_idx,
+                            'document_nbr': doc_nbr or f'row_{row_idx}',
                             'field': field,
                             'original': value,
                             'corrected': rule['correctTo'],
@@ -297,6 +377,7 @@ class CrashDataValidator:
                     else:
                         issues.append({
                             'row': row_idx,
+                            'document_nbr': doc_nbr or f'row_{row_idx}',
                             'field': field,
                             'issue': 'invalid_category',
                             'severity': 'warning',
@@ -308,6 +389,7 @@ class CrashDataValidator:
                 else:
                     issues.append({
                         'row': row_idx,
+                        'document_nbr': doc_nbr or f'row_{row_idx}',
                         'field': field,
                         'issue': 'unknown_category',
                         'severity': 'warning',
@@ -317,7 +399,7 @@ class CrashDataValidator:
 
         return issues, corrections
 
-    def _validate_consistency(self, record: pd.Series, row_idx: int) -> Tuple[List[dict], List[dict]]:
+    def _validate_consistency(self, record: pd.Series, row_idx: int, doc_nbr: str) -> Tuple[List[dict], List[dict]]:
         """Validate cross-field consistency."""
         issues = []
         corrections = []
@@ -333,11 +415,30 @@ class CrashDataValidator:
         if severity == 'K' and k_people == 0:
             issues.append({
                 'row': row_idx,
+                'document_nbr': doc_nbr or f'row_{row_idx}',
                 'field': 'K_People',
                 'issue': 'severity_mismatch',
                 'severity': 'error',
                 'value': k_people,
                 'message': 'Fatal crash (K) should have K_People > 0'
+            })
+
+        # Check: Serious injury (A) should have A_People > 0 or injuries
+        a_people = record.get('A_People', 0)
+        try:
+            a_people = int(a_people) if pd.notna(a_people) else 0
+        except (ValueError, TypeError):
+            a_people = 0
+
+        if severity == 'A' and a_people == 0:
+            issues.append({
+                'row': row_idx,
+                'document_nbr': doc_nbr or f'row_{row_idx}',
+                'field': 'A_People',
+                'issue': 'severity_mismatch',
+                'severity': 'warning',
+                'value': a_people,
+                'message': 'Serious injury crash (A) should have A_People > 0'
             })
 
         # Check: Pedestrian collision should have Pedestrian? = Yes
@@ -347,6 +448,7 @@ class CrashDataValidator:
         if collision_type == '12. Ped' and ped_flag != 'Yes':
             corrections.append({
                 'row': row_idx,
+                'document_nbr': doc_nbr or f'row_{row_idx}',
                 'field': 'Pedestrian?',
                 'original': ped_flag,
                 'corrected': 'Yes',
@@ -361,11 +463,27 @@ class CrashDataValidator:
         if collision_type == '13. Bicyclist' and bike_flag != 'Yes':
             corrections.append({
                 'row': row_idx,
+                'document_nbr': doc_nbr or f'row_{row_idx}',
                 'field': 'Bike?',
                 'original': bike_flag,
                 'corrected': 'Yes',
                 'confidence': 98,
                 'reason': 'Bicycle collision should have Bike flag = Yes',
+                'auto_applied': True
+            })
+
+        # Check: Motorcycle collision should have Motorcycle? = Yes
+        motorcycle_flag = str(record.get('Motorcycle?', '')).strip()
+
+        if collision_type == '14. Motorcyclist' and motorcycle_flag != 'Yes':
+            corrections.append({
+                'row': row_idx,
+                'document_nbr': doc_nbr or f'row_{row_idx}',
+                'field': 'Motorcycle?',
+                'original': motorcycle_flag,
+                'corrected': 'Yes',
+                'confidence': 98,
+                'reason': 'Motorcycle collision should have Motorcycle flag = Yes',
                 'auto_applied': True
             })
 
@@ -381,6 +499,7 @@ class CrashDataValidator:
         if light_condition in darkness_values and night_flag != 'Yes':
             corrections.append({
                 'row': row_idx,
+                'document_nbr': doc_nbr or f'row_{row_idx}',
                 'field': 'Night?',
                 'original': night_flag,
                 'corrected': 'Yes',
@@ -391,7 +510,7 @@ class CrashDataValidator:
 
         return issues, corrections
 
-    def _validate_completeness(self, record: pd.Series, row_idx: int) -> List[dict]:
+    def _validate_completeness(self, record: pd.Series, row_idx: int, doc_nbr: str) -> List[dict]:
         """Check for missing required/preferred fields."""
         issues = []
 
@@ -402,6 +521,7 @@ class CrashDataValidator:
             if pd.isna(value) or str(value).strip() == '':
                 issues.append({
                     'row': row_idx,
+                    'document_nbr': doc_nbr or f'row_{row_idx}',
                     'field': field,
                     'issue': 'missing_required',
                     'severity': 'error',
@@ -415,11 +535,59 @@ class CrashDataValidator:
             if pd.isna(value) or str(value).strip() == '':
                 issues.append({
                     'row': row_idx,
+                    'document_nbr': doc_nbr or f'row_{row_idx}',
                     'field': field,
                     'issue': 'missing_preferred',
                     'severity': 'info',
                     'message': f'Preferred field {field} is missing'
                 })
+
+        return issues
+
+    def _validate_duplicates(self, df: pd.DataFrame) -> List[dict]:
+        """Check for duplicate records."""
+        issues = []
+
+        # Check for duplicate Document Nbr
+        doc_nbr_col = 'Document Nbr'
+        if doc_nbr_col in df.columns:
+            duplicates = df[df.duplicated(subset=[doc_nbr_col], keep=False)]
+            if len(duplicates) > 0:
+                dup_groups = duplicates.groupby(doc_nbr_col).groups
+                for doc_nbr, indices in dup_groups.items():
+                    if len(indices) > 1:
+                        for idx in indices[1:]:  # Flag all but first
+                            issues.append({
+                                'row': idx,
+                                'document_nbr': str(doc_nbr),
+                                'field': 'Document Nbr',
+                                'issue': 'duplicate_document_nbr',
+                                'severity': 'error',
+                                'value': doc_nbr,
+                                'message': f'Duplicate Document Nbr: {doc_nbr}'
+                            })
+
+        # Check for potential duplicates (same date, location, severity)
+        potential_dup_cols = ['Crash Date', 'x', 'y', 'Crash Severity']
+        existing_cols = [c for c in potential_dup_cols if c in df.columns]
+        if len(existing_cols) >= 3:
+            df_clean = df.dropna(subset=['x', 'y'])  # Only check records with coordinates
+            if len(df_clean) > 0:
+                duplicates = df_clean[df_clean.duplicated(subset=existing_cols, keep=False)]
+                if len(duplicates) > 0:
+                    dup_groups = duplicates.groupby(existing_cols).groups
+                    for group_key, indices in dup_groups.items():
+                        if len(indices) > 1:
+                            for idx in indices[1:]:
+                                doc_nbr = str(df.at[idx, 'Document Nbr']) if 'Document Nbr' in df.columns else f'row_{idx}'
+                                issues.append({
+                                    'row': idx,
+                                    'document_nbr': doc_nbr,
+                                    'field': 'multiple',
+                                    'issue': 'potential_duplicate',
+                                    'severity': 'warning',
+                                    'message': 'Potential duplicate - same date, location, and severity as another record'
+                                })
 
         return issues
 
@@ -437,6 +605,9 @@ class CrashDataValidator:
             Corrected DataFrame
         """
         self.stats['total_records'] = len(df)
+
+        # Preprocess: Apply format corrections to entire dataframe
+        df = self._apply_format_corrections(df)
 
         if incremental and validated_ids:
             # Filter to new records only
@@ -456,8 +627,11 @@ class CrashDataValidator:
             logger.info("No new records to validate")
             return df
 
+        # Check for duplicates first (across entire new dataset)
+        duplicate_issues = self._validate_duplicates(new_df)
+
         # Validate each record
-        all_issues = []
+        all_issues = list(duplicate_issues)  # Start with duplicate issues
         all_corrections = []
 
         for idx, row in tqdm(new_df.iterrows(), total=len(new_df), desc="Validating"):
@@ -476,6 +650,7 @@ class CrashDataValidator:
         self.stats['auto_corrected'] = len([c for c in all_corrections if c.get('auto_applied')])
         self.stats['flagged'] = len([i for i in all_issues if i['severity'] in ['error', 'warning']])
         self.stats['errors'] = len([i for i in all_issues if i['severity'] == 'error'])
+        self.stats['duplicates'] = len([i for i in all_issues if 'duplicate' in i.get('issue', '')])
 
         # Merge with existing validated data
         if len(existing_df) > 0:
@@ -484,6 +659,46 @@ class CrashDataValidator:
             final_df = corrected_df
 
         return final_df
+
+    def _apply_format_corrections(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Apply format corrections to all records (whitespace, quotes, booleans)."""
+        df = df.copy()
+
+        # Trim whitespace from all string columns
+        for col in df.select_dtypes(include=['object']).columns:
+            df[col] = df[col].astype(str).str.strip()
+            # Replace 'nan' string with empty string
+            df[col] = df[col].replace('nan', '')
+
+        # Remove enclosing quotes
+        for col in df.select_dtypes(include=['object']).columns:
+            df[col] = df[col].str.replace(r'^["\']|["\']$', '', regex=True)
+
+        # Normalize boolean fields
+        boolean_fields = self.valid_values.get('booleanFields', {}).get('fieldNames', [])
+        bool_mappings = {
+            'Y': 'Yes', 'N': 'No',
+            '1': 'Yes', '0': 'No',
+            'TRUE': 'Yes', 'FALSE': 'No',
+            'true': 'Yes', 'false': 'No',
+            'yes': 'Yes', 'no': 'No'
+        }
+        for field in boolean_fields:
+            if field in df.columns:
+                df[field] = df[field].replace(bool_mappings)
+
+        # Uppercase severity
+        if 'Crash Severity' in df.columns:
+            df['Crash Severity'] = df['Crash Severity'].str.upper()
+
+        # Ensure injury counts are integers
+        injury_cols = ['K_People', 'A_People', 'B_People', 'C_People', 'Persons Injured',
+                       'Pedestrians Killed', 'Pedestrians Injured']
+        for col in injury_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+
+        return df
 
     def _apply_corrections(self, df: pd.DataFrame, corrections: List[dict]) -> pd.DataFrame:
         """Apply auto-corrections to dataframe."""
@@ -504,22 +719,25 @@ class CrashDataValidator:
 
     def get_report(self) -> dict:
         """Generate validation report."""
+        duplicates = self.stats.get('duplicates', 0)
         return {
             'metadata': {
                 'generatedAt': datetime.utcnow().isoformat() + 'Z',
                 'jurisdiction': self.jurisdiction,
-                'validationVersion': '1.0.0',
+                'validationVersion': '1.1.0',
                 'runType': 'incremental' if self.stats['new_records'] < self.stats['total_records'] else 'full'
             },
             'summary': (f"Validated {self.stats['new_records']} new records. "
                         f"{self.stats['auto_corrected']} auto-corrected, "
                         f"{self.stats['flagged']} flagged, "
+                        f"{duplicates} duplicates, "
                         f"{self.stats['validated'] - self.stats['auto_corrected'] - self.stats['flagged']} clean."),
             'totalRecords': self.stats['total_records'],
             'newRecords': self.stats['new_records'],
             'autoCorrections': self.stats['auto_corrected'],
             'flagged': self.stats['flagged'],
             'errors': self.stats['errors'],
+            'duplicates': duplicates,
             'cleanRate': round((1 - self.stats['flagged'] / max(self.stats['new_records'], 1)) * 100, 2),
             'errorRate': round(self.stats['errors'] / max(self.stats['new_records'], 1) * 100, 2),
             'issuesByCategory': self._count_issues_by_category(),

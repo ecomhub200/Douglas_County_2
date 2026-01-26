@@ -1,0 +1,182 @@
+name: Validate Crash Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      jurisdiction:
+        description: 'Jurisdiction to validate'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - henrico
+          - arlington
+          - fairfax_county
+          - loudoun
+          - prince_william
+          - virginia_beach
+          - norfolk
+          - richmond_city
+          - chesapeake
+          - newport_news
+      full_validation:
+        description: 'Force full re-validation (ignore incremental)'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Dry run (preview only, no changes)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  validate-crash-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r validation/requirements.txt
+
+      - name: Determine jurisdiction
+        id: get-jurisdiction
+        run: |
+          INPUT_JURISDICTION="${{ github.event.inputs.jurisdiction }}"
+
+          if [ -n "$INPUT_JURISDICTION" ]; then
+            echo "Using workflow input jurisdiction: $INPUT_JURISDICTION"
+            echo "jurisdiction=$INPUT_JURISDICTION" >> $GITHUB_OUTPUT
+          else
+            if [ -f "config/settings.json" ]; then
+              SAVED_JURISDICTION=$(python -c "import json; print(json.load(open('config/settings.json'))['selectedJurisdiction'])")
+              echo "Using saved jurisdiction from settings: $SAVED_JURISDICTION"
+              echo "jurisdiction=$SAVED_JURISDICTION" >> $GITHUB_OUTPUT
+            else
+              echo "Using default: henrico"
+              echo "jurisdiction=henrico" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Validate crash data
+        id: validate
+        run: |
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+          echo "=========================================="
+          echo "Validating Crash Data for: $JURISDICTION"
+          echo "Validation started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+          # Build command
+          CMD="python validation/run_validation.py --jurisdiction $JURISDICTION"
+
+          if [ "${{ github.event.inputs.full_validation }}" = "true" ]; then
+            CMD="$CMD --full"
+            echo "Mode: Full re-validation"
+          else
+            echo "Mode: Incremental validation"
+          fi
+
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            CMD="$CMD --dry-run"
+            echo "Mode: Dry run (no changes)"
+          fi
+
+          echo "Running: $CMD"
+          eval $CMD
+
+          echo "=========================================="
+          echo "Validation complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+      - name: Display validation report
+        run: |
+          if [ -f "data/.validation/latest_report.json" ]; then
+            echo "=========================================="
+            echo "Validation Report"
+            echo "=========================================="
+            cat data/.validation/latest_report.json | python -m json.tool
+          else
+            echo "No validation report generated"
+          fi
+
+      - name: Generate summary
+        run: |
+          echo "## Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "data/.validation/latest_report.json" ]; then
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Jurisdiction | ${{ steps.get-jurisdiction.outputs.jurisdiction }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Total Records | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['totalRecords'])") |" >> $GITHUB_STEP_SUMMARY
+            echo "| New Records | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['newRecords'])") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Auto-Corrected | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['autoCorrections'])") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Flagged | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['flagged'])") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Duplicates | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json')).get('duplicates', 0))") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Clean Rate | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['cleanRate'])")% |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Show flagged records if any
+            FLAGGED=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['flagged'])")
+            if [ "$FLAGGED" -gt "0" ]; then
+              echo "### Flagged Records" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo '```json' >> $GITHUB_STEP_SUMMARY
+              python -c "import json; print(json.dumps(json.load(open('data/.validation/latest_report.json'))['flaggedRecords'][:10], indent=2))" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "No validation report generated" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Commit validation results
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+          git commit -m "Validate: $JURISDICTION crash data - $(date +'%Y-%m-%d')
+
+Triggered manually via workflow_dispatch"
+
+          # Push with retry logic
+          MAX_RETRIES=4
+          for i in $(seq 1 $MAX_RETRIES); do
+            if git push; then
+              echo "Push successful"
+              exit 0
+            fi
+            echo "Push failed (attempt $i/$MAX_RETRIES), pulling latest..."
+            sleep $((2 ** i))
+            git fetch origin main
+            git rebase origin/main || {
+              git rebase --abort 2>/dev/null || true
+              git pull --no-edit origin main
+            }
+          done
+
+          echo "ERROR: Push failed after $MAX_RETRIES attempts"
+          exit 1
