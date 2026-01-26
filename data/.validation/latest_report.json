@@ -1,27 +1,28 @@
 {
   "metadata": {
-    "generatedAt": "2026-01-26T16:25:48.595387Z",
+    "generatedAt": "2026-01-26T17:15:55.887730Z",
     "jurisdiction": "henrico",
-    "validationVersion": "1.1.0",
+    "validationVersion": "1.2.0",
     "runType": "full"
   },
-  "summary": "Validated 48074 new records. 0 auto-corrected, 70032 flagged, 14 duplicates, -21958 clean.",
+  "summary": "Validated 48074 records. 44719 clean (93.02%), 3355 records flagged (3355 total issues), 0 auto-corrected.",
   "totalRecords": 48074,
   "newRecords": 48074,
   "autoCorrections": 0,
-  "flagged": 70032,
+  "flaggedRecords": 3355,
+  "totalIssues": 3355,
   "errors": 0,
   "duplicates": 14,
-  "cleanRate": -45.68,
+  "cleanRecords": 44719,
+  "cleanRate": 93.02,
   "errorRate": 0.0,
   "issuesByCategory": {
     "potential_duplicate": 14,
-    "unknown_category": 67225,
     "outside_jurisdiction_bounds": 2792,
-    "invalid_category": 1
+    "unknown_category": 549
   },
   "correctionsByField": {},
-  "flaggedRecords": [
+  "flaggedRecordsList": [
     {
       "documentNbr": "173285125",
       "issues": [
@@ -121,254 +122,254 @@
       "severity": "warning"
     },
     {
-      "documentNbr": "173095004",
+      "documentNbr": "171305195",
       "issues": [
-        "Unknown Weather Condition: 5. Rain"
+        "Longitude -77.6147854719999 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "172155126",
+      "documentNbr": "173125314",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Longitude -77.611512063 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "170165225",
+      "documentNbr": "172925022",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171815290",
+      "documentNbr": "171735203",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Longitude -77.622755898 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171055109",
+      "documentNbr": "172755346",
       "issues": [
-        "Unknown Traffic Control Type: 1. No Traffic Control"
+        "Longitude -77.638319081 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171025043",
+      "documentNbr": "173565276",
       "issues": [
-        "Unknown Intersection Type: 4. Four Approaches"
+        "Longitude -77.6450211649999 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "173205216",
+      "documentNbr": "172855380",
       "issues": [
-        "Unknown Intersection Type: 2. Two Approaches"
+        "Longitude -77.636237197 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171945336",
+      "documentNbr": "171005254",
       "issues": [
-        "Unknown Intersection Type: 3. Three Approaches"
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "173395394",
+      "documentNbr": "173325423",
       "issues": [
-        "Unknown Weather Condition: 5. Rain"
+        "Longitude -77.6273221559999 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "170425148",
+      "documentNbr": "170635034",
       "issues": [
-        "Unknown Intersection Type: 3. Three Approaches"
+        "Longitude -77.6312534419999 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "172365248",
+      "documentNbr": "170555330",
       "issues": [
-        "Unknown Weather Condition: 5. Rain"
+        "Longitude -77.6341598339999 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171095276",
+      "documentNbr": "170285056",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Longitude -77.619694851 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "172175072",
+      "documentNbr": "170675180",
       "issues": [
-        "Unknown Intersection Type: 4. Four Approaches"
+        "Longitude -77.6259866679999 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171605324",
+      "documentNbr": "173525288",
       "issues": [
-        "Unknown Intersection Type: 4. Four Approaches"
+        "Longitude -77.622947971 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171305398",
+      "documentNbr": "172275219",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Longitude -77.633957803 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "170765306",
+      "documentNbr": "171615008",
       "issues": [
-        "Unknown Intersection Type: 4. Four Approaches"
+        "Longitude -77.6382054599999 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "170645222",
+      "documentNbr": "172725264",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Longitude -77.6106928469999 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "172755303",
+      "documentNbr": "171645460",
       "issues": [
-        "Unknown Intersection Type: 3. Three Approaches"
+        "Longitude -77.611787019 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171865455",
+      "documentNbr": "171925352",
       "issues": [
-        "Unknown Weather Condition: 5. Rain"
+        "Longitude -77.6160023319999 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "173115445",
+      "documentNbr": "170695295",
       "issues": [
-        "Unknown Intersection Type: 3. Three Approaches"
+        "Longitude -77.629132179 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171315325",
+      "documentNbr": "172705061",
       "issues": [
-        "Unknown Intersection Type: 4. Four Approaches"
+        "Longitude -77.62710068 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "172915183",
+      "documentNbr": "172185201",
       "issues": [
-        "Unknown Intersection Type: 4. Four Approaches"
+        "Longitude -77.611076167 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171905076",
+      "documentNbr": "172565368",
       "issues": [
-        "Unknown Intersection Type: 4. Four Approaches"
+        "Longitude -77.620672046 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "170275378",
+      "documentNbr": "172835123",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Longitude -77.611067267 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "172825464",
+      "documentNbr": "173245471",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Longitude -77.611064431 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "172475005",
+      "documentNbr": "170845024",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Longitude -77.615651479 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "173505030",
+      "documentNbr": "170435200",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171165113",
+      "documentNbr": "171705084",
       "issues": [
-        "Unknown Intersection Type: 4. Four Approaches"
+        "Longitude -77.615715678 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "172685377",
+      "documentNbr": "172345385",
       "issues": [
-        "Unknown Intersection Type: 4. Four Approaches"
+        "Longitude -77.6383618629999 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "172035049",
+      "documentNbr": "172595148",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Longitude -77.645483633 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "173535023",
+      "documentNbr": "171825023",
       "issues": [
-        "Unknown Intersection Type: 4. Four Approaches"
+        "Longitude -77.634152398 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171156388",
+      "documentNbr": "172885021",
       "issues": [
-        "Unknown Weather Condition: 5. Rain"
+        "Longitude -77.610674928 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "173065337",
+      "documentNbr": "173395072",
       "issues": [
-        "Unknown Intersection Type: 4. Four Approaches"
+        "Longitude -77.615589958 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "171315215",
+      "documentNbr": "171955362",
       "issues": [
-        "Unknown Weather Condition: 5. Rain"
+        "Longitude -77.636264587 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "170805093",
+      "documentNbr": "173175599",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Longitude -77.6211300689999 outside henrico bounds"
       ],
       "severity": "warning"
     },
     {
-      "documentNbr": "172565031",
+      "documentNbr": "173235235",
       "issues": [
-        "Unknown Traffic Control Type: 6. Traffic Lanes Marked"
+        "Longitude -77.6150798469999 outside henrico bounds"
       ],
       "severity": "warning"
     }

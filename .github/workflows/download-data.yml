@@ -312,7 +312,7 @@ jobs:
             TOTAL=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['totalRecords'])")
             NEW=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['newRecords'])")
             CORRECTED=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['autoCorrections'])")
-            FLAGGED=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['flagged'])")
+            FLAGGED=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['flaggedRecords'])")
 
             echo "total_records=$TOTAL" >> $GITHUB_OUTPUT
             echo "new_records=$NEW" >> $GITHUB_OUTPUT

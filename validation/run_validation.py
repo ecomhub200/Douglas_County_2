@@ -308,7 +308,7 @@ class CrashDataValidator:
                     'message': f'Latitude {lat} outside Virginia bounds'
                 })
 
-        # Check jurisdiction bounds
+        # Check jurisdiction bounds (boundary crashes - info level, not flagged)
         juris_bounds = self.get_jurisdiction_bounds()
         if juris_bounds:
             if not (juris_bounds['minLon'] <= lon <= juris_bounds['maxLon']):
@@ -316,10 +316,10 @@ class CrashDataValidator:
                     'row': row_idx,
                     'document_nbr': doc_nbr or f'row_{row_idx}',
                     'field': 'x',
-                    'issue': 'outside_jurisdiction_bounds',
-                    'severity': 'warning',
+                    'issue': 'boundary_warning',
+                    'severity': 'info',
                     'value': lon,
-                    'message': f'Longitude {lon} outside {self.jurisdiction} bounds'
+                    'message': f'Longitude {lon} outside {self.jurisdiction} bounds (boundary crash)'
                 })
 
             if not (juris_bounds['minLat'] <= lat <= juris_bounds['maxLat']):
@@ -327,10 +327,10 @@ class CrashDataValidator:
                     'row': row_idx,
                     'document_nbr': doc_nbr or f'row_{row_idx}',
                     'field': 'y',
-                    'issue': 'outside_jurisdiction_bounds',
-                    'severity': 'warning',
+                    'issue': 'boundary_warning',
+                    'severity': 'info',
                     'value': lat,
-                    'message': f'Latitude {lat} outside {self.jurisdiction} bounds'
+                    'message': f'Latitude {lat} outside {self.jurisdiction} bounds (boundary crash)'
                 })
 
         return issues
@@ -544,33 +544,24 @@ class CrashDataValidator:
 
         return issues
 
-    def _validate_duplicates(self, df: pd.DataFrame) -> List[dict]:
-        """Check for duplicate records."""
+    def _validate_duplicates(self, df: pd.DataFrame) -> Tuple[List[dict], List[int]]:
+        """
+        Check for and auto-deduplicate records.
+
+        Auto-deduplicates when: same date + same GPS coordinates + same collision type.
+        Note: Same Document Nbr alone is NOT treated as duplicate (could be data entry issue).
+
+        Returns:
+            Tuple of (issues list, indices to remove for deduplication)
+        """
         issues = []
+        indices_to_remove = []
 
-        # Check for duplicate Document Nbr
-        doc_nbr_col = 'Document Nbr'
-        if doc_nbr_col in df.columns:
-            duplicates = df[df.duplicated(subset=[doc_nbr_col], keep=False)]
-            if len(duplicates) > 0:
-                dup_groups = duplicates.groupby(doc_nbr_col).groups
-                for doc_nbr, indices in dup_groups.items():
-                    if len(indices) > 1:
-                        for idx in indices[1:]:  # Flag all but first
-                            issues.append({
-                                'row': idx,
-                                'document_nbr': str(doc_nbr),
-                                'field': 'Document Nbr',
-                                'issue': 'duplicate_document_nbr',
-                                'severity': 'error',
-                                'value': doc_nbr,
-                                'message': f'Duplicate Document Nbr: {doc_nbr}'
-                            })
+        # Auto-deduplicate: same date + same GPS + same collision type (description)
+        dup_cols = ['Crash Date', 'x', 'y', 'Collision Type']
+        existing_cols = [c for c in dup_cols if c in df.columns]
 
-        # Check for potential duplicates (same date, location, severity)
-        potential_dup_cols = ['Crash Date', 'x', 'y', 'Crash Severity']
-        existing_cols = [c for c in potential_dup_cols if c in df.columns]
-        if len(existing_cols) >= 3:
+        if len(existing_cols) >= 3 and 'x' in existing_cols and 'y' in existing_cols:
             df_clean = df.dropna(subset=['x', 'y'])  # Only check records with coordinates
             if len(df_clean) > 0:
                 duplicates = df_clean[df_clean.duplicated(subset=existing_cols, keep=False)]
@@ -578,18 +569,21 @@ class CrashDataValidator:
                     dup_groups = duplicates.groupby(existing_cols).groups
                     for group_key, indices in dup_groups.items():
                         if len(indices) > 1:
-                            for idx in indices[1:]:
+                            # Keep first occurrence, remove the rest
+                            indices_list = list(indices)
+                            for idx in indices_list[1:]:
                                 doc_nbr = str(df.at[idx, 'Document Nbr']) if 'Document Nbr' in df.columns else f'row_{idx}'
                                 issues.append({
                                     'row': idx,
                                     'document_nbr': doc_nbr,
                                     'field': 'multiple',
-                                    'issue': 'potential_duplicate',
-                                    'severity': 'warning',
-                                    'message': 'Potential duplicate - same date, location, and severity as another record'
+                                    'issue': 'auto_deduplicated',
+                                    'severity': 'info',
+                                    'message': f'Auto-removed duplicate (same date, location, collision type as record {indices_list[0]})'
                                 })
+                                indices_to_remove.append(idx)
 
-        return issues
+        return issues, indices_to_remove
 
     def validate_dataframe(self, df: pd.DataFrame, incremental: bool = True,
                            validated_ids: Optional[set] = None) -> pd.DataFrame:
@@ -627,8 +621,13 @@ class CrashDataValidator:
             logger.info("No new records to validate")
             return df
 
-        # Check for duplicates first (across entire new dataset)
-        duplicate_issues = self._validate_duplicates(new_df)
+        # Check for duplicates and auto-deduplicate
+        duplicate_issues, indices_to_remove = self._validate_duplicates(new_df)
+
+        # Remove duplicates from dataframe
+        if indices_to_remove:
+            logger.info(f"Auto-deduplicating {len(indices_to_remove)} duplicate records")
+            new_df = new_df.drop(index=indices_to_remove)
 
         # Validate each record
         all_issues = list(duplicate_issues)  # Start with duplicate issues
@@ -648,6 +647,7 @@ class CrashDataValidator:
         # Update stats - count unique RECORDS with issues, not total issues
         self.stats['validated'] = len(new_df)
         self.stats['auto_corrected'] = len([c for c in all_corrections if c.get('auto_applied')])
+        self.stats['deduplicated'] = len(indices_to_remove)
 
         # Count unique records with errors/warnings (not total issues)
         flagged_records = set()
@@ -662,7 +662,7 @@ class CrashDataValidator:
         self.stats['flagged'] = len(flagged_records)
         self.stats['errors'] = len(error_records)
         self.stats['total_issues'] = len([i for i in all_issues if i['severity'] in ['error', 'warning']])
-        self.stats['duplicates'] = len([i for i in all_issues if 'duplicate' in i.get('issue', '')])
+        self.stats['duplicates'] = len([i for i in all_issues if 'duplicate' in i.get('issue', '') or 'dedup' in i.get('issue', '')])
 
         # Merge with existing validated data
         if len(existing_df) > 0:
@@ -731,29 +731,35 @@ class CrashDataValidator:
 
     def get_report(self) -> dict:
         """Generate validation report."""
-        duplicates = self.stats.get('duplicates', 0)
+        deduplicated = self.stats.get('deduplicated', 0)
         total_issues = self.stats.get('total_issues', 0)
         clean_records = self.stats['validated'] - self.stats['flagged']
         clean_rate = round((clean_records / max(self.stats['new_records'], 1)) * 100, 2)
+
+        summary_parts = [f"Validated {self.stats['new_records']} records"]
+        if deduplicated > 0:
+            summary_parts.append(f"{deduplicated} duplicates removed")
+        summary_parts.append(f"{clean_records} clean ({clean_rate}%)")
+        if self.stats['flagged'] > 0:
+            summary_parts.append(f"{self.stats['flagged']} flagged")
+        if self.stats['auto_corrected'] > 0:
+            summary_parts.append(f"{self.stats['auto_corrected']} auto-corrected")
 
         return {
             'metadata': {
                 'generatedAt': datetime.utcnow().isoformat() + 'Z',
                 'jurisdiction': self.jurisdiction,
-                'validationVersion': '1.2.0',
+                'validationVersion': '1.3.0',
                 'runType': 'incremental' if self.stats['new_records'] < self.stats['total_records'] else 'full'
             },
-            'summary': (f"Validated {self.stats['new_records']} records. "
-                        f"{clean_records} clean ({clean_rate}%), "
-                        f"{self.stats['flagged']} records flagged ({total_issues} total issues), "
-                        f"{self.stats['auto_corrected']} auto-corrected."),
+            'summary': ". ".join(summary_parts) + ".",
             'totalRecords': self.stats['total_records'],
             'newRecords': self.stats['new_records'],
             'autoCorrections': self.stats['auto_corrected'],
+            'deduplicated': deduplicated,
             'flaggedRecords': self.stats['flagged'],
             'totalIssues': total_issues,
             'errors': self.stats['errors'],
-            'duplicates': duplicates,
             'cleanRecords': clean_records,
             'cleanRate': clean_rate,
             'errorRate': round(self.stats['errors'] / max(self.stats['new_records'], 1) * 100, 2),
