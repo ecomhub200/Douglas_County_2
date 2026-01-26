@@ -127,18 +127,18 @@ jobs:
             echo "| Total Records | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['totalRecords'])") |" >> $GITHUB_STEP_SUMMARY
             echo "| New Records | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['newRecords'])") |" >> $GITHUB_STEP_SUMMARY
             echo "| Auto-Corrected | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['autoCorrections'])") |" >> $GITHUB_STEP_SUMMARY
-            echo "| Flagged | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['flagged'])") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Flagged | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['flaggedRecords'])") |" >> $GITHUB_STEP_SUMMARY
             echo "| Duplicates | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json')).get('duplicates', 0))") |" >> $GITHUB_STEP_SUMMARY
             echo "| Clean Rate | $(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['cleanRate'])")% |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
 
             # Show flagged records if any
-            FLAGGED=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['flagged'])")
+            FLAGGED=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['flaggedRecords'])")
             if [ "$FLAGGED" -gt "0" ]; then
               echo "### Flagged Records" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo '```json' >> $GITHUB_STEP_SUMMARY
-              python -c "import json; print(json.dumps(json.load(open('data/.validation/latest_report.json'))['flaggedRecords'][:10], indent=2))" >> $GITHUB_STEP_SUMMARY
+              python -c "import json; print(json.dumps(json.load(open('data/.validation/latest_report.json'))['flaggedRecordsList'][:10], indent=2))" >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
             fi
           else
