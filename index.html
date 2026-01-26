@@ -1286,7 +1286,7 @@
   <section class="intersection-visualization" id="intersection-viz">
     <div class="intersection-viz-header">
       <h2>See What Your Data <span class="gradient-text">Reveals</span></h2>
-      <p>Visualize crash patterns at intersections with KABCO severity ratings. Our AI identifies hotspots you might miss.</p>
+      <p>See beyond the spreadsheet. CRASH LENS reveals hidden crash patterns and identifies critical hotspots instantly.</p>
     </div>
 
     <div class="intersection-canvas-container" id="canvas-container">
@@ -2012,14 +2012,14 @@
       container.appendChild(renderer.domElement);
 
       const colors = {
-        ground: 0x1e293b,
+        ground: 0x2d3a4d,
         road: 0x52525b,
         roadLine: 0xffffff,
         roadLineYellow: 0xfcd34d,
         sidewalk: 0xd6d3d1,
         sidewalkEdge: 0xa8a29e,
-        building: 0x334155,
-        buildingLight: 0x475569,
+        building: 0x3d4a5c,
+        buildingLight: 0x526078,
         buildingWindow: 0x60a5fa,
         tree: 0x22c55e,
         treeDark: 0x15803d,
@@ -2589,7 +2589,7 @@
         g.add(b);
 
         const windowMat = new THREE.MeshStandardMaterial({
-          color: colors.buildingWindow, emissive: colors.buildingWindow, emissiveIntensity: 0.3
+          color: colors.buildingWindow, emissive: colors.buildingWindow, emissiveIntensity: 0.6
         });
         const rows = Math.floor(h / 2.2), cols = Math.floor(w / 2);
         for (let r = 0; r < rows; r++) {
@@ -2682,7 +2682,7 @@
           new THREE.SphereGeometry(0.5, 28, 28),
           new THREE.MeshStandardMaterial({
             color, roughness: 0.12, metalness: 0.5,
-            emissive: color, emissiveIntensity: 0.6
+            emissive: color, emissiveIntensity: 0.85
           })
         );
         head.position.y = 2.2;
@@ -2699,7 +2699,7 @@
 
         const ring = new THREE.Mesh(
           new THREE.RingGeometry(0.4, 0.7, 36),
-          new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
+          new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75, side: THREE.DoubleSide })
         );
         ring.rotation.x = -Math.PI / 2;
         ring.position.y = 0.04;
@@ -2716,10 +2716,10 @@
         scene.add(pin);
       });
 
-      // Lighting
-      scene.add(new THREE.AmbientLight(0x404060, 0.45));
+      // Lighting - Enhanced for better visibility
+      scene.add(new THREE.AmbientLight(0x404060, 0.65));
 
-      const dirLight = new THREE.DirectionalLight(0xffffff, 0.95);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
       dirLight.position.set(30, 40, 25);
       dirLight.castShadow = true;
       dirLight.shadow.mapSize.width = 2048;
@@ -2733,8 +2733,13 @@
       dirLight.shadow.bias = -0.0002;
       scene.add(dirLight);
 
-      scene.add(new THREE.PointLight(0x3b82f6, 0.35, 140));
-      scene.add(new THREE.PointLight(0xfbbf24, 0.25, 120));
+      // Fill light from opposite side to reduce harsh shadows
+      const fillLight = new THREE.DirectionalLight(0xffffff, 0.35);
+      fillLight.position.set(-25, 30, -20);
+      scene.add(fillLight);
+
+      scene.add(new THREE.PointLight(0x3b82f6, 0.5, 140));
+      scene.add(new THREE.PointLight(0xfbbf24, 0.4, 120));
 
       // Signal Animation
       const phaseTiming = {
@@ -2778,24 +2783,24 @@
           if (isNS) {
             if (isNSGreen) {
               lights.green.material.emissive.setHex(colors.signalGreen);
-              lights.green.material.emissiveIntensity = 1.5;
+              lights.green.material.emissiveIntensity = 2.0;
             } else if (isNSYellow) {
               lights.yellow.material.emissive.setHex(colors.signalYellow);
-              lights.yellow.material.emissiveIntensity = 1.5;
+              lights.yellow.material.emissiveIntensity = 2.0;
             } else {
               lights.red.material.emissive.setHex(colors.signalRed);
-              lights.red.material.emissiveIntensity = 1.5;
+              lights.red.material.emissiveIntensity = 2.0;
             }
           } else {
             if (isEWGreen) {
               lights.green.material.emissive.setHex(colors.signalGreen);
-              lights.green.material.emissiveIntensity = 1.5;
+              lights.green.material.emissiveIntensity = 2.0;
             } else if (isEWYellow) {
               lights.yellow.material.emissive.setHex(colors.signalYellow);
-              lights.yellow.material.emissiveIntensity = 1.5;
+              lights.yellow.material.emissiveIntensity = 2.0;
             } else {
               lights.red.material.emissive.setHex(colors.signalRed);
-              lights.red.material.emissiveIntensity = 1.5;
+              lights.red.material.emissiveIntensity = 2.0;
             }
           }
         });
@@ -2862,14 +2867,14 @@
 
           pins.forEach(pin => {
             const head = pin.children[0];
-            if (head) head.material.emissiveIntensity = 1.2;
+            if (head) head.material.emissiveIntensity = 1.5;
           });
 
           setTimeout(() => {
             insightLabel.classList.remove('visible');
             pins.forEach(pin => {
               const head = pin.children[0];
-              if (head) head.material.emissiveIntensity = 0.6;
+              if (head) head.material.emissiveIntensity = 0.85;
             });
           }, INSIGHT_DURATION);
 
