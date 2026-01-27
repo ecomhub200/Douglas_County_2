@@ -516,6 +516,22 @@
   </style>
 </head>
 <body class="dark">
+  <!-- Scroll Progress Bar -->
+  <div class="scroll-progress" id="scrollProgress"></div>
+
+  <!-- Animated Background -->
+  <div class="gradient-mesh"></div>
+
+  <!-- Floating Particles -->
+  <div class="particles">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
   <!-- Navigation -->
   <nav class="nav">
     <div class="nav-container">
@@ -538,11 +554,12 @@
 
   <!-- Contact Hero -->
   <section class="contact-hero">
-    <div class="glow-primary" style="top: -100px; left: 20%;"></div>
-    <div class="glow-primary" style="top: -50px; right: 10%;"></div>
+    <div class="blob blob-1" style="top: -20%; left: 10%; opacity: 0.15;"></div>
+    <div class="blob blob-2" style="top: 10%; right: -10%; opacity: 0.1;"></div>
     <div class="container">
-      <h1>Get in Touch</h1>
-      <p>Have questions about CRASH LENS? Need support or want to explore custom solutions? We're here to help your agency succeed.</p>
+      <span class="badge-pulse animate-fadeInDown" style="margin-bottom: 1.5rem;">We're Here to Help</span>
+      <h1 class="animate-fadeInUp">Get in Touch</h1>
+      <p class="animate-fadeInUp animate-delay-200">Have questions about CRASH LENS? Need support or want to explore custom solutions? We're here to help your agency succeed.</p>
     </div>
   </section>
 
@@ -550,7 +567,7 @@
   <section class="contact-section">
     <div class="contact-grid">
       <!-- Contact Information -->
-      <div class="contact-info">
+      <div class="contact-info glass-card animate-on-scroll from-left">
         <h2>Contact Information</h2>
 
         <div class="contact-info-item">
@@ -634,7 +651,7 @@
       </div>
 
       <!-- Contact Form -->
-      <div class="contact-form-container">
+      <div class="contact-form-container glass-card animate-on-scroll from-right">
         <h2>Send Us a Message</h2>
 
         <!-- Form with Formspree -->
@@ -892,6 +909,44 @@
         answer.classList.add('show');
       }
     }
+
+    // Scroll Progress Bar
+    const scrollProgress = document.getElementById('scrollProgress');
+    window.addEventListener('scroll', () => {
+      const scrollTop = document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      const progress = (scrollTop / scrollHeight) * 100;
+      scrollProgress.style.width = progress + '%';
+    });
+
+    // Scroll-triggered animations
+    const observerOptions = {
+      root: null,
+      rootMargin: '0px',
+      threshold: 0.1
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('animate-visible');
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll('.animate-on-scroll').forEach(el => {
+      observer.observe(el);
+    });
+
+    // Smooth nav scroll effect
+    const nav = document.querySelector('.nav');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 50) {
+        nav.classList.add('scrolled');
+      } else {
+        nav.classList.remove('scrolled');
+      }
+    });
   </script>
 </body>
 </html>

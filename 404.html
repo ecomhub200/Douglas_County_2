@@ -21,21 +21,102 @@
       justify-content: center;
       padding: 2rem;
       text-align: center;
+      position: relative;
+      overflow: hidden;
     }
 
     .error-content {
-      max-width: 500px;
+      max-width: 600px;
+      position: relative;
+      z-index: 10;
     }
 
     .error-code {
-      font-size: 8rem;
-      font-weight: 700;
-      background: var(--primary-gradient);
+      font-size: clamp(6rem, 20vw, 12rem);
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 1rem;
+      position: relative;
+      cursor: default;
+    }
+
+    .error-code span {
+      display: inline-block;
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      line-height: 1;
+      animation: numberFloat 3s ease-in-out infinite;
+      transition: transform 0.3s ease;
+    }
+
+    .error-code span:nth-child(1) { animation-delay: 0s; }
+    .error-code span:nth-child(2) { animation-delay: 0.1s; }
+    .error-code span:nth-child(3) { animation-delay: 0.2s; }
+
+    .error-code span:hover {
+      transform: scale(1.2) rotate(10deg);
+    }
+
+    @keyframes numberFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+
+    .glitch-text {
+      position: relative;
+    }
+
+    .glitch-text::before,
+    .glitch-text::after {
+      content: '404';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      opacity: 0;
+    }
+
+    .error-code:hover .glitch-text::before {
+      animation: glitch1 0.3s infinite;
+      opacity: 0.8;
+    }
+
+    .error-code:hover .glitch-text::after {
+      animation: glitch2 0.3s infinite;
+      opacity: 0.8;
+    }
+
+    @keyframes glitch1 {
+      0%, 100% { transform: translate(0); }
+      20% { transform: translate(-3px, 3px); }
+      40% { transform: translate(-3px, -3px); }
+      60% { transform: translate(3px, 3px); }
+      80% { transform: translate(3px, -3px); }
+    }
+
+    @keyframes glitch2 {
+      0%, 100% { transform: translate(0); }
+      20% { transform: translate(3px, -3px); }
+      40% { transform: translate(3px, 3px); }
+      60% { transform: translate(-3px, -3px); }
+      80% { transform: translate(-3px, 3px); }
+    }
+
+    .error-icon {
+      font-size: 4rem;
       margin-bottom: 1rem;
+      animation: bounce 2s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      25% { transform: translateY(-10px) rotate(-5deg); }
+      75% { transform: translateY(-10px) rotate(5deg); }
     }
 
     .error-title {
@@ -43,6 +124,7 @@
       font-weight: 600;
       color: var(--white);
       margin-bottom: 1rem;
+      animation: fadeInUp 0.6s ease-out 0.2s both;
     }
 
     .error-description {
@@ -50,6 +132,7 @@
       font-size: 1.1rem;
       margin-bottom: 2rem;
       line-height: 1.6;
+      animation: fadeInUp 0.6s ease-out 0.3s both;
     }
 
     .error-buttons {
@@ -57,12 +140,14 @@
       gap: 1rem;
       justify-content: center;
       flex-wrap: wrap;
+      animation: fadeInUp 0.6s ease-out 0.4s both;
     }
 
     .error-links {
-      margin-top: 2rem;
+      margin-top: 2.5rem;
       padding-top: 2rem;
       border-top: 1px solid var(--border-dark);
+      animation: fadeInUp 0.6s ease-out 0.5s both;
     }
 
     .error-links-title {
@@ -82,36 +167,296 @@
       color: var(--primary);
       text-decoration: none;
       font-size: 0.95rem;
+      position: relative;
+      transition: color 0.3s ease;
+    }
+
+    .error-links-list a::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      transition: width 0.3s ease;
     }
 
     .error-links-list a:hover {
-      text-decoration: underline;
+      color: var(--white);
+    }
+
+    .error-links-list a:hover::after {
+      width: 100%;
+    }
+
+    /* Fun interactive element */
+    .lost-astronaut {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      opacity: 0.6;
+      animation: floatAround 20s linear infinite;
+      pointer-events: none;
+    }
+
+    .lost-astronaut svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    @keyframes floatAround {
+      0% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(100px, -150px) rotate(90deg); }
+      50% { transform: translate(-50px, -200px) rotate(180deg); }
+      75% { transform: translate(-150px, -100px) rotate(270deg); }
+      100% { transform: translate(0, 0) rotate(360deg); }
+    }
+
+    /* Shooting stars */
+    .shooting-star {
+      position: absolute;
+      width: 100px;
+      height: 2px;
+      background: linear-gradient(90deg, #3b82f6, transparent);
+      opacity: 0;
+      animation: shootingStar 3s ease-in-out infinite;
+    }
+
+    .shooting-star:nth-child(1) { top: 20%; left: 70%; animation-delay: 0s; }
+    .shooting-star:nth-child(2) { top: 40%; left: 80%; animation-delay: 1s; }
+    .shooting-star:nth-child(3) { top: 60%; left: 60%; animation-delay: 2s; }
+
+    @keyframes shootingStar {
+      0% { transform: translateX(0) translateY(0) rotate(-45deg); opacity: 0; }
+      10% { opacity: 1; }
+      30% { transform: translateX(-200px) translateY(200px) rotate(-45deg); opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    /* Interactive game hint */
+    .easter-egg {
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      color: var(--gray);
+      opacity: 0;
+      animation: fadeIn 1s ease 2s forwards;
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 0.6; }
+    }
+
+    .click-counter {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      background: rgba(59, 130, 246, 0.2);
+      border-radius: 4px;
+      margin-left: 0.25rem;
+      font-weight: 600;
+      color: #60a5fa;
     }
   </style>
 </head>
 <body class="dark">
+  <!-- Animated Background -->
+  <div class="gradient-mesh"></div>
+
+  <!-- Floating Particles -->
+  <div class="particles">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
+  <!-- Shooting Stars -->
+  <div class="shooting-star"></div>
+  <div class="shooting-star"></div>
+  <div class="shooting-star"></div>
+
+  <!-- Morphing Blobs -->
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
   <div class="error-container">
-    <div class="error-content animate-fadeInUp">
-      <div class="error-code">404</div>
-      <h1 class="error-title">Page Not Found</h1>
+    <!-- Lost Astronaut -->
+    <div class="lost-astronaut">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="35" r="20" fill="#E5E7EB" stroke="#9CA3AF" stroke-width="2"/>
+        <rect x="35" y="50" width="30" height="35" rx="5" fill="#E5E7EB" stroke="#9CA3AF" stroke-width="2"/>
+        <circle cx="50" cy="35" r="12" fill="#1F2937"/>
+        <circle cx="45" cy="32" r="3" fill="#60A5FA" opacity="0.8"/>
+        <rect x="25" y="55" width="15" height="8" rx="3" fill="#9CA3AF"/>
+        <rect x="60" y="55" width="15" height="8" rx="3" fill="#9CA3AF"/>
+        <rect x="38" y="85" width="10" height="12" rx="2" fill="#9CA3AF"/>
+        <rect x="52" y="85" width="10" height="12" rx="2" fill="#9CA3AF"/>
+      </svg>
+    </div>
+
+    <div class="error-content">
+      <div class="error-code" id="errorCode">
+        <span class="glitch-text">4</span><span>0</span><span>4</span>
+      </div>
+      <h1 class="error-title">Houston, We Have a Problem</h1>
       <p class="error-description">
-        The page you're looking for doesn't exist or has been moved.
-        Let's get you back on track.
+        Looks like this page got lost in space. Don't worry, we'll help you navigate back to safety.
       </p>
       <div class="error-buttons">
-        <a href="./" class="btn btn-gradient">Go to Home</a>
+        <a href="./" class="btn btn-glow">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.5rem;">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          Go Home
+        </a>
         <a href="./login/" class="btn btn-outline-light">Sign In</a>
       </div>
       <div class="error-links">
-        <p class="error-links-title">Or try one of these pages:</p>
+        <p class="error-links-title">Or explore these pages:</p>
         <div class="error-links-list">
           <a href="./features.html">Features</a>
           <a href="./pricing.html">Pricing</a>
           <a href="./resources.html">Resources</a>
-          <a href="./contact-sales.html">Contact</a>
+          <a href="./contact.html">Contact</a>
         </div>
+      </div>
+      <div class="easter-egg">
+        Click the numbers for a surprise! Clicks: <span class="click-counter" id="clickCounter">0</span>
       </div>
     </div>
   </div>
+
+  <script>
+    // Fun click counter on 404
+    let clicks = 0;
+    const counter = document.getElementById('clickCounter');
+    const errorCode = document.getElementById('errorCode');
+
+    errorCode.addEventListener('click', (e) => {
+      clicks++;
+      counter.textContent = clicks;
+
+      // Create explosion of particles on click
+      for (let i = 0; i < 8; i++) {
+        createClickParticle(e.clientX, e.clientY);
+      }
+
+      // Easter egg at 10 clicks
+      if (clicks === 10) {
+        document.body.style.animation = 'hueRotate 2s ease';
+        setTimeout(() => {
+          document.body.style.animation = '';
+        }, 2000);
+      }
+
+      // Confetti at 20 clicks
+      if (clicks === 20) {
+        createConfetti();
+      }
+    });
+
+    function createClickParticle(x, y) {
+      const particle = document.createElement('div');
+      particle.style.cssText = `
+        position: fixed;
+        left: ${x}px;
+        top: ${y}px;
+        width: 8px;
+        height: 8px;
+        background: ${['#3b82f6', '#8b5cf6', '#ec4899', '#10b981'][Math.floor(Math.random() * 4)]};
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 1000;
+      `;
+      document.body.appendChild(particle);
+
+      const angle = Math.random() * Math.PI * 2;
+      const velocity = 50 + Math.random() * 100;
+      const vx = Math.cos(angle) * velocity;
+      const vy = Math.sin(angle) * velocity;
+
+      let posX = 0, posY = 0, opacity = 1;
+
+      function animate() {
+        posX += vx * 0.02;
+        posY += vy * 0.02 + 2; // gravity
+        opacity -= 0.02;
+
+        particle.style.transform = `translate(${posX}px, ${posY}px)`;
+        particle.style.opacity = opacity;
+
+        if (opacity > 0) {
+          requestAnimationFrame(animate);
+        } else {
+          particle.remove();
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    function createConfetti() {
+      for (let i = 0; i < 50; i++) {
+        setTimeout(() => {
+          const confetti = document.createElement('div');
+          const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b'];
+          confetti.style.cssText = `
+            position: fixed;
+            left: ${Math.random() * window.innerWidth}px;
+            top: -20px;
+            width: ${5 + Math.random() * 10}px;
+            height: ${5 + Math.random() * 10}px;
+            background: ${colors[Math.floor(Math.random() * colors.length)]};
+            border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+            pointer-events: none;
+            z-index: 1000;
+          `;
+          document.body.appendChild(confetti);
+
+          let y = -20;
+          let x = 0;
+          let rotation = 0;
+          const speed = 2 + Math.random() * 3;
+          const drift = (Math.random() - 0.5) * 2;
+          const rotationSpeed = (Math.random() - 0.5) * 10;
+
+          function fall() {
+            y += speed;
+            x += drift;
+            rotation += rotationSpeed;
+            confetti.style.transform = `translate(${x}px, ${y}px) rotate(${rotation}deg)`;
+
+            if (y < window.innerHeight + 50) {
+              requestAnimationFrame(fall);
+            } else {
+              confetti.remove();
+            }
+          }
+
+          requestAnimationFrame(fall);
+        }, i * 30);
+      }
+    }
+
+    // Add hue rotate keyframe
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes hueRotate {
+        0% { filter: hue-rotate(0deg); }
+        50% { filter: hue-rotate(180deg); }
+        100% { filter: hue-rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(style);
+  </script>
 </body>
 </html>

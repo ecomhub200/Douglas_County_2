@@ -489,6 +489,22 @@
   </style>
 </head>
 <body class="dark">
+  <!-- Scroll Progress Bar -->
+  <div class="scroll-progress" id="scrollProgress"></div>
+
+  <!-- Animated Background -->
+  <div class="gradient-mesh"></div>
+
+  <!-- Floating Particles -->
+  <div class="particles">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
   <!-- Navigation -->
   <nav class="nav">
     <div class="nav-container">
@@ -511,10 +527,12 @@
 
   <!-- Pricing Hero -->
   <section class="pricing-hero">
-    <div class="glow-primary" style="top: -100px; left: 20%;"></div>
+    <div class="blob blob-1" style="top: -20%; left: 10%; opacity: 0.15;"></div>
+    <div class="blob blob-2" style="top: 10%; right: -10%; opacity: 0.1;"></div>
     <div class="container">
-      <h1>Simple, Transparent Pricing</h1>
-      <p>Start with a 14-day free trial. No credit card required. Choose the plan that works for your team.</p>
+      <span class="badge-pulse animate-fadeInDown" style="margin-bottom: 1.5rem;">14-Day Free Trial</span>
+      <h1 class="animate-fadeInUp">Simple, Transparent Pricing</h1>
+      <p class="animate-fadeInUp animate-delay-200">Start with a 14-day free trial. No credit card required. Choose the plan that works for your team.</p>
 
       <div class="pricing-toggle">
         <span class="active">Monthly</span>
@@ -550,9 +568,9 @@
   </section>
 
   <!-- Pricing Cards -->
-  <section class="pricing-grid">
+  <section class="pricing-grid stagger-children animate-on-scroll">
     <!-- Free Trial -->
-    <div class="pricing-card">
+    <div class="pricing-card glass-card">
       <div class="plan-name">Free Trial</div>
       <div class="plan-desc">Perfect for evaluation</div>
       <div class="plan-price">
@@ -581,7 +599,7 @@
     </div>
 
     <!-- Individual -->
-    <div class="pricing-card popular">
+    <div class="pricing-card glass-card popular">
       <span class="popular-badge">Most Popular</span>
       <div class="plan-name">Individual</div>
       <div class="plan-desc">For independent professionals</div>
@@ -615,7 +633,7 @@
     </div>
 
     <!-- Team -->
-    <div class="pricing-card">
+    <div class="pricing-card glass-card">
       <div class="plan-name">Team</div>
       <div class="plan-desc">For small teams and departments</div>
       <div class="plan-price">
@@ -648,7 +666,7 @@
     </div>
 
     <!-- Agency -->
-    <div class="pricing-card">
+    <div class="pricing-card glass-card">
       <div class="plan-name">Agency</div>
       <div class="plan-desc">For large organizations</div>
       <div class="plan-price">
@@ -901,6 +919,46 @@
       });
     });
 
+    // Scroll Progress Bar
+    const scrollProgress = document.getElementById('scrollProgress');
+    window.addEventListener('scroll', () => {
+      const scrollTop = document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      const progress = (scrollTop / scrollHeight) * 100;
+      scrollProgress.style.width = progress + '%';
+    });
+
+    // Scroll-triggered animations
+    const observerOptions = {
+      root: null,
+      rootMargin: '0px',
+      threshold: 0.1
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('animate-visible');
+          if (entry.target.classList.contains('stagger-children')) {
+            entry.target.classList.add('reveal');
+          }
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll('.animate-on-scroll, .stagger-children').forEach(el => {
+      observer.observe(el);
+    });
+
+    // Smooth nav scroll effect
+    const nav = document.querySelector('.nav');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 50) {
+        nav.classList.add('scrolled');
+      } else {
+        nav.classList.remove('scrolled');
+      }
+    });
   </script>
 </body>
 </html>

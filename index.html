@@ -1195,6 +1195,24 @@
   </style>
 </head>
 <body class="dark">
+  <!-- Scroll Progress Bar -->
+  <div class="scroll-progress" id="scrollProgress"></div>
+
+  <!-- Animated Background -->
+  <div class="gradient-mesh"></div>
+
+  <!-- Floating Particles -->
+  <div class="particles">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
   <!-- Navigation -->
   <nav class="nav">
     <div class="nav-container">
@@ -1236,12 +1254,12 @@
 
   <!-- Hero Section -->
   <section class="hero">
-    <div class="glow-primary" style="top: 20%; left: 10%;"></div>
-    <div class="glow-secondary" style="bottom: 10%; right: 10%;"></div>
+    <div class="blob blob-1" style="top: 5%; left: -5%; opacity: 0.2;"></div>
+    <div class="blob blob-2" style="bottom: 20%; right: -10%; opacity: 0.15;"></div>
 
     <div class="hero-content">
       <div class="hero-text animate-fadeInUp">
-        <span class="hero-badge">Trusted by Virginia DOTs & Counties</span>
+        <span class="badge-pulse">Trusted by Virginia DOTs & Counties</span>
         <h1 class="hero-title">
           Analyze 5 Years of Crash Data in <span class="gradient-text">2 Hours, Not 2 Weeks</span>
         </h1>
@@ -1970,12 +1988,26 @@
       });
     }
 
+    // Scroll Progress Bar
+    function initScrollProgress() {
+      const scrollProgress = document.getElementById('scrollProgress');
+      if (!scrollProgress) return;
+
+      window.addEventListener('scroll', () => {
+        const scrollTop = document.documentElement.scrollTop;
+        const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        const progress = (scrollTop / scrollHeight) * 100;
+        scrollProgress.style.width = progress + '%';
+      });
+    }
+
     // Initialize all animations on DOM ready
     document.addEventListener('DOMContentLoaded', function() {
       initStaggeredGrids();
       initScrollAnimations();
       initNavScrollEffect();
       initSmoothScroll();
+      initScrollProgress();
     });
   </script>
 
