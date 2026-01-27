@@ -1192,6 +1192,205 @@
     .legend-dot.minor { background: #f59e0b; }
     .legend-dot.possible { background: #22c55e; }
     .legend-dot.pdo { background: #64748b; }
+
+    /* Crash Scenarios Split Column Section */
+    .crash-scenarios-section {
+      padding: 5rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .crash-scenarios-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 3rem;
+      align-items: center;
+    }
+
+    @media (min-width: 1024px) {
+      .crash-scenarios-container {
+        grid-template-columns: 1fr 1.2fr;
+        gap: 4rem;
+      }
+    }
+
+    .crash-scenarios-content {
+      z-index: 10;
+    }
+
+    .crash-scenarios-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(220, 38, 38, 0.15);
+      border: 1px solid rgba(220, 38, 38, 0.3);
+      border-radius: 50px;
+      font-size: 0.875rem;
+      color: #f87171;
+      margin-bottom: 1.5rem;
+    }
+
+    .crash-scenarios-badge svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .crash-scenarios-content h2 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--white);
+      line-height: 1.2;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (min-width: 768px) {
+      .crash-scenarios-content h2 {
+        font-size: 2.75rem;
+      }
+    }
+
+    .crash-scenarios-content > p {
+      font-size: 1.125rem;
+      color: var(--text-dark);
+      margin-bottom: 2rem;
+      line-height: 1.7;
+    }
+
+    .crash-types-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .crash-type-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem;
+      background: rgba(30, 41, 59, 0.5);
+      border-radius: var(--radius);
+      border: 1px solid var(--border-dark);
+      transition: all 0.3s ease;
+    }
+
+    .crash-type-item:hover {
+      background: rgba(30, 41, 59, 0.8);
+      border-color: rgba(59, 130, 246, 0.3);
+      transform: translateX(4px);
+    }
+
+    .crash-type-icon {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+
+    .crash-type-icon.fatal {
+      background: rgba(220, 38, 38, 0.2);
+      color: #f87171;
+    }
+
+    .crash-type-icon.serious {
+      background: rgba(249, 115, 22, 0.2);
+      color: #fb923c;
+    }
+
+    .crash-type-icon.minor {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+    }
+
+    .crash-type-text h4 {
+      color: var(--white);
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .crash-type-text p {
+      color: var(--text-dark);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .kabco-info {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      padding: 1rem;
+      background: rgba(30, 41, 59, 0.3);
+      border-radius: var(--radius);
+      border: 1px solid var(--border-dark);
+    }
+
+    .kabco-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 50px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .kabco-badge.k { background: rgba(220, 38, 38, 0.2); color: #f87171; }
+    .kabco-badge.a { background: rgba(249, 115, 22, 0.2); color: #fb923c; }
+    .kabco-badge.b { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .kabco-badge.c { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+    .kabco-badge.o { background: rgba(100, 116, 139, 0.3); color: #94a3b8; }
+
+    .kabco-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .kabco-badge.k .kabco-dot { background: #dc2626; }
+    .kabco-badge.a .kabco-dot { background: #f97316; }
+    .kabco-badge.b .kabco-dot { background: #f59e0b; }
+    .kabco-badge.c .kabco-dot { background: #22c55e; }
+    .kabco-badge.o .kabco-dot { background: #64748b; }
+
+    .crash-scenarios-visual {
+      position: relative;
+      z-index: 10;
+    }
+
+    .crash-animation-frame {
+      width: 100%;
+      aspect-ratio: 16/9;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-dark);
+      background: var(--bg-dark-card);
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .crash-animation-frame iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .animation-caption {
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.875rem;
+      color: var(--text-dark);
+    }
+
+    .animation-caption strong {
+      color: var(--white);
+    }
   </style>
 </head>
 <body class="dark">
@@ -1360,6 +1559,72 @@
           <span class="trust-stat-value">500K+</span>
           <span class="trust-stat-label">Crashes Analyzed</span>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Crash Scenarios Split Column Section -->
+  <section class="crash-scenarios-section" id="crash-scenarios">
+    <div class="blob blob-1" style="top: 10%; left: -15%; opacity: 0.1;"></div>
+    <div class="blob blob-2" style="bottom: 10%; right: -10%; opacity: 0.08;"></div>
+
+    <div class="crash-scenarios-container">
+      <!-- Left Column: Content -->
+      <div class="crash-scenarios-content animate-on-scroll from-left">
+        <div class="crash-scenarios-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <span>Crash Pattern Analysis</span>
+        </div>
+
+        <h2>Understand Every <span class="gradient-text">Crash Scenario</span></h2>
+
+        <p>CRASH LENS analyzes real-world crash patterns to help you identify risks and implement effective countermeasures. See how different crash types occur at intersections.</p>
+
+        <div class="crash-types-list">
+          <div class="crash-type-item">
+            <div class="crash-type-icon fatal">🚶</div>
+            <div class="crash-type-text">
+              <h4>Vehicle-Pedestrian</h4>
+              <p>Often the most severe crashes. Analyze crosswalk visibility, signal timing, and pedestrian infrastructure.</p>
+            </div>
+          </div>
+
+          <div class="crash-type-item">
+            <div class="crash-type-icon serious">🚗</div>
+            <div class="crash-type-text">
+              <h4>Vehicle-Vehicle</h4>
+              <p>Angle crashes, rear-ends, and sideswipes. Identify signal warrant needs and intersection geometry issues.</p>
+            </div>
+          </div>
+
+          <div class="crash-type-item">
+            <div class="crash-type-icon minor">🚴</div>
+            <div class="crash-type-text">
+              <h4>Vehicle-Bicycle</h4>
+              <p>Right-hook and left-cross crashes. Evaluate bike lane placement and protected intersection designs.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="kabco-info">
+          <span class="kabco-badge k"><span class="kabco-dot"></span> K - Fatal</span>
+          <span class="kabco-badge a"><span class="kabco-dot"></span> A - Serious Injury</span>
+          <span class="kabco-badge b"><span class="kabco-dot"></span> B - Minor Injury</span>
+          <span class="kabco-badge c"><span class="kabco-dot"></span> C - Possible Injury</span>
+          <span class="kabco-badge o"><span class="kabco-dot"></span> O - Property Damage</span>
+        </div>
+      </div>
+
+      <!-- Right Column: Animation -->
+      <div class="crash-scenarios-visual animate-on-scroll from-right">
+        <div class="crash-animation-frame">
+          <iframe src="assets/animations/crash-scenarios.html" title="Crash Scenarios Animation" loading="lazy"></iframe>
+        </div>
+        <p class="animation-caption">
+          <strong>Interactive 3D visualization</strong> — Vehicle-Pedestrian, Vehicle-Vehicle, and Vehicle-Bicycle crash scenarios
+        </p>
       </div>
     </div>
   </section>
