@@ -439,98 +439,6 @@
       color: #60a5fa;
     }
 
-    /* Trusted By Section */
-    .trusted-by {
-      padding: 3rem 1.5rem;
-      border-bottom: 1px solid var(--border-dark);
-    }
-
-    .trusted-by-content {
-      max-width: 1200px;
-      margin: 0 auto;
-      text-align: center;
-    }
-
-    .trusted-by p {
-      color: var(--gray);
-      font-size: 0.875rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 2rem;
-    }
-
-    .trusted-logos {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      align-items: center;
-      gap: 3rem;
-      margin-bottom: 2rem;
-    }
-
-    .trusted-logo-item {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .trusted-logo-item img {
-      height: 40px;
-      width: auto;
-      filter: grayscale(100%) brightness(0.8);
-      opacity: 0.7;
-      transition: all 0.3s;
-    }
-
-    .trusted-logo-item:hover img {
-      filter: grayscale(0%) brightness(1);
-      opacity: 1;
-    }
-
-    .logo-fallback {
-      display: none;
-      color: var(--gray);
-      font-weight: 600;
-      font-size: 1rem;
-      opacity: 0.7;
-      transition: opacity 0.3s;
-    }
-
-    .trusted-logo-item:hover .logo-fallback {
-      opacity: 1;
-    }
-
-    .trust-stats {
-      display: flex;
-      justify-content: center;
-      gap: 4rem;
-      padding-top: 2rem;
-      border-top: 1px solid var(--border-dark);
-    }
-
-    .trust-stat {
-      text-align: center;
-    }
-
-    .trust-stat-value {
-      display: block;
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--white);
-    }
-
-    .trust-stat-label {
-      font-size: 0.75rem;
-      color: var(--gray);
-    }
-
-    @media (max-width: 768px) {
-      .trust-stats {
-        flex-direction: column;
-        gap: 1rem;
-      }
-    }
-
     /* Video Demo Section */
     .demo-video-section {
       padding: 5rem 1.5rem;
@@ -1584,50 +1492,6 @@
     </div>
   </section>
 
-  <!-- Trusted By Section -->
-  <section class="trusted-by">
-    <div class="trusted-by-content">
-      <p>Trusted by Virginia Transportation Professionals</p>
-      <div class="trusted-logos">
-        <!-- TODO: Replace with actual agency logos if available -->
-        <div class="trusted-logo-item">
-          <img src="data/images/logos/vdot-logo.png" alt="Virginia DOT" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <span class="logo-fallback">VDOT</span>
-        </div>
-        <div class="trusted-logo-item">
-          <img src="data/images/logos/henrico-logo.png" alt="Henrico County" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <span class="logo-fallback">Henrico County</span>
-        </div>
-        <div class="trusted-logo-item">
-          <img src="data/images/logos/richmond-logo.png" alt="City of Richmond" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <span class="logo-fallback">City of Richmond</span>
-        </div>
-        <div class="trusted-logo-item">
-          <img src="data/images/logos/chesterfield-logo.png" alt="Chesterfield County" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <span class="logo-fallback">Chesterfield County</span>
-        </div>
-        <div class="trusted-logo-item">
-          <img src="data/images/logos/fhwa-logo.png" alt="FHWA HSIP" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <span class="logo-fallback">FHWA HSIP</span>
-        </div>
-      </div>
-      <div class="trust-stats">
-        <div class="trust-stat">
-          <span class="trust-stat-value">12+</span>
-          <span class="trust-stat-label">Virginia Agencies</span>
-        </div>
-        <div class="trust-stat">
-          <span class="trust-stat-value">$10M+</span>
-          <span class="trust-stat-label">HSIP Funding Supported</span>
-        </div>
-        <div class="trust-stat">
-          <span class="trust-stat-value">500K+</span>
-          <span class="trust-stat-label">Crashes Analyzed</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- Crash Scenarios Split Column Section -->
   <section class="crash-scenarios-section" id="crash-scenarios">
     <div class="blob blob-1" style="top: 10%; left: -15%; opacity: 0.1;"></div>
@@ -2205,8 +2069,7 @@
             entry.target.classList.add('animate-visible');
 
             // Trigger count-up for stats
-            if (entry.target.classList.contains('stats-grid') ||
-                entry.target.classList.contains('trust-stats')) {
+            if (entry.target.classList.contains('stats-grid')) {
               animateCountUp(entry.target);
             }
 
@@ -2222,7 +2085,7 @@
         '.features-header, .pricing-preview-header, .case-studies-header, ' +
         '.how-it-works-header, .demo-video-header, .roi-calculator-header, ' +
         '.features-grid, .pricing-cards, .case-studies-grid, .steps-container, ' +
-        '.stats-grid, .trust-stats'
+        '.stats-grid'
       );
 
       animatedElements.forEach(el => observer.observe(el));
@@ -2230,7 +2093,7 @@
 
     // Count-Up Animation for Statistics
     function animateCountUp(container) {
-      const statValues = container.querySelectorAll('.stat-value, .trust-stat-value');
+      const statValues = container.querySelectorAll('.stat-value');
 
       statValues.forEach(el => {
         const text = el.textContent.trim();
