@@ -206,11 +206,11 @@
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        // Lighting - Brighter scene
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
         scene.add(ambientLight);
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
         directionalLight.position.set(15, 25, 15);
         directionalLight.castShadow = true;
         directionalLight.shadow.mapSize.width = 2048;
