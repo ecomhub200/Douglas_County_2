@@ -1727,7 +1727,237 @@
         }
 
         window.addEventListener('resize', onResize);
-        
+
+        // ============ CAMERA VIEW PRESETS ============
+        const cameraPresets = {
+            isometric: { angle: Math.PI * 1.15, height: 16, radius: 28, frustum: 22 },
+            topdown: { angle: 0, height: 45, radius: 0.1, frustum: 35 },
+            street: { angle: Math.PI * 0.75, height: 4, radius: 35, frustum: 18 }
+        };
+
+        let targetCameraState = { ...cameraPresets.isometric };
+        let currentCameraState = { ...cameraPresets.isometric };
+        let cameraTransitionProgress = 1;
+        const cameraTransitionSpeed = 2.5;
+
+        function setCameraPreset(preset) {
+            if (cameraPresets[preset]) {
+                targetCameraState = { ...cameraPresets[preset] };
+                cameraTransitionProgress = 0;
+            }
+        }
+
+        function updateCameraTransition(dt) {
+            if (cameraTransitionProgress < 1) {
+                cameraTransitionProgress = Math.min(1, cameraTransitionProgress + dt * cameraTransitionSpeed);
+                const t = smoothstep(cameraTransitionProgress);
+
+                currentCameraState.angle = lerp(currentCameraState.angle, targetCameraState.angle, t * 0.1);
+                currentCameraState.height = lerp(currentCameraState.height, targetCameraState.height, t * 0.1);
+                currentCameraState.radius = lerp(currentCameraState.radius, targetCameraState.radius, t * 0.1);
+                currentCameraState.frustum = lerp(currentCameraState.frustum, targetCameraState.frustum, t * 0.1);
+
+                // Update camera frustum
+                const aspect = container.clientWidth / container.clientHeight;
+                camera.left = currentCameraState.frustum * aspect / -2;
+                camera.right = currentCameraState.frustum * aspect / 2;
+                camera.top = currentCameraState.frustum / 2;
+                camera.bottom = currentCameraState.frustum / -2;
+                camera.updateProjectionMatrix();
+            }
+        }
+
+        // ============ SCENARIO CONTROL ============
+        let manualScenario = -1; // -1 means auto-cycle
+        let scenarioTransitionOpacity = 1;
+        let lastScenarioIndex = -1;
+
+        function setManualScenario(index) {
+            manualScenario = index;
+            // Jump to the selected scenario
+            if (index >= 0 && index < 3) {
+                animationTime = index * sceneDuration + 0.1;
+            }
+        }
+
+        // ============ PARENT COMMUNICATION ============
+        function notifyParent(type, data) {
+            if (window.parent !== window) {
+                window.parent.postMessage({ type, ...data }, '*');
+            }
+        }
+
+        // Listen for messages from parent
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type) {
+                switch (event.data.type) {
+                    case 'setCameraView':
+                        setCameraPreset(event.data.data);
+                        break;
+                    case 'setScenario':
+                        setManualScenario(event.data.data);
+                        break;
+                    case 'resize':
+                        onResize();
+                        break;
+                }
+            }
+        });
+
+        // Override animate to include new features
+        const originalAnimate = animate;
+        animate = function(currentTime) {
+            requestAnimationFrame(animate);
+
+            if (lastTime === 0) lastTime = currentTime;
+            const dt = Math.min((currentTime - lastTime) / 1000, 0.05);
+            lastTime = currentTime;
+
+            animationTime += dt;
+
+            const cycleTime = animationTime % cycleDuration;
+            const normalizedTime = cycleTime / cycleDuration;
+
+            // Report progress to parent
+            notifyParent('progressUpdate', { progress: normalizedTime });
+
+            timerBar.style.width = (normalizedTime * 100) + '%';
+
+            // Update camera transition
+            updateCameraTransition(dt);
+
+            // Camera rotation (slower when transitioning)
+            if (cameraTransitionProgress >= 1 && targetCameraState === cameraPresets.isometric) {
+                cameraAngle += dt * 0.025;
+            }
+            currentCameraState.angle = cameraAngle;
+
+            updateCameraShake(dt);
+
+            camera.position.x = Math.cos(currentCameraState.angle) * currentCameraState.radius + cameraShake.x;
+            camera.position.z = Math.sin(currentCameraState.angle) * currentCameraState.radius + cameraShake.y;
+            camera.position.y = currentCameraState.height;
+            camera.lookAt(cameraShake.x * 0.5, 0, cameraShake.y * 0.5);
+
+            hideAll();
+
+            // Determine current scenario
+            let currentScenarioIndex;
+            if (cycleTime < sceneDuration) {
+                currentScenarioIndex = 0;
+            } else if (cycleTime < sceneDuration * 2) {
+                currentScenarioIndex = 1;
+            } else {
+                currentScenarioIndex = 2;
+            }
+
+            // Notify parent of scenario change
+            if (currentScenarioIndex !== lastScenarioIndex) {
+                lastScenarioIndex = currentScenarioIndex;
+                notifyParent('scenarioChanged', { scenario: currentScenarioIndex });
+            }
+
+            // ============ SCENE 1: Vehicle-Pedestrian ============
+            if (cycleTime < sceneDuration) {
+                const sceneTime = cycleTime / sceneDuration;
+
+                labelElement.className = 'crash-label fatal';
+                labelText.textContent = 'Vehicle-Pedestrian Crash';
+
+                redCar.visible = true;
+                pedestrian.visible = true;
+
+                const sbLaneCenter = -laneWidth * 1.5;
+
+                if (sceneTime < 0.5) {
+                    const t = easeInOutQuad(sceneTime / 0.5);
+                    pedestrian.position.set(roadWidth/2 - t * (roadWidth/2 - sbLaneCenter), 0.3, -cwOffset);
+                    pedestrian.rotation.y = -Math.PI / 2;
+                    pedestrian.rotation.x = 0;
+                    pedestrian.rotation.z = 0;
+                    redCar.position.set(sbLaneCenter, 0, -28 + t * 16);
+                    redCar.rotation.y = -Math.PI / 2;
+                } else if (sceneTime < 0.6) {
+                    const t = (sceneTime - 0.5) / 0.1;
+                    pedestrian.position.set(sbLaneCenter + 1, 0.3 + t * 0.2, -cwOffset);
+                    pedestrian.rotation.x = t * Math.PI / 4;
+                    redCar.position.set(sbLaneCenter, 0, -cwOffset - 2);
+                    redCar.rotation.y = -Math.PI / 2;
+                    impactSphere1.visible = true;
+                    impactSphere1.position.set(sbLaneCenter, 1.2, -cwOffset);
+                    impactSphere1.material.opacity = t * 0.85;
+                    impactSphere1.scale.setScalar(0.5 + t * 0.8);
+                    if (t > 0.3) triggerCameraShake(0.5);
+                } else if (sceneTime < 0.85) {
+                    const t = (sceneTime - 0.6) / 0.25;
+                    pedestrian.position.set(sbLaneCenter + 1 - t * 2.5, Math.max(0.1, 0.5 - t * 0.4), -cwOffset + t * 2);
+                    pedestrian.rotation.x = Math.PI / 4 + t * Math.PI / 2;
+                    pedestrian.rotation.z = -t * 0.4;
+                    redCar.position.set(sbLaneCenter, 0, -cwOffset - 1.5);
+                    impactSphere1.visible = true;
+                    impactSphere1.material.opacity = 0.85 - t * 0.3;
+                    impactSphere1.scale.setScalar(1.3 + Math.sin(animationTime * 10) * 0.15);
+                } else {
+                    pedestrian.position.set(sbLaneCenter - 1.5, 0.1, -cwOffset + 2);
+                    pedestrian.rotation.x = Math.PI * 0.75;
+                    pedestrian.rotation.z = -0.4;
+                    redCar.position.set(sbLaneCenter, 0, -cwOffset - 1.5);
+                    redCar.rotation.y = -Math.PI / 2;
+                    impactSphere1.visible = true;
+                    const pulse = Math.sin(animationTime * 8);
+                    impactSphere1.material.opacity = 0.5 + pulse * 0.25;
+                    impactSphere1.scale.setScalar(1.3 + pulse * 0.2);
+                }
+            } else if (cycleTime < sceneDuration * 2) {
+                labelElement.className = 'crash-label serious';
+                labelText.textContent = 'Vehicle-Vehicle Crash';
+                updateScene2(dt, cycleTime - sceneDuration);
+            } else {
+                labelElement.className = 'crash-label minor';
+                labelText.textContent = 'Vehicle-Bicycle Crash';
+                updateScene3(dt, cycleTime - sceneDuration * 2);
+            }
+
+            // Signal phase cycling
+            const currentPhaseDuration = phaseTiming[phaseSequence[signalPhaseIndex]];
+            if (currentTime - signalPhaseStartTime > currentPhaseDuration) {
+                signalPhaseStartTime = currentTime;
+                signalPhaseIndex = (signalPhaseIndex + 1) % phaseSequence.length;
+                updateSignals(phaseSequence[signalPhaseIndex]);
+            }
+
+            // Pin animations
+            const elapsedMs = animationTime * 1000;
+            pins.forEach((pin, i) => {
+                if (elapsedMs > pin.userData.delay) {
+                    const pinElapsed = elapsedMs - pin.userData.delay;
+                    const dropDuration = 800;
+
+                    if (pinElapsed < dropDuration) {
+                        const t = pinElapsed / dropDuration;
+                        pin.position.y = 20 - 20 * easeOutBounce(t);
+                    } else {
+                        const floatTime = (pinElapsed - dropDuration) / 1000;
+                        const pulseSpeed = 1.5 + (i % 3) * 0.3;
+                        pin.position.y = pin.userData.baseY + Math.sin(floatTime * pulseSpeed) * 0.08;
+
+                        const ring = pin.children[2];
+                        if (ring) {
+                            ring.material.opacity = 0.4 + Math.sin(floatTime * pulseSpeed) * 0.2;
+                            ring.scale.setScalar(1 + Math.sin(floatTime * pulseSpeed) * 0.15);
+                        }
+
+                        const head = pin.children[0];
+                        if (head) {
+                            head.material.emissiveIntensity = 0.4 + Math.sin(floatTime * pulseSpeed) * 0.2;
+                        }
+                    }
+                }
+            });
+
+            renderer.render(scene, camera);
+        };
+
         // Initialize signals and scene states
         resetScene2();
         resetScene3();
