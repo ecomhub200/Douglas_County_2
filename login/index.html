@@ -38,13 +38,36 @@
     .login-card {
       width: 100%;
       max-width: 420px;
-      background: rgba(12, 46, 78, 0.8);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border-dark);
+      background: linear-gradient(135deg, rgba(30, 58, 95, 0.85) 0%, rgba(12, 46, 78, 0.75) 100%);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: var(--radius-lg);
       padding: 2.5rem;
       position: relative;
       z-index: 10;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .login-card:hover {
+      border-color: rgba(59, 130, 246, 0.3);
+      box-shadow:
+        0 20px 40px rgba(0, 0, 0, 0.5),
+        0 0 60px rgba(59, 130, 246, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
     }
 
     .login-header {
@@ -68,7 +91,17 @@
     .login-logo span {
       font-size: 1.75rem;
       font-weight: 700;
-      color: var(--white);
+      background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 25%, #60a5fa 50%, #34d399 75%, #60a5fa 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: gradientFlow 4s ease infinite;
+    }
+
+    @keyframes gradientFlow {
+      0% { background-position: 0% center; }
+      100% { background-position: 200% center; }
     }
 
     .login-title {
@@ -130,7 +163,23 @@
     }
 
     .social-btn:hover {
-      transform: translateY(-2px);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .social-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .social-btn:hover::before {
+      left: 100%;
     }
 
     .social-btn svg {
@@ -237,8 +286,30 @@
     }
 
     .submit-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 15px rgba(30, 64, 175, 0.4);
+      transform: translateY(-3px);
+      box-shadow:
+        0 10px 30px rgba(30, 64, 175, 0.5),
+        0 0 40px rgba(59, 130, 246, 0.2);
+    }
+
+    .submit-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .submit-btn:hover::before {
+      left: 100%;
+    }
+
+    .submit-btn {
+      position: relative;
+      overflow: hidden;
     }
 
     .submit-btn:disabled {
@@ -423,9 +494,24 @@
   </style>
 </head>
 <body class="dark">
-  <!-- Background glows -->
-  <div class="glow-1"></div>
-  <div class="glow-2"></div>
+  <!-- Animated Background -->
+  <div class="gradient-mesh"></div>
+
+  <!-- Floating Particles -->
+  <div class="particles">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
+  <!-- Morphing Blobs -->
+  <div class="blob blob-1" style="top: 10%; left: -10%; opacity: 0.2;"></div>
+  <div class="blob blob-2" style="bottom: 10%; right: -15%; opacity: 0.15;"></div>
 
   <div class="login-container">
     <div class="login-card animate-fadeInUp">

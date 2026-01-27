@@ -345,6 +345,22 @@
   </style>
 </head>
 <body class="dark">
+  <!-- Scroll Progress Bar -->
+  <div class="scroll-progress" id="scrollProgress"></div>
+
+  <!-- Animated Background -->
+  <div class="gradient-mesh"></div>
+
+  <!-- Floating Particles -->
+  <div class="particles">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
   <!-- Navigation -->
   <nav class="nav">
     <div class="nav-container">
@@ -367,16 +383,18 @@
 
   <!-- Hero -->
   <section class="features-hero">
-    <div class="glow-primary" style="top: -100px; left: 30%;"></div>
+    <div class="blob blob-1" style="top: -20%; left: 10%; opacity: 0.15;"></div>
+    <div class="blob blob-2" style="top: 10%; right: -10%; opacity: 0.1;"></div>
     <div class="container">
-      <h1>Powerful Tools for Traffic Safety</h1>
-      <p>Everything you need to analyze crash data, identify hazards, and make data-driven safety decisions.</p>
+      <span class="badge-pulse animate-fadeInDown" style="margin-bottom: 1.5rem;">All Features Included</span>
+      <h1 class="animate-fadeInUp">Powerful Tools for Traffic Safety</h1>
+      <p class="animate-fadeInUp animate-delay-200">Everything you need to analyze crash data, identify hazards, and make data-driven safety decisions.</p>
     </div>
   </section>
 
   <!-- Feature 1: Interactive Maps -->
   <section class="features-section">
-    <div class="feature-row">
+    <div class="feature-row animate-on-scroll">
       <div class="feature-content">
         <h2>Interactive Crash Mapping</h2>
         <p>Visualize crash locations with powerful filtering and clustering. Identify patterns and hotspots at a glance.</p>
@@ -416,7 +434,7 @@
 
   <!-- Feature 2: AI Assistant -->
   <section class="features-section">
-    <div class="feature-row reverse">
+    <div class="feature-row reverse animate-on-scroll">
       <div class="feature-content">
         <h2>AI-Powered Analysis</h2>
         <p>Get instant insights with our AI assistant. Ask questions in plain English and receive actionable recommendations based on FHWA guidelines.</p>
@@ -455,7 +473,7 @@
 
   <!-- Feature 3: Signal Warrants -->
   <section class="features-section">
-    <div class="feature-row">
+    <div class="feature-row animate-on-scroll">
       <div class="feature-content">
         <h2>Signal Warrant Analysis</h2>
         <p>Evaluate intersections against MUTCD signal warrants with automated data analysis and professional recommendation reports.</p>
@@ -496,7 +514,7 @@
 
   <!-- Feature 4: Report Generation (NEW) -->
   <section class="features-section">
-    <div class="feature-row reverse">
+    <div class="feature-row reverse animate-on-scroll">
       <div class="feature-content">
         <h2>Professional Report Generation</h2>
         <p>Generate HSIP-ready reports, crash summaries, and grant application documentation with a single click.</p>
@@ -539,8 +557,8 @@
     <div class="container">
       <h2>All Features</h2>
       <p class="subtitle">Comprehensive tools for traffic safety professionals</p>
-      <div class="features-grid">
-        <div class="feature-card">
+      <div class="features-grid stagger-children animate-on-scroll">
+        <div class="feature-card glass-card">
           <div class="feature-card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
@@ -551,7 +569,7 @@
           <p>Interactive maps with filtering, clustering, and hotspot detection for crash locations.</p>
         </div>
 
-        <div class="feature-card">
+        <div class="feature-card glass-card">
           <div class="feature-card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
@@ -561,7 +579,7 @@
           <p>Track crash trends over time with interactive charts and statistical insights.</p>
         </div>
 
-        <div class="feature-card">
+        <div class="feature-card glass-card">
           <div class="feature-card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/>
@@ -693,5 +711,58 @@
       </div>
     </div>
   </footer>
+
+  <script>
+    // Scroll Progress Bar
+    const scrollProgress = document.getElementById('scrollProgress');
+    window.addEventListener('scroll', () => {
+      const scrollTop = document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      const progress = (scrollTop / scrollHeight) * 100;
+      scrollProgress.style.width = progress + '%';
+    });
+
+    // Scroll-triggered animations
+    const observerOptions = {
+      root: null,
+      rootMargin: '0px',
+      threshold: 0.1
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('animate-visible');
+          if (entry.target.classList.contains('stagger-children')) {
+            entry.target.classList.add('reveal');
+          }
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll('.animate-on-scroll, .stagger-children').forEach(el => {
+      observer.observe(el);
+    });
+
+    // Smooth nav scroll effect
+    const nav = document.querySelector('.nav');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 50) {
+        nav.classList.add('scrolled');
+      } else {
+        nav.classList.remove('scrolled');
+      }
+    });
+
+    // Mobile menu toggle
+    const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
+    const mobileMenu = document.querySelector('.mobile-menu');
+    if (mobileMenuBtn) {
+      mobileMenuBtn.addEventListener('click', () => {
+        mobileMenuBtn.classList.toggle('active');
+        mobileMenu.classList.toggle('show');
+      });
+    }
+  </script>
 </body>
 </html>

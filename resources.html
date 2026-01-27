@@ -472,6 +472,22 @@
   </style>
 </head>
 <body class="dark">
+  <!-- Scroll Progress Bar -->
+  <div class="scroll-progress" id="scrollProgress"></div>
+
+  <!-- Animated Background -->
+  <div class="gradient-mesh"></div>
+
+  <!-- Floating Particles -->
+  <div class="particles">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
   <!-- Navigation -->
   <nav class="nav">
     <div class="nav-container">
@@ -494,10 +510,12 @@
 
   <!-- Hero -->
   <section class="resources-hero">
-    <div class="glow-primary" style="top: -100px; left: 40%;"></div>
+    <div class="blob blob-1" style="top: -20%; left: 10%; opacity: 0.15;"></div>
+    <div class="blob blob-2" style="top: 10%; right: -10%; opacity: 0.1;"></div>
     <div class="container">
-      <h1>Resources & Documentation</h1>
-      <p>Guides, tutorials, and reference materials to help you get the most out of CRASH LENS.</p>
+      <span class="badge-pulse animate-fadeInDown" style="margin-bottom: 1.5rem;">Free Downloads</span>
+      <h1 class="animate-fadeInUp">Resources & Documentation</h1>
+      <p class="animate-fadeInUp animate-delay-200">Guides, tutorials, and reference materials to help you get the most out of CRASH LENS.</p>
     </div>
   </section>
 
@@ -506,8 +524,8 @@
     <div class="container">
       <h2>Free Resources</h2>
       <p class="subtitle">Download guides and templates to improve your traffic safety analysis</p>
-      <div class="downloads-grid">
-        <div class="download-card">
+      <div class="downloads-grid stagger-children animate-on-scroll">
+        <div class="download-card glass-card">
           <div class="download-icon pdf">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -1034,6 +1052,47 @@
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
         closeDownloadModal();
+      }
+    });
+
+    // Scroll Progress Bar
+    const scrollProgress = document.getElementById('scrollProgress');
+    window.addEventListener('scroll', () => {
+      const scrollTop = document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      const progress = (scrollTop / scrollHeight) * 100;
+      scrollProgress.style.width = progress + '%';
+    });
+
+    // Scroll-triggered animations
+    const observerOptions = {
+      root: null,
+      rootMargin: '0px',
+      threshold: 0.1
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('animate-visible');
+          if (entry.target.classList.contains('stagger-children')) {
+            entry.target.classList.add('reveal');
+          }
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll('.animate-on-scroll, .stagger-children').forEach(el => {
+      observer.observe(el);
+    });
+
+    // Smooth nav scroll effect
+    const nav = document.querySelector('.nav');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 50) {
+        nav.classList.add('scrolled');
+      } else {
+        nav.classList.remove('scrolled');
       }
     });
   </script>
