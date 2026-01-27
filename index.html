@@ -2878,7 +2878,7 @@
         const elapsed = time - startTime;
 
         // Camera rotation (faster orbit)
-        cameraAngle += 0.006;
+        cameraAngle += 0.0009;
         camera.position.x = Math.cos(cameraAngle) * cameraRadius;
         camera.position.z = Math.sin(cameraAngle) * cameraRadius;
         camera.position.y = cameraHeight + Math.sin(cameraAngle * 0.3) * 2;
