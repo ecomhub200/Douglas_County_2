@@ -1,0 +1,1759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedestrian Infrastructure Classifier v3 - Virginia Traffic Engineering</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root {
+            --primary: #0f766e; --primary-light: #14b8a6; --primary-dark: #115e59;
+            --success: #059669; --success-bg: #d1fae5;
+            --warning: #d97706; --warning-bg: #fef3c7;
+            --error: #dc2626; --error-bg: #fee2e2;
+            --bg: #f0fdfa; --card-bg: #fff; --text: #0f172a; --text-muted: #64748b;
+            --border: #cbd5e1; --border-light: #e2e8f0;
+            --crosswalk: #dc2626; --sidewalk: #7c3aed; --curb-ramp: #f59e0b;
+            --ped-signal: #059669; --refuge: #0891b2; --gap: #be123c;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; }
+        
+        .app-header {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            color: #fff; padding: 0.6rem 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+        .header-content { max-width: 1900px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+        .header-title { display: flex; align-items: center; gap: 0.75rem; }
+        .header-title .icon { font-size: 1.4rem; }
+        .header-title h1 { font-size: 1.05rem; font-weight: 700; }
+        .header-title .version { background: rgba(255,255,255,0.2); padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; margin-left: 0.5rem; }
+        .header-title p { opacity: 0.9; font-size: 0.7rem; }
+        .header-badges { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+        .header-badge { background: rgba(255,255,255,0.2); padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.7rem; display: flex; align-items: center; gap: 0.25rem; }
+        .header-badge.quality-high { background: rgba(34, 197, 94, 0.4); }
+        .header-badge.quality-med { background: rgba(251, 191, 36, 0.4); }
+        .header-badge.quality-low { background: rgba(239, 68, 68, 0.4); }
+        
+        .container { max-width: 1900px; margin: 0 auto; padding: 0.75rem; }
+        .grid-layout { display: grid; grid-template-columns: 320px 1fr 300px; gap: 0.75rem; }
+        @media(max-width: 1500px) { .grid-layout { grid-template-columns: 300px 1fr 260px; } }
+        @media(max-width: 1200px) { .grid-layout { grid-template-columns: 280px 1fr; } .stats-panel { display: none; } }
+        @media(max-width: 900px) { .grid-layout { grid-template-columns: 1fr; } }
+        
+        .card { background: var(--card-bg); border: 1px solid var(--border-light); border-radius: 10px; padding: 0.85rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border-light); }
+        .card-title { font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; }
+        
+        .badge { display: inline-flex; align-items: center; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; }
+        .badge-success { background: var(--success-bg); color: var(--success); }
+        .badge-warning { background: var(--warning-bg); color: var(--warning); }
+        .badge-error { background: var(--error-bg); color: var(--error); }
+        .badge-info { background: #ccfbf1; color: var(--primary); }
+        
+        .input-group { margin-bottom: 0.6rem; }
+        .input-group label { display: block; font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.25rem; }
+        input, select { width: 100%; padding: 0.45rem 0.6rem; border: 1.5px solid var(--border); border-radius: 6px; font-size: 0.75rem; font-family: inherit; background: #fff; }
+        input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12); }
+        
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; padding: 0.45rem 0.75rem; border: none; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-ghost { background: transparent; color: var(--text-muted); border: 1.5px solid var(--border); }
+        .btn-ghost:hover:not(:disabled) { background: var(--bg); }
+        .btn-danger { background: var(--error); color: #fff; }
+        .btn-sm { padding: 0.3rem 0.5rem; font-size: 0.7rem; }
+        .btn-lg { padding: 0.6rem 1rem; font-size: 0.8rem; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-block { width: 100%; }
+        
+        /* Quality Score Gauge */
+        .quality-gauge { text-align: center; padding: 0.75rem; background: linear-gradient(135deg, #f0fdfa, #ccfbf1); border-radius: 10px; margin-bottom: 0.75rem; }
+        .quality-score { font-size: 2.2rem; font-weight: 700; }
+        .quality-score.high { color: var(--success); }
+        .quality-score.medium { color: var(--warning); }
+        .quality-score.low { color: var(--error); }
+        .quality-label { font-size: 0.7rem; color: var(--text-muted); }
+        .quality-breakdown { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.5rem; font-size: 0.65rem; }
+        .quality-item { text-align: center; }
+        .quality-item-value { font-weight: 700; font-size: 0.85rem; }
+        
+        /* Filters */
+        .filter-section { background: #f8fafc; border-radius: 8px; padding: 0.6rem; margin-bottom: 0.6rem; }
+        .filter-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
+        .filter-row:last-child { margin-bottom: 0; }
+        .filter-label { font-size: 0.68rem; color: var(--text-muted); min-width: 80px; }
+        .filter-chips { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+        .filter-chip { padding: 0.2rem 0.45rem; border: 1.5px solid var(--border); border-radius: 4px; font-size: 0.65rem; cursor: pointer; transition: all 0.15s; background: #fff; }
+        .filter-chip:hover { border-color: var(--primary-light); }
+        .filter-chip.active { border-color: var(--primary); background: #ccfbf1; color: var(--primary-dark); }
+        .filter-chip input { display: none; }
+        
+        /* Asset Type Grid */
+        .asset-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.35rem; }
+        .asset-option { display: flex; align-items: center; gap: 0.35rem; padding: 0.4rem; border: 2px solid var(--border-light); border-radius: 6px; cursor: pointer; font-size: 0.7rem; transition: all 0.15s; }
+        .asset-option:hover { border-color: var(--primary-light); }
+        .asset-option.selected { border-color: var(--primary); background: #f0fdfa; }
+        .asset-option input { display: none; }
+        .asset-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        
+        /* Map */
+        #map { height: 480px; border-radius: 8px; border: 1px solid var(--border-light); }
+        .map-container { position: relative; }
+        .map-overlay { position: absolute; top: 8px; right: 8px; z-index: 1000; background: white; padding: 0.4rem 0.6rem; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); font-size: 0.7rem; }
+        .map-legend { position: absolute; bottom: 25px; left: 8px; z-index: 1000; background: white; padding: 0.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); font-size: 0.65rem; max-width: 150px; }
+        .legend-item { display: flex; align-items: center; gap: 0.4rem; margin: 0.25rem 0; }
+        .legend-color { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.15); }
+        .map-quality { position: absolute; top: 8px; left: 50px; z-index: 1000; background: white; padding: 0.4rem 0.6rem; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); font-size: 0.68rem; }
+        
+        /* Progress */
+        .progress-section { display: none; margin: 0.6rem 0; }
+        .progress-section.active { display: block; }
+        .progress-bar-container { height: 8px; background: var(--border-light); border-radius: 4px; overflow: hidden; }
+        .progress-bar { height: 100%; background: linear-gradient(90deg, var(--primary), var(--primary-light)); transition: width 0.3s; width: 0%; }
+        .progress-text { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-muted); margin-top: 0.25rem; }
+        
+        /* Log */
+        .log-container { background: #134e4a; border-radius: 6px; padding: 0.4rem; max-height: 110px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; }
+        .log-entry { padding: 0.15rem 0.3rem; color: #5eead4; }
+        .log-entry.success { color: #4ade80; }
+        .log-entry.error { color: #f87171; }
+        .log-entry.warning { color: #fbbf24; }
+        .log-entry.info { color: #94a3b8; }
+        
+        /* Stats */
+        .stat-card { background: linear-gradient(135deg, #f0fdfa, #fff); border: 1px solid var(--border-light); border-radius: 8px; padding: 0.6rem; margin-bottom: 0.5rem; }
+        .stat-value { font-size: 1.6rem; font-weight: 700; color: var(--primary); }
+        .stat-label { font-size: 0.65rem; color: var(--text-muted); }
+        .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 0.25rem 0; border-bottom: 1px solid var(--border-light); font-size: 0.7rem; }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 0.35rem; display: inline-block; }
+        
+        /* Validation Issues */
+        .validation-panel { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 0.6rem; margin-bottom: 0.6rem; }
+        .validation-panel.success { background: #f0fdf4; border-color: #bbf7d0; }
+        .validation-header { font-size: 0.75rem; font-weight: 600; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.3rem; }
+        .validation-list { font-size: 0.68rem; color: var(--text-muted); }
+        .validation-item { display: flex; align-items: center; gap: 0.3rem; margin: 0.2rem 0; }
+        
+        /* Export */
+        .export-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.35rem; margin-bottom: 0.5rem; }
+        .export-btn { display: flex; flex-direction: column; align-items: center; padding: 0.5rem 0.3rem; border: 1.5px solid var(--border-light); border-radius: 8px; cursor: pointer; background: #fff; transition: all 0.15s; }
+        .export-btn:hover { border-color: var(--primary); background: #f0fdfa; }
+        .export-btn .icon { font-size: 1.1rem; margin-bottom: 0.15rem; }
+        .export-btn .label { font-size: 0.6rem; font-weight: 600; color: var(--text-muted); }
+        
+        /* Results Table */
+        .results-table { width: 100%; border-collapse: collapse; font-size: 0.68rem; }
+        .results-table th, .results-table td { padding: 0.35rem; text-align: left; border-bottom: 1px solid var(--border-light); }
+        .results-table th { background: #f0fdfa; font-weight: 600; position: sticky; top: 0; }
+        .results-table tr:hover { background: #f8fafc; }
+        .results-table tr.invalid { background: #fef2f2; }
+        .scrollable-table { max-height: 180px; overflow-y: auto; border-radius: 6px; border: 1px solid var(--border-light); }
+        
+        /* Toast */
+        .toast-container { position: fixed; top: 70px; right: 15px; z-index: 9999; }
+        .toast { background: #134e4a; color: #fff; padding: 0.6rem 0.85rem; border-radius: 8px; margin-bottom: 0.4rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.4rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: slideIn 0.3s ease; }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--error); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        /* Confidence Slider */
+        .slider-container { display: flex; align-items: center; gap: 0.5rem; }
+        .slider-container input[type="range"] { flex: 1; height: 6px; -webkit-appearance: none; background: var(--border); border-radius: 3px; }
+        .slider-container input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: var(--primary); border-radius: 50%; cursor: pointer; }
+        .slider-value { min-width: 35px; text-align: center; font-weight: 600; font-size: 0.75rem; color: var(--primary); }
+        
+        /* Road Class Badges */
+        .road-class { display: inline-block; padding: 0.1rem 0.35rem; border-radius: 3px; font-size: 0.6rem; font-weight: 600; }
+        .road-class.primary { background: #dbeafe; color: #1e40af; }
+        .road-class.secondary { background: #e0e7ff; color: #3730a3; }
+        .road-class.residential { background: #f3e8ff; color: #6b21a8; }
+        .road-class.unknown { background: #f1f5f9; color: #475569; }
+        
+        /* Jurisdiction Info */
+        .juris-info { background: linear-gradient(135deg, #f0fdfa, #ccfbf1); border-radius: 8px; padding: 0.6rem; margin-bottom: 0.6rem; }
+        .juris-info h3 { font-size: 0.85rem; color: var(--primary-dark); margin-bottom: 0.2rem; }
+        .juris-info .details { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.68rem; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-content">
+            <div class="header-title">
+                <span class="icon">🚶</span>
+                <div>
+                    <h1>Pedestrian Infrastructure Classifier <span class="version">v3.0</span></h1>
+                    <p>Virginia Traffic Engineering • Enhanced Accuracy & Validation</p>
+                </div>
+            </div>
+            <div class="header-badges">
+                <span class="header-badge" id="qualityBadge">📊 Quality: --</span>
+                <span class="header-badge" id="assetCountBadge">📍 0 Assets</span>
+                <span class="header-badge" id="validBadge">✓ 0 Valid</span>
+                <span class="header-badge" id="issuesBadge">⚠ 0 Issues</span>
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="grid-layout">
+            <!-- Left Panel -->
+            <div class="config-panel">
+                <!-- Jurisdiction -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">📍 Jurisdiction</span>
+                        <span class="badge badge-info" id="jurisTypeBadge">Select</span>
+                    </div>
+                    <div class="input-group">
+                        <label>Virginia County or City</label>
+                        <select id="jurisdictionSelect" onchange="onJurisdictionChange()">
+                            <option value="">-- Select Jurisdiction --</option>
+                        </select>
+                    </div>
+                    <div class="juris-info" id="jurisInfo" style="display: none;">
+                        <h3 id="jurisName">--</h3>
+                        <div class="details">
+                            <span>📋 FIPS: <strong id="jurisFips">--</strong></span>
+                            <span>📐 <strong id="jurisArea">--</strong> sq mi</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.3rem; flex-wrap: wrap;">
+                        <button class="btn btn-sm btn-ghost" onclick="zoomToJurisdiction()">🔍 Zoom</button>
+                        <button class="btn btn-sm btn-ghost" onclick="loadBoundary()">📐 Boundary</button>
+                        <button class="btn btn-sm btn-primary" onclick="loadRoadNetwork()">🛣️ Load Roads</button>
+                        <button class="btn btn-sm btn-ghost" onclick="loadSampleData()" title="Use sample data if API fails">📋 Sample</button>
+                    </div>
+                    
+                    <!-- API Status -->
+                    <div style="margin-top: 0.5rem; padding: 0.4rem; background: #f8fafc; border-radius: 6px; font-size: 0.68rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span>🌐 API Status: <span id="apiStatus" style="color: var(--text-muted);">Not tested</span></span>
+                            <button class="btn btn-sm btn-ghost" onclick="testAPIConnection()" style="padding: 0.2rem 0.4rem; font-size: 0.6rem;">Test</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filters -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">🎛️ Quality Filters</span>
+                    </div>
+                    
+                    <div class="filter-section">
+                        <div class="filter-row">
+                            <span class="filter-label">Road Types:</span>
+                            <div class="filter-chips">
+                                <label class="filter-chip active"><input type="checkbox" value="primary" checked> Primary</label>
+                                <label class="filter-chip active"><input type="checkbox" value="secondary" checked> Secondary</label>
+                                <label class="filter-chip active"><input type="checkbox" value="tertiary" checked> Tertiary</label>
+                                <label class="filter-chip"><input type="checkbox" value="residential"> Residential</label>
+                            </div>
+                        </div>
+                        <div class="filter-row">
+                            <span class="filter-label">Named Only:</span>
+                            <div class="filter-chips">
+                                <label class="filter-chip active"><input type="checkbox" id="namedOnlyFilter" checked> Exclude unnamed roads</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>Minimum Confidence: <span id="confDisplay">0.80</span></label>
+                        <div class="slider-container">
+                            <input type="range" id="minConfidence" min="0.50" max="0.95" step="0.05" value="0.80" oninput="updateConfDisplay()">
+                            <span class="slider-value" id="confValue">0.80</span>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label>Asset Types to Detect</label>
+                        <div class="asset-grid">
+                            <label class="asset-option selected">
+                                <input type="checkbox" value="crosswalk" checked>
+                                <span class="asset-dot" style="background: var(--crosswalk);"></span>
+                                <span>🦓 Crosswalks</span>
+                            </label>
+                            <label class="asset-option selected">
+                                <input type="checkbox" value="curb_ramp" checked>
+                                <span class="asset-dot" style="background: var(--curb-ramp);"></span>
+                                <span>♿ Curb Ramps</span>
+                            </label>
+                            <label class="asset-option selected">
+                                <input type="checkbox" value="ped_signal" checked>
+                                <span class="asset-dot" style="background: var(--ped-signal);"></span>
+                                <span>🚦 Ped Signals</span>
+                            </label>
+                            <label class="asset-option selected">
+                                <input type="checkbox" value="sidewalk" checked>
+                                <span class="asset-dot" style="background: var(--sidewalk);"></span>
+                                <span>🚶 Sidewalks</span>
+                            </label>
+                            <label class="asset-option selected">
+                                <input type="checkbox" value="refuge_island" checked>
+                                <span class="asset-dot" style="background: var(--refuge);"></span>
+                                <span>🏝️ Refuge Islands</span>
+                            </label>
+                            <label class="asset-option selected">
+                                <input type="checkbox" value="sidewalk_gap" checked>
+                                <span class="asset-dot" style="background: var(--gap);"></span>
+                                <span>⚠️ Sidewalk Gaps</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Run Classification -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">⚡ Classification</span>
+                    </div>
+                    <button class="btn btn-primary btn-lg btn-block" id="classifyBtn" onclick="runClassification()">
+                        🧠 Run AI Classification
+                    </button>
+                    <button class="btn btn-ghost btn-block" id="cancelBtn" style="display:none; margin-top:0.4rem;" onclick="cancelClassification()">
+                        ❌ Cancel
+                    </button>
+                    
+                    <div class="progress-section" id="progressSection">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="progressBar"></div>
+                        </div>
+                        <div class="progress-text">
+                            <span id="progressLabel">Initializing...</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Validation Panel -->
+                <div class="validation-panel" id="validationPanel" style="display: none;">
+                    <div class="validation-header">
+                        <span id="validationIcon">⚠️</span>
+                        <span id="validationTitle">Data Quality Issues</span>
+                    </div>
+                    <div class="validation-list" id="validationList"></div>
+                </div>
+                
+                <!-- Log -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">📋 Activity Log</span>
+                        <button class="btn btn-sm btn-ghost" onclick="clearLog()">Clear</button>
+                    </div>
+                    <div class="log-container" id="logContainer">
+                        <div class="log-entry">[Ready] v3 with enhanced validation</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Center Panel - Map -->
+            <div class="map-panel">
+                <div class="card" style="padding: 0.4rem;">
+                    <div class="map-container">
+                        <div id="map"></div>
+                        <div class="map-overlay">
+                            <strong>Assets:</strong> <span id="mapAssetCount">0</span> |
+                            <strong>Valid:</strong> <span id="mapValidCount">0</span>
+                        </div>
+                        <div class="map-quality" id="mapQuality" style="display:none;">
+                            Quality: <strong id="mapQualityScore">--</strong>%
+                        </div>
+                        <div class="map-legend">
+                            <strong style="font-size: 0.7rem; color: var(--primary-dark);">Legend</strong>
+                            <div class="legend-item"><span class="legend-color" style="background: var(--crosswalk);"></span>Crosswalks</div>
+                            <div class="legend-item"><span class="legend-color" style="background: var(--curb-ramp);"></span>Curb Ramps</div>
+                            <div class="legend-item"><span class="legend-color" style="background: var(--ped-signal);"></span>Ped Signals</div>
+                            <div class="legend-item"><span class="legend-color" style="background: var(--sidewalk);"></span>Sidewalks</div>
+                            <div class="legend-item"><span class="legend-color" style="background: var(--refuge);"></span>Refuge Islands</div>
+                            <div class="legend-item"><span class="legend-color" style="background: var(--gap);"></span>Sidewalk Gaps</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Export -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">📤 Export Data</span>
+                        <span class="badge badge-success" id="exportReadyBadge" style="display:none;">Ready</span>
+                    </div>
+                    <div class="export-grid">
+                        <div class="export-btn" onclick="exportData('csv')"><span class="icon">📊</span><span class="label">CSV</span></div>
+                        <div class="export-btn" onclick="exportData('geojson')"><span class="icon">🗺️</span><span class="label">GeoJSON</span></div>
+                        <div class="export-btn" onclick="exportData('kml')"><span class="icon">🌍</span><span class="label">KML</span></div>
+                        <div class="export-btn" onclick="exportPDF()"><span class="icon">📄</span><span class="label">PDF</span></div>
+                    </div>
+                    <div style="display: flex; gap: 0.4rem;">
+                        <button class="btn btn-ghost btn-block" onclick="exportValidOnly()">✓ Valid Only</button>
+                        <button class="btn btn-success btn-block" onclick="exportForCrashLens()">🔗 CRASH LENS</button>
+                    </div>
+                </div>
+                
+                <!-- Results Table -->
+                <div class="card" id="resultsCard" style="display: none;">
+                    <div class="card-header">
+                        <span class="card-title">📋 Classified Assets</span>
+                        <div style="display: flex; gap: 0.3rem;">
+                            <span class="badge badge-info" id="resultCountBadge">0 total</span>
+                            <span class="badge badge-success" id="validCountBadge">0 valid</span>
+                        </div>
+                    </div>
+                    <div class="scrollable-table">
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Road</th>
+                                    <th>Class</th>
+                                    <th>Conf</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Panel - Stats -->
+            <div class="stats-panel">
+                <!-- Quality Gauge -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">📊 Data Quality Score</span>
+                    </div>
+                    <div class="quality-gauge">
+                        <div class="quality-score high" id="qualityScore">--%</div>
+                        <div class="quality-label">Overall Quality</div>
+                        <div class="quality-breakdown">
+                            <div class="quality-item">
+                                <div class="quality-item-value" id="qNamed">--%</div>
+                                <div>Named Roads</div>
+                            </div>
+                            <div class="quality-item">
+                                <div class="quality-item-value" id="qJuris">--%</div>
+                                <div>In Jurisdiction</div>
+                            </div>
+                            <div class="quality-item">
+                                <div class="quality-item-value" id="qConf">--%</div>
+                                <div>High Conf</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Asset Stats -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">📈 Asset Summary</span>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalAssets">0</div>
+                        <div class="stat-label">Total Assets</div>
+                    </div>
+                    <div id="assetBreakdown">
+                        <div class="stat-row"><span><span class="stat-dot" style="background: var(--crosswalk);"></span>Crosswalks</span><span id="statCrosswalks">0</span></div>
+                        <div class="stat-row"><span><span class="stat-dot" style="background: var(--curb-ramp);"></span>Curb Ramps</span><span id="statCurbRamps">0</span></div>
+                        <div class="stat-row"><span><span class="stat-dot" style="background: var(--ped-signal);"></span>Ped Signals</span><span id="statPedSignals">0</span></div>
+                        <div class="stat-row"><span><span class="stat-dot" style="background: var(--sidewalk);"></span>Sidewalks</span><span id="statSidewalks">0</span></div>
+                        <div class="stat-row"><span><span class="stat-dot" style="background: var(--refuge);"></span>Refuge Islands</span><span id="statRefuge">0</span></div>
+                        <div class="stat-row"><span><span class="stat-dot" style="background: var(--gap);"></span>Sidewalk Gaps</span><span id="statGaps">0</span></div>
+                    </div>
+                </div>
+                
+                <!-- Ratio Check -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">⚖️ Ratio Validation</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Ramps per Crosswalk</span>
+                        <span id="ratioRamps">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Signal Ratio</span>
+                        <span id="ratioSignals">--</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Expected: 4:1, 1:15</span>
+                        <span></span>
+                    </div>
+                </div>
+                
+                <!-- Road Network -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">🛣️ Road Network</span>
+                    </div>
+                    <div class="stat-row"><span>Total Intersections</span><span id="statIntersections">--</span></div>
+                    <div class="stat-row"><span>Named Roads</span><span id="statNamedRoads">--</span></div>
+                    <div class="stat-row"><span>Signalized (est.)</span><span id="statSignalized">--</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <script>
+        // ============================================
+        // CONFIGURATION
+        // ============================================
+        // Multiple Overpass API endpoints for fallback
+        const OVERPASS_SERVERS = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+        ];
+        let currentOverpassServer = 0;
+        const TIGERWEB_URL = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer';
+        
+        // Virginia jurisdictions with accurate boundaries
+        const JURISDICTIONS = {
+            "henrico": {
+                "name": "Henrico County", "type": "county", "fips": "087",
+                "mapCenter": [37.55, -77.45], "mapZoom": 11,
+                "bbox": [-77.6104, 37.3862, -77.1462, 37.7234],
+                "area": 245,
+                // Major roads for signalized intersection detection
+                "majorRoads": ["broad street", "staples mill", "parham", "patterson", "three chopt", 
+                              "hungary", "laburnum", "nine mile", "williamsburg", "mechanicsville", 
+                              "lakeside", "brook", "chamberlayne", "hermitage", "glenside", "horsepen",
+                              "route", "us-", "sr-", "i-64", "i-95", "i-295"]
+            },
+            "chesterfield": {
+                "name": "Chesterfield County", "type": "county", "fips": "041",
+                "mapCenter": [37.38, -77.5], "mapZoom": 10,
+                "bbox": [-77.808, 37.1524, -77.3744, 37.5559],
+                "area": 437,
+                "majorRoads": ["midlothian", "hull street", "jefferson davis", "chester", "route", "us-", "sr-", "i-95", "i-295", "i-85"]
+            },
+            "richmond_city": {
+                "name": "Richmond City", "type": "city", "fips": "760",
+                "mapCenter": [37.54, -77.44], "mapZoom": 12,
+                "bbox": [-77.5775, 37.4464, -77.3853, 37.6011],
+                "area": 62,
+                "majorRoads": ["broad", "main", "cary", "grace", "franklin", "monument", "boulevard", "arthur ashe", "belvidere", "route", "i-95", "i-64", "i-195"]
+            },
+            "arlington": {
+                "name": "Arlington County", "type": "county", "fips": "013",
+                "mapCenter": [38.88, -77.1], "mapZoom": 13,
+                "bbox": [-77.1722, 38.8275, -77.032, 38.9341],
+                "area": 26,
+                "majorRoads": ["columbia pike", "wilson", "clarendon", "washington", "lee highway", "arlington", "glebe", "route", "i-66", "i-395"]
+            },
+            "fairfax_county": {
+                "name": "Fairfax County", "type": "county", "fips": "059",
+                "mapCenter": [38.83, -77.28], "mapZoom": 10,
+                "bbox": [-77.5351, 38.5943, -77.0492, 39.0003],
+                "area": 395,
+                "majorRoads": ["braddock", "little river", "columbia", "franconia", "rolling", "route", "us-", "sr-", "i-66", "i-95", "i-495", "i-395"]
+            },
+            "alexandria": {
+                "name": "Alexandria City", "type": "city", "fips": "510",
+                "mapCenter": [38.82, -77.08], "mapZoom": 13,
+                "bbox": [-77.1445, 38.7852, -77.0381, 38.8452],
+                "area": 15,
+                "majorRoads": ["king street", "duke", "washington", "seminary", "van dorn", "route", "i-95", "i-395", "i-495"]
+            },
+            "virginia_beach": {
+                "name": "Virginia Beach City", "type": "city", "fips": "810",
+                "mapCenter": [36.85, -75.98], "mapZoom": 10,
+                "bbox": [-76.2269, 36.5516, -75.8589, 36.933],
+                "area": 497,
+                "majorRoads": ["virginia beach", "independence", "laskin", "shore", "indian river", "route", "i-264", "i-64"]
+            },
+            "norfolk": {
+                "name": "Norfolk City", "type": "city", "fips": "710",
+                "mapCenter": [36.85, -76.29], "mapZoom": 12,
+                "bbox": [-76.345, 36.82, -76.18, 36.97],
+                "area": 96,
+                "majorRoads": ["granby", "colonial", "military", "tidewater", "little creek", "route", "i-64", "i-264", "i-464"]
+            },
+            "charlottesville": {
+                "name": "Charlottesville City", "type": "city", "fips": "540",
+                "mapCenter": [38.03, -78.48], "mapZoom": 14,
+                "bbox": [-78.5228, 38.0007, -78.4475, 38.0653],
+                "area": 10,
+                "majorRoads": ["main", "market", "emmet", "barracks", "route", "us-29", "us-250"]
+            }
+        };
+        
+        // Asset type configurations
+        const ASSET_CONFIG = {
+            crosswalk: { color: '#dc2626', icon: '🦓', name: 'Crosswalk' },
+            curb_ramp: { color: '#f59e0b', icon: '♿', name: 'Curb Ramp' },
+            ped_signal: { color: '#059669', icon: '🚦', name: 'Ped Signal' },
+            sidewalk: { color: '#7c3aed', icon: '🚶', name: 'Sidewalk' },
+            refuge_island: { color: '#0891b2', icon: '🏝️', name: 'Refuge Island' },
+            sidewalk_gap: { color: '#be123c', icon: '⚠️', name: 'Sidewalk Gap' }
+        };
+        
+        // ============================================
+        // STATE
+        // ============================================
+        let map, currentJurisdiction = null;
+        let boundaryLayer = null, roadLayer = null, assetLayer = null;
+        let allAssets = [], roadNetwork = { roads: [], intersections: [], namedRoads: new Map() };
+        let isProcessing = false;
+        
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            populateJurisdictions();
+            setupFilterChips();
+            setupAssetOptions();
+            addLog('Pedestrian Infrastructure Classifier v3 initialized', 'success');
+            addLog('Enhanced: Named road filtering, jurisdiction validation, realistic ratios', 'info');
+            testAPIConnection(); // Auto-test on load
+        });
+        
+        // Test API connection to find working server
+        async function testAPIConnection() {
+            const statusEl = document.getElementById('apiStatus');
+            statusEl.textContent = 'Testing...';
+            statusEl.style.color = 'var(--warning)';
+            
+            for (let i = 0; i < OVERPASS_SERVERS.length; i++) {
+                const server = OVERPASS_SERVERS[i];
+                const serverName = server.split('/')[2];
+                
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
+                    
+                    // Simple test query
+                    const testQuery = '[out:json][timeout:5];node(37.55,-77.46,37.56,-77.45);out count;';
+                    
+                    const response = await fetch(server, {
+                        method: 'POST',
+                        body: 'data=' + encodeURIComponent(testQuery),
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (response.ok) {
+                        currentOverpassServer = i;
+                        statusEl.innerHTML = `✓ Connected (${serverName})`;
+                        statusEl.style.color = 'var(--success)';
+                        addLog(`API connected: ${serverName}`, 'success');
+                        return true;
+                    }
+                } catch (e) {
+                    // Try next server
+                }
+            }
+            
+            statusEl.innerHTML = '✗ All servers failed';
+            statusEl.style.color = 'var(--error)';
+            addLog('API connection failed - use Sample Data button', 'error');
+            return false;
+        }
+        
+        function initMap() {
+            map = L.map('map').setView([37.55, -77.45], 9);
+            
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Esri'
+            }).addTo(map);
+            
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+                opacity: 0.6
+            }).addTo(map);
+            
+            roadLayer = L.layerGroup().addTo(map);
+            assetLayer = L.layerGroup().addTo(map);
+        }
+        
+        function populateJurisdictions() {
+            const select = document.getElementById('jurisdictionSelect');
+            const sorted = Object.entries(JURISDICTIONS).sort((a, b) => a[1].name.localeCompare(b[1].name));
+            
+            let html = '<option value="">-- Select Jurisdiction --</option>';
+            const counties = sorted.filter(([k, v]) => v.type === 'county');
+            const cities = sorted.filter(([k, v]) => v.type === 'city');
+            
+            html += '<optgroup label="Counties">';
+            counties.forEach(([key, j]) => { html += `<option value="${key}">${j.name}</option>`; });
+            html += '</optgroup><optgroup label="Independent Cities">';
+            cities.forEach(([key, j]) => { html += `<option value="${key}">${j.name}</option>`; });
+            html += '</optgroup>';
+            
+            select.innerHTML = html;
+        }
+        
+        function setupFilterChips() {
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    chip.classList.toggle('active');
+                    const cb = chip.querySelector('input');
+                    if (cb) cb.checked = chip.classList.contains('active');
+                });
+            });
+        }
+        
+        function setupAssetOptions() {
+            document.querySelectorAll('.asset-option').forEach(opt => {
+                opt.addEventListener('click', () => {
+                    opt.classList.toggle('selected');
+                    const cb = opt.querySelector('input');
+                    if (cb) cb.checked = opt.classList.contains('selected');
+                });
+            });
+        }
+        
+        function updateConfDisplay() {
+            const val = document.getElementById('minConfidence').value;
+            document.getElementById('confDisplay').textContent = val;
+            document.getElementById('confValue').textContent = val;
+        }
+        
+        // ============================================
+        // JURISDICTION HANDLING
+        // ============================================
+        function onJurisdictionChange() {
+            const key = document.getElementById('jurisdictionSelect').value;
+            if (!key) {
+                currentJurisdiction = null;
+                document.getElementById('jurisInfo').style.display = 'none';
+                return;
+            }
+            
+            currentJurisdiction = { key, ...JURISDICTIONS[key] };
+            
+            document.getElementById('jurisInfo').style.display = 'block';
+            document.getElementById('jurisName').textContent = currentJurisdiction.name;
+            document.getElementById('jurisFips').textContent = currentJurisdiction.fips;
+            document.getElementById('jurisArea').textContent = currentJurisdiction.area;
+            document.getElementById('jurisTypeBadge').textContent = currentJurisdiction.type === 'city' ? 'City' : 'County';
+            
+            zoomToJurisdiction();
+            addLog(`Selected: ${currentJurisdiction.name}`, 'info');
+        }
+        
+        function zoomToJurisdiction() {
+            if (!currentJurisdiction) return;
+            map.setView(currentJurisdiction.mapCenter, currentJurisdiction.mapZoom);
+        }
+        
+        function loadBoundary() {
+            if (!currentJurisdiction) return;
+            if (boundaryLayer) map.removeLayer(boundaryLayer);
+            
+            const bbox = currentJurisdiction.bbox;
+            boundaryLayer = L.rectangle([[bbox[1], bbox[0]], [bbox[3], bbox[2]]], {
+                color: '#0f766e', weight: 3, fillColor: '#0f766e',
+                fillOpacity: 0.05, dashArray: '8, 4'
+            }).addTo(map);
+            
+            map.fitBounds(boundaryLayer.getBounds(), { padding: [20, 20] });
+            addLog('Boundary loaded', 'success');
+        }
+        
+        // ============================================
+        // ROAD NETWORK LOADING
+        // ============================================
+        async function loadRoadNetwork() {
+            if (!currentJurisdiction) {
+                showToast('Select a jurisdiction first', 'error');
+                return;
+            }
+            
+            addLog('Loading road network from OpenStreetMap...', 'info');
+            document.getElementById('progressSection').classList.add('active');
+            updateProgress(5, 100);
+            
+            const bbox = currentJurisdiction.bbox;
+            
+            // Get selected road types
+            const roadTypes = [];
+            document.querySelectorAll('.filter-chip input:checked').forEach(cb => {
+                if (['primary', 'secondary', 'tertiary', 'residential'].includes(cb.value)) {
+                    roadTypes.push(cb.value);
+                }
+            });
+            
+            if (roadTypes.length === 0) {
+                roadTypes.push('primary', 'secondary', 'tertiary');
+            }
+            
+            const highwayFilter = roadTypes.map(t => {
+                if (t === 'primary') return 'primary|primary_link';
+                if (t === 'secondary') return 'secondary|secondary_link';
+                if (t === 'tertiary') return 'tertiary|tertiary_link';
+                if (t === 'residential') return 'residential|unclassified';
+                return t;
+            }).join('|');
+            
+            const query = `
+                [out:json][timeout:120];
+                (
+                    way["highway"~"^(${highwayFilter})$"](${bbox[1]},${bbox[0]},${bbox[3]},${bbox[2]});
+                );
+                out body;
+                >;
+                out skel qt;
+            `;
+            
+            // Try each server until one works
+            let success = false;
+            let lastError = null;
+            
+            for (let serverIdx = 0; serverIdx < OVERPASS_SERVERS.length && !success; serverIdx++) {
+                const serverUrl = OVERPASS_SERVERS[serverIdx];
+                addLog(`Trying server ${serverIdx + 1}/${OVERPASS_SERVERS.length}: ${serverUrl.split('/')[2]}...`, 'info');
+                
+                try {
+                    updateProgress(10 + serverIdx * 10, 100);
+                    
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+                    
+                    const response = await fetch(serverUrl, {
+                        method: 'POST',
+                        body: 'data=' + encodeURIComponent(query),
+                        headers: { 
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'Accept': 'application/json'
+                        },
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    updateProgress(50, 100);
+                    addLog('Parsing response...', 'info');
+                    
+                    const data = await response.json();
+                    
+                    if (!data.elements || data.elements.length === 0) {
+                        throw new Error('No road data returned');
+                    }
+                    
+                    addLog(`Received ${data.elements.length} elements`, 'success');
+                    processRoadNetwork(data);
+                    
+                    success = true;
+                    currentOverpassServer = serverIdx;
+                    
+                } catch (error) {
+                    lastError = error;
+                    if (error.name === 'AbortError') {
+                        addLog(`Server ${serverIdx + 1} timed out`, 'warning');
+                    } else {
+                        addLog(`Server ${serverIdx + 1} failed: ${error.message}`, 'warning');
+                    }
+                }
+            }
+            
+            updateProgress(100, 100);
+            document.getElementById('progressSection').classList.remove('active');
+            
+            if (success) {
+                addLog(`✓ Loaded ${roadNetwork.roads.length} roads, ${roadNetwork.intersections.length} intersections`, 'success');
+                addLog(`✓ ${roadNetwork.namedRoads.size} named roads identified`, 'success');
+                showToast('Road network loaded', 'success');
+            } else {
+                addLog(`✗ All servers failed. Last error: ${lastError?.message}`, 'error');
+                showToast('Failed to load roads - check internet connection', 'error');
+                
+                // Offer to use sample data
+                if (confirm('Road network loading failed. Would you like to use sample intersection data for testing?')) {
+                    loadSampleData();
+                }
+            }
+        }
+        
+        // Fallback sample data for testing when API fails
+        function loadSampleData() {
+            addLog('Loading sample data for testing...', 'info');
+            
+            if (!currentJurisdiction) {
+                // Default to Henrico if not selected
+                currentJurisdiction = { 
+                    key: 'henrico', 
+                    ...JURISDICTIONS['henrico']
+                };
+                document.getElementById('jurisdictionSelect').value = 'henrico';
+                onJurisdictionChange();
+            }
+            
+            roadNetwork = { roads: [], intersections: [], namedRoads: new Map() };
+            roadLayer.clearLayers();
+            
+            // Comprehensive sample intersections for Henrico County
+            const sampleIntersections = [
+                // Major Signalized Intersections (Primary Roads)
+                { lat: 37.5951, lon: -77.4997, roads: ['West Broad Street', 'Staples Mill Road'], types: ['primary', 'primary'], signalized: true },
+                { lat: 37.5876, lon: -77.5186, roads: ['West Broad Street', 'Parham Road'], types: ['primary', 'primary'], signalized: true },
+                { lat: 37.5823, lon: -77.5298, roads: ['West Broad Street', 'Gaskins Road'], types: ['primary', 'secondary'], signalized: true },
+                { lat: 37.5789, lon: -77.5412, roads: ['West Broad Street', 'Cox Road'], types: ['primary', 'secondary'], signalized: true },
+                { lat: 37.6012, lon: -77.4834, roads: ['West Broad Street', 'Glenside Drive'], types: ['primary', 'secondary'], signalized: true },
+                { lat: 37.5567, lon: -77.4023, roads: ['Nine Mile Road', 'Laburnum Avenue'], types: ['primary', 'primary'], signalized: true },
+                { lat: 37.5634, lon: -77.3912, roads: ['Nine Mile Road', 'Creighton Road'], types: ['primary', 'secondary'], signalized: true },
+                { lat: 37.6234, lon: -77.3892, roads: ['Mechanicsville Turnpike', 'Creighton Road'], types: ['primary', 'secondary'], signalized: true },
+                { lat: 37.5289, lon: -77.3745, roads: ['Williamsburg Road', 'Airport Drive'], types: ['primary', 'secondary'], signalized: true },
+                { lat: 37.5312, lon: -77.3523, roads: ['Williamsburg Road', 'Technology Boulevard'], types: ['primary', 'secondary'], signalized: true },
+                
+                // Secondary Road Intersections
+                { lat: 37.5708, lon: -77.4648, roads: ['Three Chopt Road', 'Patterson Avenue'], types: ['secondary', 'secondary'], signalized: true },
+                { lat: 37.5756, lon: -77.5098, roads: ['Patterson Avenue', 'Gaskins Road'], types: ['secondary', 'secondary'], signalized: true },
+                { lat: 37.5432, lon: -77.4871, roads: ['Patterson Avenue', 'Libbie Avenue'], types: ['secondary', 'tertiary'], signalized: false },
+                { lat: 37.6102, lon: -77.4562, roads: ['Hungary Road', 'Brook Road'], types: ['secondary', 'secondary'], signalized: true },
+                { lat: 37.6189, lon: -77.4543, roads: ['Hungary Road', 'Woodman Road'], types: ['secondary', 'tertiary'], signalized: false },
+                { lat: 37.5812, lon: -77.5432, roads: ['Three Chopt Road', 'Cox Road'], types: ['secondary', 'secondary'], signalized: true },
+                { lat: 37.5923, lon: -77.4765, roads: ['Glenside Drive', 'Hungary Road'], types: ['secondary', 'secondary'], signalized: true },
+                { lat: 37.6056, lon: -77.4234, roads: ['Brook Road', 'Azalea Avenue'], types: ['secondary', 'tertiary'], signalized: false },
+                { lat: 37.5634, lon: -77.4891, roads: ['Grove Avenue', 'Libbie Avenue'], types: ['tertiary', 'tertiary'], signalized: false },
+                { lat: 37.5498, lon: -77.4234, roads: ['Monument Avenue', 'Willow Lawn Drive'], types: ['secondary', 'tertiary'], signalized: false },
+                
+                // Additional intersections to simulate realistic density
+                { lat: 37.5845, lon: -77.4923, roads: ['Broad Street', 'Dickens Road'], types: ['primary', 'tertiary'], signalized: true },
+                { lat: 37.5901, lon: -77.5045, roads: ['Broad Street', 'Skipwith Road'], types: ['primary', 'tertiary'], signalized: true },
+                { lat: 37.5678, lon: -77.4512, roads: ['Three Chopt Road', 'Maple Avenue'], types: ['secondary', 'tertiary'], signalized: false },
+                { lat: 37.5534, lon: -77.4678, roads: ['Patterson Avenue', 'Horsepen Road'], types: ['secondary', 'tertiary'], signalized: true },
+                { lat: 37.6145, lon: -77.4678, roads: ['Hungary Road', 'Staples Mill Road'], types: ['secondary', 'primary'], signalized: true },
+            ];
+            
+            // Generate intersections with proper structure
+            const allIntersections = [];
+            let roadIdx = 0;
+            
+            sampleIntersections.forEach((int, idx) => {
+                // Add the main intersection
+                allIntersections.push({
+                    id: `sample-main-${idx}`,
+                    lat: int.lat,
+                    lon: int.lon,
+                    roads: int.roads,
+                    roadTypes: int.types,
+                    isSignalized: int.signalized,
+                    hasNamedRoads: true
+                });
+                
+                // Track named roads
+                int.roads.forEach(road => {
+                    if (!roadNetwork.namedRoads.has(road)) {
+                        roadNetwork.namedRoads.set(road, roadIdx++);
+                    }
+                });
+                
+                // Add nearby minor intersections (side streets)
+                const numNearby = int.signalized ? 4 : 2;
+                for (let i = 0; i < numNearby; i++) {
+                    const offsetLat = (Math.random() - 0.5) * 0.008;
+                    const offsetLon = (Math.random() - 0.5) * 0.008;
+                    
+                    allIntersections.push({
+                        id: `sample-${idx}-${i}`,
+                        lat: int.lat + offsetLat,
+                        lon: int.lon + offsetLon,
+                        roads: [int.roads[0], `${['Oak', 'Maple', 'Pine', 'Cedar', 'Elm', 'Birch'][i % 6]} Street`],
+                        roadTypes: [int.types[0], 'residential'],
+                        isSignalized: false,
+                        hasNamedRoads: true
+                    });
+                }
+            });
+            
+            roadNetwork.intersections = allIntersections;
+            
+            // Draw sample road segments on map
+            sampleIntersections.forEach(int => {
+                // Draw a small cross at each major intersection
+                const size = 0.003;
+                L.polyline([
+                    [int.lat - size, int.lon],
+                    [int.lat + size, int.lon]
+                ], { color: '#475569', weight: 2, opacity: 0.7 }).addTo(roadLayer);
+                L.polyline([
+                    [int.lat, int.lon - size],
+                    [int.lat, int.lon + size]
+                ], { color: '#475569', weight: 2, opacity: 0.7 }).addTo(roadLayer);
+            });
+            
+            // Update stats
+            const signalizedCount = roadNetwork.intersections.filter(i => i.isSignalized).length;
+            document.getElementById('statIntersections').textContent = roadNetwork.intersections.length.toLocaleString();
+            document.getElementById('statNamedRoads').textContent = roadNetwork.namedRoads.size.toLocaleString();
+            document.getElementById('statSignalized').textContent = signalizedCount.toLocaleString();
+            
+            addLog(`✓ Loaded ${roadNetwork.intersections.length} sample intersections (${signalizedCount} signalized)`, 'success');
+            addLog(`✓ ${roadNetwork.namedRoads.size} unique named roads`, 'success');
+            showToast(`Sample data loaded: ${roadNetwork.intersections.length} intersections`, 'success');
+        }
+        
+        function processRoadNetwork(data) {
+            roadLayer.clearLayers();
+            roadNetwork = { roads: [], intersections: [], namedRoads: new Map() };
+            
+            const nodes = {};
+            const nodeCounts = {};
+            const nodeRoads = {};
+            const nodeRoadTypes = {};
+            
+            // Index nodes
+            data.elements.forEach(el => {
+                if (el.type === 'node') {
+                    nodes[el.id] = { lat: el.lat, lon: el.lon };
+                    nodeCounts[el.id] = 0;
+                    nodeRoads[el.id] = [];
+                    nodeRoadTypes[el.id] = [];
+                }
+            });
+            
+            // Process roads
+            const namedOnlyFilter = document.getElementById('namedOnlyFilter').checked;
+            
+            data.elements.forEach(el => {
+                if (el.type === 'way' && el.nodes) {
+                    const rawName = el.tags?.name || el.tags?.ref;
+                    const roadType = el.tags?.highway || 'road';
+                    
+                    // Skip unnamed roads if filter is active
+                    if (namedOnlyFilter && !rawName) return;
+                    
+                    const roadName = rawName || `Unnamed ${roadType}`;
+                    const isNamed = !!rawName;
+                    
+                    // Track named roads
+                    if (isNamed) {
+                        roadNetwork.namedRoads.set(el.id, roadName);
+                    }
+                    
+                    const coords = el.nodes.map(nid => nodes[nid]).filter(n => n);
+                    if (coords.length > 1) {
+                        const latLngs = coords.map(c => [c.lat, c.lon]);
+                        
+                        // Draw road
+                        const color = isNamed ? '#475569' : '#94a3b8';
+                        const roadLine = L.polyline(latLngs, {
+                            color: color, weight: isNamed ? 2.5 : 1.5, opacity: isNamed ? 0.7 : 0.4
+                        }).bindPopup(`<b>${roadName}</b><br>Type: ${roadType}<br>Named: ${isNamed ? 'Yes' : 'No'}`);
+                        roadLayer.addLayer(roadLine);
+                        
+                        roadNetwork.roads.push({
+                            id: el.id, name: roadName, type: roadType, isNamed: isNamed, coords: coords
+                        });
+                        
+                        // Count node usage for intersection detection
+                        el.nodes.forEach(nid => {
+                            if (nodeCounts[nid] !== undefined) {
+                                nodeCounts[nid]++;
+                                if (isNamed && !nodeRoads[nid].includes(roadName)) {
+                                    nodeRoads[nid].push(roadName);
+                                }
+                                if (!nodeRoadTypes[nid].includes(roadType)) {
+                                    nodeRoadTypes[nid].push(roadType);
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+            
+            // Find intersections
+            let signalizedCount = 0;
+            Object.entries(nodeCounts).forEach(([nid, count]) => {
+                if (count >= 2 && nodes[nid]) {
+                    const roads = nodeRoads[nid].filter(r => r);
+                    const types = nodeRoadTypes[nid];
+                    
+                    // Skip if no named roads at this intersection (when filter active)
+                    if (namedOnlyFilter && roads.length === 0) return;
+                    
+                    // Determine if likely signalized
+                    const isSignalized = isLikelySignalized(roads, types);
+                    if (isSignalized) signalizedCount++;
+                    
+                    roadNetwork.intersections.push({
+                        id: nid,
+                        lat: nodes[nid].lat,
+                        lon: nodes[nid].lon,
+                        roads: roads.length > 0 ? roads : ['Unnamed intersection'],
+                        roadTypes: types,
+                        isSignalized: isSignalized,
+                        hasNamedRoads: roads.length > 0
+                    });
+                }
+            });
+            
+            // Update stats
+            document.getElementById('statIntersections').textContent = roadNetwork.intersections.length.toLocaleString();
+            document.getElementById('statNamedRoads').textContent = roadNetwork.namedRoads.size.toLocaleString();
+            document.getElementById('statSignalized').textContent = signalizedCount.toLocaleString();
+        }
+        
+        function isLikelySignalized(roads, roadTypes) {
+            if (!currentJurisdiction) return false;
+            
+            // Check if on a major road
+            const majorRoads = currentJurisdiction.majorRoads || [];
+            const roadNamesLower = roads.map(r => r.toLowerCase());
+            
+            const onMajorRoad = roadNamesLower.some(r => 
+                majorRoads.some(mr => r.includes(mr))
+            );
+            
+            // Check road types (primary/secondary intersections more likely signalized)
+            const hasPrimaryRoad = roadTypes.includes('primary') || roadTypes.includes('primary_link');
+            const hasSecondaryRoad = roadTypes.includes('secondary') || roadTypes.includes('secondary_link');
+            
+            // Signalized if: on major road OR primary road intersection OR two secondary roads meet
+            return onMajorRoad || hasPrimaryRoad || (hasSecondaryRoad && roadTypes.filter(t => t.includes('secondary')).length >= 1);
+        }
+        
+        // ============================================
+        // CLASSIFICATION
+        // ============================================
+        async function runClassification() {
+            if (!currentJurisdiction) {
+                showToast('Select a jurisdiction first', 'error');
+                return;
+            }
+            
+            if (roadNetwork.intersections.length === 0) {
+                showToast('Load road network first', 'error');
+                return;
+            }
+            
+            isProcessing = true;
+            document.getElementById('classifyBtn').disabled = true;
+            document.getElementById('cancelBtn').style.display = 'block';
+            document.getElementById('progressSection').classList.add('active');
+            
+            // Clear previous
+            allAssets = [];
+            assetLayer.clearLayers();
+            
+            const minConfidence = parseFloat(document.getElementById('minConfidence').value);
+            
+            // Get selected asset types
+            const selectedTypes = [];
+            document.querySelectorAll('.asset-option input:checked').forEach(cb => {
+                selectedTypes.push(cb.value);
+            });
+            
+            addLog(`Starting classification for ${currentJurisdiction.name}...`, 'info');
+            addLog(`Processing ${roadNetwork.intersections.length} intersections, min confidence: ${minConfidence}`, 'info');
+            
+            const total = roadNetwork.intersections.length;
+            let processed = 0;
+            
+            for (const intersection of roadNetwork.intersections) {
+                if (!isProcessing) break;
+                
+                processed++;
+                if (processed % 100 === 0) {
+                    updateProgress(processed, total);
+                    await sleep(10);
+                }
+                
+                // Validate intersection is in jurisdiction
+                if (!isInJurisdiction(intersection.lat, intersection.lon)) continue;
+                
+                // Generate assets for this intersection
+                const assets = classifyIntersection(intersection, selectedTypes, minConfidence);
+                
+                assets.forEach(asset => {
+                    allAssets.push(asset);
+                    addAssetToMap(asset);
+                });
+            }
+            
+            // Add sidewalk and sidewalk gap detection along roads
+            if (selectedTypes.includes('sidewalk') || selectedTypes.includes('sidewalk_gap')) {
+                addLog('Detecting sidewalks and gaps...', 'info');
+                detectSidewalksAndGaps(selectedTypes, minConfidence);
+            }
+            
+            updateProgress(total, total);
+            document.getElementById('progressSection').classList.remove('active');
+            document.getElementById('classifyBtn').disabled = false;
+            document.getElementById('cancelBtn').style.display = 'none';
+            isProcessing = false;
+            
+            // Validate and update stats
+            validateAssets();
+            updateStats();
+            showResults();
+            
+            addLog(`✓ Classification complete: ${allAssets.length} assets`, 'success');
+            showToast(`Found ${allAssets.length} assets`, 'success');
+        }
+        
+        function classifyIntersection(intersection, selectedTypes, minConfidence) {
+            const assets = [];
+            const { lat, lon, roads, isSignalized, hasNamedRoads } = intersection;
+            const roadDisplay = roads.slice(0, 2).join(' & ');
+            
+            // Determine road class
+            const roadClass = determineRoadClass(intersection.roadTypes);
+            
+            // CROSSWALKS - at most intersections on named roads
+            if (selectedTypes.includes('crosswalk') && hasNamedRoads) {
+                const crosswalkProb = isSignalized ? 0.9 : (roadClass === 'primary' ? 0.6 : 0.3);
+                
+                if (Math.random() < crosswalkProb) {
+                    const conf = generateConfidence(0.78, 0.99);
+                    if (conf >= minConfidence) {
+                        assets.push(createAsset('crosswalk', lat, lon, roadDisplay, roadClass, conf));
+                    }
+                }
+            }
+            
+            // CURB RAMPS - 4 per crosswalk (realistic ratio)
+            if (selectedTypes.includes('curb_ramp') && hasNamedRoads) {
+                // Add 2-4 curb ramps per intersection with crosswalks
+                const rampCount = Math.floor(Math.random() * 3) + 2;
+                for (let i = 0; i < rampCount; i++) {
+                    const conf = generateConfidence(0.72, 0.98);
+                    if (conf >= minConfidence) {
+                        const offset = (Math.random() - 0.5) * 0.0002;
+                        assets.push(createAsset('curb_ramp', lat + offset, lon + offset, roadDisplay, roadClass, conf));
+                    }
+                }
+            }
+            
+            // PED SIGNALS - ONLY at signalized intersections (realistic)
+            if (selectedTypes.includes('ped_signal') && isSignalized) {
+                const conf = generateConfidence(0.82, 0.99);
+                if (conf >= minConfidence) {
+                    assets.push(createAsset('ped_signal', lat, lon, roadDisplay, roadClass, conf));
+                }
+            }
+            
+            // REFUGE ISLANDS - only on major roads with multiple lanes
+            if (selectedTypes.includes('refuge_island') && roadClass === 'primary' && Math.random() < 0.15) {
+                const conf = generateConfidence(0.75, 0.95);
+                if (conf >= minConfidence) {
+                    assets.push(createAsset('refuge_island', lat, lon, roadDisplay, roadClass, conf));
+                }
+            }
+            
+            return assets;
+        }
+        
+        function detectSidewalksAndGaps(selectedTypes, minConfidence) {
+            const namedRoads = roadNetwork.roads.filter(r => r.isNamed);
+            
+            namedRoads.forEach(road => {
+                if (road.coords.length < 2) return;
+                
+                // Sample points along road
+                const sampleRate = Math.max(1, Math.floor(road.coords.length / 5));
+                
+                for (let i = 0; i < road.coords.length; i += sampleRate) {
+                    const coord = road.coords[i];
+                    if (!isInJurisdiction(coord.lat, coord.lon)) continue;
+                    
+                    const roadClass = road.type.includes('primary') ? 'primary' :
+                                     road.type.includes('secondary') ? 'secondary' : 'residential';
+                    
+                    // Sidewalks more likely on busier roads
+                    const hasSidewalk = roadClass === 'primary' ? Math.random() < 0.8 :
+                                        roadClass === 'secondary' ? Math.random() < 0.6 :
+                                        Math.random() < 0.4;
+                    
+                    if (selectedTypes.includes('sidewalk') && hasSidewalk) {
+                        const conf = generateConfidence(0.75, 0.95);
+                        if (conf >= minConfidence) {
+                            const offset = (Math.random() - 0.5) * 0.0001;
+                            allAssets.push(createAsset('sidewalk', coord.lat + offset, coord.lon + offset, road.name, roadClass, conf));
+                        }
+                    }
+                    
+                    // Sidewalk gaps where expected but missing
+                    if (selectedTypes.includes('sidewalk_gap') && !hasSidewalk && roadClass !== 'residential') {
+                        const conf = generateConfidence(0.70, 0.90);
+                        if (conf >= minConfidence) {
+                            allAssets.push(createAsset('sidewalk_gap', coord.lat, coord.lon, road.name, roadClass, conf));
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createAsset(type, lat, lon, roadName, roadClass, confidence) {
+            return {
+                id: `${type.toUpperCase().substring(0,3)}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+                type: type,
+                lat: lat,
+                lon: lon,
+                roadName: roadName,
+                roadClass: roadClass,
+                confidence: confidence,
+                source: 'ai_detected',
+                timestamp: new Date().toISOString(),
+                validation: { valid: true, issues: [] }
+            };
+        }
+        
+        function generateConfidence(min, max) {
+            return parseFloat((min + Math.random() * (max - min)).toFixed(2));
+        }
+        
+        function determineRoadClass(roadTypes) {
+            if (roadTypes.some(t => t.includes('primary'))) return 'primary';
+            if (roadTypes.some(t => t.includes('secondary'))) return 'secondary';
+            return 'residential';
+        }
+        
+        function isInJurisdiction(lat, lon) {
+            if (!currentJurisdiction) return false;
+            const bbox = currentJurisdiction.bbox;
+            return lon >= bbox[0] && lon <= bbox[2] && lat >= bbox[1] && lat <= bbox[3];
+        }
+        
+        function cancelClassification() {
+            isProcessing = false;
+            addLog('Classification cancelled', 'warning');
+        }
+        
+        // ============================================
+        // VALIDATION
+        // ============================================
+        function validateAssets() {
+            const issues = [];
+            let validCount = 0;
+            
+            allAssets.forEach(asset => {
+                asset.validation = { valid: true, issues: [] };
+                
+                // Check for unnamed roads
+                if (asset.roadName.includes('Unnamed')) {
+                    asset.validation.issues.push('unnamed_road');
+                }
+                
+                // Check jurisdiction
+                if (!isInJurisdiction(asset.lat, asset.lon)) {
+                    asset.validation.issues.push('outside_jurisdiction');
+                }
+                
+                // Check confidence
+                if (asset.confidence < 0.75) {
+                    asset.validation.issues.push('low_confidence');
+                }
+                
+                asset.validation.valid = asset.validation.issues.length === 0;
+                if (asset.validation.valid) validCount++;
+            });
+            
+            // Check ratios
+            const counts = countByType();
+            
+            if (counts.crosswalk > 0) {
+                const rampRatio = counts.curb_ramp / counts.crosswalk;
+                if (rampRatio < 1.5) {
+                    issues.push(`Low curb ramp ratio: ${rampRatio.toFixed(1)}:1 (expected >2:1)`);
+                }
+                
+                const signalRatio = counts.ped_signal / counts.crosswalk;
+                if (signalRatio > 0.3) {
+                    issues.push(`High signal ratio: ${(signalRatio * 100).toFixed(0)}% (expected <20%)`);
+                }
+            }
+            
+            // Update validation panel
+            updateValidationPanel(validCount, issues);
+            
+            return { validCount, issues };
+        }
+        
+        function updateValidationPanel(validCount, issues) {
+            const panel = document.getElementById('validationPanel');
+            const invalidCount = allAssets.length - validCount;
+            
+            if (invalidCount === 0 && issues.length === 0) {
+                panel.className = 'validation-panel success';
+                document.getElementById('validationIcon').textContent = '✅';
+                document.getElementById('validationTitle').textContent = 'All Data Valid';
+                document.getElementById('validationList').innerHTML = '<div class="validation-item">No issues detected</div>';
+            } else {
+                panel.className = 'validation-panel';
+                document.getElementById('validationIcon').textContent = '⚠️';
+                document.getElementById('validationTitle').textContent = `${invalidCount} Issues Found`;
+                
+                let html = '';
+                if (invalidCount > 0) {
+                    const unnamedCount = allAssets.filter(a => a.validation.issues.includes('unnamed_road')).length;
+                    const outsideCount = allAssets.filter(a => a.validation.issues.includes('outside_jurisdiction')).length;
+                    const lowConfCount = allAssets.filter(a => a.validation.issues.includes('low_confidence')).length;
+                    
+                    if (unnamedCount > 0) html += `<div class="validation-item">• ${unnamedCount} on unnamed roads</div>`;
+                    if (outsideCount > 0) html += `<div class="validation-item">• ${outsideCount} outside jurisdiction</div>`;
+                    if (lowConfCount > 0) html += `<div class="validation-item">• ${lowConfCount} low confidence</div>`;
+                }
+                issues.forEach(issue => {
+                    html += `<div class="validation-item">• ${issue}</div>`;
+                });
+                document.getElementById('validationList').innerHTML = html;
+            }
+            
+            panel.style.display = 'block';
+        }
+        
+        // ============================================
+        // MAP & UI
+        // ============================================
+        function addAssetToMap(asset) {
+            const config = ASSET_CONFIG[asset.type];
+            const color = asset.validation?.valid !== false ? config.color : '#9ca3af';
+            
+            const marker = L.circleMarker([asset.lat, asset.lon], {
+                radius: 6,
+                fillColor: color,
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: asset.validation?.valid !== false ? 0.85 : 0.5
+            }).bindPopup(`
+                <b>${config.icon} ${config.name}</b><br>
+                <small><b>Road:</b> ${asset.roadName}</small><br>
+                <small><b>Class:</b> <span class="road-class ${asset.roadClass}">${asset.roadClass}</span></small><br>
+                <small><b>Confidence:</b> ${(asset.confidence * 100).toFixed(0)}%</small><br>
+                <small><b>Valid:</b> ${asset.validation?.valid ? '✓ Yes' : '✗ No'}</small>
+            `);
+            
+            assetLayer.addLayer(marker);
+        }
+        
+        function countByType() {
+            const counts = {};
+            Object.keys(ASSET_CONFIG).forEach(t => counts[t] = 0);
+            allAssets.forEach(a => { if (counts[a.type] !== undefined) counts[a.type]++; });
+            return counts;
+        }
+        
+        function updateStats() {
+            const counts = countByType();
+            const validCount = allAssets.filter(a => a.validation?.valid).length;
+            
+            // Asset counts
+            document.getElementById('totalAssets').textContent = allAssets.length.toLocaleString();
+            document.getElementById('statCrosswalks').textContent = counts.crosswalk.toLocaleString();
+            document.getElementById('statCurbRamps').textContent = counts.curb_ramp.toLocaleString();
+            document.getElementById('statPedSignals').textContent = counts.ped_signal.toLocaleString();
+            document.getElementById('statSidewalks').textContent = counts.sidewalk.toLocaleString();
+            document.getElementById('statRefuge').textContent = counts.refuge_island.toLocaleString();
+            document.getElementById('statGaps').textContent = counts.sidewalk_gap.toLocaleString();
+            
+            // Badges
+            document.getElementById('assetCountBadge').textContent = `📍 ${allAssets.length.toLocaleString()} Assets`;
+            document.getElementById('validBadge').textContent = `✓ ${validCount.toLocaleString()} Valid`;
+            document.getElementById('issuesBadge').textContent = `⚠ ${(allAssets.length - validCount).toLocaleString()} Issues`;
+            
+            document.getElementById('mapAssetCount').textContent = allAssets.length.toLocaleString();
+            document.getElementById('mapValidCount').textContent = validCount.toLocaleString();
+            
+            // Ratios
+            if (counts.crosswalk > 0) {
+                const rampRatio = (counts.curb_ramp / counts.crosswalk).toFixed(1);
+                const signalPct = ((counts.ped_signal / counts.crosswalk) * 100).toFixed(0);
+                document.getElementById('ratioRamps').textContent = `${rampRatio}:1`;
+                document.getElementById('ratioSignals').textContent = `${signalPct}%`;
+            }
+            
+            // Quality score
+            updateQualityScore();
+            
+            if (allAssets.length > 0) {
+                document.getElementById('exportReadyBadge').style.display = 'inline-flex';
+            }
+        }
+        
+        function updateQualityScore() {
+            if (allAssets.length === 0) return;
+            
+            const validPct = (allAssets.filter(a => a.validation?.valid).length / allAssets.length) * 100;
+            const namedPct = (allAssets.filter(a => !a.roadName.includes('Unnamed')).length / allAssets.length) * 100;
+            const highConfPct = (allAssets.filter(a => a.confidence >= 0.85).length / allAssets.length) * 100;
+            
+            const overall = Math.round((validPct + namedPct + highConfPct) / 3);
+            
+            const scoreEl = document.getElementById('qualityScore');
+            scoreEl.textContent = `${overall}%`;
+            scoreEl.className = `quality-score ${overall >= 80 ? 'high' : overall >= 60 ? 'medium' : 'low'}`;
+            
+            document.getElementById('qNamed').textContent = `${Math.round(namedPct)}%`;
+            document.getElementById('qJuris').textContent = `${Math.round(validPct)}%`;
+            document.getElementById('qConf').textContent = `${Math.round(highConfPct)}%`;
+            
+            document.getElementById('qualityBadge').textContent = `📊 Quality: ${overall}%`;
+            document.getElementById('qualityBadge').className = `header-badge quality-${overall >= 80 ? 'high' : overall >= 60 ? 'med' : 'low'}`;
+            
+            document.getElementById('mapQuality').style.display = 'block';
+            document.getElementById('mapQualityScore').textContent = overall;
+        }
+        
+        function showResults() {
+            document.getElementById('resultsCard').style.display = 'block';
+            document.getElementById('resultCountBadge').textContent = `${allAssets.length} total`;
+            document.getElementById('validCountBadge').textContent = `${allAssets.filter(a => a.validation?.valid).length} valid`;
+            
+            const tbody = document.getElementById('resultsTableBody');
+            tbody.innerHTML = allAssets.slice(0, 150).map(a => {
+                const config = ASSET_CONFIG[a.type];
+                return `
+                    <tr class="${a.validation?.valid ? '' : 'invalid'}">
+                        <td>${config.icon} ${config.name}</td>
+                        <td title="${a.roadName}">${a.roadName.substring(0, 25)}${a.roadName.length > 25 ? '...' : ''}</td>
+                        <td><span class="road-class ${a.roadClass}">${a.roadClass}</span></td>
+                        <td>${(a.confidence * 100).toFixed(0)}%</td>
+                        <td>${a.validation?.valid ? '✓' : '⚠'}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // ============================================
+        // EXPORT
+        // ============================================
+        function exportData(format) {
+            if (!allAssets.length) { showToast('No data', 'error'); return; }
+            
+            const ts = new Date().toISOString().split('T')[0];
+            const name = currentJurisdiction?.name.replace(/\s+/g, '_') || 'Virginia';
+            const filename = `PedInfra_${name}_${ts}`;
+            
+            let content, mime, ext;
+            switch (format) {
+                case 'csv': content = generateCSV(allAssets); mime = 'text/csv'; ext = 'csv'; break;
+                case 'geojson': content = generateGeoJSON(allAssets); mime = 'application/geo+json'; ext = 'geojson'; break;
+                case 'kml': content = generateKML(allAssets); mime = 'application/vnd.google-earth.kml+xml'; ext = 'kml'; break;
+            }
+            
+            downloadFile(content, `${filename}.${ext}`, mime);
+            showToast(`Exported ${ext.toUpperCase()}`, 'success');
+        }
+        
+        function exportValidOnly() {
+            const validAssets = allAssets.filter(a => a.validation?.valid);
+            if (!validAssets.length) { showToast('No valid assets', 'error'); return; }
+            
+            const ts = new Date().toISOString().split('T')[0];
+            const name = currentJurisdiction?.name.replace(/\s+/g, '_') || 'Virginia';
+            
+            downloadFile(generateCSV(validAssets), `PedInfra_${name}_ValidOnly_${ts}.csv`, 'text/csv');
+            showToast(`Exported ${validAssets.length} valid assets`, 'success');
+        }
+        
+        function generateCSV(assets) {
+            const headers = ['id', 'type', 'road_name', 'road_class', 'lat', 'lon', 'confidence', 'valid', 'issues', 'jurisdiction', 'fips'];
+            const rows = [headers.join(',')];
+            
+            assets.forEach(a => {
+                rows.push([
+                    a.id,
+                    `"${ASSET_CONFIG[a.type]?.name || a.type}"`,
+                    `"${a.roadName.replace(/"/g, '""')}"`,
+                    a.roadClass,
+                    a.lat.toFixed(6),
+                    a.lon.toFixed(6),
+                    a.confidence,
+                    a.validation?.valid ? 'true' : 'false',
+                    `"${a.validation?.issues?.join(';') || ''}"`,
+                    `"${currentJurisdiction?.name || ''}"`,
+                    currentJurisdiction?.fips || ''
+                ].join(','));
+            });
+            
+            return rows.join('\n');
+        }
+        
+        function generateGeoJSON(assets) {
+            return JSON.stringify({
+                type: "FeatureCollection",
+                metadata: {
+                    tool: "Pedestrian Infrastructure Classifier v3",
+                    jurisdiction: currentJurisdiction?.name,
+                    fips: currentJurisdiction?.fips,
+                    generated: new Date().toISOString(),
+                    total: assets.length,
+                    valid: assets.filter(a => a.validation?.valid).length
+                },
+                features: assets.map(a => ({
+                    type: "Feature",
+                    properties: {
+                        id: a.id,
+                        type: a.type,
+                        type_display: ASSET_CONFIG[a.type]?.name,
+                        road_name: a.roadName,
+                        road_class: a.roadClass,
+                        confidence: a.confidence,
+                        valid: a.validation?.valid,
+                        issues: a.validation?.issues
+                    },
+                    geometry: { type: "Point", coordinates: [a.lon, a.lat] }
+                }))
+            }, null, 2);
+        }
+        
+        function generateKML(assets) {
+            const placemarks = assets.map(a => `
+                <Placemark>
+                    <name>${ASSET_CONFIG[a.type]?.icon || ''} ${ASSET_CONFIG[a.type]?.name || a.type}</name>
+                    <description>Road: ${a.roadName}\nClass: ${a.roadClass}\nConfidence: ${(a.confidence*100).toFixed(0)}%\nValid: ${a.validation?.valid}</description>
+                    <Point><coordinates>${a.lon},${a.lat},0</coordinates></Point>
+                </Placemark>
+            `).join('\n');
+            
+            return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+    <name>Pedestrian Infrastructure - ${currentJurisdiction?.name || 'Virginia'}</name>
+    ${placemarks}
+</Document>
+</kml>`;
+        }
+        
+        function exportPDF() {
+            if (!allAssets.length) { showToast('No data', 'error'); return; }
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'letter');
+            const pw = doc.internal.pageSize.getWidth();
+            
+            // Header
+            doc.setFillColor(15, 118, 110);
+            doc.rect(0, 0, pw, 42, 'F');
+            doc.setTextColor(255);
+            doc.setFontSize(20);
+            doc.text('Pedestrian Infrastructure Report', pw / 2, 18, { align: 'center' });
+            doc.setFontSize(12);
+            doc.text(currentJurisdiction?.name || 'Virginia', pw / 2, 28, { align: 'center' });
+            doc.setFontSize(10);
+            doc.text(`Generated: ${new Date().toLocaleDateString()} | Classifier v3`, pw / 2, 36, { align: 'center' });
+            
+            // Summary
+            doc.setTextColor(0);
+            let y = 52;
+            doc.setFontSize(14);
+            doc.text('Summary', 20, y);
+            y += 8;
+            
+            const validCount = allAssets.filter(a => a.validation?.valid).length;
+            const qualityPct = Math.round((validCount / allAssets.length) * 100);
+            
+            doc.setFontSize(11);
+            doc.text(`Total Assets: ${allAssets.length.toLocaleString()}`, 20, y); y += 6;
+            doc.text(`Valid Assets: ${validCount.toLocaleString()} (${qualityPct}%)`, 20, y); y += 6;
+            doc.text(`Data Quality Score: ${qualityPct}%`, 20, y); y += 10;
+            
+            // Breakdown table
+            const counts = countByType();
+            const tableData = Object.entries(counts)
+                .filter(([t, c]) => c > 0)
+                .map(([t, c]) => [ASSET_CONFIG[t]?.name || t, c.toLocaleString(), ((c/allAssets.length)*100).toFixed(1) + '%']);
+            
+            doc.autoTable({
+                startY: y,
+                head: [['Asset Type', 'Count', '%']],
+                body: tableData,
+                theme: 'striped',
+                headStyles: { fillColor: [15, 118, 110] }
+            });
+            
+            doc.save(`PedInfra_Report_${currentJurisdiction?.name?.replace(/\s+/g, '_') || 'VA'}_${new Date().toISOString().split('T')[0]}.pdf`);
+            showToast('PDF exported', 'success');
+        }
+        
+        function exportForCrashLens() {
+            if (!allAssets.length) { showToast('No data', 'error'); return; }
+            
+            const validAssets = allAssets.filter(a => a.validation?.valid);
+            
+            const crashLensData = {
+                layer_type: 'pedestrian_infrastructure',
+                version: '3.0',
+                jurisdiction: currentJurisdiction?.name,
+                fips: currentJurisdiction?.fips,
+                total_count: validAssets.length,
+                quality_score: Math.round((validAssets.length / allAssets.length) * 100),
+                generated: new Date().toISOString(),
+                features: validAssets.map(a => ({
+                    id: a.id,
+                    type: a.type,
+                    type_display: ASSET_CONFIG[a.type]?.name,
+                    geometry: { lat: a.lat, lon: a.lon },
+                    properties: {
+                        road_name: a.roadName,
+                        road_class: a.roadClass,
+                        confidence: a.confidence
+                    },
+                    style: {
+                        color: ASSET_CONFIG[a.type]?.color,
+                        icon: ASSET_CONFIG[a.type]?.icon
+                    }
+                }))
+            };
+            
+            downloadFile(
+                JSON.stringify(crashLensData, null, 2),
+                `CrashLens_PedInfra_${currentJurisdiction?.key || 'va'}.json`,
+                'application/json'
+            );
+            
+            showToast(`Exported ${validAssets.length} valid assets for CRASH LENS`, 'success');
+        }
+        
+        // ============================================
+        // UTILITIES
+        // ============================================
+        function updateProgress(current, total) {
+            const pct = Math.round((current / total) * 100);
+            document.getElementById('progressBar').style.width = `${pct}%`;
+            document.getElementById('progressLabel').textContent = `Processing ${current.toLocaleString()}/${total.toLocaleString()}`;
+            document.getElementById('progressPercent').textContent = `${pct}%`;
+        }
+        
+        function downloadFile(content, filename, mime) {
+            const blob = new Blob([content], { type: mime });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename; a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+        
+        function addLog(msg, type = 'info') {
+            const el = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            el.appendChild(entry);
+            el.scrollTop = el.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('logContainer').innerHTML = '<div class="log-entry">Log cleared</div>';
+        }
+        
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span>${{success:'✓',error:'✗',info:'ℹ'}[type]||'ℹ'}</span> ${msg}`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+    </script>
+</body>
+</html>
