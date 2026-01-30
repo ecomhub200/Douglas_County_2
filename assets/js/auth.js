@@ -95,6 +95,10 @@ const CrashLensAuth = {
   signInWithEmail: async function(email, password) {
     try {
       const result = await firebase.auth().signInWithEmailAndPassword(email, password);
+
+      // Set currentUser immediately to avoid race conditions
+      this.currentUser = result.user;
+
       console.log('Email sign in successful');
       return result.user;
     } catch (error) {
@@ -114,6 +118,9 @@ const CrashLensAuth = {
       if (displayName) {
         await result.user.updateProfile({ displayName });
       }
+
+      // Set currentUser immediately to avoid race condition with sendVerificationEmail
+      this.currentUser = result.user;
 
       console.log('Email sign up successful');
       return result.user;

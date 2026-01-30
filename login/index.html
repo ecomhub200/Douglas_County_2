@@ -737,8 +737,27 @@
     // Check if already authenticated
     document.addEventListener('DOMContentLoaded', function() {
       if (window.isFirebaseConfigured) {
-        // Check for verified=true query param (user clicked email link)
         const urlParams = new URLSearchParams(window.location.search);
+        const reason = urlParams.get('reason');
+        const emailParam = urlParams.get('email');
+
+        // Handle redirect reasons with user-friendly messages
+        if (reason === 'verify_email') {
+          // User was redirected because email not verified
+          CrashLensAuth.init(async (user) => {
+            if (user) {
+              showVerificationPending(user.email);
+              showError('Please verify your email address to access Crash Lens. Check your inbox (and spam folder) for the verification link.');
+            } else if (emailParam) {
+              // User not logged in but we have email - show message
+              switchTab('signin');
+              showError('Please sign in and verify your email address to access Crash Lens.');
+            }
+          });
+          return;
+        }
+
+        // Check for verified=true query param (user clicked email link)
         if (urlParams.get('verified') === 'true') {
           // User came back from email verification
           handleVerificationReturn();
@@ -889,6 +908,14 @@
 
         // Check if email needs verification
         if (CrashLensAuth.needsEmailVerification()) {
+          // Auto-send verification email for unverified users
+          try {
+            await CrashLensAuth.sendVerificationEmail();
+            showSuccess('Verification email sent! Please check your inbox (and spam folder).');
+          } catch (emailErr) {
+            // Don't fail sign-in if email send fails (might be rate limited)
+            console.warn('Could not auto-send verification email:', emailErr);
+          }
           showVerificationPending(email);
           setLoading('signinBtn', false);
         } else {
