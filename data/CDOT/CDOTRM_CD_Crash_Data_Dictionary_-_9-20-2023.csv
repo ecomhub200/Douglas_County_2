@@ -1,0 +1,84 @@
+﻿2021+ Crash Listing Data Dictionary,"August 23, 2024"
+,
+Field,Description
+CUID,Colorado Department of Transportation (CDOT) Crash Database Identifier
+System Code,Roadway Classification
+Rd_Number,"State Highway Route and Section for Interstate, State Highway or Frontage Road"
+,County Code for County Road
+,City Code for City Street
+Rd_Section,"Highway Milepoint for Interstate, State Highway or Frontage Road"
+,Location 1 Street Name Abbreviation for County Road or City Street
+City_Street,"Interchange Ramp Code for Interstate, State Highway or Frontage Road"
+,Location 2 Street Name Abbreviation for County Road or City Street
+Crash Date,Month/Day/Year
+Crash Time,Hour (2400)
+Agency Id,Reporting Law Enforcement Agency
+City,City Where Crash Occurred
+County,County Where Crash Occurred
+Latitude,Latitude Coordinate
+Longitude,Longitude Coordinate
+Location 1,Location Where Crash Occurred
+Link,Distance of Location 1 from Location 2
+Location 2,Reference Point of Crash in Relation to Location 1
+Location,"Location of Crash in Relation to Roadway (On Road, Off Road Right, Etc.)"
+Road Description,Road Description
+First HE,First Harmful Event
+Second HE,Second Harmul Event
+Third HE,Third Harmful Event
+Fourth HE,Fourth Harmful Event
+MHE,Most Harmful Event
+Crash Type,Crash Type
+Approach Overtaking,Approach Turn or Overtaking Turn Crash
+Wild Animal,Wild Animal Type (only for Wild Animal Crash)
+Number Killed,Persons Killed
+Number Injured,Persons Injured
+Injury 00,Persons Not Injured (O)
+Injury 01,Persons w/ Possible Injury (C)
+Injury 02,Persons w/ Suspected Minor Injury (B)
+Injury 03,Persons w/ Suspected Serious Injury (A)
+Injury 04,Persons Killed (K)
+Total Vehicles,Number of Vehicles
+Secondary Crash,Crashes That Follow Previous Crashes or Other Incidents
+Construction Zone,Crashes Occurring within Construction Zone
+School Zone,Crashes Occurring within School Zone
+Road Contour Curves,Notes if Roadway is Straight or Curved (Right or Left) at Location of Crash
+Road Contour Grade,Notes if Roadway is Level or Inclined
+Road Condition,Roadway Condition
+Lighting Condition,Roadway Lighting
+"Weather Condition, Weather Condition 2",Weather Condition
+Lane Position,Notes Lane Number Position Where Crash Occurred (Left to Right)
+"TU-1 Direction, TU-2 Direction",Traffic Unit (Vehicle) Direction of Travel
+"TU-1 Movement, TU-2 Movement",Traffic Unit (Vehicle) Movement
+"TU-1 Type, TU-2 Type",Traffic Unit (Vehicle) Type
+"TU-1 Special Function, TU-2 Special Function",Traffic Unit (Vehicle) Special Function
+"TU-1 Autonomous Vehicle, TU-2 Autonomous Vehicle",Traffic Unit (Vehicle) Autonomous Vehicle Capability
+"TU-1 Hit And Run, TU-2 Hit And Run",Traffic Unit (Vehicle) Leaving Scene
+"TU-1 Speed Limit, TU-2 Speed Limit",Traffic Unit (Vehicle) Roadway Speed Limit
+"TU-1 Estimated Speed, TU-2 Estimated Speed",Traffic Unit (Vehicle) Estimated Vehicle Speed
+"TU-1 Speed, TU-2 Speed",Traffic Unit (Vehicle) Driver's Stated Speed
+"TU-1 Driver Action, TU-2 Driver Action",Traffic Unit (Vehicle) Driver Action (Officer's Opinion Only)
+"TU-1 Human Contributing Factor, TU-2 Human Contributing Factor",Traftic Unit (Vehicle) Driver Human Contributing Factor (Officer's Opinion Only)
+"TU-1 Age, TU-2 Age",Traffic Unit (Vehicle) Driver Age
+"TU-1 Sex, TU-2 Sex",Traffic Unit (Vehicle) Driver Gender
+"TU-1 Safety System Available, TU-2 Safety System Available ",Traffic Unit (Vehicle) Driver Safety Equipment - Available
+"TU-1 Safety Restraint Use, TU-2 Safety Restraint Use",Traffic Unit (Vehicle) Driver Safety Equipment - Use
+"TU-1 Safety Helmet, TU-2 Safety Helmet",Traffic Unit (Vehicle) Driver Safety Equipment - Helmet
+"TU-1 Alcohol Suspected, TU-2 Alcohol Suspected",Traffic Unit (Vehicle) Driver Alcohol Suspected (Officer's Opinion Only)
+"TU-1 Marijuana Suspected, TU-2 Marijuana Suspected",Traffic Unit (Vehicle) Driver Marijuana Suspected (Officer's Opinion Only)
+"TU-1 Other Drugs Suspected, TU-2 Other Drugs Suspected ",Traffic Unit (Vehicle) Driver Other Drugs/Impairment Suspected (Officer's Opinion Only)
+"TU-1 NM Direction, TU-2 NM Direction",Traffic Unit (Non-Motorist) Direction of Travel
+"TU-1 NM Movement, TU-2 NM Movement",Traffic Unit (Non-Motorist) Movement
+"TU-1 NM Facility Available, TU-2 NM Facility Available",Traffic Unit (Non-Motorist) Designated Bicycle/Pedestrian Facility (Zone) Available
+"TU-1 NM Location, TU-2 NM Location",Traffic Unit (Non-Motorist) Location
+"TU-1 NM Type, TU-2 NM Type",Traffic Unit (Non-Motorist) Type
+"TU-1 NM Age, TU-2 NM Age",Traffic Unit (Non-Motorist) Age
+"TU-1 NM Sex, TU-2 NM Sex",Traffic Unit (Non-Motorist) Gender
+"TU-1 NM Action, TU-2 NM Action",Traffic Unit (Non-Motorist) Action (Officer's Opinion Only)
+"TU-1 NM Human Contributing Factor, TU-2 NM Human Contributing Factor",Traftic Unit (Non-Motorist) Human Contributing Factor (Officer's Opinion Only)
+"TU-1 NM Safety Helmet, TU-2 NM Safety Helmet ",Traffic Unit (Non-Motorist) Safety Equipment - Helmet
+"TU-1 NM Alcohol Suspected, TU-2 NM Alcohol Suspected ",Traffic Unit (Non-Motorist) Alcohol Suspected (Officer's Opinion Only)
+"TU-1 NM Marijuana Suspected, TU-2 NM Marijuana Suspected",Traffic Unit (Non-Motorist) Marijuana Suspected (Officer's Opinion Only)
+"TU-1 NM Other Drugs Suspected, TU-2 NM Other Drugs Suspected ",Traffic Unit (Non-Motorist) Other Drugs/Impairment Suspected (Officer's Opinion Only)
+Record Status,CDOT Coding Status of Record
+Processing Status,CDOT Processing Status of Record
+Last Updated,Date Crash Record Was Last Completed or Updated
