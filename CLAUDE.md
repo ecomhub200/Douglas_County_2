@@ -1,4 +1,12 @@
-# Claude Guidelines for Virginia Crash Analysis Tool
+# Claude Guidelines for Douglas County (Colorado) Crash Analysis Tool
+
+## Project Overview
+
+This is a **Colorado-specific deployment** of the Crash Lens tool for **Douglas County, Colorado**. The tool analyzes crash data from the Colorado Department of Transportation (CDOT) Crash Data system.
+
+**Important**: This repository is dedicated to Colorado/Douglas County. Virginia has a separate repository.
+
+---
 
 ## Role & Expertise
 
@@ -6,7 +14,8 @@ When working on this project, act as:
 
 ### World-Class Traffic Safety Engineer
 - Apply deep knowledge of **traffic safety principles**, crash analysis methodologies, and countermeasure effectiveness
-- Understand **Virginia-specific traffic laws**, VDOT standards, and DMV crash reporting requirements
+- Understand **Colorado-specific traffic laws**, CDOT standards, and state crash reporting requirements
+- Familiarity with Colorado reporting agencies: CSP (Colorado State Patrol), DSO (Douglas County Sheriff), PPD (Parker PD), CRPD (Castle Rock PD), LNTRPD (Lone Tree PD)
 - Apply expertise in:
   - Crash data analysis and interpretation
   - Highway Safety Improvement Program (HSIP) methodologies
@@ -36,6 +45,76 @@ When working on this project, act as:
 - Translate complex safety data into **clear, actionable visualizations**
 - Ensure tools meet the practical needs of traffic engineers and safety analysts
 - Balance technical sophistication with ease of use for non-technical users
+
+---
+
+## CDOT Data Format & Preprocessing
+
+### Data Source
+- **Provider**: Colorado Department of Transportation (CDOT)
+- **Coverage**: Douglas County, Colorado
+- **Date Range**: 2021-2025
+- **Format**: CSV export from CDOT Crash Data system
+
+### Raw CDOT Data Structure
+
+The raw CDOT data uses different column names and structures than the tool expects. Key differences:
+
+| Tool Field | CDOT Column | Notes |
+|------------|-------------|-------|
+| Crash ID | `CUID` | Colorado unique identifier |
+| Year | *Derived* | Extract from `Crash Date` |
+| Date | `Crash Date` | Format: M/D/YYYY |
+| Time | `Crash Time` | Format: HH:MM:SS |
+| Severity | *Derived* | Calculate from Injury columns |
+| K (Fatal) | `Injury 04` | Persons killed |
+| A (Serious) | `Injury 03` | Suspected serious injury |
+| B (Minor) | `Injury 02` | Suspected minor injury |
+| C (Possible) | `Injury 01` | Possible injury |
+| O (None) | `Injury 00` | No injury |
+| Collision Type | `Crash Type` | Different classification system |
+| Pedestrian | *Derived* | From `TU-X NM Type` columns |
+| Bicycle | *Derived* | From `TU-X NM Type` columns |
+| Route | *Composite* | `System Code` + `Rd_Number` + `Location 1` |
+| Node | *Composite* | `Location 1` + `Location 2` |
+| Latitude | `Latitude` | Standard format |
+| Longitude | `Longitude` | Standard format |
+
+### Preprocessing Required
+
+A Python preprocessing script (`convert_cdot_data.py`) transforms CDOT data to tool-compatible format:
+
+1. **Severity Derivation**: Calculates crash severity from highest injury level
+2. **Year Extraction**: Parses year from M/D/YYYY date format
+3. **Ped/Bike Detection**: Scans `TU-1 NM Type` and `TU-2 NM Type` for "Pedestrian"/"Bicyclist"
+4. **Route Naming**: Combines fields into format: `"State Highway 83 - S PARKER RD"`
+5. **Node Construction**: Creates intersection identifiers from location fields
+6. **Crash Type Mapping**: Maps CDOT crash types to standard categories
+
+### Route Naming Convention
+
+Routes are named using the composite format:
+```
+{System Type} {Route Number} - {Street Name}
+```
+
+Examples:
+- `State Highway 83 - S PARKER RD`
+- `Interstate 25 - I-25`
+- `County Road 4700 - S UNIVERSITY BLVD`
+- `City Street - LINCOLN AVE`
+
+### CDOT Road Description Values
+
+| Value | Intersection Status |
+|-------|---------------------|
+| `At Intersection` | Yes |
+| `Intersection Related` | Yes |
+| `Roundabout` | Yes |
+| `Non-Intersection` | No |
+| `Driveway Access Related` | No |
+| `Ramp` | No |
+| `Ramp-related` | No |
 
 ---
 
@@ -81,28 +160,33 @@ When working on this project, act as:
 ## Project-Specific Guidelines
 
 ### Architecture
-- This is a **browser-based crash analysis tool** for Virginia transportation agencies
-- Main application is in `index.html` (single-file application)
+- This is a **browser-based crash analysis tool** for Douglas County, Colorado
+- Main application is in `app/index.html` (single-file application)
 - Configuration stored in `config.json`
-- Data processing scripts in Python (`download_crash_data.py`, `download_grants_data.py`)
+- Data preprocessing scripts in Python
+- Raw CDOT data stored in `data/CDOT/`
 
 ### File Structure
 ```
-henrico_crash_tool/
-├── index.html              # Main application (single-file)
-├── config.json             # Configuration
-├── data/                   # Data files
-├── config/                 # Additional config
-├── docs/                   # Documentation
-└── .github/workflows/      # CI/CD workflows
+Douglas_County_2/
+├── app/
+│   └── index.html              # Main application (single-file)
+├── config.json                 # Configuration
+├── data/
+│   └── CDOT/
+│       ├── Douglas_County.csv                           # Raw CDOT crash data
+│       └── CDOTRM_CD_Crash_Data_Dictionary_*.csv       # Data dictionary
+├── docs/                       # Documentation
+└── .github/workflows/          # CI/CD workflows
 ```
 
 ### Before Making Changes
-1. Read relevant sections of `index.html`
+1. Read relevant sections of `app/index.html`
 2. Check `config.json` for related settings
 3. Review existing documentation in `docs/`
 4. Understand the tab-based UI structure
 5. Test changes don't break other tabs/features
+6. Verify data preprocessing compatibility
 
 ## Pull Request Process
 
@@ -137,7 +221,7 @@ The application uses **global state objects** to manage data across tabs. Unders
 ### Data Flow Hierarchy
 
 ```
-crashState.sampleRows (raw CSV data)
+crashState.sampleRows (preprocessed CSV data)
     │
     ├─► crashState.aggregates (pre-computed statistics)
     │       └─► Main AI Tab (county-wide analysis)
@@ -155,7 +239,7 @@ crashState.sampleRows (raw CSV data)
             └─► Cross-tab navigation (Map → CMF, Map → Grants, etc.)
 ```
 
-### ⚠️ CRITICAL: Function Naming Conventions
+### CRITICAL: Function Naming Conventions
 
 **NEVER create duplicate function names.** JavaScript function hoisting causes later definitions to overwrite earlier ones silently.
 
@@ -256,18 +340,30 @@ console.log('[Counts]', {
 });
 ```
 
-### Column Reference (COL object)
+### Column Reference (COL object) - After Preprocessing
 
-Key column indices used throughout the codebase:
-- `COL.ROUTE` - Road/route name
-- `COL.NODE` - Intersection node ID
-- `COL.SEVERITY` - K/A/B/C/O severity
-- `COL.COLLISION` - Collision type
-- `COL.PED` - Pedestrian involved flag
-- `COL.BIKE` - Bicycle involved flag
-- `COL.WEATHER` - Weather conditions
-- `COL.LIGHT` - Light conditions
-- `COL.DATE` - Crash date
+Key column indices used throughout the codebase (after CDOT data is preprocessed):
+
+| COL Field | Preprocessed Column | Original CDOT Source |
+|-----------|--------------------|-----------------------|
+| `COL.ID` | `Document Nbr` | `CUID` |
+| `COL.YEAR` | `Crash Year` | Derived from `Crash Date` |
+| `COL.DATE` | `Crash Date` | `Crash Date` (reformatted) |
+| `COL.TIME` | `Crash Military Time` | `Crash Time` |
+| `COL.SEVERITY` | `Crash Severity` | Derived from Injury 00-04 |
+| `COL.K` | `K_People` | `Injury 04` |
+| `COL.A` | `A_People` | `Injury 03` |
+| `COL.B` | `B_People` | `Injury 02` |
+| `COL.C` | `C_People` | `Injury 01` |
+| `COL.COLLISION` | `Collision Type` | `Crash Type` (mapped) |
+| `COL.ROUTE` | `RTE Name` | Composite route name |
+| `COL.NODE` | `Node` | `Location 1` + `Location 2` |
+| `COL.PED` | `Pedestrian?` | Derived from TU-X NM Type |
+| `COL.BIKE` | `Bike?` | Derived from TU-X NM Type |
+| `COL.WEATHER` | `Weather Condition` | `Weather Condition` |
+| `COL.LIGHT` | `Light Condition` | `Lighting Conditions` |
+| `COL.X` | `x` | `Longitude` |
+| `COL.Y` | `y` | `Latitude` |
 
 ### EPDO Calculation
 
@@ -277,3 +373,29 @@ const EPDO_WEIGHTS = { K: 462, A: 62, B: 12, C: 5, O: 1 };
 ```
 
 Always use `calcEPDO(severityObject)` for consistent calculations.
+
+---
+
+## Colorado-Specific Considerations
+
+### Jurisdiction Configuration
+- **State FIPS Code**: 08 (Colorado)
+- **County FIPS Code**: 035 (Douglas County)
+- **Map Center**: Approximately 39.34°N, 104.86°W
+- **TigerWeb Census API**: State parameter = 08
+
+### Reporting Agencies
+| Code | Agency |
+|------|--------|
+| CSP | Colorado State Patrol |
+| DSO | Douglas County Sheriff's Office |
+| PPD | Parker Police Department |
+| CRPD | Castle Rock Police Department |
+| LNTRPD | Lone Tree Police Department |
+
+### Major Routes in Douglas County
+- **Interstate 25** - Primary north-south corridor
+- **State Highway 83 (S Parker Rd)** - Major arterial
+- **State Highway 86** - East-west connector
+- **E-470** - Toll road
+- **County roads and local streets**
