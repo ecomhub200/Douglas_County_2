@@ -144,8 +144,9 @@ const StateAdapter = (() => {
             normalized['Physical Juris Name'] = row['County'] || '';
 
             // ── Boolean flags (DERIVED) ──
-            normalized['Pedestrian?'] = this._checkNonMotoristType(row, 'Pedestrian') ? 'Y' : 'N';
-            normalized['Bike?'] = this._checkNonMotoristType(row, 'Bicycle') ? 'Y' : 'N';
+            // Check NM Type AND Crash Type/MHE (NM Type alone misses many)
+            normalized['Pedestrian?'] = this._checkPedestrian(row) ? 'Y' : 'N';
+            normalized['Bike?'] = this._checkBicycle(row) ? 'Y' : 'N';
             normalized['Alcohol?'] = this._checkAlcohol(row) ? 'Y' : 'N';
             normalized['Speed?'] = this._checkSpeed(row) ? 'Y' : 'N';
             normalized['Hitrun?'] = (row['TU-1 Hit And Run'] === 'TRUE' || row['TU-2 Hit And Run'] === 'TRUE') ? 'Y' : 'N';
@@ -204,19 +205,35 @@ const StateAdapter = (() => {
         _mapCollisionType(crashType) {
             const ct = (crashType || '').trim();
             const mapping = {
+                // Vehicle-to-vehicle
                 'Rear-End': 'Rear End',
+                'Front to Rear': 'Rear End',
                 'Broadside': 'Angle',
-                'Head-On': 'Head On',
-                'Sideswipe Same Direction': 'Sideswipe - Same Direction',
-                'Sideswipe Opposite Direction': 'Sideswipe - Opposite Direction',
+                'Front to Side': 'Angle',
+                'Rear to Side': 'Angle',
                 'Approach Turn': 'Angle',
                 'Overtaking Turn': 'Angle',
+                'Head-On': 'Head On',
+                'Front to Front': 'Head On',
+                'Sideswipe Same Direction': 'Sideswipe - Same Direction',
+                'Side to Side-Same Direction': 'Sideswipe - Same Direction',
+                'Sideswipe Opposite Direction': 'Sideswipe - Opposite Direction',
+                'Side to Side-Opposite Direction': 'Sideswipe - Opposite Direction',
+                // Non-collision / rollover
                 'Overturning/Rollover': 'Non-Collision',
+                'Other Non-Collision': 'Non-Collision',
+                'Fell from Motor Vehicle': 'Non-Collision',
+                'Ground': 'Non-Collision',
+                // Vulnerable road users
                 'Pedestrian': 'Pedestrian',
+                'School Age To/From School': 'Pedestrian',
                 'Bicycle/Motorized Bicycle': 'Bicyclist',
+                // Animals
                 'Wild Animal': 'Other Animal',
-                'Parked Motor Vehicle': 'Other',
+                'Domestic Animal': 'Other Animal',
+                // Fixed objects - off road
                 'Light Pole/Utility Pole': 'Fixed Object - Off Road',
+                'Traffic Signal Pole': 'Fixed Object - Off Road',
                 'Concrete Highway Barrier': 'Fixed Object - Off Road',
                 'Guardrail Face': 'Fixed Object - Off Road',
                 'Guardrail End': 'Fixed Object - Off Road',
@@ -229,10 +246,22 @@ const StateAdapter = (() => {
                 'Ditch': 'Fixed Object - Off Road',
                 'Large Rocks or Boulder': 'Fixed Object - Off Road',
                 'Electrical/Utility Box': 'Fixed Object - Off Road',
-                'Vehicle Debris or Cargo': 'Fixed Object in Road',
+                'Crash Cushion/Traffic Barrel': 'Fixed Object - Off Road',
+                'Mailbox': 'Fixed Object - Off Road',
+                'Delineator/Milepost': 'Fixed Object - Off Road',
+                'Culvert or Headwall': 'Fixed Object - Off Road',
+                'Wall or Building': 'Fixed Object - Off Road',
+                'Barricade': 'Fixed Object - Off Road',
+                'Bridge Structure (Not Overhead)': 'Fixed Object - Off Road',
+                'Overhead Structure (Not Bridge)': 'Fixed Object - Off Road',
+                'Railroad Crossing Equipment': 'Fixed Object - Off Road',
                 'Other Fixed Object (Describe in Narrative)': 'Fixed Object - Off Road',
-                'Other Non-Fixed Object Describe in Narrative)': 'Other',
-                'Other Non-Collision': 'Non-Collision'
+                // Fixed objects - in road
+                'Vehicle Debris or Cargo': 'Fixed Object in Road',
+                // Other
+                'Parked Motor Vehicle': 'Other',
+                'Other Non-Fixed Object (Describe in Narrative)': 'Other',
+                'Other Non-Fixed Object Describe in Narrative)': 'Other'
             };
             return mapping[ct] || ct || 'Unknown';
         },
@@ -292,9 +321,10 @@ const StateAdapter = (() => {
                 'County Road': 'NonVDOT secondary',
                 'State Highway': 'Primary',
                 'Interstate Highway': 'Interstate',
-                'Frontage Road': 'Secondary'
+                'Frontage Road': 'Secondary',
+                'Non Crash': 'NonVDOT secondary'
             };
-            return mapping[sc] || sc;
+            return mapping[sc] || 'NonVDOT secondary';
         },
 
         // ── Helper: Build node ID from intersection data ──
@@ -330,6 +360,23 @@ const StateAdapter = (() => {
             return tu1.includes(type) || tu2.includes(type);
         },
 
+        // ── Helper: Check pedestrian (NM Type + Crash Type + MHE) ──
+        _checkPedestrian(row) {
+            if (this._checkNonMotoristType(row, 'Pedestrian')) return true;
+            const ct = (row['Crash Type'] || '').trim();
+            const mhe = (row['MHE'] || '').trim();
+            return ct === 'Pedestrian' || mhe === 'Pedestrian'
+                || ct === 'School Age To/From School' || mhe === 'School Age To/From School';
+        },
+
+        // ── Helper: Check bicycle (NM Type + Crash Type + MHE) ──
+        _checkBicycle(row) {
+            if (this._checkNonMotoristType(row, 'Bicycle')) return true;
+            const ct = (row['Crash Type'] || '').trim();
+            const mhe = (row['MHE'] || '').trim();
+            return ct.includes('Bicycle') || mhe.includes('Bicycle');
+        },
+
         // ── Helper: Check vehicle type ──
         _checkVehicleType(row, type) {
             const tu1 = (row['TU-1 Type'] || '').trim();
@@ -347,10 +394,13 @@ const StateAdapter = (() => {
 
         // ── Helper: Check speed ──
         _checkSpeed(row) {
-            const speedActions = ['Too Fast for Conditions', 'Exceeded Speed Limit', 'Exceeded Safe/Posted Speed'];
+            const speedActions = ['Too Fast for Conditions', 'Exceeded Speed Limit', 'Exceeded Safe/Posted Speed', 'Speeding'];
             const tu1a = (row['TU-1 Driver Action'] || '').trim();
             const tu2a = (row['TU-2 Driver Action'] || '').trim();
-            return speedActions.includes(tu1a) || speedActions.includes(tu2a);
+            const tu1h = (row['TU-1 Human Contributing Factor'] || '').trim();
+            const tu2h = (row['TU-2 Human Contributing Factor'] || '').trim();
+            return speedActions.includes(tu1a) || speedActions.includes(tu2a)
+                || speedActions.includes(tu1h) || speedActions.includes(tu2h);
         },
 
         // ── Helper: Check distracted ──
@@ -372,7 +422,7 @@ const StateAdapter = (() => {
 
         // ── Helper: Check drowsy ──
         _checkDrowsy(row) {
-            const drowsyValues = ['Asleep/Fatigued', 'Fatigued/Asleep', 'Ill/Asleep/Fatigued'];
+            const drowsyValues = ['Asleep or Fatigued', 'Asleep/Fatigued', 'Fatigued/Asleep', 'Ill/Asleep/Fatigued', 'Fatigued', 'Asleep'];
             const tu1 = (row['TU-1 Human Contributing Factor'] || '').trim();
             const tu2 = (row['TU-2 Human Contributing Factor'] || '').trim();
             return drowsyValues.some(v => tu1.includes(v) || tu2.includes(v));
