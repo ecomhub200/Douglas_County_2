@@ -652,6 +652,158 @@ Consider:
 
 ---
 
-*Document Version: 1.0*
+## APPENDIX A: Exact Virginia ↔ Colorado Column Mapping
+
+### Direct Column Mappings
+
+| Internal Field | Virginia Column | Colorado Column | Notes |
+|---------------|-----------------|-----------------|-------|
+| ID | `Document Nbr` | `CUID` | Crash identifier |
+| YEAR | `Crash Year` | *(derived from Crash Date)* | CO: extract year from M/D/YYYY |
+| DATE | `Crash Date` | `Crash Date` | Different format: VA=varies, CO=M/D/YYYY |
+| TIME | `Crash Military Time` | `Crash Time` | CO: HH:MM:SS → strip colons |
+| SEVERITY | `Crash Severity` | *(derived from Injury 00-04)* | **CO has NO severity column** |
+| K count | `K_People` | `Injury 04` | Persons killed |
+| A count | `A_People` | `Injury 03` | Suspected serious injury |
+| B count | `B_People` | `Injury 02` | Suspected minor injury |
+| C count | `C_People` | `Injury 01` | Possible injury |
+| COLLISION | `Collision Type` | `Crash Type` / `MHE` | CO: text values, needs mapping |
+| WEATHER | `Weather Condition` | `Weather Condition` | Same field name, similar values |
+| LIGHT | `Light Condition` | `Lighting Conditions` | Different column name |
+| SURFACE | `Roadway Surface Condition` | `Road Condition` | Different column name |
+| ROAD_DESC | `Roadway Description` | `Road Description` | CO has more categories |
+| ROUTE | `RTE Name` | *(built from System Code + Rd_Number + Location 1)* | CO: multiple fields combined |
+| NODE | `Node` | *(built from Location 1 + Location 2)* | CO: no numeric node system |
+| MP | `RNS MP` | `Rd_Section` | Only for state highways |
+| LAT | `y` | `Latitude` | |
+| LON | `x` | `Longitude` | |
+| JURISDICTION | `Physical Juris Name` | `County` | |
+| ROAD_SYSTEM | `SYSTEM` | `System Code` | Different classification names |
+| WORKZONE | `Work Zone Related` | `Construction Zone` | CO: TRUE/FALSE |
+| SCHOOL | `School Zone` | `School Zone` | CO: TRUE/FALSE |
+| FIRST_HARMFUL | `First Harmful Event` | `First HE` | |
+
+### Derived Boolean Flags (Virginia has directly, Colorado must compute)
+
+| Flag | Virginia Column | Colorado Derivation |
+|------|----------------|---------------------|
+| Pedestrian? | `Pedestrian?` (Y/N) | `TU-1 NM Type` or `TU-2 NM Type` contains "Pedestrian" |
+| Bike? | `Bike?` (Y/N) | `TU-1 NM Type` or `TU-2 NM Type` contains "Bicycle" |
+| Alcohol? | `Alcohol?` (Y/N) | `TU-1/2 Alcohol Suspected` = "Yes - SFST/BAC/Both/Observation" |
+| Speed? | `Speed?` (Y/N) | `TU-1/2 Driver Action` = "Too Fast for Conditions" or "Exceeded Speed Limit" |
+| Hitrun? | `Hitrun?` (Y/N) | `TU-1/2 Hit And Run` = "TRUE" |
+| Motorcycle? | `Motorcycle?` (Y/N) | `TU-1/2 Type` = "Motorcycle" |
+| Night? | `Night?` (Y/N) | `Lighting Conditions` starts with "Dark" |
+| Distracted? | `Distracted?` (Y/N) | `TU-1/2 Driver Action` or `Human Contributing Factor` contains distraction keywords |
+| Drowsy? | `Drowsy?` (Y/N) | `TU-1/2 Human Contributing Factor` contains "Asleep/Fatigued" |
+| Drug? | `Drug Related?` (Y/N) | `TU-1/2 Marijuana Suspected` or `Other Drugs Suspected` = positive |
+| Young? | `Young?` (Y/N) | `TU-1/2 Age` between 16-20 |
+| Senior? | `Senior?` (Y/N) | `TU-1/2 Age` ≥ 65 |
+| Unrestrained? | `Unrestrained?` (Y/N) | `TU-1/2 Safety restraint Use` = "Not Used" or "Improperly Used" |
+
+### Road System Mapping
+
+| Virginia Value | Colorado Value | Filter Category |
+|---------------|----------------|-----------------|
+| NonVDOT secondary | City Street | Local (countyOnly) |
+| NONVDOT | County Road | Local (countyOnly) |
+| Primary | State Highway | State (countyPlusState) |
+| Secondary | Frontage Road | State (countyPlusState) |
+| Interstate | Interstate Highway | Interstate (allRoads) |
+
+### Collision Type Mapping
+
+| Colorado Crash Type / MHE | Mapped To (Virginia Standard) |
+|--------------------------|-------------------------------|
+| Rear-End | Rear End |
+| Broadside | Angle |
+| Approach Turn | Angle |
+| Overtaking Turn | Angle |
+| Head-On | Head On |
+| Sideswipe Same Direction | Sideswipe - Same Direction |
+| Sideswipe Opposite Direction | Sideswipe - Opposite Direction |
+| Pedestrian | Pedestrian |
+| Bicycle/Motorized Bicycle | Bicyclist |
+| Wild Animal | Other Animal |
+| Overturning/Rollover | Non-Collision |
+| Light Pole/Utility Pole | Fixed Object - Off Road |
+| Concrete Highway Barrier | Fixed Object - Off Road |
+| Guardrail Face/End | Fixed Object - Off Road |
+| Tree, Fence, Sign, Curb, Embankment, Ditch | Fixed Object - Off Road |
+| Vehicle Debris or Cargo | Fixed Object in Road |
+| Parked Motor Vehicle | Other |
+
+### Fields Only in Colorado (Extra Data)
+
+| Colorado Column | Description | Not in Virginia |
+|----------------|-------------|-----------------|
+| `Agency Id` | Reporting police agency (e.g., DCSO, CSP) | ✓ |
+| `City` | City where crash occurred | ✓ |
+| `MHE` | Most Harmful Event | ✓ |
+| `Approach Overtaking Turn` | Turn type detail | ✓ |
+| `Wild Animal` | Animal type for animal crashes | ✓ |
+| `Number Killed` | Total persons killed | ✓ |
+| `Number Injured` | Total persons injured | ✓ |
+| `Secondary Crash` | Related to previous incident | ✓ |
+| `TU-1/2 Autonomous Vehicle` | Autonomous vehicle capability | ✓ |
+| `TU-1/2 Marijuana Suspected` | Marijuana impairment (CO-specific) | ✓ |
+| `TU-1/2 Estimated Speed` | Officer estimated speed | ✓ |
+| `TU-1/2 Speed` | Driver stated speed | ✓ |
+| `Road Contour Curves` | Curve direction detail | ✓ |
+| `Road Contour Grade` | Grade detail | ✓ |
+
+### Fields Only in Virginia (Not in Colorado)
+
+| Virginia Column | Description | Not in Colorado |
+|----------------|-------------|-----------------|
+| `Functional Class` | Federal functional classification | ✓ |
+| `Area Type` | Urban/Rural classification | ✓ |
+| `Facility Type` | Road facility type | ✓ |
+| `Ownership` | Road ownership | ✓ |
+| `Node Offset` | Distance from node | ✓ |
+| `Traffic Control Type` | Signal, stop sign, etc. | ✓ |
+| `Traffic Control Status` | Functioning, not functioning | ✓ |
+| `Guardrail Related?` | Guardrail involvement | ✓ |
+| `RoadDeparture Type` | Road departure classification | ✓ |
+| `Max Speed Diff` | Speed differential | ✓ |
+| `Roadway Defect` | Road defect type | ✓ |
+| `Relation To Roadway` | On/off roadway | ✓ |
+
+---
+
+## APPENDIX B: Multi-State Adapter Architecture
+
+The `states/state_adapter.js` module handles all normalization automatically:
+
+```
+states/
+├── state_adapter.js              ← Auto-detect + normalize (include in HTML)
+├── INTEGRATION_GUIDE.md          ← Step-by-step integration instructions
+├── colorado/
+│   ├── config.json               ← Column mappings, road systems, valid values
+│   └── jurisdictions.json        ← Douglas County + 5 neighboring counties
+└── virginia/
+    └── config.json               ← Reference config (existing state)
+```
+
+### How It Works
+
+1. User uploads a CSV (any supported state)
+2. `StateAdapter.detect(headers)` examines column names
+3. If Colorado: `StateAdapter.normalizeRow(row)` transforms each row
+4. Normalized data has Virginia-compatible column names
+5. All existing analysis logic works unchanged
+
+### Adding a New State
+
+1. Get a sample crash CSV
+2. Create `states/{state}/config.json`
+3. Add detection signature in `state_adapter.js`
+4. Add normalizer function in `state_adapter.js`
+5. Create `states/{state}/jurisdictions.json`
+
+---
+
+*Document Version: 2.0*
 *Created: February 2026*
 *Last Updated: February 2026*
