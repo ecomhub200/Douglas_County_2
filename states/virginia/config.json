@@ -1,0 +1,167 @@
+{
+  "state": {
+    "name": "Virginia",
+    "abbreviation": "VA",
+    "fips": "51",
+    "dotName": "VDOT",
+    "dotFullName": "Virginia Department of Transportation",
+    "dmvName": "Virginia DMV",
+    "dataSystemName": "TREDS / Virginia Roads",
+    "dataPortalUrl": "https://www.virginiaroads.org",
+    "contactEmail": "TREDS.SAVESLIVES@DMV.Virginia.Gov",
+    "mutcdVersion": "Virginia MUTCD 11.0",
+    "mutcdSupplements": ["Virginia 2011 Supplement"],
+    "coordinateBounds": {
+      "latMin": 36.5,
+      "latMax": 39.5,
+      "lonMin": -83.7,
+      "lonMax": -75.2
+    }
+  },
+
+  "columnMapping": {
+    "_description": "Maps Virginia TREDS CSV column names to internal field codes",
+
+    "ID": "Document Nbr",
+    "YEAR": "Crash Year",
+    "DATE": "Crash Date",
+    "TIME": "Crash Military Time",
+    "SEVERITY": "Crash Severity",
+    "K": "K_People",
+    "A": "A_People",
+    "B": "B_People",
+    "C": "C_People",
+    "COLLISION": "Collision Type",
+    "WEATHER": "Weather Condition",
+    "LIGHT": "Light Condition",
+    "SURFACE": "Roadway Surface Condition",
+    "ALIGNMENT": "Roadway Alignment",
+    "ROAD_DESC": "Roadway Description",
+    "INT_TYPE": "Intersection Type",
+    "TRAFFIC_CTRL": "Traffic Control Type",
+    "CTRL_STATUS": "Traffic Control Status",
+    "WORKZONE": "Work Zone Related",
+    "SCHOOL": "School Zone",
+    "ALCOHOL": "Alcohol?",
+    "BIKE": "Bike?",
+    "PED": "Pedestrian?",
+    "SPEED": "Speed?",
+    "DISTRACTED": "Distracted?",
+    "DROWSY": "Drowsy?",
+    "HITRUN": "Hitrun?",
+    "SENIOR": "Senior?",
+    "YOUNG": "Young?",
+    "NIGHT": "Night?",
+    "UNRESTRAINED": "Unrestrained?",
+    "MOTORCYCLE": "Motorcycle?",
+    "FUNC_CLASS": "Functional Class",
+    "AREA_TYPE": "Area Type",
+    "ROUTE": "RTE Name",
+    "NODE": "Node",
+    "MP": "RNS MP",
+    "X": "x",
+    "Y": "y",
+    "JURISDICTION": "Physical Juris Name",
+    "FACILITY_TYPE": "Facility Type",
+    "ROAD_SYSTEM": "SYSTEM",
+    "OWNERSHIP": "Ownership",
+    "NODE_OFFSET": "Node Offset",
+    "DRUG": "Drug Related?",
+    "GUARDRAIL": "Guardrail Related?",
+    "LGTRUCK": "Lgtruck?",
+    "ROAD_DEPARTURE": "RoadDeparture Type",
+    "MAX_SPEED_DIFF": "Max Speed Diff",
+    "FIRST_HARMFUL": "First Harmful Event",
+    "FIRST_HARMFUL_LOC": "First Harmful Event Loc",
+    "ROAD_DEFECT": "Roadway Defect",
+    "RELATION_TO_ROAD": "Relation To Roadway",
+    "ANIMAL": "ANIMAL"
+  },
+
+  "derivedFields": {
+    "_description": "Virginia data has most fields directly in the CSV - minimal derivation needed",
+    "SEVERITY": {
+      "method": "direct",
+      "source": "Crash Severity"
+    }
+  },
+
+  "roadSystems": {
+    "values": {
+      "NonVDOT secondary": {
+        "category": "local",
+        "isStateDOT": false,
+        "isInterstate": false,
+        "displayName": "NonVDOT Secondary"
+      },
+      "NONVDOT": {
+        "category": "local",
+        "isStateDOT": false,
+        "isInterstate": false,
+        "displayName": "NonVDOT"
+      },
+      "Non-VDOT": {
+        "category": "local",
+        "isStateDOT": false,
+        "isInterstate": false,
+        "displayName": "Non-VDOT"
+      },
+      "Primary": {
+        "category": "state",
+        "isStateDOT": true,
+        "isInterstate": false,
+        "displayName": "VDOT Primary"
+      },
+      "Secondary": {
+        "category": "state",
+        "isStateDOT": true,
+        "isInterstate": false,
+        "displayName": "VDOT Secondary"
+      },
+      "Interstate": {
+        "category": "interstate",
+        "isStateDOT": true,
+        "isInterstate": true,
+        "displayName": "Interstate"
+      }
+    },
+
+    "filterProfiles": {
+      "countyOnly": {
+        "name": "County/City Roads Only",
+        "description": "Only locally-maintained roads (NonVDOT)",
+        "systemValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT"]
+      },
+      "countyPlusVDOT": {
+        "name": "All Roads (No Interstate)",
+        "description": "Local roads plus VDOT primary/secondary, excluding interstates",
+        "systemValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT", "Primary", "Secondary"],
+        "excludeRoutePatterns": ["^I-\\d+"]
+      },
+      "allRoads": {
+        "name": "All Roads (Including Interstate)",
+        "description": "All road types including interstates",
+        "systemValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT", "Primary", "Secondary", "Interstate"]
+      }
+    }
+  },
+
+  "epdoWeights": {
+    "K": 462,
+    "A": 62,
+    "B": 12,
+    "C": 5,
+    "O": 1
+  },
+
+  "dataSource": {
+    "name": "Virginia Roads",
+    "url": "https://www.virginiaroads.org",
+    "apiUrl": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_Basic_Updated/FeatureServer/0/query",
+    "fallbackUrl": "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0"
+  },
+
+  "tigerweb": {
+    "stateFips": "51"
+  }
+}
