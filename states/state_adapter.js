@@ -573,6 +573,101 @@ const StateAdapter = (() => {
         },
 
         /**
+         * Get geographic configuration for the detected state.
+         * Used by the app to override Virginia-default settings for map center,
+         * coordinate bounds, FIPS codes, jurisdictions, etc.
+         * @returns {Object|null} Geographic config object, or null if Virginia (use defaults)
+         */
+        getGeoConfig() {
+            if (detectedState === 'colorado') {
+                return {
+                    stateFips: '08',
+                    stateName: 'Colorado',
+                    stateAbbr: 'CO',
+                    coordinateBounds: {
+                        latMin: 36.9, latMax: 41.1,
+                        lonMin: -109.1, lonMax: -101.9
+                    },
+                    defaultJurisdiction: 'douglas',
+                    defaultMapCenter: [39.3298, -104.9253],
+                    defaultMapZoom: 11,
+                    appSubtitle: 'Colorado Crash Analysis Tool',
+                    districtLabel: 'Census Subdivisions',
+                    jurisdictions: {
+                        douglas: {
+                            name: "Douglas County",
+                            type: "county",
+                            fips: "035",
+                            stateCountyFips: "08035",
+                            namePatterns: ["DOUGLAS", "Douglas", "Douglas County"],
+                            mapCenter: [39.3298, -104.9253],
+                            mapZoom: 11,
+                            bbox: [-105.0543, 39.1298, -104.6014, 39.5624],
+                            maintainsOwnRoads: true
+                        },
+                        arapahoe: {
+                            name: "Arapahoe County",
+                            type: "county",
+                            fips: "005",
+                            stateCountyFips: "08005",
+                            namePatterns: ["ARAPAHOE", "Arapahoe", "Arapahoe County"],
+                            mapCenter: [39.6498, -104.3389],
+                            mapZoom: 10,
+                            bbox: [-105.0534, 39.5638, -103.7064, 39.7404],
+                            maintainsOwnRoads: true
+                        },
+                        jefferson: {
+                            name: "Jefferson County",
+                            type: "county",
+                            fips: "059",
+                            stateCountyFips: "08059",
+                            namePatterns: ["JEFFERSON", "Jefferson", "Jefferson County"],
+                            mapCenter: [39.5866, -105.2508],
+                            mapZoom: 10,
+                            bbox: [-105.6798, 39.3677, -105.0534, 39.8282],
+                            maintainsOwnRoads: true
+                        },
+                        elpaso: {
+                            name: "El Paso County",
+                            type: "county",
+                            fips: "041",
+                            stateCountyFips: "08041",
+                            namePatterns: ["EL PASO", "El Paso", "El Paso County"],
+                            mapCenter: [38.8339, -104.7581],
+                            mapZoom: 10,
+                            bbox: [-105.0286, 38.5157, -104.0534, 39.1298],
+                            maintainsOwnRoads: true
+                        },
+                        denver: {
+                            name: "Denver County",
+                            type: "county",
+                            fips: "031",
+                            stateCountyFips: "08031",
+                            namePatterns: ["DENVER", "Denver", "Denver County"],
+                            mapCenter: [39.7392, -104.9903],
+                            mapZoom: 12,
+                            bbox: [-105.1098, 39.6144, -104.5996, 39.9142],
+                            maintainsOwnRoads: true
+                        },
+                        adams: {
+                            name: "Adams County",
+                            type: "county",
+                            fips: "001",
+                            stateCountyFips: "08001",
+                            namePatterns: ["ADAMS", "Adams", "Adams County"],
+                            mapCenter: [39.8737, -104.7624],
+                            mapZoom: 10,
+                            bbox: [-105.0534, 39.7404, -104.4610, 40.0015],
+                            maintainsOwnRoads: true
+                        }
+                    }
+                };
+            }
+            // Virginia: return null (app uses existing config.json defaults)
+            return null;
+        },
+
+        /**
          * Get Colorado-specific road system info for a row.
          * Useful for displaying original classification in UI.
          * @param {Object} normalizedRow - A normalized row
