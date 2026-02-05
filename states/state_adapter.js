@@ -43,6 +43,8 @@ const StateAdapter = (() => {
     // ─── Current state ───
     let detectedState = null;
     let stateConfig = null;
+    let manualStateFips = null;  // Set when user picks a state from the UI
+    let dynamicGeoConfig = null; // Built from FIPSDatabase for non-hardcoded states
 
     // ─── Detection ───
     function detect(csvHeaders) {
@@ -510,10 +512,15 @@ const StateAdapter = (() => {
         },
 
         /**
-         * Get display name for detected state.
+         * Get display name for detected/selected state.
          * @returns {string}
          */
         getStateName() {
+            // Check FIPS database first (for manual selections)
+            if (manualStateFips && typeof FIPSDatabase !== 'undefined') {
+                const state = FIPSDatabase.getState(manualStateFips);
+                if (state) return `${state.name} (${state.dotName})`;
+            }
             if (!detectedState) return 'Unknown';
             return STATE_SIGNATURES[detectedState]?.displayName || detectedState;
         },
@@ -524,6 +531,16 @@ const StateAdapter = (() => {
          */
         needsNormalization() {
             return detectedState !== null && detectedState !== 'virginia';
+        },
+
+        /**
+         * Check if a non-default state has been selected (either detected or manual).
+         * Used by applyStateAdapterConfig to decide whether to apply overrides.
+         * @returns {boolean}
+         */
+        hasStateOverride() {
+            return (manualStateFips !== null && manualStateFips !== '51') ||
+                   (detectedState !== null && detectedState !== 'virginia');
         },
 
         /**
@@ -552,11 +569,28 @@ const StateAdapter = (() => {
         },
 
         /**
-         * Get available state signatures for the setup wizard.
+         * Get available state signatures (states with CSV normalizers).
          * @returns {Object} State signatures
          */
         getAvailableStates() {
             return { ...STATE_SIGNATURES };
+        },
+
+        /**
+         * Get all states from FIPS database (for the state selector UI).
+         * Returns all 50 states + DC with FIPS, name, abbreviation.
+         * @returns {Object[]|null} Array of state objects, or null if FIPSDatabase not loaded
+         */
+        getAllSelectableStates() {
+            if (typeof FIPSDatabase !== 'undefined') {
+                return FIPSDatabase.getAllStates();
+            }
+            // Fallback: return just the states with signatures
+            return Object.entries(STATE_SIGNATURES).map(([key, sig]) => ({
+                fips: key === 'colorado' ? '08' : key === 'virginia' ? '51' : '',
+                name: sig.displayName,
+                abbr: key === 'colorado' ? 'CO' : key === 'virginia' ? 'VA' : ''
+            }));
         },
 
         /**
@@ -566,10 +600,160 @@ const StateAdapter = (() => {
         setState(stateKey) {
             if (STATE_SIGNATURES[stateKey]) {
                 detectedState = stateKey;
+                manualStateFips = null;
+                dynamicGeoConfig = null;
                 console.log(`[StateAdapter] State manually set to: ${STATE_SIGNATURES[stateKey].displayName}`);
             } else {
-                console.error(`[StateAdapter] Unknown state: ${stateKey}`);
+                console.error(`[StateAdapter] Unknown state key: ${stateKey}. Use setStateByFips() for arbitrary states.`);
             }
+        },
+
+        /**
+         * Set state by FIPS code (for the state selector UI).
+         * Works for ANY US state, not just those with CSV normalizers.
+         * Uses FIPSDatabase to auto-configure map, FIPS, jurisdictions.
+         * @param {string} stateFips - Two-digit state FIPS (e.g., '08', '51', '48')
+         * @returns {Promise<Object|null>} The generated geoConfig, or null on failure
+         */
+        async setStateByFips(stateFips) {
+            if (typeof FIPSDatabase === 'undefined') {
+                console.error('[StateAdapter] FIPSDatabase not loaded. Cannot set state by FIPS.');
+                return null;
+            }
+
+            const padded = String(stateFips).padStart(2, '0');
+            const stateInfo = FIPSDatabase.getState(padded);
+            if (!stateInfo) {
+                console.error(`[StateAdapter] Unknown state FIPS: ${padded}`);
+                return null;
+            }
+
+            // Check if this maps to a known normalizer state
+            const fipsToKey = { '08': 'colorado', '51': 'virginia' };
+            if (fipsToKey[padded]) {
+                detectedState = fipsToKey[padded];
+            }
+
+            manualStateFips = padded;
+            console.log(`[StateAdapter] State set by FIPS: ${stateInfo.name} (${padded})`);
+
+            // Load counties from TIGERweb (or cache)
+            const counties = await FIPSDatabase.getCounties(padded);
+
+            // For Colorado, merge with bundled detailed jurisdictions if available
+            if (padded === '08' && counties) {
+                // Preserve the detailed Douglas County config from the hardcoded data
+                const hardcodedConfig = this._getHardcodedColoradoJurisdictions();
+                for (const [key, val] of Object.entries(hardcodedConfig)) {
+                    counties[key] = val; // Overwrite with richer data
+                }
+            }
+
+            // Build dynamic geo config
+            dynamicGeoConfig = FIPSDatabase.buildGeoConfig(padded, counties);
+
+            // Save selection
+            try { localStorage.setItem('selectedStateFips', padded); } catch(e) {}
+
+            return dynamicGeoConfig;
+        },
+
+        /**
+         * Get the manually selected state FIPS (from UI dropdown).
+         * @returns {string|null}
+         */
+        getManualStateFips() {
+            return manualStateFips;
+        },
+
+        /**
+         * Get geographic configuration for the current state.
+         * Priority: dynamic config (from setStateByFips) > hardcoded > null
+         * @returns {Object|null} Geographic config object, or null if Virginia defaults
+         */
+        getGeoConfig() {
+            // If dynamic config was built from FIPSDatabase, use it
+            if (dynamicGeoConfig) {
+                return dynamicGeoConfig;
+            }
+
+            // Fallback to hardcoded Colorado config
+            if (detectedState === 'colorado') {
+                return {
+                    stateFips: '08',
+                    stateName: 'Colorado',
+                    stateAbbr: 'CO',
+                    coordinateBounds: {
+                        latMin: 36.9, latMax: 41.1,
+                        lonMin: -109.1, lonMax: -101.9
+                    },
+                    defaultJurisdiction: 'douglas',
+                    defaultMapCenter: [39.3298, -104.9253],
+                    defaultMapZoom: 11,
+                    appSubtitle: 'Colorado Crash Analysis Tool',
+                    districtLabel: 'Census Subdivisions',
+                    jurisdictions: this._getHardcodedColoradoJurisdictions()
+                };
+            }
+            // Virginia: return null (app uses existing config.json defaults)
+            return null;
+        },
+
+        /**
+         * Internal: Get hardcoded Colorado jurisdictions (detailed data).
+         * @private
+         */
+        _getHardcodedColoradoJurisdictions() {
+            return {
+                douglas: {
+                    name: "Douglas County", type: "county", fips: "035",
+                    stateCountyFips: "08035",
+                    namePatterns: ["DOUGLAS", "Douglas", "Douglas County"],
+                    mapCenter: [39.3298, -104.9253], mapZoom: 11,
+                    bbox: [-105.0543, 39.1298, -104.6014, 39.5624],
+                    maintainsOwnRoads: true
+                },
+                arapahoe: {
+                    name: "Arapahoe County", type: "county", fips: "005",
+                    stateCountyFips: "08005",
+                    namePatterns: ["ARAPAHOE", "Arapahoe", "Arapahoe County"],
+                    mapCenter: [39.6498, -104.3389], mapZoom: 10,
+                    bbox: [-105.0534, 39.5638, -103.7064, 39.7404],
+                    maintainsOwnRoads: true
+                },
+                jefferson: {
+                    name: "Jefferson County", type: "county", fips: "059",
+                    stateCountyFips: "08059",
+                    namePatterns: ["JEFFERSON", "Jefferson", "Jefferson County"],
+                    mapCenter: [39.5866, -105.2508], mapZoom: 10,
+                    bbox: [-105.6798, 39.3677, -105.0534, 39.8282],
+                    maintainsOwnRoads: true
+                },
+                elpaso: {
+                    name: "El Paso County", type: "county", fips: "041",
+                    stateCountyFips: "08041",
+                    namePatterns: ["EL PASO", "El Paso", "El Paso County"],
+                    mapCenter: [38.8339, -104.7581], mapZoom: 10,
+                    bbox: [-105.0286, 38.5157, -104.0534, 39.1298],
+                    maintainsOwnRoads: true
+                },
+                denver: {
+                    name: "Denver County", type: "county", fips: "031",
+                    stateCountyFips: "08031",
+                    namePatterns: ["DENVER", "Denver", "Denver County"],
+                    mapCenter: [39.7392, -104.9903], mapZoom: 12,
+                    bbox: [-105.1098, 39.6144, -104.5996, 39.9142],
+                    maintainsOwnRoads: true
+                },
+                adams: {
+                    name: "Adams County", type: "county", fips: "001",
+                    stateCountyFips: "08001",
+                    namePatterns: ["ADAMS", "Adams", "Adams County"],
+                    mapCenter: [39.8737, -104.7624], mapZoom: 10,
+                    bbox: [-105.0534, 39.7404, -104.4610, 40.0015],
+                    maintainsOwnRoads: true
+                }
+            };
         },
 
         /**
