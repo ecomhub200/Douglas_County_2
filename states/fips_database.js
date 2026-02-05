@@ -427,7 +427,7 @@ const FIPSDatabase = (() => {
         },
 
         /**
-         * Get counties for a state. Tries cache first, then fetches from TIGERweb.
+         * Get counties for a state. Priority: cache > embedded USCountiesDB > TIGERweb API.
          * For states with custom config (CO, VA), merges with bundled jurisdiction data.
          * @param {string} stateFips - Two-digit state FIPS
          * @returns {Promise<Object>} County objects keyed by ID
@@ -440,14 +440,24 @@ const FIPSDatabase = (() => {
                 return countyCache[padded];
             }
 
-            // Fetch from TIGERweb
+            // Try embedded USCountiesDB first (no network required)
+            if (typeof USCountiesDB !== 'undefined' && USCountiesDB.hasState(padded)) {
+                const embedded = USCountiesDB.getCounties(padded);
+                if (embedded && Object.keys(embedded).length > 0) {
+                    countyCache[padded] = embedded;
+                    console.log(`[FIPSDatabase] Loaded ${Object.keys(embedded).length} counties for state ${padded} from embedded database`);
+                    return embedded;
+                }
+            }
+
+            // Fallback: fetch from TIGERweb API
             const counties = await fetchCountiesFromTIGERweb(padded);
             if (counties) {
                 countyCache[padded] = counties;
                 return counties;
             }
 
-            // Fallback: return empty
+            // Final fallback: return empty
             console.warn(`[FIPSDatabase] Could not load counties for state ${padded}`);
             return {};
         },
