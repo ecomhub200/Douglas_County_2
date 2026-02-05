@@ -637,7 +637,21 @@ const StateAdapter = (() => {
             manualStateFips = padded;
             console.log(`[StateAdapter] State set by FIPS: ${stateInfo.name} (${padded})`);
 
-            // Load counties from TIGERweb (or cache)
+            // For Virginia: use the cached config.json jurisdictions (rich data with bbox, education, jurisCode)
+            // These are cached at startup in window._virginiaConfigJurisdictions to survive state switching
+            if (padded === '51') {
+                const vaJurisdictions = (typeof window !== 'undefined' && window._virginiaConfigJurisdictions)
+                    ? window._virginiaConfigJurisdictions
+                    : null;
+                if (vaJurisdictions && Object.keys(vaJurisdictions).length > 0) {
+                    console.log(`[StateAdapter] Using cached config.json jurisdictions for Virginia (${Object.keys(vaJurisdictions).length} entries)`);
+                    dynamicGeoConfig = FIPSDatabase.buildGeoConfig(padded, vaJurisdictions);
+                    try { localStorage.setItem('selectedStateFips', padded); } catch(e) {}
+                    return dynamicGeoConfig;
+                }
+            }
+
+            // Load counties from embedded DB or TIGERweb
             const counties = await FIPSDatabase.getCounties(padded);
 
             // For Colorado, merge with bundled detailed jurisdictions if available
