@@ -3,20 +3,19 @@
 Split CDOT merged crash data into three road-type filter files.
 
 Reads the all-roads merged CSV and produces:
-  - {jurisdiction}_county_roads.csv  : City Street + County Road only (local roads)
+  - {jurisdiction}_county_roads.csv  : Agency Id = "DSO" only (county-maintained roads)
   - {jurisdiction}_no_interstate.csv : All roads EXCEPT Interstate Highway
   - {jurisdiction}_all_roads.csv     : Already exists (unchanged)
 
 Usage:
     python split_cdot_data.py [--jurisdiction douglas] [--data-dir ../data/CDOT]
 
-System Code values in CDOT data:
-    City Street        -> local (included in county_roads)
-    County Road        -> local (included in county_roads)
-    State Highway      -> state-maintained
-    Interstate Highway -> state-maintained (excluded from no_interstate)
-    Frontage Road      -> state-maintained
-    Non Crash          -> misc
+Filtering logic:
+    county_roads   -> Agency Id = "DSO" (Douglas County Sheriff's Office)
+                      DSO only reports on county-maintained roads
+    no_interstate  -> System Code != "Interstate Highway"
+                      All Douglas County crashes minus interstates
+    all_roads      -> Source file (County = "DOUGLAS"), unchanged
 """
 
 import argparse
@@ -24,22 +23,12 @@ import csv
 import os
 import sys
 
-# Filter definitions matching states/colorado/config.json filterProfiles
-FILTER_PROFILES = {
-    "county_roads": {
-        "description": "County/City Roads Only - Local roads (NonVDOT equivalent)",
-        "include_systems": ["City Street", "County Road"],
-        "exclude_systems": [],
-    },
-    "no_interstate": {
-        "description": "All Roads (No Interstate) - Includes state highways",
-        "include_systems": None,  # None = include all
-        "exclude_systems": ["Interstate Highway"],
-    },
-    # all_roads is the source file itself - no filtering needed
-}
-
+AGENCY_ID_COLUMN = "Agency Id"
 SYSTEM_CODE_COLUMN = "System Code"
+COUNTY_COLUMN = "County"
+
+# Douglas County Sheriff's Office - handles county-maintained roads only
+COUNTY_AGENCY_ID = "DSO"
 
 
 def split_data(source_path, output_dir, jurisdiction):
@@ -53,10 +42,12 @@ def split_data(source_path, output_dir, jurisdiction):
     with open(source_path, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         headers = reader.fieldnames
-        if SYSTEM_CODE_COLUMN not in headers:
-            print(f"ERROR: '{SYSTEM_CODE_COLUMN}' column not found in CSV headers.")
-            print(f"  Available columns: {', '.join(headers[:10])}...")
-            sys.exit(1)
+
+        for required_col in [AGENCY_ID_COLUMN, SYSTEM_CODE_COLUMN]:
+            if required_col not in headers:
+                print(f"ERROR: '{required_col}' column not found in CSV headers.")
+                print(f"  Available columns: {', '.join(headers[:10])}...")
+                sys.exit(1)
 
         all_rows = list(reader)
 
@@ -65,49 +56,60 @@ def split_data(source_path, output_dir, jurisdiction):
     print(f"Output directory: {output_dir}")
     print()
 
-    # Show system code distribution
+    # Show distributions
+    agency_counts = {}
     system_counts = {}
     for row in all_rows:
-        sc = row[SYSTEM_CODE_COLUMN]
+        ag = row[AGENCY_ID_COLUMN].strip()
+        sc = row[SYSTEM_CODE_COLUMN].strip()
+        agency_counts[ag] = agency_counts.get(ag, 0) + 1
         system_counts[sc] = system_counts.get(sc, 0) + 1
+
+    print("Agency Id distribution:")
+    for ag, count in sorted(agency_counts.items(), key=lambda x: -x[1]):
+        marker = " <-- county-maintained" if ag == COUNTY_AGENCY_ID else ""
+        print(f"  {ag}: {count:,}{marker}")
+    print()
+
     print("System Code distribution:")
     for sc, count in sorted(system_counts.items(), key=lambda x: -x[1]):
         print(f"  {sc}: {count:,}")
     print()
 
-    # Generate each filtered file
-    for suffix, profile in FILTER_PROFILES.items():
-        output_path = os.path.join(output_dir, f"{jurisdiction}_{suffix}.csv")
+    # === Filter 1: county_roads (Agency Id = DSO only) ===
+    county_roads = [r for r in all_rows if r[AGENCY_ID_COLUMN].strip() == COUNTY_AGENCY_ID]
+    _write_csv(
+        os.path.join(output_dir, f"{jurisdiction}_county_roads.csv"),
+        headers, county_roads,
+        f"County/City Roads Only (Agency Id = {COUNTY_AGENCY_ID})",
+        len(all_rows)
+    )
 
-        filtered = []
-        for row in all_rows:
-            system = row[SYSTEM_CODE_COLUMN]
-
-            # If include list is specified, row must match
-            if profile["include_systems"] is not None:
-                if system not in profile["include_systems"]:
-                    continue
-
-            # If exclude list is specified, row must NOT match
-            if system in profile["exclude_systems"]:
-                continue
-
-            filtered.append(row)
-
-        # Write filtered CSV
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=headers)
-            writer.writeheader()
-            writer.writerows(filtered)
-
-        size_mb = os.path.getsize(output_path) / (1024 * 1024)
-        print(f"Created: {output_path}")
-        print(f"  Profile: {profile['description']}")
-        print(f"  Rows: {len(filtered):,} / {len(all_rows):,}")
-        print(f"  Size: {size_mb:.1f} MB")
-        print()
+    # === Filter 2: no_interstate (all except Interstate Highway) ===
+    no_interstate = [r for r in all_rows if r[SYSTEM_CODE_COLUMN].strip() != "Interstate Highway"]
+    _write_csv(
+        os.path.join(output_dir, f"{jurisdiction}_no_interstate.csv"),
+        headers, no_interstate,
+        "All Roads (No Interstate) - System Code != Interstate Highway",
+        len(all_rows)
+    )
 
     print("Done! All filter files created.")
+
+
+def _write_csv(output_path, headers, rows, description, total):
+    """Write a filtered CSV and print summary."""
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=headers)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    size_mb = os.path.getsize(output_path) / (1024 * 1024)
+    print(f"Created: {output_path}")
+    print(f"  Filter: {description}")
+    print(f"  Rows: {len(rows):,} / {total:,}")
+    print(f"  Size: {size_mb:.1f} MB")
+    print()
 
 
 def main():
@@ -130,7 +132,6 @@ def main():
     if args.data_dir:
         data_dir = args.data_dir
     else:
-        # Try relative to script location
         script_dir = os.path.dirname(os.path.abspath(__file__))
         repo_root = os.path.dirname(script_dir)
         data_dir = os.path.join(repo_root, "data", "CDOT")
