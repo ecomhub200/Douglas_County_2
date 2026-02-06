@@ -162,6 +162,7 @@ on:
           - 'crash_only'
           - 'grants_only'
           - 'cmf_only'
+          - 'road_network_only'
           - 'all'
 
 permissions:
@@ -562,9 +563,120 @@ EOF
           echo "ERROR: Push failed after $MAX_RETRIES attempts"
           exit 1
 
+  download-road-network:
+    runs-on: ubuntu-latest
+    # Run road network download quarterly (Jan, Apr, Jul, Oct) OR manual trigger (road_network_only or all)
+    if: |
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.download_type == 'road_network_only' || github.event.inputs.download_type == 'all') ||
+      github.event_name == 'schedule' && github.event.schedule == '0 12 1-7 1,4,7,10 1'
+    outputs:
+      road_status: ${{ steps.road-download.outcome }}
+      road_segments: ${{ steps.road-stats.outputs.segments }}
+      road_intersections: ${{ steps.road-stats.outputs.intersections }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Determine jurisdiction
+        id: get-jurisdiction
+        run: |
+          INPUT_JURISDICTION="${{ github.event.inputs.jurisdiction }}"
+          if [ -n "$INPUT_JURISDICTION" ]; then
+            echo "Using workflow input jurisdiction: $INPUT_JURISDICTION"
+            echo "jurisdiction=$INPUT_JURISDICTION" >> $GITHUB_OUTPUT
+          else
+            if [ -f "config/settings.json" ]; then
+              SAVED_JURISDICTION=$(python -c "import json; print(json.load(open('config/settings.json'))['selectedJurisdiction'])")
+              echo "Using saved jurisdiction: $SAVED_JURISDICTION"
+              echo "jurisdiction=$SAVED_JURISDICTION" >> $GITHUB_OUTPUT
+            else
+              echo "jurisdiction=henrico" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Download road network from Overture Maps
+        id: road-download
+        run: |
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+          echo "=========================================="
+          echo "Downloading Road Network for: $JURISDICTION"
+          echo "Source: Overture Maps Foundation"
+          echo "Started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+          python download_road_network.py --jurisdiction "$JURISDICTION" --skip-minor
+
+          echo "=========================================="
+          echo "Download complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+      - name: Generate road network statistics
+        id: road-stats
+        run: |
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+
+          if [ -f "data/${JURISDICTION}_road_network.geojson" ]; then
+            SEGMENTS=$(python -c "import json; d=json.load(open('data/${JURISDICTION}_road_network.geojson')); print(d['metadata']['totalFeatures'])")
+            echo "Road segments: $SEGMENTS"
+            echo "segments=$SEGMENTS" >> $GITHUB_OUTPUT
+            ls -lh "data/${JURISDICTION}_road_network.geojson"
+          fi
+
+          if [ -f "data/${JURISDICTION}_intersections.geojson" ]; then
+            INTERSECTIONS=$(python -c "import json; d=json.load(open('data/${JURISDICTION}_intersections.geojson')); print(d['metadata']['totalIntersections'])")
+            echo "Intersections: $INTERSECTIONS"
+            echo "intersections=$INTERSECTIONS" >> $GITHUB_OUTPUT
+            ls -lh "data/${JURISDICTION}_intersections.geojson"
+          fi
+
+      - name: Commit and push road network data
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+          git add "data/${JURISDICTION}_road_network.geojson" "data/${JURISDICTION}_intersections.geojson" 2>/dev/null || true
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Auto-update: Road network ($JURISDICTION) - $(date +'%Y-%m-%d') (Overture Maps)"
+
+          MAX_RETRIES=4
+          for i in $(seq 1 $MAX_RETRIES); do
+            if git push; then
+              echo "Push successful"
+              exit 0
+            fi
+            echo "Push failed (attempt $i/$MAX_RETRIES), pulling latest..."
+            sleep $((2 ** i))
+            git fetch origin main
+            git rebase origin/main || {
+              git rebase --abort 2>/dev/null || true
+              git pull --no-edit origin main
+            }
+          done
+
+          echo "ERROR: Push failed after $MAX_RETRIES attempts"
+          exit 1
+
   notify-on-failure:
     runs-on: ubuntu-latest
-    needs: [download-crash-data, download-grants-data, download-cmf-data]
+    needs: [download-crash-data, download-grants-data, download-cmf-data, download-road-network]
     if: failure()
     steps:
       - name: Send failure notification
@@ -595,7 +707,7 @@ EOF
 
   notify-on-success:
     runs-on: ubuntu-latest
-    needs: [download-crash-data, download-grants-data, download-cmf-data]
+    needs: [download-crash-data, download-grants-data, download-cmf-data, download-road-network]
     if: success() && github.event_name == 'schedule'
     steps:
       - name: Send success notification (monthly only)
@@ -627,8 +739,14 @@ EOF
             === GRANTS ===
             Grants Updated: ${{ needs.download-grants-data.outputs.grants_count || 'N/A' }}
 
-            Data Source: Virginia Roads (VDOT)
-            Dataset ID: 1a96a2f31b4f4d77991471b6cabb38ba
+            === ROAD NETWORK (Overture Maps) ===
+            Road Segments: ${{ needs.download-road-network.outputs.road_segments || 'N/A' }}
+            Intersections: ${{ needs.download-road-network.outputs.road_intersections || 'N/A' }}
+
+            Data Sources:
+            - Crash Data: Virginia Roads (VDOT) / CDOT
+            - Road Network: Overture Maps Foundation
+            - Grants: Grants.gov
 
             --
             CRASH LENS Automated Notification

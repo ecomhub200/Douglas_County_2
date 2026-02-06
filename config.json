@@ -29,6 +29,46 @@
       "messagingSenderId": "345091421318",
       "appId": "1:345091421318:web:88f99469eb0ce73c734d07"
     },
+    "overtureMaps": {
+      "enabled": true,
+      "s3Base": "s3://overturemaps-us-west-2/release",
+      "defaultRelease": "2025-12-01.0",
+      "updateFrequency": "quarterly",
+      "roadNetworkFile": "road_network.geojson",
+      "intersectionsFile": "intersections.geojson",
+      "roadClassColors": {
+        "motorway": "#dc2626",
+        "trunk": "#ea580c",
+        "primary": "#f59e0b",
+        "secondary": "#84cc16",
+        "tertiary": "#22c55e",
+        "residential": "#94a3b8",
+        "service": "#cbd5e1",
+        "unclassified": "#e2e8f0"
+      },
+      "roadClassLabels": {
+        "motorway": "Interstate/Freeway",
+        "trunk": "US Highway/Expressway",
+        "primary": "State Highway/Primary",
+        "secondary": "Secondary Road",
+        "tertiary": "Collector Road",
+        "residential": "Local/Residential",
+        "service": "Service Road",
+        "unclassified": "Unclassified"
+      },
+      "intersectionStyle": {
+        "color3leg": "#f59e0b",
+        "color4leg": "#ef4444",
+        "colorComplex": "#7c3aed",
+        "minRadius": 4,
+        "maxRadius": 10
+      },
+      "snapRadius": 150,
+      "snapRadiusUnit": "feet",
+      "defaultVisible": false,
+      "minZoomSegments": 12,
+      "minZoomIntersections": 13
+    },
     "tigerweb": {
       "enabled": true,
       "baseUrl": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer",
