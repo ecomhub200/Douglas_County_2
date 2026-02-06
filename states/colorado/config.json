@@ -16,7 +16,8 @@
       "latMax": 41.01,
       "lonMin": -109.06,
       "lonMax": -102.04
-    }
+    },
+    "dataDir": "CDOT"
   },
 
   "columnMapping": {
