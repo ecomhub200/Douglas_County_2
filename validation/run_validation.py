@@ -68,16 +68,20 @@ class ValidationError(Exception):
 
 
 class CrashDataValidator:
-    """Main validator class for Virginia crash data."""
+    """Main validator class for crash data (multi-state aware)."""
 
-    def __init__(self, jurisdiction: str, config: dict):
+    def __init__(self, jurisdiction: str, config: dict, state: str = 'virginia'):
         self.jurisdiction = jurisdiction
         self.config = config
+        self.state = state
         self.jurisdiction_config = config.get('jurisdictions', {}).get(jurisdiction, {})
 
         # Load reference data
         self.valid_values = self._load_json(VALID_VALUES_FILE)
         self.correction_rules = self._load_json(CORRECTION_RULES_FILE)
+
+        # Load state-specific config for coordinate bounds
+        self.state_config = self._load_state_config(state)
 
         # Validation results
         self.issues = []
@@ -98,6 +102,32 @@ class CrashDataValidator:
             return {}
         with open(path, 'r') as f:
             return json.load(f)
+
+    def _load_state_config(self, state: str) -> dict:
+        """Load state-specific config from states/{state}/config.json."""
+        states_dir = PROJECT_ROOT / 'states'
+        state_config_path = states_dir / state / 'config.json'
+        if state_config_path.exists():
+            with open(state_config_path, 'r') as f:
+                return json.load(f)
+        return {}
+
+    def get_state_bounds(self) -> Optional[Dict]:
+        """Get coordinate bounds from state config (multi-state aware)."""
+        # Try state-specific config first
+        bounds = self.state_config.get('state', {}).get('coordinateBounds', {})
+        if bounds:
+            return {
+                'minLat': bounds.get('latMin'),
+                'maxLat': bounds.get('latMax'),
+                'minLon': bounds.get('lonMin'),
+                'maxLon': bounds.get('lonMax')
+            }
+        # Fallback to virginia_valid_values.json
+        state_bounds = self.valid_values.get('stateBounds', {}).get('virginia', {})
+        if state_bounds:
+            return state_bounds
+        return None
 
     def get_jurisdiction_bounds(self) -> Optional[Dict]:
         """Get bounding box for jurisdiction."""
@@ -281,12 +311,17 @@ class CrashDataValidator:
             })
             return issues
 
-        # Check for transposed lat/lon (latitude in longitude range)
-        state_bounds = self.valid_values.get('stateBounds', {}).get('virginia', {})
+        # Check for transposed lat/lon and out-of-bounds (state-aware)
+        state_bounds = self.get_state_bounds()
+        state_label = self.state_config.get('state', {}).get('name', 'state')
         if state_bounds:
+            min_lat = state_bounds.get('minLat', -90)
+            max_lat = state_bounds.get('maxLat', 90)
+            min_lon = state_bounds.get('minLon', -180)
+            max_lon = state_bounds.get('maxLon', 180)
+
             # Check if lat/lon might be swapped
-            if (state_bounds.get('minLat', 36) <= lon <= state_bounds.get('maxLat', 40) and
-                state_bounds.get('minLon', -84) <= lat <= state_bounds.get('maxLon', -75)):
+            if (min_lat <= lon <= max_lat and min_lon <= lat <= max_lon):
                 issues.append({
                     'row': row_idx,
                     'document_nbr': doc_nbr or f'row_{row_idx}',
@@ -297,7 +332,7 @@ class CrashDataValidator:
                     'message': 'Latitude and longitude may be transposed'
                 })
 
-            if not (state_bounds.get('minLon', -84) <= lon <= state_bounds.get('maxLon', -75)):
+            if not (min_lon <= lon <= max_lon):
                 issues.append({
                     'row': row_idx,
                     'document_nbr': doc_nbr or f'row_{row_idx}',
@@ -305,10 +340,10 @@ class CrashDataValidator:
                     'issue': 'outside_state_bounds',
                     'severity': 'error',
                     'value': lon,
-                    'message': f'Longitude {lon} outside Virginia bounds'
+                    'message': f'Longitude {lon} outside {state_label} bounds'
                 })
 
-            if not (state_bounds.get('minLat', 36) <= lat <= state_bounds.get('maxLat', 40)):
+            if not (min_lat <= lat <= max_lat):
                 issues.append({
                     'row': row_idx,
                     'document_nbr': doc_nbr or f'row_{row_idx}',
@@ -316,7 +351,7 @@ class CrashDataValidator:
                     'issue': 'outside_state_bounds',
                     'severity': 'error',
                     'value': lat,
-                    'message': f'Latitude {lat} outside Virginia bounds'
+                    'message': f'Latitude {lat} outside {state_label} bounds'
                 })
 
         # Check jurisdiction bounds (boundary crashes - info level, not flagged)
@@ -939,16 +974,18 @@ def get_data_files(jurisdiction: str, config: dict) -> List[Tuple[str, str]]:
 
 def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
                           dry_run: bool = False, auto_correct: bool = True,
-                          geocode: bool = False, spatial_validate_pct: float = 0) -> dict:
+                          geocode: bool = False, spatial_validate_pct: float = 0,
+                          state: str = 'virginia') -> dict:
     """
     Validate all data files for a jurisdiction.
 
     Args:
-        jurisdiction: Jurisdiction ID (e.g., 'henrico')
+        jurisdiction: Jurisdiction ID (e.g., 'henrico', 'douglas')
         config: Configuration dict
         full: Force full re-validation
         dry_run: Preview without making changes
         auto_correct: Apply auto-corrections
+        state: State key for coordinate bounds (e.g., 'virginia', 'colorado')
 
     Returns:
         Validation report dict
@@ -965,7 +1002,7 @@ def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
                           "Skipping geocoding and spatial validation. "
                           "Install spatial dependencies: pip install -r validation/requirements.txt")
 
-    validator = CrashDataValidator(jurisdiction, config)
+    validator = CrashDataValidator(jurisdiction, config, state=state)
     data_files = get_data_files(jurisdiction, config)
     files_validated = []
     combined_report = None
@@ -1063,15 +1100,16 @@ def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description='Virginia Crash Data Validation System',
+        description='CRASH LENS Data Validation System (multi-state)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python run_validation.py                                # Default jurisdiction
-  python run_validation.py --jurisdiction henrico         # Specific jurisdiction
-  python run_validation.py --jurisdiction henrico --full  # Force full re-validation
-  python run_validation.py --dry-run                      # Preview without changes
-  python run_validation.py --all                          # All jurisdictions
+  python run_validation.py                                          # Default jurisdiction
+  python run_validation.py --jurisdiction henrico                   # Virginia jurisdiction
+  python run_validation.py --jurisdiction douglas --state colorado  # Colorado jurisdiction
+  python run_validation.py --jurisdiction henrico --full            # Force full re-validation
+  python run_validation.py --dry-run                                # Preview without changes
+  python run_validation.py --all                                    # All jurisdictions
         """
     )
 
@@ -1126,6 +1164,13 @@ Examples:
         help='Validate PCT%% of records against OSM road network (0-100, 0=disabled)'
     )
 
+    parser.add_argument(
+        '--state', '-s',
+        type=str,
+        default='virginia',
+        help='State key for coordinate bounds (default: virginia). Options: virginia, colorado'
+    )
+
     return parser.parse_args()
 
 
@@ -1160,7 +1205,8 @@ def main():
                 dry_run=args.dry_run,
                 auto_correct=not args.no_auto_correct,
                 geocode=args.geocode,
-                spatial_validate_pct=args.spatial_validate
+                spatial_validate_pct=args.spatial_validate,
+                state=args.state
             )
             all_reports[jurisdiction] = report
 
