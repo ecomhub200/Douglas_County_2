@@ -73,6 +73,20 @@ DATA_DIR = PROJECT_ROOT / 'data'
 STATES_DIR = PROJECT_ROOT / 'states'
 
 
+def get_state_dot_name(state_key: str) -> str:
+    """Get the DOT folder name for a state from states/{state}/config.json."""
+    config_path = STATES_DIR / state_key / 'config.json'
+    if config_path.exists():
+        with open(config_path, 'r') as f:
+            cfg = json.load(f)
+        return cfg.get('state', {}).get('dotName', state_key.upper())
+    fallback = {
+        'colorado': 'CDOT', 'virginia': 'VDOT', 'texas': 'TxDOT',
+        'maryland': 'MDOT', 'northcarolina': 'NCDOT', 'pennsylvania': 'PennDOT',
+    }
+    return fallback.get(state_key, state_key.upper())
+
+
 class PipelineConfig:
     """Configuration for the processing pipeline."""
 
@@ -92,10 +106,13 @@ class PipelineConfig:
         self.full_validation = args.full_validation
         self.force = args.force
 
-        # Resolve output directory
+        # Resolve output directory from state DOT name
         if not self.output_dir:
-            # Default: same directory as input, or data/ for merged
-            if self.input_files:
+            if self.state:
+                # Use state DOT folder: data/{dotName}/
+                dot_name = get_state_dot_name(self.state)
+                self.output_dir = DATA_DIR / dot_name
+            elif self.input_files:
                 self.output_dir = Path(self.input_files[0]).parent
             else:
                 self.output_dir = DATA_DIR
@@ -256,6 +273,21 @@ def stage_convert(input_path: str, config: PipelineConfig, stats: PipelineStats)
     stats.rows_without_gps = total_rows - with_gps
     stats.files_created.append(output_path)
     stats.stages_completed.append('convert')
+
+    # Auto-resolve output directory from detected state DOT name if not explicitly set
+    if not config.state and detected_state and detected_state != 'unknown':
+        config.state = detected_state
+        dot_name = get_state_dot_name(detected_state)
+        new_output_dir = DATA_DIR / dot_name
+        if new_output_dir != config.output_dir:
+            new_output_dir.mkdir(parents=True, exist_ok=True)
+            new_output_path = str(new_output_dir / f"{config.jurisdiction}_standardized.csv")
+            shutil.move(output_path, new_output_path)
+            config.output_dir = new_output_dir
+            output_path = new_output_path
+            # Update tracked files
+            stats.files_created[-1] = output_path
+            logger.info("  Auto-resolved output dir: %s (from %s DOT)", new_output_dir, dot_name)
 
     logger.info("  Detected state: %s", detected_state)
     logger.info("  Total rows: %d", total_rows)
