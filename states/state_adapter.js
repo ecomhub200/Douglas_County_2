@@ -787,6 +787,27 @@ const StateAdapter = (() => {
                 city: normalizedRow['_co_city'] || '',
                 agency: normalizedRow['_co_agency'] || ''
             };
+        },
+
+        /**
+         * Get the data subdirectory for the current state.
+         * States with their own data folder (e.g., Colorado → "CDOT") return that folder name.
+         * Virginia and unknown states return null (data lives in the root data/ dir).
+         * @returns {string|null} Subdirectory name or null for root
+         */
+        getDataDir() {
+            const STATE_DATA_DIRS = {
+                'colorado': 'CDOT'
+            };
+            // Check detected state first, then manual FIPS selection
+            if (detectedState && STATE_DATA_DIRS[detectedState]) {
+                return STATE_DATA_DIRS[detectedState];
+            }
+            const fipsToKey = { '08': 'colorado' };
+            if (manualStateFips && fipsToKey[manualStateFips]) {
+                return STATE_DATA_DIRS[fipsToKey[manualStateFips]] || null;
+            }
+            return null;
         }
     };
 })();
