@@ -357,12 +357,12 @@ jobs:
 
           if [ -f "data/.validation/latest_report.json" ]; then
             SUMMARY=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['summary'])")
-            git commit -m "$(cat <<EOF
-$COMMIT_MSG
+            git commit -m "$(cat <<EOFMSG
+          $COMMIT_MSG
 
-Validation: $SUMMARY
-EOF
-)"
+          Validation: $SUMMARY
+          EOFMSG
+          )"
           else
             git commit -m "$COMMIT_MSG"
           fi

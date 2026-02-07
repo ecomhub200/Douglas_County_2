@@ -673,7 +673,7 @@ Examples:
     parser.add_argument(
         '--output', '-o',
         type=str,
-        help='Output file path (default: data/crashes.csv)'
+        help='Output file path (default: data/CDOT/crashes.csv)'
     )
 
     parser.add_argument(
@@ -724,7 +724,7 @@ def main():
     filter_profile = filter_profiles.get(filter_id, filter_profiles.get('countyOnly', {}))
 
     # Get output file
-    output_file = args.output or os.path.join(OUTPUT_DIR, "crashes.csv")
+    output_file = args.output or os.path.join(OUTPUT_DIR, "CDOT", "crashes.csv")
 
     logger.info("=" * 60)
     logger.info(f"Starting crash data download at {datetime.now()}")
