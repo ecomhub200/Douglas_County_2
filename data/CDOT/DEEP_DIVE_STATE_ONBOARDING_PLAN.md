@@ -117,7 +117,7 @@ Inside each render function, find all hardcoded column references like `r['_co_t
 
 ## Step 6: Update the `enhancements.json`
 
-Create `states/<state>/enhancements.json` documenting which panels are available:
+Create `data/<STATE_FOLDER>/enhancements.json` documenting which panels are available:
 
 ```json
 {
@@ -143,7 +143,7 @@ Create `states/<state>/enhancements.json` documenting which panels are available
 
 ## Step 7: Update State `config.json`
 
-If the new state's CSV has these standard columns, add them to `states/<state>/config.json` under `columnMapping`:
+If the new state's CSV has these standard columns, add them to `data/<STATE_FOLDER>/config.json` under `columnMapping`:
 
 ```json
 "VEHICLE_COUNT": "<actual CSV column header>",
@@ -174,8 +174,8 @@ After making all changes, verify:
 | `app/index.html` — `deepDiveState.panelConfig` | Column names for the new state |
 | `app/index.html` — `renderDD*()` functions | Column name references (`r['_co_...']` → `r['_<st>_...']`) |
 | `app/index.html` — `ddDecodeLanePos()` | Add state-specific value decoders if needed |
-| `states/<state>/enhancements.json` | Create — documents available panels |
-| `states/<state>/config.json` | Add standard unused column mappings if available |
+| `data/<STATE_FOLDER>/enhancements.json` | Create — documents available panels |
+| `data/<STATE_FOLDER>/config.json` | Add standard unused column mappings if available |
 
 ## Reference: Existing Panel Render Functions
 
