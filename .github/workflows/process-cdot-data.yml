@@ -43,10 +43,10 @@ on:
         type: boolean
         default: true
       skip_geocode:
-        description: 'Skip geocoding stage (faster)'
+        description: 'Skip geocoding stage (geocoding is slow: ~1 sec/row via Nominatim API)'
         required: false
         type: boolean
-        default: false
+        default: true
       dry_run:
         description: 'Dry run (preview only, no output files)'
         required: false
@@ -59,6 +59,7 @@ permissions:
 jobs:
   process-cdot-data:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -145,7 +146,7 @@ jobs:
 
             echo "jurisdiction=$JURISDICTION" >> "$GITHUB_OUTPUT"
             echo "merge=true" >> "$GITHUB_OUTPUT"
-            echo "skip_geocode=false" >> "$GITHUB_OUTPUT"
+            echo "skip_geocode=true" >> "$GITHUB_OUTPUT"
             echo "dry_run=false" >> "$GITHUB_OUTPUT"
           fi
 
