@@ -1,30 +1,98 @@
 {
   "metadata": {
-    "generatedAt": "2026-02-07T06:55:59.998796Z",
+    "generatedAt": "2026-02-07T11:24:49.346234Z",
     "jurisdiction": "henrico",
     "validationVersion": "1.3.0",
     "runType": "incremental"
   },
-  "summary": "Validated 0 records. 0 clean (0.0%).",
-  "totalRecords": 48074,
-  "newRecords": 0,
-  "autoCorrections": 0,
+  "summary": "Validated 402 records. 392 clean (97.51%). 10 flagged. 1 auto-corrected.",
+  "totalRecords": 48476,
+  "newRecords": 402,
+  "autoCorrections": 1,
   "deduplicated": 0,
-  "flaggedRecords": 0,
-  "totalIssues": 0,
+  "flaggedRecords": 10,
+  "totalIssues": 10,
   "errors": 0,
-  "cleanRecords": 0,
-  "cleanRate": 0.0,
+  "cleanRecords": 392,
+  "cleanRate": 97.51,
   "errorRate": 0.0,
-  "issuesByCategory": {},
-  "correctionsByField": {},
-  "flaggedRecordsList": [],
-  "spatialProcessing": {
-    "geocoding": {},
-    "validation": {},
-    "correction": {},
-    "issues": [],
-    "records_processed": 0,
-    "records_skipped": 48074
-  }
+  "issuesByCategory": {
+    "unknown_category": 10,
+    "boundary_warning": 3
+  },
+  "correctionsByField": {
+    "Motorcycle?": 1
+  },
+  "flaggedRecordsList": [
+    {
+      "documentNbr": "252490059",
+      "issues": [
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "252570205",
+      "issues": [
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "252510209",
+      "issues": [
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "252500169",
+      "issues": [
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "252610079",
+      "issues": [
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "252560166",
+      "issues": [
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "252590211",
+      "issues": [
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "252560061",
+      "issues": [
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "252710146",
+      "issues": [
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
+      ],
+      "severity": "warning"
+    },
+    {
+      "documentNbr": "252610123",
+      "issues": [
+        "Unknown Traffic Control Type: 17. Highway Safety Corridor"
+      ],
+      "severity": "warning"
+    }
+  ]
 }
