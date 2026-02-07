@@ -311,15 +311,16 @@ jobs:
             INPUT=$(python -c "import json; print(json.load(open('$REPORT'))['input_rows'])")
             OUTPUT=$(python -c "import json; print(json.load(open('$REPORT'))['output_rows'])")
             GPS=$(python -c "import json; print(json.load(open('$REPORT'))['gps_coverage'])")
-            COMMIT_MSG="Auto-process: CDOT $JURISDICTION pipeline - $(date +'%Y-%m-%d')
+            git commit -m "$(cat <<EOFMSG
+          Auto-process: CDOT $JURISDICTION pipeline - $(date +'%Y-%m-%d')
 
-Pipeline: $INPUT input -> $OUTPUT output | GPS: $GPS
-Trigger: ${{ github.event_name }}"
+          Pipeline: $INPUT input -> $OUTPUT output | GPS: $GPS
+          Trigger: ${{ github.event_name }}
+          EOFMSG
+          )"
           else
-            COMMIT_MSG="Auto-process: CDOT $JURISDICTION pipeline - $(date +'%Y-%m-%d')"
+            git commit -m "Auto-process: CDOT $JURISDICTION pipeline - $(date +'%Y-%m-%d')"
           fi
-
-          git commit -m "$COMMIT_MSG"
 
           # Push with retry logic
           MAX_RETRIES=4
