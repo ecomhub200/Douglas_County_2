@@ -1124,6 +1124,105 @@ CDOT Hyland OnBase (statewide Excel files)
                                                   (process-cdot-data.yml)
 ```
 
+### Three Data Entry Points
+
+Data can enter the system through any of three paths. All three ultimately land a CSV in `data/CDOT/`, which triggers the same pipeline.
+
+```
+ENTRY 1: Auto-Download          ENTRY 2: UI Upload          ENTRY 3: Manual Drop
+(GitHub Actions monthly)        (Browser upload tab)        (git push to data/CDOT/)
+         |                              |                            |
+         v                              v                            v
+download_cdot_crash_data.py     pipeline_server.py           User drops CSV file
+  - Downloads from OnBase         - Saves to data/CDOT/        into data/CDOT/
+  - Filters to county            - Triggers pipeline           and pushes to main
+  - CUID merge (append-only)       immediately (server-side)
+  - Commits to repo
+         |                              |                            |
+         v                              v                            v
+   Push to main branch          Pipeline runs server-side    Push triggers workflow
+         |                       (Convert → Validate →               |
+         |                        Geocode → Split)                   |
+         v                                                           v
+   process-cdot-data.yml ◄───────────────────────────────────────────┘
+   (auto-triggers on CSV push)
+         |
+         v
+   Merge all year CSVs → Convert → Validate → Geocode → Split
+         |
+         v
+   douglas_county_roads.csv → crashes.csv → CRASH LENS loads it
+```
+
+#### Entry 1: Auto-Download (GitHub Actions)
+
+- **Trigger:** Monthly cron (1st of month at 6 AM UTC) or manual "Run workflow" button
+- **What happens:** `download_cdot_crash_data.py` downloads statewide Excel from OnBase → filters to Douglas County → CUID merge with existing CSV → commits to repo
+- **Merge protection:** Final years (2021-2024) are skipped entirely. Preliminary years (2025) get merge-appended — only new CUIDs added, existing records untouched
+- **After commit:** The push to `data/CDOT/` auto-triggers `process-cdot-data.yml`
+
+#### Entry 2: UI Upload (Browser)
+
+- **Trigger:** User uploads a CSV through the Upload tab in CRASH LENS
+- **What happens:** Browser processes it instantly for dashboard display (JavaScript). If the pipeline server is running, it also saves the file to `data/CDOT/` and runs the full Python pipeline server-side
+- **No CUID merge here** — the server saves the file as-is. The pipeline's own Stage 0 (merge) handles combining multiple year files during processing
+- **If server is offline:** Browser-only mode — data loads in UI but isn't persisted to disk
+
+#### Entry 3: Manual Drop (git push)
+
+- **Trigger:** User manually places a CSV in `data/CDOT/` and pushes to main
+- **What happens:** GitHub detects the new/changed CSV and auto-triggers `process-cdot-data.yml`
+- **Simplest path** — just drop the file and push. No filtering or CUID merge (file is assumed to be already county-specific)
+
+### Two Different Merges (Don't Confuse Them)
+
+There are two merge operations in the system. They serve different purposes and happen at different stages:
+
+| | Downloader CUID Merge | Pipeline Stage 0 Merge |
+|---|---|---|
+| **Where** | `download_cdot_crash_data.py` | `process_crash_data.py` (Stage 0) |
+| **When** | Before CSV lands on disk | After all CSVs are on disk |
+| **What it does** | Protects a single year file — appends only new crash records (by CUID) to `2025 douglas.csv` | Concatenates all year files (2021 + 2022 + 2023 + 2024 + 2025) into one big dataset |
+| **Dedup logic** | CUID-based (per-year, per-county) | Simple concat (years are already clean) |
+| **Applies to** | Entry 1 only (auto-download) | All entries (runs in pipeline) |
+
+```
+CUID merge (per-year file protection)      Pipeline Stage 0 (combine all years)
+         |                                            |
+         v                                            v
+  "2025 douglas.csv"                       All 5 year files concatenated
+  (1,065 existing + 47 new = 1,112)        (5K + 4.6K + 5.4K + 5.5K + 1.1K = ~21.6K rows)
+         |                                            |
+         v                                            v
+  Stays on disk as individual file          Goes through Convert → Validate → Geocode → Split
+```
+
+### What the Pipeline Does After Any Entry
+
+Regardless of how data got into `data/CDOT/`, the pipeline performs the same stages:
+
+| Stage | What | Why |
+|-------|------|-----|
+| **0. Merge** | Combine all year CSVs (2021-2025) into one dataset | CRASH LENS needs the full history in one file |
+| **1. Convert** | Map Colorado columns/values to VDOT format | CRASH LENS only understands VDOT format |
+| **2. Validate** | QA/QC — fix severity, check bounds, remove duplicates | Catch data quality issues automatically |
+| **3. Geocode** | Fill missing GPS coordinates (node lookup + Nominatim) | Map tab needs lat/lon for every crash |
+| **4. Split** | Create 3 filtered views (all roads, county roads, no interstate) | Different analysis needs different road subsets |
+
+The final output is `crashes.csv` (copy of `county_roads`) which CRASH LENS loads automatically.
+
+### What You Don't Have to Worry About
+
+| Concern | Why It's Handled |
+|---------|-----------------|
+| Re-downloading 2021-2024 | Skipped automatically (`status: final` + file exists) |
+| Overwriting validated data | CUID merge only appends new records to preliminary years |
+| Running the pipeline manually | Auto-triggers on any CSV push to `data/CDOT/` |
+| Combining multiple year files | Pipeline Stage 0 merges all year CSVs automatically |
+| Duplicate crashes across years | Pipeline Stage 2 deduplicates (date + GPS + collision type) |
+| Missing GPS coordinates | Pipeline Stage 3 fills them (node lookup + Nominatim geocoding) |
+| Updating the manifest yearly | Only manual step: add new doc ID when CDOT publishes a new year |
+
 ### Data Source: Hyland OnBase
 
 CDOT publishes statewide crash data as Excel files on their Hyland OnBase document management system:
