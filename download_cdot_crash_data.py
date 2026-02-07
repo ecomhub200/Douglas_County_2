@@ -216,10 +216,138 @@ def extract_download_url_from_html(html_content, base_url):
     return None
 
 
+def _playwright_available():
+    """Check if Playwright is installed and has browsers."""
+    try:
+        from playwright.sync_api import sync_playwright  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def download_with_playwright(docid, label='document', timeout_ms=60000):
+    """
+    Fallback: use a headless Chromium browser to download the file.
+    Playwright handles JavaScript rendering, session cookies, and redirects
+    that requests cannot follow.
+
+    Returns (content_bytes, extension) or raises on failure.
+    """
+    from playwright.sync_api import sync_playwright
+
+    url = f"{ONBASE_BASE_URL}?clienttype=html&docid={docid}"
+    logger.info(f"  Playwright fallback: launching headless browser...")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(accept_downloads=True)
+        page = context.new_page()
+
+        downloaded_path = None
+
+        try:
+            # Navigate to the document page
+            page.goto(url, wait_until='networkidle', timeout=timeout_ms)
+            logger.info(f"  Page loaded: {page.title()}")
+
+            # Strategy A: intercept automatic download triggered by OnBase
+            # Some OnBase pages auto-start a download on page load
+            try:
+                with page.expect_download(timeout=15000) as download_info:
+                    # Click any visible download/open link on the page
+                    for selector in [
+                        'a[href*="GetDoc"]',
+                        'a[href*="Download"]',
+                        'a[href*="PdfPop"]',
+                        'a[href*=".xlsx"]',
+                        'a[href*=".xls"]',
+                        'text=Download',
+                        'text=Open',
+                        'text=Save',
+                    ]:
+                        link = page.query_selector(selector)
+                        if link and link.is_visible():
+                            logger.info(f"  Clicking download link: {selector}")
+                            link.click()
+                            break
+
+                download = download_info.value
+                downloaded_path = download.path()
+                logger.info(f"  Browser download captured: {download.suggested_filename}")
+            except Exception:
+                # Strategy B: no auto-download, try to find a direct link
+                logger.info("  No automatic download triggered. Checking page content...")
+
+            # Strategy B: if no download was captured, try fetching page content
+            # The OnBase viewer may embed the document or provide a link
+            if downloaded_path is None:
+                # Look for iframe or embedded content with the actual document
+                for frame in page.frames:
+                    frame_url = frame.url
+                    if any(ext in frame_url.lower() for ext in ['.xlsx', '.xls', 'getdoc', 'pdfpop']):
+                        logger.info(f"  Found document frame: {frame_url[:100]}")
+                        # Fetch the frame URL directly
+                        resp = page.request.get(frame_url)
+                        content = resp.body()
+                        is_valid, ext, reason = detect_file_type(content)
+                        if is_valid:
+                            browser.close()
+                            logger.info(f"  Playwright success via frame: {reason}")
+                            return content, ext
+
+                # Strategy C: try triggering download via JavaScript
+                try:
+                    with page.expect_download(timeout=10000) as download_info:
+                        page.evaluate("""() => {
+                            // Try clicking the document link in OnBase viewer
+                            const links = document.querySelectorAll('a');
+                            for (const a of links) {
+                                const href = (a.href || '').toLowerCase();
+                                if (href.includes('getdoc') || href.includes('download') ||
+                                    href.includes('.xls') || href.includes('pdfpop')) {
+                                    a.click();
+                                    return;
+                                }
+                            }
+                            // Try the OnBase-specific download button
+                            const btn = document.querySelector('[id*="download"], [id*="Download"]');
+                            if (btn) btn.click();
+                        }""")
+                    download = download_info.value
+                    downloaded_path = download.path()
+                    logger.info(f"  JS-triggered download: {download.suggested_filename}")
+                except Exception:
+                    pass
+
+            # Read the downloaded file
+            if downloaded_path:
+                with open(downloaded_path, 'rb') as f:
+                    content = f.read()
+
+                is_valid, ext, reason = detect_file_type(content)
+                browser.close()
+
+                if is_valid:
+                    logger.info(f"  Playwright success: {len(content):,} bytes ({reason})")
+                    return content, ext
+                else:
+                    raise Exception(f"Playwright downloaded file but it's not Excel: {reason}")
+
+            browser.close()
+            raise Exception("Playwright could not trigger a file download from OnBase")
+
+        except Exception as e:
+            browser.close()
+            raise Exception(f"Playwright fallback failed: {e}")
+
+
 def download_onbase_document(session, docid, label='document'):
     """
-    Download a document from Hyland OnBase. Handles the redirect chain
-    and falls back to parsing HTML if needed.
+    Download a document from Hyland OnBase. Tries multiple strategies:
+      1. Direct requests with redirect following
+      2. Parse HTML response for real download URL
+      3. clienttype=activex parameter
+      4. Playwright headless browser (fallback for JS-rendered pages)
 
     Returns (content_bytes, extension) or raises on failure.
     """
@@ -228,59 +356,74 @@ def download_onbase_document(session, docid, label='document'):
 
     logger.info(f"Downloading {label} (docid={docid})...")
 
-    # First attempt: direct request with redirects
-    response = make_request_with_retry(session, url, params=params, timeout=180)
-    content = response.content
-    content_type = response.headers.get('Content-Type', '')
-    content_disposition = response.headers.get('Content-Disposition', '')
-
-    is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
-    logger.info(f"  First attempt: {reason}")
-
-    if is_valid:
-        logger.info(f"  Downloaded {len(content):,} bytes")
-        return content, ext
-
-    # Second attempt: if we got HTML, try to extract the real download URL
-    logger.info("  Got HTML response. Parsing for download link...")
-    download_url = extract_download_url_from_html(content, response.url)
-
-    if download_url:
-        logger.info(f"  Found download link: {download_url[:100]}...")
-        response = make_request_with_retry(session, download_url, timeout=180)
-        content = response.content
-        content_type = response.headers.get('Content-Type', '')
-        content_disposition = response.headers.get('Content-Disposition', '')
-
-        is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
-        logger.info(f"  Second attempt: {reason}")
-
-        if is_valid:
-            logger.info(f"  Downloaded {len(content):,} bytes")
-            return content, ext
-
-    # Third attempt: try clienttype=activex (some OnBase instances support this)
-    logger.info("  Trying clienttype=activex...")
-    params_activex = {'clienttype': 'activex', 'docid': str(docid)}
+    # --- Strategy 1: direct request with redirects ---
     try:
-        response = make_request_with_retry(session, url, params=params_activex, timeout=180)
+        response = make_request_with_retry(session, url, params=params, timeout=180)
         content = response.content
         content_type = response.headers.get('Content-Type', '')
         content_disposition = response.headers.get('Content-Disposition', '')
 
         is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
-        logger.info(f"  Third attempt: {reason}")
+        logger.info(f"  Strategy 1 (requests): {reason}")
 
         if is_valid:
             logger.info(f"  Downloaded {len(content):,} bytes")
             return content, ext
+
+        # --- Strategy 2: parse HTML for download URL ---
+        logger.info("  Got HTML response. Parsing for download link...")
+        download_url = extract_download_url_from_html(content, response.url)
+
+        if download_url:
+            logger.info(f"  Found download link: {download_url[:100]}...")
+            response = make_request_with_retry(session, download_url, timeout=180)
+            content = response.content
+            content_type = response.headers.get('Content-Type', '')
+            content_disposition = response.headers.get('Content-Disposition', '')
+
+            is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
+            logger.info(f"  Strategy 2 (HTML parse): {reason}")
+
+            if is_valid:
+                logger.info(f"  Downloaded {len(content):,} bytes")
+                return content, ext
+
+        # --- Strategy 3: clienttype=activex ---
+        logger.info("  Trying clienttype=activex...")
+        params_activex = {'clienttype': 'activex', 'docid': str(docid)}
+        try:
+            response = make_request_with_retry(session, url, params=params_activex, timeout=180)
+            content = response.content
+            content_type = response.headers.get('Content-Type', '')
+            content_disposition = response.headers.get('Content-Disposition', '')
+
+            is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
+            logger.info(f"  Strategy 3 (activex): {reason}")
+
+            if is_valid:
+                logger.info(f"  Downloaded {len(content):,} bytes")
+                return content, ext
+        except Exception as e:
+            logger.debug(f"  activex attempt failed: {e}")
+
     except Exception as e:
-        logger.debug(f"  activex attempt failed: {e}")
+        logger.warning(f"  All requests-based strategies failed: {e}")
+
+    # --- Strategy 4: Playwright headless browser ---
+    if _playwright_available():
+        logger.info("  Falling back to Playwright headless browser...")
+        try:
+            return download_with_playwright(docid, label=label)
+        except Exception as e:
+            logger.error(f"  Playwright fallback failed: {e}")
+    else:
+        logger.info("  Playwright not installed. To enable browser fallback:")
+        logger.info("    pip install playwright && playwright install chromium")
 
     raise Exception(
         f"Failed to download {label} (docid={docid}). "
-        f"All download strategies returned non-Excel content. "
-        f"The OnBase portal may require browser-based access."
+        f"All strategies (requests + HTML parse + activex + Playwright) failed. "
+        f"Try: pip install playwright && playwright install chromium"
     )
 
 
@@ -353,9 +496,109 @@ def filter_to_jurisdiction(df, jurisdiction_config, jurisdiction_key):
     return df_filtered
 
 
-def process_year(session, year, year_info, manifest, data_dir, jurisdiction_key):
+def _get_output_filename(year, jurisdiction_key, manifest):
+    """Build the output CSV filename for a given year and jurisdiction."""
+    jurisdiction_filters = manifest.get('jurisdiction_filters', {})
+    if jurisdiction_key and jurisdiction_key in jurisdiction_filters:
+        display_name = jurisdiction_filters[jurisdiction_key].get('display_name', jurisdiction_key)
+        return f"{year} {display_name.lower().replace(' county', '').strip()}.csv"
+    return f"cdot_crash_statewide_{year}.csv"
+
+
+# The unique crash identifier column used for deduplication
+CUID_COLUMN = 'CUID'
+
+
+def merge_with_existing(new_df, existing_path):
+    """
+    Merge new downloaded data with an existing CSV file using CUID as the
+    deduplication key. Preserves all existing records and appends only
+    genuinely new ones.
+
+    Returns (merged_df, stats_dict) where stats_dict contains:
+      - existing_count: rows in the existing file
+      - new_download_count: rows in the fresh download
+      - new_records: count of records added (CUID not in existing)
+      - updated_records: count of records with same CUID but changed data
+      - merged_count: total rows in the merged result
+    """
+    import pandas as pd
+
+    existing_df = pd.read_csv(existing_path)
+    stats = {
+        'existing_count': len(existing_df),
+        'new_download_count': len(new_df),
+        'new_records': 0,
+        'updated_records': 0,
+        'merged_count': 0,
+    }
+
+    # Find the CUID column (case-insensitive) in both DataFrames
+    cuid_col_existing = None
+    for col in existing_df.columns:
+        if col.strip().upper() == CUID_COLUMN:
+            cuid_col_existing = col
+            break
+
+    cuid_col_new = None
+    for col in new_df.columns:
+        if col.strip().upper() == CUID_COLUMN:
+            cuid_col_new = col
+            break
+
+    if cuid_col_existing is None or cuid_col_new is None:
+        # No CUID column — can't deduplicate, fall back to full replace
+        logger.warning(f"  CUID column not found. Falling back to full replacement.")
+        logger.warning(f"    Existing columns: {list(existing_df.columns)[:10]}")
+        logger.warning(f"    New columns: {list(new_df.columns)[:10]}")
+        stats['merged_count'] = len(new_df)
+        return new_df, stats
+
+    existing_cuids = set(existing_df[cuid_col_existing].dropna().astype(str))
+    new_cuids = set(new_df[cuid_col_new].dropna().astype(str))
+
+    # New records: CUIDs in download that aren't in existing
+    added_cuids = new_cuids - existing_cuids
+    stats['new_records'] = len(added_cuids)
+
+    # Check for updated records (same CUID, different data)
+    common_cuids = existing_cuids & new_cuids
+    if common_cuids:
+        # Compare row counts — if CDOT revised a record, the new version wins
+        # but we log it for audit
+        existing_common = existing_df[existing_df[cuid_col_existing].astype(str).isin(common_cuids)]
+        new_common = new_df[new_df[cuid_col_new].astype(str).isin(common_cuids)]
+
+        # Quick check: row count difference in common CUIDs
+        if len(existing_common) != len(new_common):
+            stats['updated_records'] = abs(len(new_common) - len(existing_common))
+
+    if stats['new_records'] == 0:
+        logger.info(f"  No new records to merge (all {len(common_cuids)} CUIDs already exist)")
+        stats['merged_count'] = len(existing_df)
+        return existing_df, stats
+
+    # Append only the new rows
+    new_rows = new_df[new_df[cuid_col_new].astype(str).isin(added_cuids)].copy()
+    merged_df = pd.concat([existing_df, new_rows], ignore_index=True)
+    stats['merged_count'] = len(merged_df)
+
+    logger.info(f"  Merge: {stats['existing_count']:,} existing + {stats['new_records']:,} new "
+                f"= {stats['merged_count']:,} total")
+
+    return merged_df, stats
+
+
+def process_year(session, year, year_info, manifest, data_dir, jurisdiction_key,
+                 force=False):
     """
     Download a single year's statewide file, filter to county, save as CSV.
+
+    Merge strategy:
+      - "final" years: skip download if CSV already exists (use --force to override)
+      - "preliminary" years: download and merge with existing using CUID dedup
+      - missing files: download fresh regardless of status
+
     Returns (year, success_bool, output_path_or_error).
     """
     docid = year_info['docid']
@@ -363,6 +606,18 @@ def process_year(session, year, year_info, manifest, data_dir, jurisdiction_key)
     label = f"CDOT Crash Listing {year}"
     if status == 'preliminary':
         label += " (preliminary)"
+
+    # Build output filename
+    filename = _get_output_filename(year, jurisdiction_key, manifest)
+    output_path = data_dir / filename
+
+    # --- Skip-if-final: don't re-download finalized years that already exist ---
+    if output_path.exists() and status == 'final' and not force:
+        import pandas as pd
+        existing_count = len(pd.read_csv(output_path))
+        logger.info(f"  {year}: SKIPPED — final data already exists "
+                    f"({output_path.name}, {existing_count:,} records). Use --force to re-download.")
+        return year, True, str(output_path)
 
     try:
         # Download the Excel file
@@ -383,15 +638,21 @@ def process_year(session, year, year_info, manifest, data_dir, jurisdiction_key)
             jur_config = jurisdiction_filters[jurisdiction_key]
             df = filter_to_jurisdiction(df, jur_config, jurisdiction_key)
             display_name = jur_config.get('display_name', jurisdiction_key)
-            filename = f"{year} {display_name.lower().replace(' county', '').strip()}.csv"
 
             if df.empty:
                 return year, False, f"No records for {display_name} in {year} data"
         else:
-            filename = f"cdot_crash_statewide_{year}.csv"
+            pass  # statewide — no filter
+
+        # --- Merge logic: merge with existing data if file exists ---
+        if output_path.exists() and status == 'preliminary':
+            logger.info(f"  Merging with existing {output_path.name}...")
+            df, merge_stats = merge_with_existing(df, output_path)
+            logger.info(f"  Merge result: +{merge_stats['new_records']} new records")
+        elif output_path.exists() and force:
+            logger.info(f"  Force mode: replacing existing {output_path.name}")
 
         # Save as CSV
-        output_path = data_dir / filename
         df.to_csv(output_path, index=False)
         logger.info(f"  Saved: {output_path} ({len(df):,} records)")
 
@@ -438,8 +699,8 @@ def list_available(manifest):
     print(f"\nJURISDICTIONS ({len(jurisdictions)}):")
     print("-" * 40)
     for key, jur in sorted(jurisdictions.items()):
-        agency = f" (Agency: {', '.join(jur['agency_ids'])})" if jur.get('agency_ids') else ''
-        print(f"  {key:<15} {jur['display_name']}{agency}")
+        fips = f" (FIPS: {jur['fips']})" if jur.get('fips') else ''
+        print(f"  {key:<15} {jur['display_name']}{fips}")
 
     dicts = manifest.get('data_dictionaries', {})
     print(f"\nDATA DICTIONARIES ({len(dicts)}):")
@@ -464,6 +725,7 @@ Examples:
   python download_cdot_crash_data.py --list                   # Show available years/counties
   python download_cdot_crash_data.py --statewide              # Keep statewide (no county filter)
   python download_cdot_crash_data.py --no-dict                # Skip data dictionary
+  python download_cdot_crash_data.py --force --years 2024      # Re-download even if 2024 exists
         """
     )
 
@@ -517,6 +779,12 @@ Examples:
         '--list', '-l',
         action='store_true',
         help='List available years and jurisdictions, then exit'
+    )
+
+    parser.add_argument(
+        '--force',
+        action='store_true',
+        help='Force re-download even for finalized years that already exist locally'
     )
 
     return parser.parse_args()
@@ -594,7 +862,8 @@ def main():
 
     for year in sorted(years_to_download.keys(), reverse=True):
         year_info = years_to_download[year]
-        year_result = process_year(session, year, year_info, manifest, data_dir, jurisdiction_key)
+        year_result = process_year(session, year, year_info, manifest, data_dir, jurisdiction_key,
+                                   force=args.force)
         results.append(year_result)
 
     # Print summary
