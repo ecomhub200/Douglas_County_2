@@ -75,7 +75,11 @@
     "FIRST_HARMFUL_LOC": "First Harmful Event Loc",
     "ROAD_DEFECT": "Roadway Defect",
     "RELATION_TO_ROAD": "Relation To Roadway",
-    "ANIMAL": "ANIMAL"
+    "ANIMAL": "ANIMAL",
+    "VEHICLE_COUNT": "Vehicle Count",
+    "PERSONS_INJURED": "Persons Injured",
+    "PED_KILLED": "Pedestrians Killed",
+    "PED_INJURED": "Pedestrians Injured"
   },
 
   "derivedFields": {
