@@ -601,14 +601,46 @@ Preserve raw state fields that provide richer detail than the boolean flags. Pre
 
 ## 13. Geocoding Strategy
 
-### Strategy 1: Node Lookup (Free, Fast)
+The geocode stage uses a **persistent cache** (`data/{DOT}/.geocode_cache.json`) to avoid redundant API calls across pipeline runs. The cache is committed to the repository so it persists across CI runs and local executions.
 
-Rows with GPS at known intersection Nodes form a lookup table. Rows missing GPS but sharing the same Node ID get coordinates copied.
+### Strategy 1: Persistent Cache Lookup (Instant)
 
-### Strategy 2: Nominatim/OpenStreetMap (Free, Rate-Limited)
+Before any API calls, check the cache file for previously resolved coordinates:
+- **Node cache:** `{ "NODE_ID": [longitude, latitude] }` — from prior node lookups
+- **Nominatim cache:** `{ "query string": [lon, lat] | null }` — from prior API calls (includes failed lookups as `null` to avoid retrying)
+
+### Strategy 2: Node Lookup (Free, Fast)
+
+Rows with GPS at known intersection Nodes form a lookup table. Rows missing GPS but sharing the same Node ID get coordinates copied. **New node mappings are saved to the persistent cache** for future runs.
+
+### Strategy 3: Nominatim/OpenStreetMap (Free, Rate-Limited)
 
 Query: `"{Location 1} and {Location 2}, {jurisdiction}, {state}"`
-Rate: 1 request/second
+Rate: 1 request/second (Nominatim usage policy)
+**Results (both hits and misses) are saved to the persistent cache.**
+
+### Cache Lifecycle
+
+```
+First run:     Cache empty → all lookups go to Node + Nominatim → cache populated
+Second run:    Cache has 95%+ entries → only new locations need API → ~seconds
+Re-run:        Cache has 100% entries → zero API calls → instant
+New year data: Cache has most locations → only truly new intersections need API
+```
+
+### Cache File Format
+
+```json
+{
+  "nodes": {
+    "MAIN ST & OAK AVE": [-104.8567, 39.3345],
+    "I-25 & FOUNDERS PKWY": [-104.8523, 39.3891]
+  },
+  "nominatim": {
+    "PLUM CREEK BLVD and WOLFENSBERGER RD, Douglas, Colorado": [-104.8612, 39.3567],
+    "UNKNOWN RD, Douglas, Colorado": null
+  }
+}
 
 ---
 
@@ -827,6 +859,8 @@ paths:
   - '!data/CDOT/*_county_roads.csv'
   - '!data/CDOT/*_no_interstate.csv'
   - '!data/CDOT/crashes.csv'
+  - '!data/CDOT/*_merged_raw.csv'
+  - '!data/CDOT/.geocode_cache.json'
 ```
 
 So dropping `2024 douglas.csv` into `data/CDOT/` and pushing to main will trigger it. But the pipeline's own output commits will **not** re-trigger (no infinite loop).
@@ -860,7 +894,7 @@ Go to **Actions** > **Process CDOT Crash Data** > **Run workflow**:
 | Jurisdiction | `douglas` | Which county to process |
 | Input files | _(empty = all raw CSVs)_ | Glob pattern, e.g., `data/CDOT/2024*.csv` |
 | Merge | `true` | Combine all matching files before pipeline |
-| Skip geocode | `false` | Set `true` for faster processing |
+| Skip geocode | `false` | Set `true` to skip (uses persistent cache, so geocoding is fast after first run) |
 | Dry run | `false` | Preview without writing output |
 
 ### What the Workflow Does
@@ -881,12 +915,13 @@ Go to **Actions** > **Process CDOT Crash Data** > **Run workflow**:
 
 ### Output Commit
 
-The workflow commits only pipeline output files:
+The workflow commits pipeline output files and the geocode cache:
 - `data/{DOT}/{jurisdiction}_standardized.csv`
 - `data/{DOT}/{jurisdiction}_all_roads.csv`
 - `data/{DOT}/{jurisdiction}_county_roads.csv`
 - `data/{DOT}/{jurisdiction}_no_interstate.csv`
 - `data/{DOT}/crashes.csv`
+- `data/{DOT}/.geocode_cache.json` (persistent geocode cache)
 - `data/{DOT}/.validation/pipeline_report.json`
 
 Commit message format:
@@ -1073,8 +1108,9 @@ Create `states/{state_key}/config.json` and `jurisdictions.json`.
 ```
 Input:  4,323 rows (2021-2025), 110 columns
 Output: 4,296 rows (27 duplicates removed), 103 columns
-GPS:    99.1% coverage (147 recovered via node lookup)
-Time:   ~40 seconds full pipeline
+GPS:    99.1% coverage (147 recovered via node lookup + Nominatim)
+Time:   ~40 seconds full pipeline (first run with geocoding)
+        ~10 seconds subsequent runs (geocode cache populated)
 ```
 
 ### Files Produced
