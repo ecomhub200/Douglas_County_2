@@ -49,25 +49,10 @@
     "2024": {"docid": 35111742, "status": "final"},
     "2023": {"docid": 24805487, "status": "final"},
     "2022": {"docid": 17470642, "status": "final"},
-    "2021": {"docid": 13118621, "status": "final"},
-    "2020": {"docid": 9760262,  "status": "final"},
-    "2019": {"docid": 8077600,  "status": "final"},
-    "2018": {"docid": 8077599,  "status": "final"},
-    "2017": {"docid": 8077593,  "status": "final"},
-    "2016": {"docid": 8077592,  "status": "final"},
-    "2015": {"docid": 8077587,  "status": "final"},
-    "2014": {"docid": 8077585,  "status": "final"},
-    "2013": {"docid": 8077584,  "status": "final"},
-    "2012": {"docid": 8077581,  "status": "final"},
-    "2011": {"docid": 8077576,  "status": "final"},
-    "2010": {"docid": 8077574,  "status": "final"},
-    "2009": {"docid": 9760231,  "status": "final"},
-    "2008": {"docid": 9760169,  "status": "final"},
-    "2007": {"docid": 9760108,  "status": "final"}
+    "2021": {"docid": 13118621, "status": "final"}
   },
 
   "data_dictionaries": {
-    "2021-2025": {"docid": 17470635, "description": "Data dictionary for 2021+ crash listings"},
-    "2007-2020": {"docid": 13094548, "description": "Data dictionary for 2007-2020 crash listings"}
+    "2021-2025": {"docid": 17470635, "description": "Data dictionary for 2021+ crash listings"}
   }
 }
