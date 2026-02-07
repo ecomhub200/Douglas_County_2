@@ -53,7 +53,7 @@ STATE_SIGNATURES = {
 
 # Standardized output columns (Virginia-compatible format)
 STANDARD_COLUMNS = [
-    'Document Nbr', 'Crash Year', 'Crash Date', 'Crash Military Time',
+    'Document Nbr', 'Crash Date', 'Crash Year', 'Crash Military Time',
     'Crash Severity', 'K_People', 'A_People', 'B_People', 'C_People',
     'Collision Type', 'Weather Condition', 'Light Condition',
     'Roadway Surface Condition', 'Roadway Alignment',
@@ -67,6 +67,8 @@ STANDARD_COLUMNS = [
     'Traffic Control Type', 'Traffic Control Status',
     'Functional Class', 'Area Type', 'Facility Type', 'Ownership',
     'First Harmful Event', 'First Harmful Event Loc',
+    'Relation To Roadway',  # intersection location relationship
+    'Vehicle Count',         # number of vehicles involved
     'Persons Injured', 'Pedestrians Killed', 'Pedestrians Injured',
     # Original state columns preserved with prefix
     '_source_state', '_source_file'
@@ -161,9 +163,15 @@ class VirginiaNormalizer(BaseNormalizer):
 
 
 class ColoradoNormalizer(BaseNormalizer):
-    """Colorado CDOT data normalizer - converts to Virginia-compatible format."""
+    """Colorado CDOT data normalizer - converts to Virginia-compatible VDOT format.
 
-    # Collision type mapping (Colorado → standardized)
+    Produces output with numbered-prefix values matching the Henrico VDOT reference
+    format used by CRASH LENS (e.g., '1. Rear End', '2. Daylight').
+    """
+
+    # ----------------------------------------------------------------
+    # Step 1: Colorado MHE/Crash Type → intermediate collision category
+    # ----------------------------------------------------------------
     COLLISION_MAP = {
         'Rear-End': 'Rear End', 'Front to Rear': 'Rear End',
         'Broadside': 'Angle', 'Front to Side': 'Angle',
@@ -193,6 +201,7 @@ class ColoradoNormalizer(BaseNormalizer):
         'Embankment': 'Fixed Object - Off Road', 'Ditch': 'Fixed Object - Off Road',
         'Large Rocks or Boulder': 'Fixed Object - Off Road',
         'Electrical/Utility Box': 'Fixed Object - Off Road',
+        'Electical/Utility Box': 'Fixed Object - Off Road',  # typo in source
         'Crash Cushion/Traffic Barrel': 'Fixed Object - Off Road',
         'Mailbox': 'Fixed Object - Off Road',
         'Delineator/Milepost': 'Fixed Object - Off Road',
@@ -209,6 +218,216 @@ class ColoradoNormalizer(BaseNormalizer):
         'Other Non-Fixed Object Describe in Narrative)': 'Other',
     }
 
+    # ----------------------------------------------------------------
+    # Step 2: Intermediate category → VDOT numbered-prefix format
+    # ----------------------------------------------------------------
+    COLLISION_VDOT_MAP = {
+        'Rear End': '1. Rear End',
+        'Angle': '2. Angle',
+        'Head On': '3. Head On',
+        'Sideswipe - Same Direction': '4. Sideswipe - Same Direction',
+        'Sideswipe - Opposite Direction': '5. Sideswipe - Opposite Direction',
+        'Non-Collision': '8. Non-Collision',
+        'Fixed Object - Off Road': '9. Fixed Object - Off Road',
+        'Other Animal': '10. Deer/Animal',
+        'Fixed Object in Road': '11. Fixed Object in Road',
+        'Pedestrian': '12. Ped',
+        'Bicyclist': '13. Bicycle',
+        'Other': '16. Other',
+        'Unknown': '16. Other',
+    }
+
+    # ----------------------------------------------------------------
+    # Weather: Colorado raw → VDOT numbered format
+    # ----------------------------------------------------------------
+    WEATHER_VDOT_MAP = {
+        'Clear': '1. No Adverse Condition (Clear/Cloudy)',
+        'Cloudy': '1. No Adverse Condition (Clear/Cloudy)',
+        'Rain': '5. Rain',
+        'Snow': '4. Snow',
+        'Blowing Snow': '4. Snow',
+        'Sleet, Hail (Freezing Rain or Drizzle)': '6. Sleet/Hail/Freezing',
+        'Freezing Rain or Freezing Drizzle': '6. Sleet/Hail/Freezing',
+        'Sleet or Hail': '6. Sleet/Hail/Freezing',
+        'Fog': '3. Fog/Smog/Smoke',
+        'Blowing Sand, Soil, Dirt': '7. Blowing Sand/Dust',
+        'Dust': '7. Blowing Sand/Dust',
+        'Severe Crosswinds': '8. Severe Crosswinds',
+        'Wind': '8. Severe Crosswinds',
+    }
+
+    # ----------------------------------------------------------------
+    # Light: Colorado raw → VDOT numbered format
+    # ----------------------------------------------------------------
+    LIGHT_VDOT_MAP = {
+        'Daylight': '2. Daylight',
+        'Dark \u2013 Lighted': '4. Darkness - Road Lighted',
+        'Dark \u2013 Unlighted': '5. Darkness - Road Not Lighted',
+        'Dark - Lighted': '4. Darkness - Road Lighted',
+        'Dark - Unlighted': '5. Darkness - Road Not Lighted',
+        'Dawn or Dusk': '1. Dawn',  # refined by time in normalize_row
+    }
+
+    # ----------------------------------------------------------------
+    # Roadway Surface: Colorado raw → VDOT numbered format
+    # ----------------------------------------------------------------
+    SURFACE_VDOT_MAP = {
+        'Dry': '1. Dry',
+        'Wet': '2. Wet',
+        'Snow': '3. Snow', 'Snowy': '3. Snow',
+        'Snowy W/Visible Icy Road Treatment': '3. Snow',
+        'Ice': '5. Ice', 'Icy': '5. Ice',
+        'Icy W/Visible Icy Road Treatment': '5. Ice',
+        'Slush': '4. Slush', 'Slushy': '4. Slush',
+        'Slushy W/Visible Icy Road Treatment': '4. Slush',
+        'Dry W/Visible Icy Road Treatment': '1. Dry',
+        'Wet W/Visible Icy Road Treatment': '2. Wet',
+        'Sand, Mud, Dirt, Oil, Gravel': '6. Sand/Mud/Dirt/Oil/Gravel',
+        'Sand/Gravel': '6. Sand/Mud/Dirt/Oil/Gravel',
+        'Muddy': '6. Sand/Mud/Dirt/Oil/Gravel',
+        'Water (Standing, Moving)': '7. Water',
+        'Roto-Milled': '16. Other',
+        'Other': '16. Other',
+    }
+
+    # ----------------------------------------------------------------
+    # Roadway Description: derive road geometry from System Code
+    # (CO "Road Description" is actually intersection relation, not geometry)
+    # ----------------------------------------------------------------
+    ROAD_DESC_FROM_SYSTEM = {
+        'Interstate Highway': '3. Two-Way, Divided, Positive Median Barrier',
+        'State Highway': '2. Two-Way, Divided, Unprotected Median',
+        'County Road': '1. Two-Way, Not Divided',
+        'City Street': '1. Two-Way, Not Divided',
+        'Frontage Road': '1. Two-Way, Not Divided',
+    }
+
+    # ----------------------------------------------------------------
+    # Intersection Type: CO Road Description → VDOT approach counts
+    # ----------------------------------------------------------------
+    INTERSECTION_VDOT_MAP = {
+        'Non-Intersection': '1. Not at Intersection',
+        'At Intersection': '4. Four Approaches',
+        'Intersection Related': '4. Four Approaches',
+        'Driveway Access Related': '2. Two Approaches',
+        'Ramp': '1. Not at Intersection',
+        'Ramp-related': '1. Not at Intersection',
+        'Roundabout': '5. Roundabout',
+        'Crossover-Related': '1. Not at Intersection',
+        'Crossover-Related ': '1. Not at Intersection',
+        'Express/Managed/HOV Lane': '1. Not at Intersection',
+        'Auxiliary Lane': '1. Not at Intersection',
+        'Alley Related': '4. Four Approaches',
+        'Railroad Crossing Related': '2. Two Approaches',
+        'Mid-Block Crosswalk': '1. Not at Intersection',
+    }
+
+    # ----------------------------------------------------------------
+    # Relation To Roadway: CO Road Description → VDOT relation codes
+    # ----------------------------------------------------------------
+    RELATION_TO_ROADWAY_MAP = {
+        'Non-Intersection': '8. Non-Intersection',
+        'At Intersection': '9. Within Intersection',
+        'Intersection Related': '10. Intersection Related - Within 150 Feet',
+        'Ramp': '2. Acceleration/Deceleration Lanes',
+        'Ramp-related': '2. Acceleration/Deceleration Lanes',
+        'Driveway Access Related': '8. Non-Intersection',
+        'Crossover-Related': '1. Main-Line Roadway',
+        'Crossover-Related ': '1. Main-Line Roadway',
+        'Roundabout': '9. Within Intersection',
+        'Express/Managed/HOV Lane': '1. Main-Line Roadway',
+        'Auxiliary Lane': '1. Main-Line Roadway',
+        'Alley Related': '8. Non-Intersection',
+        'Railroad Crossing Related': '8. Non-Intersection',
+        'Mid-Block Crosswalk': '8. Non-Intersection',
+    }
+
+    # ----------------------------------------------------------------
+    # First Harmful Event: CO raw → VDOT numbered codes
+    # ----------------------------------------------------------------
+    FIRST_HE_VDOT_MAP = {
+        # Motor vehicle collisions
+        'Front to Rear': '20. Motor Vehicle In Transport',
+        'Front to Side': '20. Motor Vehicle In Transport',
+        'Rear to Side': '20. Motor Vehicle In Transport',
+        'Front to Front': '20. Motor Vehicle In Transport',
+        'Side to Side-Same Direction': '20. Motor Vehicle In Transport',
+        'Side to Side-Opposite Direction': '20. Motor Vehicle In Transport',
+        'Rear to Rear': '20. Motor Vehicle In Transport',
+        'Other Non-Collision': '38. Other Non-Collision',
+        'Other Non-Fixed Object (Describe in Narrative)': '37. Other Object (Not Fixed)',
+        'Other Non-Fixed Object Describe in Narrative)': '37. Other Object (Not Fixed)',
+        # Fixed objects
+        'Light Pole/Utility Pole': '3. Utility Pole',
+        'Traffic Signal Pole': '3. Utility Pole',
+        'Electrical/Utility Box': '3. Utility Pole',
+        'Electical/Utility Box': '3. Utility Pole',  # typo in source
+        'Tree': '2. Trees',
+        'Guardrail Face': '5. Guard Rail',
+        'Guardrail End': '5. Guard Rail',
+        'Cable Rail': '5. Guard Rail',
+        'Fence': '8. Fence',
+        'Curb': '27. Curb',
+        'Ditch': '14. Ditch',
+        'Embankment': '13. Embankment',
+        'Sign': '4. Traffic Sign Support',
+        'Concrete Highway Barrier': '15. Concrete Traffic Barrier',
+        'Crash Cushion/Traffic Barrel': '16. Impact Attenuator/Crash Cushion',
+        'Bridge Structure (Not Overhead)': '17. Bridge Pier or Abutment',
+        'Overhead Structure (Not Bridge)': '18. Overhead Sign Post',
+        'Wall or Building': '12. Building/Structure',
+        'Large Rocks or Boulder': '24. Other Fixed Object',
+        'Delineator/Milepost': '24. Other Fixed Object',
+        'Mailbox': '7. Mailbox',
+        'Culvert or Headwall': '10. Culvert',
+        'Barricade': '24. Other Fixed Object',
+        'Railroad Crossing Equipment': '24. Other Fixed Object',
+        'Other Fixed Object (Describe in Narrative)': '24. Other Fixed Object',
+        # Rollover / non-collision
+        'Overturning/Rollover': '30. Overturn (Rollover)',
+        'Ground': '30. Overturn (Rollover)',
+        'Fell from Motor Vehicle': '39. Fell/Jumped From Vehicle',
+        # Non-motorist
+        'Pedestrian': '19. Ped',
+        'School Age To/From School': '19. Ped',
+        'Bicycle/Motorized Bicycle': '22. Bicycle',
+        # Animals
+        'Wild Animal': '21. Animal',
+        'Domestic Animal': '21. Animal',
+        # Parked vehicles
+        'Parked Motor Vehicle': '6. Parked Vehicle',
+        'Vehicle Debris or Cargo': '37. Other Object (Not Fixed)',
+        # Fire
+        'Fire/Explosion': '34. Fire/Explosion',
+    }
+
+    # ----------------------------------------------------------------
+    # First Harmful Event Location: CO raw → VDOT numbered codes
+    # ----------------------------------------------------------------
+    FIRST_HE_LOC_VDOT_MAP = {
+        'On Roadway': '1. On Roadway',
+        'Center median/ Island': '3. Median',
+        'Ran off left side': '4. Roadside',
+        'Ran off right side': '4. Roadside',
+        'Shoulder': '2. Shoulder',
+        'In Parking Lane': '1. On Roadway',
+        'Gore': '5. Gore',
+        'Vehicle crossed center median into opposing lanes': '3. Median',
+        'Ran off "T" intersection': '4. Roadside',
+        'On private property': '9. Outside Right-of-Way',
+    }
+
+    # ----------------------------------------------------------------
+    # Ownership: derive from System Code
+    # ----------------------------------------------------------------
+    OWNERSHIP_FROM_SYSTEM = {
+        'Interstate Highway': '1. State Hwy Agency',
+        'State Highway': '1. State Hwy Agency',
+        'County Road': '2. County Hwy Agency',
+        'City Street': '3. City or Town Hwy Agency',
+        'Frontage Road': '1. State Hwy Agency',
+    }
+
     ROAD_SYSTEM_MAP = {
         'City Street': 'NonVDOT secondary',
         'County Road': 'NonVDOT secondary',
@@ -216,21 +435,6 @@ class ColoradoNormalizer(BaseNormalizer):
         'Interstate Highway': 'Interstate',
         'Frontage Road': 'Secondary',
         'Non Crash': 'NonVDOT secondary',
-    }
-
-    INTERSECTION_MAP = {
-        'Non-Intersection': 'Non-Intersection',
-        'At Intersection': 'Intersection',
-        'Intersection Related': 'Intersection',
-        'Driveway Access Related': 'Driveway',
-        'Ramp': 'Ramp', 'Ramp-related': 'Ramp',
-        'Roundabout': 'Roundabout',
-        'Express/Managed/HOV Lane': 'Non-Intersection',
-        'Crossover-Related ': 'Intersection',
-        'Auxiliary Lane': 'Non-Intersection',
-        'Alley Related': 'Intersection',
-        'Railroad Crossing Related': 'Railroad Crossing',
-        'Mid-Block Crosswalk': 'Intersection',
     }
 
     SPEED_ACTIONS = {
@@ -258,9 +462,63 @@ class ColoradoNormalizer(BaseNormalizer):
     }
 
     DARKNESS_VALUES = {
-        'Dark – Lighted', 'Dark – Unlighted',
+        'Dark \u2013 Lighted', 'Dark \u2013 Unlighted',
         'Dark - Lighted', 'Dark - Unlighted'
     }
+
+    # Colorado-specific detail columns to preserve (output_name, raw_col_name)
+    CO_EXTRA_COLUMNS = [
+        ('_co_total_vehicles', 'Total Vehicles'),
+        ('_co_mhe', 'MHE'),
+        ('_co_crash_type', 'Crash Type'),
+        ('_co_link', 'Link'),
+        ('_co_second_he', 'Second HE'),
+        ('_co_third_he', 'Third HE'),
+        ('_co_wild_animal', 'Wild Animal'),
+        ('_co_secondary_crash', 'Secondary Crash'),
+        ('_co_weather2', 'Weather Condition 2'),
+        ('_co_lane_position', 'Lane Position'),
+        ('_co_injury00_uninjured', 'Injury 00'),
+        # TU-1 fields
+        ('_co_tu1_direction', 'TU-1 Direction'),
+        ('_co_tu1_movement', 'TU-1 Movement'),
+        ('_co_tu1_vehicle_type', 'TU-1 Type'),
+        ('_co_tu1_speed_limit', 'TU-1 Speed Limit'),
+        ('_co_tu1_estimated_speed', 'TU-1 Estimated Speed'),
+        ('_co_tu1_stated_speed', 'TU-1 Speed'),
+        ('_co_tu1_driver_action', 'TU-1 Driver Action'),
+        ('_co_tu1_human_factor', 'TU-1 Human Contributing Factor'),
+        ('_co_tu1_age', 'TU-1 Age'),
+        ('_co_tu1_sex', 'TU-1 Sex '),
+        # TU-2 fields
+        ('_co_tu2_direction', 'TU-2 Direction'),
+        ('_co_tu2_movement', 'TU-2 Movement'),
+        ('_co_tu2_vehicle_type', 'TU-2 Type'),
+        ('_co_tu2_speed_limit', 'TU-2 Speed Limit'),
+        ('_co_tu2_estimated_speed', 'TU-2 Estimated Speed'),
+        ('_co_tu2_stated_speed', 'TU-2 Speed'),
+        ('_co_tu2_driver_action', 'TU-2 Driver Action'),
+        ('_co_tu2_human_factor', 'TU-2 Human Contributing Factor'),
+        ('_co_tu2_age', 'TU-2 Age'),
+        ('_co_tu2_sex', 'TU-2 Sex'),
+        # Non-motorist (ped/bike) fields
+        ('_co_nm1_type', 'TU-1 NM Type'),
+        ('_co_nm1_age', 'TU-1 NM Age '),
+        ('_co_nm1_sex', 'TU-1 NM Sex '),
+        ('_co_nm1_action', 'TU-1 NM Action '),
+        ('_co_nm1_movement', 'TU-1 NM Movement'),
+        ('_co_nm1_location', 'TU-1 NM Location '),
+        ('_co_nm1_facility', 'TU-1 NM Facility Available'),
+        ('_co_nm1_contributing_factor', 'TU-1 NM Human Contributing Factor '),
+        ('_co_nm2_type', 'TU-2 NM Type'),
+        ('_co_nm2_age', 'TU-2 NM Age '),
+        ('_co_nm2_sex', 'TU-2 NM Sex '),
+        ('_co_nm2_action', 'TU-2 NM Action '),
+        ('_co_nm2_movement', 'TU-2 NM Movement'),
+        ('_co_nm2_location', 'TU-2 NM Location '),
+        ('_co_nm2_facility', 'TU-2 NM Facility Available'),
+        ('_co_nm2_contributing_factor', 'TU-2 NM Human Contributing Factor '),
+    ]
 
     def normalize_row(self, row: Dict[str, str]) -> Dict[str, str]:
         n = {}
@@ -272,7 +530,8 @@ class ColoradoNormalizer(BaseNormalizer):
         raw_date = row.get('Crash Date', '').strip()
         n['Crash Date'] = raw_date
         n['Crash Year'] = self._extract_year(raw_date)
-        n['Crash Military Time'] = row.get('Crash Time', '').replace(':', '').strip()[:4]
+        mil_time = row.get('Crash Time', '').replace(':', '').strip()[:4]
+        n['Crash Military Time'] = mil_time
 
         # --- Severity (derived from injury counts) ---
         inj_k = self._int(row.get('Injury 04', '0'))
@@ -296,40 +555,63 @@ class ColoradoNormalizer(BaseNormalizer):
         n['B_People'] = str(inj_b)
         n['C_People'] = str(inj_c)
 
-        # --- Collision Type ---
+        # --- Collision Type (two-step: CO raw → category → VDOT numbered) ---
         crash_type = row.get('Crash Type', '').strip() or row.get('MHE', '').strip()
-        n['Collision Type'] = self.COLLISION_MAP.get(crash_type, crash_type or 'Unknown')
+        intermediate = self.COLLISION_MAP.get(crash_type, crash_type or 'Unknown')
+        n['Collision Type'] = self.COLLISION_VDOT_MAP.get(intermediate, '16. Other')
 
-        # --- Conditions ---
-        n['Weather Condition'] = row.get('Weather Condition', '').strip()
-        n['Light Condition'] = row.get('Lighting Conditions', '').strip()
-        n['Roadway Surface Condition'] = row.get('Road Condition', '').strip()
+        # --- Weather Condition (VDOT numbered format) ---
+        raw_weather = row.get('Weather Condition', '').strip()
+        n['Weather Condition'] = self.WEATHER_VDOT_MAP.get(raw_weather, raw_weather)
+
+        # --- Light Condition (VDOT numbered format + Dawn/Dusk split by time) ---
+        raw_light = row.get('Lighting Conditions', '').strip()
+        mapped_light = self.LIGHT_VDOT_MAP.get(raw_light, raw_light)
+        if mapped_light == '1. Dawn' and mil_time:
+            try:
+                if int(mil_time) >= 1200:
+                    mapped_light = '3. Dusk'
+            except ValueError:
+                pass
+        n['Light Condition'] = mapped_light
+
+        # --- Roadway Surface Condition (VDOT numbered format) ---
+        raw_surface = row.get('Road Condition', '').strip()
+        n['Roadway Surface Condition'] = self.SURFACE_VDOT_MAP.get(raw_surface, raw_surface)
+
+        # --- Roadway Alignment (VDOT 4-category system) ---
         n['Roadway Alignment'] = self._map_alignment(
             row.get('Road Contour Curves', '').strip(),
             row.get('Road Contour Grade', '').strip()
         )
 
-        # --- Road Description / Intersection ---
+        # --- Road Description / Intersection / Relation To Roadway ---
+        # CO "Road Description" is actually intersection relation, NOT road geometry
         road_desc = row.get('Road Description', '').strip()
-        n['Roadway Description'] = road_desc
-        n['Intersection Type'] = self.INTERSECTION_MAP.get(road_desc, road_desc or 'Unknown')
+        system = row.get('System Code', '').strip()
+
+        # Roadway Description = road geometry (derived from system code)
+        n['Roadway Description'] = self.ROAD_DESC_FROM_SYSTEM.get(
+            system, '1. Two-Way, Not Divided')
+
+        # Intersection Type = VDOT approach-count format (derived from CO Road Description)
+        n['Intersection Type'] = self.INTERSECTION_VDOT_MAP.get(
+            road_desc, '1. Not at Intersection')
+
+        # Relation To Roadway = VDOT location relationship (from CO Road Description)
+        n['Relation To Roadway'] = self.RELATION_TO_ROADWAY_MAP.get(road_desc, road_desc)
 
         # --- Route & Location ---
         n['RTE Name'] = self._build_route_name(row)
-        n['SYSTEM'] = self.ROAD_SYSTEM_MAP.get(
-            row.get('System Code', '').strip(), 'NonVDOT secondary'
-        )
+        n['SYSTEM'] = self.ROAD_SYSTEM_MAP.get(system, 'NonVDOT secondary')
         n['Node'] = self._build_node_id(row)
-        system = row.get('System Code', '').strip()
         n['RNS MP'] = row.get('Rd_Section', '').strip() if system in (
             'State Highway', 'Interstate Highway'
         ) else ''
 
         # --- Coordinates (x=longitude, y=latitude per Virginia convention) ---
-        lat_str = row.get('Latitude', '').strip()
-        lon_str = row.get('Longitude', '').strip()
-        n['x'] = lon_str  # longitude
-        n['y'] = lat_str  # latitude
+        n['x'] = row.get('Longitude', '').strip()
+        n['y'] = row.get('Latitude', '').strip()
 
         # --- Jurisdiction ---
         n['Physical Juris Name'] = row.get('County', '').strip()
@@ -351,30 +633,48 @@ class ColoradoNormalizer(BaseNormalizer):
         n['School Zone'] = 'Yes' if row.get('School Zone', '').strip() in ('TRUE', 'True') else 'No'
         n['Work Zone Related'] = 'Yes' if row.get('Construction Zone', '').strip() in ('TRUE', 'True') else 'No'
 
-        # --- Traffic Control (not in CDOT data) ---
+        # --- Traffic Control (not available in CDOT data) ---
         n['Traffic Control Type'] = ''
         n['Traffic Control Status'] = ''
 
-        # --- Other fields ---
+        # --- Infrastructure fields ---
         n['Functional Class'] = ''
         n['Area Type'] = ''
         n['Facility Type'] = ''
-        n['Ownership'] = ''
-        n['First Harmful Event'] = row.get('First HE', '').strip()
-        n['First Harmful Event Loc'] = row.get('Location', '').strip()
+        n['Ownership'] = self.OWNERSHIP_FROM_SYSTEM.get(system, '')
+
+        # --- First Harmful Event (VDOT numbered codes) ---
+        raw_fhe = row.get('First HE', '').strip()
+        n['First Harmful Event'] = self.FIRST_HE_VDOT_MAP.get(raw_fhe, raw_fhe)
+
+        # --- First Harmful Event Location (VDOT numbered codes) ---
+        raw_fhe_loc = row.get('Location', '').strip()
+        n['First Harmful Event Loc'] = self.FIRST_HE_LOC_VDOT_MAP.get(
+            raw_fhe_loc, raw_fhe_loc)
+
+        # --- Vehicle Count ---
+        n['Vehicle Count'] = row.get('Total Vehicles', '').strip()
+
+        # --- Injury counts ---
         n['Persons Injured'] = row.get('Number Injured', '0').strip()
-        n['Pedestrians Killed'] = ''
-        n['Pedestrians Injured'] = ''
+
+        # --- Pedestrians Killed/Injured (derived from NM data) ---
+        pk, pi = self._derive_ped_killed_injured(row)
+        n['Pedestrians Killed'] = str(pk)
+        n['Pedestrians Injured'] = str(pi)
 
         # --- Source tracking ---
         n['_source_state'] = 'colorado'
-        # Preserve key original Colorado columns
-        n['_co_system_code'] = row.get('System Code', '').strip()
+        n['_co_system_code'] = system
         n['_co_agency_id'] = row.get('Agency Id', '').strip()
         n['_co_rd_number'] = row.get('Rd_Number', '').strip()
         n['_co_location1'] = row.get('Location 1', '').strip()
         n['_co_location2'] = row.get('Location 2', '').strip()
         n['_co_city'] = row.get('City', '').strip()
+
+        # --- Colorado-specific detail columns ---
+        for col_name, raw_col in self.CO_EXTRA_COLUMNS:
+            n[col_name] = row.get(raw_col, '').strip()
 
         return n
 
@@ -389,11 +689,9 @@ class ColoradoNormalizer(BaseNormalizer):
     def _extract_year(self, date_str: str) -> str:
         if not date_str:
             return ''
-        # Try M/D/YYYY
         parts = date_str.split('/')
         if len(parts) == 3:
             return parts[2][:4]
-        # Try YYYY-MM-DD
         parts = date_str.split('-')
         if len(parts) == 3 and len(parts[0]) == 4:
             return parts[0]
@@ -428,12 +726,34 @@ class ColoradoNormalizer(BaseNormalizer):
         return ''
 
     def _map_alignment(self, curves: str, grade: str) -> str:
-        parts = []
-        if curves and curves != 'Straight':
-            parts.append(curves)
-        if grade and grade != 'Level':
-            parts.append(grade)
-        return ', '.join(parts) if parts else 'Straight/Level'
+        """Map CO Road Contour fields to VDOT 4-category alignment."""
+        # Only recognized curve values count (Unknown, empty, Straight do not)
+        curve_values = {'Curve Right', 'Curve Left'}
+        grade_values = {'Uphill', 'Downhill', 'Hill Crest'}
+        has_curve = curves in curve_values
+        has_grade = grade in grade_values
+        if has_curve and has_grade:
+            return '4. Grade - Curve'
+        if has_curve:
+            return '2. Curve - Level'
+        if has_grade:
+            return '3. Grade - Straight'
+        return '1. Straight - Level'
+
+    def _derive_ped_killed_injured(self, row: Dict[str, str]):
+        """Derive pedestrian killed/injured from NM type + injury counts."""
+        ped_killed = 0
+        ped_injured = 0
+        for tu in ['TU-1', 'TU-2']:
+            nm_type = row.get(f'{tu} NM Type', '').strip()
+            if 'Pedestrian' in nm_type:
+                if self._int(row.get('Injury 04', '0')) > 0:
+                    ped_killed = max(ped_killed, 1)
+                if (self._int(row.get('Injury 03', '0')) > 0 or
+                        self._int(row.get('Injury 02', '0')) > 0 or
+                        self._int(row.get('Injury 01', '0')) > 0):
+                    ped_injured = max(ped_injured, 1)
+        return ped_killed, ped_injured
 
     def _check_nm_type(self, row: Dict[str, str], nm_type: str) -> bool:
         tu1 = row.get('TU-1 NM Type', '').strip()
