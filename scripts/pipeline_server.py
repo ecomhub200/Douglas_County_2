@@ -11,19 +11,20 @@ Usage:
     python scripts/pipeline_server.py --port 8080  # Custom port
 
 Endpoints:
-    POST /api/pipeline/run    - Upload CSV + trigger pipeline
+    POST /api/pipeline/run    - Upload CSV, save to data/{DOT}/, trigger pipeline
     GET  /api/pipeline/status - Check pipeline progress
     GET  /api/pipeline/states - List supported states & their DOT folders
     GET  /health              - Health check
 """
 
 import argparse
+import csv
+import glob
 import json
 import logging
 import os
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 from datetime import datetime
@@ -86,8 +87,56 @@ def get_supported_states():
     return states
 
 
+def _build_save_filename(original_name, jurisdiction):
+    """Build a clean filename for saving an uploaded CSV.
+
+    Strategy:
+      - If the original name is already descriptive (contains year or jurisdiction),
+        sanitize and keep it.
+      - Otherwise, generate: {jurisdiction}_{date}.csv
+    """
+    import re
+    name = original_name.strip()
+    # Sanitize: keep alphanumeric, spaces, hyphens, underscores, dots
+    name = re.sub(r'[^\w\s\-.]', '', name)
+    # Ensure .csv extension
+    if not name.lower().endswith('.csv'):
+        name += '.csv'
+    # If the name is too generic (e.g., "data.csv", "upload.csv"), make it descriptive
+    base = name[:-4].lower().strip()
+    generic_names = {'data', 'upload', 'file', 'crash', 'crashes', 'export', 'download', 'untitled'}
+    if base in generic_names or len(base) < 3:
+        date_str = datetime.utcnow().strftime('%Y-%m-%d')
+        name = f"{jurisdiction}_{date_str}.csv"
+    return name
+
+
+def _is_pipeline_output(filename):
+    """Check if a filename is a pipeline output (not raw input data)."""
+    name = os.path.basename(filename).lower()
+    output_suffixes = ('_standardized.csv', '_all_roads.csv',
+                       '_county_roads.csv', '_no_interstate.csv',
+                       '_merged_raw.csv')
+    if name == 'crashes.csv':
+        return True
+    return any(name.endswith(s) for s in output_suffixes)
+
+
+def _collect_raw_csvs(dot_dir):
+    """Collect all raw (non-output) CSV files in a DOT data directory."""
+    raw_files = []
+    for f in sorted(Path(dot_dir).glob('*.csv')):
+        if not _is_pipeline_output(f.name):
+            raw_files.append(str(f))
+    return raw_files
+
+
 def run_pipeline(file_path, state_key, jurisdiction, dot_name):
-    """Run the pipeline in a background thread."""
+    """Run the pipeline in a background thread.
+
+    file_path is the newly saved raw CSV inside data/{DOT}/.
+    The pipeline merges it with any existing raw CSVs in the same folder.
+    """
     global pipeline_state
 
     output_dir = str(DATA_DIR / dot_name)
@@ -103,14 +152,24 @@ def run_pipeline(file_path, state_key, jurisdiction, dot_name):
         'started_at': time.time(),
     })
 
+    # Collect ALL raw CSVs in the DOT folder for merging
+    all_raw = _collect_raw_csvs(output_dir)
+    if not all_raw:
+        all_raw = [file_path]
+
+    use_merge = len(all_raw) > 1
+
     cmd = [
         sys.executable,
         str(SCRIPT_DIR / 'process_crash_data.py'),
-        '-i', file_path,
+        '-i', *all_raw,
         '-s', state_key,
         '-j', jurisdiction,
         '-o', output_dir,
+        '-f',  # Force overwrite existing outputs
     ]
+    if use_merge:
+        cmd.append('--merge')
 
     logger.info("Running pipeline: %s", ' '.join(cmd))
 
@@ -130,7 +189,11 @@ def run_pipeline(file_path, state_key, jurisdiction, dot_name):
             logger.info("[pipeline] %s", line)
 
             # Parse stage progress from log output
-            if 'STAGE 1: CONVERT' in line:
+            if 'STAGE 0: MERGE' in line:
+                pipeline_state['stage'] = 'merge'
+                pipeline_state['progress'] = 5
+                pipeline_state['message'] = 'Merging input files...'
+            elif 'STAGE 1: CONVERT' in line:
                 pipeline_state['stage'] = 'convert'
                 pipeline_state['progress'] = 10
                 pipeline_state['message'] = 'Converting state format to standard...'
@@ -209,12 +272,7 @@ def run_pipeline(file_path, state_key, jurisdiction, dot_name):
             'error': str(e),
         })
 
-    # Clean up temp file
-    try:
-        if os.path.exists(file_path) and '/tmp/' in file_path:
-            os.remove(file_path)
-    except OSError:
-        pass
+    # File is kept in data/{DOT}/ permanently (no cleanup needed)
 
 
 class PipelineHandler(BaseHTTPRequestHandler):
@@ -304,22 +362,40 @@ class PipelineHandler(BaseHTTPRequestHandler):
                 self._json_response({'error': 'Missing file upload'}, 400)
                 return
 
-            # Get DOT folder name
+            # Get DOT folder name and create data directory
             dot_name = get_state_dot_name(state_key)
+            dot_dir = DATA_DIR / dot_name
+            dot_dir.mkdir(parents=True, exist_ok=True)
 
-            # Save uploaded file to temp location
-            suffix = os.path.splitext(file_item.filename)[1] or '.csv'
-            tmp_fd, tmp_path = tempfile.mkstemp(suffix=suffix, prefix='crashlens_')
-            with os.fdopen(tmp_fd, 'wb') as tmp_file:
-                tmp_file.write(file_item.file.read())
+            # Build a descriptive filename for the saved raw CSV
+            # Use original filename if it looks reasonable, otherwise generate one
+            orig_name = file_item.filename
+            safe_name = _build_save_filename(orig_name, jurisdiction)
+            save_path = str(dot_dir / safe_name)
 
+            # Don't overwrite an existing file with the same name
+            if os.path.exists(save_path):
+                base, ext = os.path.splitext(safe_name)
+                save_path = str(dot_dir / f"{base}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{ext}")
+
+            # Write uploaded file to the DOT data directory
+            file_data = file_item.file.read()
+            with open(save_path, 'wb') as out_f:
+                out_f.write(file_data)
+
+            file_size_mb = round(len(file_data) / (1024 * 1024), 2)
+            logger.info("Saved: %s (%.2f MB) -> %s", orig_name, file_size_mb, save_path)
             logger.info("Received: file=%s, state=%s, jurisdiction=%s, dotFolder=%s",
-                         file_item.filename, state_key, jurisdiction, dot_name)
+                         orig_name, state_key, jurisdiction, dot_name)
+
+            # Count existing raw CSVs (for merge info)
+            existing_raw = _collect_raw_csvs(str(dot_dir))
+            will_merge = len(existing_raw) > 1
 
             # Start pipeline in background thread
             thread = threading.Thread(
                 target=run_pipeline,
-                args=(tmp_path, state_key, jurisdiction, dot_name),
+                args=(save_path, state_key, jurisdiction, dot_name),
                 daemon=True,
             )
             thread.start()
@@ -327,7 +403,10 @@ class PipelineHandler(BaseHTTPRequestHandler):
             self._json_response({
                 'status': 'started',
                 'message': f'Pipeline started for {state_key}/{jurisdiction}',
+                'savedAs': str(Path(save_path).relative_to(PROJECT_ROOT)),
                 'outputDir': f'data/{dot_name}/',
+                'merging': will_merge,
+                'rawFileCount': len(existing_raw),
                 'pollUrl': '/api/pipeline/status',
             })
 

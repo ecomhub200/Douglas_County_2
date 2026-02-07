@@ -1086,9 +1086,9 @@ def validate_jurisdiction(jurisdiction: str, config: dict, full: bool = False,
         save_report(combined_report)
         save_manifest(jurisdiction, validator.stats, files_validated)
 
-        # Copy county_roads to crashes.csv (fallback)
+        # Copy county_roads to crashes.csv (fallback) into the same directory
         county_roads_file = DATA_DIR / f"{jurisdiction}_county_roads.csv"
-        crashes_fallback = DATA_DIR / "crashes.csv"
+        crashes_fallback = county_roads_file.parent / "crashes.csv"
         if county_roads_file.exists():
             import shutil
             shutil.copy(county_roads_file, crashes_fallback)
