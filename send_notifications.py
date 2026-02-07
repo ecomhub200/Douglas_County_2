@@ -44,7 +44,7 @@ def validate_config():
 BASE_DIR = Path(__file__).parent
 SUBSCRIBERS_FILE = BASE_DIR / 'data' / 'subscribers.json'
 GRANTS_FILE = BASE_DIR / 'data' / 'grants.csv'
-CRASHES_FILE = BASE_DIR / 'data' / 'crashes.csv'
+CRASHES_FILE = BASE_DIR / 'data' / 'CDOT' / 'crashes.csv'
 
 # =============================================================================
 # AWS SES CLIENT

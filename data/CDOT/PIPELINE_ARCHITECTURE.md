@@ -80,9 +80,9 @@ project_root/
 |   |   +-- douglas_all_roads.csv     # Stage 4 output
 |   |   +-- douglas_county_roads.csv  # Stage 4 output
 |   |   +-- douglas_no_interstate.csv # Stage 4 output
+|   |   +-- crashes.csv               # Default fallback (copy of county_roads)
 |   |   +-- .validation/
 |   |       +-- pipeline_report.json  # Processing report
-|   +-- crashes.csv                   # Default fallback (copy of county_roads)
 |
 +-- app/
     +-- index.html                    # Browser UI with inline pipeline JS
@@ -212,7 +212,7 @@ COUNTY_AGENCY_MAP = {
 }
 ```
 
-Also copies `county_roads.csv` to `data/crashes.csv` as the UI default fallback.
+Also copies `county_roads.csv` to `data/CDOT/crashes.csv` as the UI default fallback.
 
 ---
 
@@ -671,11 +671,9 @@ data/CDOT/
   douglas_all_roads.csv          # Stage 4: Complete dataset (1.5 MB)
   douglas_county_roads.csv       # Stage 4: County roads only (383 KB)
   douglas_no_interstate.csv      # Stage 4: No interstate (1.2 MB)
+  crashes.csv                    # Copy of county_roads (UI default fallback)
   .validation/
     pipeline_report.json         # Processing statistics
-
-data/
-  crashes.csv                    # Copy of county_roads (UI default fallback)
 ```
 
 ---
