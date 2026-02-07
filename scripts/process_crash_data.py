@@ -98,6 +98,7 @@ class PipelineConfig:
         self.dry_run = args.dry_run
         self.verbose = args.verbose
         self.merge = args.merge
+        self.merge_existing = args.merge_existing
         self.convert_only = args.convert_only
         self.skip_validation = args.skip_validation
         self.skip_geocode = args.skip_geocode
@@ -836,6 +837,80 @@ def stage_split(validated_path: str, config: PipelineConfig, stats: PipelineStat
 
     logger.info("  Source: %s (%d rows)", validated_path, len(all_rows))
 
+    # --- Merge with existing output files if --merge-existing ---
+    if config.merge_existing:
+        all_roads_path = str(config.output_dir / f"{jurisdiction}_all_roads.csv")
+        if os.path.exists(all_roads_path):
+            logger.info("  MERGE MODE: Merging with existing %s", all_roads_path)
+            with open(all_roads_path, 'r', encoding='utf-8') as f:
+                existing_reader = csv.DictReader(f)
+                existing_rows = list(existing_reader)
+                # Use existing headers if new headers are a subset
+                if existing_reader.fieldnames:
+                    # Merge headers: keep all unique columns
+                    existing_headers = existing_reader.fieldnames
+                    merged_headers = list(existing_headers)
+                    for h in headers:
+                        if h not in merged_headers:
+                            merged_headers.append(h)
+                    headers = merged_headers
+
+            existing_count = len(existing_rows)
+            new_count = len(all_rows)
+            logger.info("    Existing: %d rows, New: %d rows", existing_count, new_count)
+
+            # Combine: existing first (they take priority in dedup)
+            combined_rows = existing_rows + all_rows
+
+            # Deduplicate by Document Nbr (primary key)
+            doc_col = None
+            for col in ['Document Nbr', 'Document Number', 'CrashID', 'CRASH_ID']:
+                if col in headers:
+                    doc_col = col
+                    break
+
+            if doc_col:
+                seen_docs = set()
+                deduped_rows = []
+                for row in combined_rows:
+                    doc_val = (row.get(doc_col, '') or '').strip()
+                    if doc_val and doc_val != 'nan':
+                        if doc_val in seen_docs:
+                            continue
+                        seen_docs.add(doc_val)
+                    deduped_rows.append(row)
+                combined_rows = deduped_rows
+
+            # Secondary dedup: Crash Date + coords + Collision Type
+            dedup_fields = ['Crash Date', 'x', 'y', 'Collision Type']
+            if all(f in headers for f in dedup_fields):
+                seen_geo = set()
+                deduped_rows = []
+                for row in combined_rows:
+                    x_val = (row.get('x', '') or '').strip()
+                    y_val = (row.get('y', '') or '').strip()
+                    date_val = (row.get('Crash Date', '') or '').strip()
+                    coll_val = (row.get('Collision Type', '') or '').strip()
+                    if x_val and y_val and x_val != '0' and y_val != '0' and date_val and coll_val:
+                        try:
+                            geo_key = f"{date_val}|{float(x_val):.4f}|{float(y_val):.4f}|{coll_val}"
+                        except (ValueError, TypeError):
+                            geo_key = None
+                        if geo_key:
+                            if geo_key in seen_geo:
+                                continue
+                            seen_geo.add(geo_key)
+                    deduped_rows.append(row)
+                combined_rows = deduped_rows
+
+            duplicates_removed = (existing_count + new_count) - len(combined_rows)
+            net_new = len(combined_rows) - existing_count
+            logger.info("    Merged: %d total (%d net new, %d duplicates removed)",
+                        len(combined_rows), net_new, duplicates_removed)
+            all_rows = combined_rows
+        else:
+            logger.info("  MERGE MODE: No existing file found at %s, creating new", all_roads_path)
+
     created_files = []
 
     # --- File 1: All Roads ---
@@ -934,6 +1009,9 @@ Examples:
   # Merge multiple year files:
   python process_crash_data.py -i "data/CDOT/202*.csv" -j douglas --merge
 
+  # Merge new data with existing validated output (append, deduplicate):
+  python process_crash_data.py -i data/CDOT/new_crashes.csv -j douglas --merge-existing
+
   # Convert only (no validation/geocode/split):
   python process_crash_data.py -i data/CDOT/Douglas_County.csv -j douglas --convert-only
 
@@ -957,6 +1035,8 @@ Supported states: colorado (CDOT), virginia (TREDS)
                         help='Output directory (default: same as input)')
     parser.add_argument('--merge', action='store_true',
                         help='Merge multiple input files before processing')
+    parser.add_argument('--merge-existing', action='store_true',
+                        help='Merge new data with existing validated output files instead of replacing them')
     parser.add_argument('--convert-only', action='store_true',
                         help='Only run conversion stage (no validation/geocode/split)')
     parser.add_argument('--skip-validation', action='store_true',
@@ -994,6 +1074,8 @@ def main():
     logger.info("  Output dir: %s", config.output_dir)
     if config.dry_run:
         logger.info("  *** DRY RUN MODE ***")
+    if config.merge_existing:
+        logger.info("  *** MERGE-EXISTING MODE: Will merge with existing validated output ***")
     logger.info("")
 
     # Ensure output directory exists

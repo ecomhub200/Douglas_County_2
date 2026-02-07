@@ -688,6 +688,12 @@ Examples:
         help='Run API health check and exit'
     )
 
+    parser.add_argument(
+        '--merge',
+        action='store_true',
+        help='Merge new data with existing validated dataset instead of replacing it'
+    )
+
     return parser.parse_args()
 
 
@@ -796,6 +802,67 @@ def main():
 
     # Standardize column names
     df = standardize_columns(df)
+
+    # Merge with existing validated dataset if --merge flag is set
+    if args.merge and os.path.exists(output_file):
+        logger.info("=" * 40)
+        logger.info("MERGE MODE: Merging with existing dataset")
+        logger.info("=" * 40)
+
+        try:
+            existing_df = pd.read_csv(output_file, dtype=str)
+            existing_count = len(existing_df)
+            logger.info(f"Existing dataset: {existing_count} records")
+            logger.info(f"New download: {len(df)} records")
+
+            # Concatenate existing + new
+            combined_df = pd.concat([existing_df, df], ignore_index=True)
+            combined_count = len(combined_df)
+
+            # Deduplicate: prefer existing records (keep='first')
+            # Primary key: Document Nbr (if available)
+            doc_col = None
+            for col in ['Document Nbr', 'Document Number', 'CrashID', 'CRASH_ID']:
+                if col in combined_df.columns:
+                    doc_col = col
+                    break
+
+            dedup_count_before = len(combined_df)
+
+            if doc_col:
+                # Remove rows with duplicate Document Numbers (keep existing = first)
+                mask = combined_df[doc_col].notna() & (combined_df[doc_col] != '') & (combined_df[doc_col] != 'nan')
+                has_doc = combined_df[mask]
+                no_doc = combined_df[~mask]
+                has_doc_deduped = has_doc.drop_duplicates(subset=[doc_col], keep='first')
+                combined_df = pd.concat([has_doc_deduped, no_doc], ignore_index=True)
+                logger.info(f"  Doc# dedup: {dedup_count_before} -> {len(combined_df)} records")
+
+            # Secondary dedup: Crash Date + coordinates + Collision Type
+            dedup_cols = ['Crash Date', 'x', 'y', 'Collision Type']
+            existing_dedup_cols = [c for c in dedup_cols if c in combined_df.columns]
+            if len(existing_dedup_cols) == 4:
+                has_coords = (
+                    combined_df['x'].notna() & (combined_df['x'] != '') & (combined_df['x'] != '0') &
+                    combined_df['y'].notna() & (combined_df['y'] != '') & (combined_df['y'] != '0')
+                )
+                df_with_coords = combined_df[has_coords]
+                df_without_coords = combined_df[~has_coords]
+                dedup_before = len(df_with_coords)
+                df_with_coords_deduped = df_with_coords.drop_duplicates(
+                    subset=existing_dedup_cols, keep='first'
+                )
+                combined_df = pd.concat([df_with_coords_deduped, df_without_coords], ignore_index=True)
+                logger.info(f"  Geo dedup: {dedup_before + len(df_without_coords)} -> {len(combined_df)} records")
+
+            duplicates_removed = dedup_count_before - len(combined_df)
+            new_records = len(combined_df) - existing_count
+            logger.info(f"  Merge result: {existing_count} existing + {new_records} new ({duplicates_removed} duplicates removed)")
+            df = combined_df
+
+        except Exception as e:
+            logger.error(f"Merge failed: {e}")
+            logger.info("Falling back to full replacement")
 
     # Save to CSV
     logger.info(f"Saving {len(df)} records to {output_file}")
