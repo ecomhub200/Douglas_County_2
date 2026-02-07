@@ -101,6 +101,7 @@ project_root/
 |   |   +-- {jurisdiction}_county_roads.csv  # Stage 4 output
 |   |   +-- {jurisdiction}_no_interstate.csv # Stage 4 output
 |   |   +-- crashes.csv               # Default fallback (copy of county_roads)
+|   |   +-- .geocode_cache.json      # Persistent geocode cache
 |   |   +-- .validation/
 |   |       +-- pipeline_report.json  # Processing report
 |   +-- henrico_all_roads.csv         # VDOT REFERENCE dataset (Henrico County, VA)
@@ -138,7 +139,36 @@ Quality checks with auto-correction. See [Section 12](#12-validation-rules).
 
 ### Stage 3: GEOCODE (Fill Missing GPS)
 
-Node lookup + Nominatim. See [Section 13](#13-geocoding-strategy).
+**Script:** `process_crash_data.py` -> `stage_geocode()`
+**What it does:** Three strategies applied sequentially, with a **persistent cache** to avoid redundant API calls across runs:
+
+1. **Persistent Cache Lookup** -- Checks `.geocode_cache.json` for previously resolved coordinates (both node and Nominatim results from prior runs). Instant, no API calls.
+2. **Node Lookup** -- Rows with GPS at known intersection Nodes form a lookup table. Rows missing GPS but sharing the same Node ID get coordinates copied. New mappings are added to the persistent cache.
+3. **Nominatim/OpenStreetMap** -- Free geocoding service, querying `"{Location 1} and {Location 2}, {jurisdiction}, {state}"`. Rate-limited to 1 req/sec. Results (including failed lookups) are cached persistently.
+
+**Geocode Cache File:** `data/CDOT/.geocode_cache.json`
+```json
+{
+  "nodes": { "NODE_ID": [longitude, latitude], ... },
+  "nominatim": { "query string": [longitude, latitude] | null, ... }
+}
+```
+
+**Performance impact:**
+
+| Scenario | Without Cache | With Cache |
+|----------|--------------|------------|
+| First run (1000 rows, 500 missing GPS) | ~500 API calls (~8 min) | ~500 API calls (~8 min) |
+| Add new year data (200 new rows) | ~500 API calls again | ~20 new locations (~20 sec) |
+| Re-run same data | ~500 API calls again | 0 API calls (~0 sec) |
+
+The cache file is committed to the repository so it persists across CI runs.
+
+Also see [Section 13](#13-geocoding-strategy) for detailed strategy documentation.
+
+**Only runs in server pipeline** (Python path). Browser path skips this.
+
+---
 
 ### Stage 4: SPLIT (Road-Type Filtering)
 
@@ -641,6 +671,20 @@ elpaso  -> EPSO   denver   -> DPD    adams     -> ACSO
 ---
 
 ## 16. Execution Paths (Browser vs Server)
+
+After running the full pipeline for jurisdiction `douglas`:
+
+```
+data/CDOT/
+  douglas_standardized.csv       # Stage 1: Normalized format (1.5 MB)
+  douglas_all_roads.csv          # Stage 4: Complete dataset (1.5 MB)
+  douglas_county_roads.csv       # Stage 4: County roads only (383 KB)
+  douglas_no_interstate.csv      # Stage 4: No interstate (1.2 MB)
+  crashes.csv                    # Copy of county_roads (UI default fallback)
+  .geocode_cache.json            # Persistent geocode cache (grows over time)
+  .validation/
+    pipeline_report.json         # Processing statistics
+```
 
 ### Path A: Browser-Only (JavaScript)
 

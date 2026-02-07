@@ -17,6 +17,7 @@ on:
       - '!data/CDOT/*_no_interstate.csv'
       - '!data/CDOT/crashes.csv'
       - '!data/CDOT/*_merged_raw.csv'
+      - '!data/CDOT/.geocode_cache.json'
 
   workflow_dispatch:
     inputs:
@@ -43,7 +44,7 @@ on:
         type: boolean
         default: true
       skip_geocode:
-        description: 'Skip geocoding stage (faster)'
+        description: 'Skip geocoding stage (uses persistent cache - only new locations need API calls)'
         required: false
         type: boolean
         default: false
@@ -59,6 +60,7 @@ permissions:
 jobs:
   process-cdot-data:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -305,13 +307,14 @@ jobs:
 
           JURISDICTION="${{ steps.detect.outputs.jurisdiction }}"
 
-          # Stage only pipeline output files (not the raw input CSVs)
+          # Stage pipeline output files and geocode cache (not the raw input CSVs)
           git add \
             "data/CDOT/${JURISDICTION}_standardized.csv" \
             "data/CDOT/${JURISDICTION}_all_roads.csv" \
             "data/CDOT/${JURISDICTION}_county_roads.csv" \
             "data/CDOT/${JURISDICTION}_no_interstate.csv" \
             "data/CDOT/crashes.csv" \
+            "data/CDOT/.geocode_cache.json" \
             "data/CDOT/.validation/" \
             2>/dev/null || true
 

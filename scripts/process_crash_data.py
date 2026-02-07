@@ -524,14 +524,40 @@ STATE_SIGNATURES_DIRS = {
 # STAGE 4: GEOCODE
 # ============================================================
 
+def _load_geocode_cache(cache_path: str) -> dict:
+    """Load persistent geocode cache from disk."""
+    try:
+        with open(cache_path, 'r') as f:
+            data = json.load(f)
+        logger.info("  Geocode cache loaded: %d entries from %s",
+                     len(data.get('nominatim', {})) + len(data.get('nodes', {})),
+                     cache_path)
+        return data
+    except (FileNotFoundError, json.JSONDecodeError):
+        logger.info("  No existing geocode cache found. Starting fresh.")
+        return {'nominatim': {}, 'nodes': {}}
+
+
+def _save_geocode_cache(cache_path: str, cache_data: dict) -> None:
+    """Save persistent geocode cache to disk."""
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    with open(cache_path, 'w') as f:
+        json.dump(cache_data, f, indent=1)
+    total = len(cache_data.get('nominatim', {})) + len(cache_data.get('nodes', {}))
+    logger.info("  Geocode cache saved: %d entries to %s", total, cache_path)
+
+
 def stage_geocode(validated_path: str, config: PipelineConfig, stats: PipelineStats) -> str:
     """
     Geocode records with missing GPS coordinates.
 
-    Uses multiple strategies:
-      1. Node lookup - find coords from other crashes at the same intersection
-      2. Nominatim/OSM - free geocoding from street names
-      3. State DOT API - if available
+    Uses a persistent cache to avoid redundant API calls across runs.
+    Cache file: {output_dir}/.geocode_cache.json
+
+    Strategies (in order):
+      1. Persistent cache - instant lookup from previous runs
+      2. Node lookup - find coords from other crashes at the same intersection
+      3. Nominatim/OSM - free geocoding from street names (rate-limited)
 
     Returns path to geocoded file.
     """
@@ -541,6 +567,12 @@ def stage_geocode(validated_path: str, config: PipelineConfig, stats: PipelineSt
 
     import pandas as pd
     df = pd.read_csv(validated_path, dtype=str)
+
+    # Load persistent cache
+    cache_path = str(config.output_dir / '.geocode_cache.json')
+    cache_data = _load_geocode_cache(cache_path)
+    node_cache = cache_data.get('nodes', {})
+    nominatim_cache = cache_data.get('nominatim', {})
 
     # Find rows without GPS
     missing_mask = (
@@ -563,8 +595,31 @@ def stage_geocode(validated_path: str, config: PipelineConfig, stats: PipelineSt
         return validated_path
 
     geocoded_count = 0
+    cache_hits = 0
 
-    # --- Strategy 1: Node Lookup ---
+    # --- Strategy 1: Persistent Node Cache ---
+    # Apply cached node coordinates before building the live lookup table
+    if node_cache:
+        node_cache_hits = 0
+        for idx in df[missing_mask].index:
+            node = str(df.at[idx, 'Node']).strip()
+            if node and node in node_cache:
+                coords = node_cache[node]
+                df.at[idx, 'x'] = str(coords[0])
+                df.at[idx, 'y'] = str(coords[1])
+                node_cache_hits += 1
+                geocoded_count += 1
+                cache_hits += 1
+        if node_cache_hits:
+            logger.info("  Node cache: %d records resolved from cache", node_cache_hits)
+
+        # Refresh missing mask after cache hits
+        missing_mask = (
+            (df['x'].fillna('') == '') | (df['y'].fillna('') == '') |
+            (df['x'] == '0') | (df['y'] == '0')
+        )
+
+    # --- Strategy 2: Live Node Lookup ---
     # Build lookup table from rows that HAVE coordinates at known intersections
     node_coords = {}
     has_coords = ~missing_mask
@@ -575,7 +630,10 @@ def stage_geocode(validated_path: str, config: PipelineConfig, stats: PipelineSt
             y = str(row.get('y', '')).strip()
             if x and y:
                 try:
-                    node_coords[node] = (float(x), float(y))
+                    coords = (float(x), float(y))
+                    node_coords[node] = coords
+                    # Add to persistent cache
+                    node_cache[node] = list(coords)
                 except ValueError:
                     pass
 
@@ -594,7 +652,7 @@ def stage_geocode(validated_path: str, config: PipelineConfig, stats: PipelineSt
     if node_hits:
         logger.info("  Node lookup: geocoded %d records", node_hits)
 
-    # --- Strategy 2: Cross-street geocoding via Nominatim (free, rate-limited) ---
+    # --- Strategy 3: Nominatim with persistent cache ---
     # Re-check missing after node lookup
     missing_mask = (
         (df['x'].fillna('') == '') | (df['y'].fillna('') == '') |
@@ -603,8 +661,6 @@ def stage_geocode(validated_path: str, config: PipelineConfig, stats: PipelineSt
     still_missing = missing_mask.sum()
 
     if still_missing > 0:
-        logger.info("  Attempting Nominatim geocoding for %d remaining records...", still_missing)
-
         # Load state config for jurisdiction name
         jurisdiction_name = config.jurisdiction.replace('_', ' ').title()
         state_name = stats.detected_state or config.state or ''
@@ -613,8 +669,27 @@ def stage_geocode(validated_path: str, config: PipelineConfig, stats: PipelineSt
         state_names = {'colorado': 'Colorado', 'virginia': 'Virginia'}
         state_full = state_names.get(state_name, state_name.title())
 
+        # Check how many need API calls vs cache hits
+        api_needed = 0
+        for idx in df[missing_mask].index:
+            loc1 = str(df.at[idx, '_co_location1'] if '_co_location1' in df.columns
+                       else df.at[idx, 'RTE Name']).strip()
+            loc2 = str(df.at[idx, '_co_location2'] if '_co_location2' in df.columns
+                       else '').strip()
+            if not loc1:
+                continue
+            if loc2 and loc2 not in ('', 'UNKNOWN LOC', 'Unknown'):
+                query = f"{loc1} and {loc2}, {jurisdiction_name}, {state_full}"
+            else:
+                query = f"{loc1}, {jurisdiction_name}, {state_full}"
+            if query not in nominatim_cache:
+                api_needed += 1
+
+        logger.info("  Nominatim: %d records to resolve (%d cached, %d need API)",
+                     still_missing, still_missing - api_needed, api_needed)
+
         nominatim_hits = 0
-        nominatim_cache = {}
+        api_calls = 0
 
         try:
             import urllib.request
@@ -635,12 +710,15 @@ def stage_geocode(validated_path: str, config: PipelineConfig, stats: PipelineSt
                 else:
                     query = f"{loc1}, {jurisdiction_name}, {state_full}"
 
-                # Check cache
+                # Check persistent cache first
                 if query in nominatim_cache:
                     result = nominatim_cache[query]
+                    if result:
+                        cache_hits += 1
                 else:
                     # Rate limit: 1 request per second (Nominatim policy)
                     time.sleep(1.0)
+                    api_calls += 1
                     try:
                         encoded = urllib.parse.urlencode({
                             'q': query,
@@ -655,13 +733,14 @@ def stage_geocode(validated_path: str, config: PipelineConfig, stats: PipelineSt
                         with urllib.request.urlopen(req, timeout=10) as resp:
                             data = json.loads(resp.read().decode())
                             if data and len(data) > 0:
-                                result = (float(data[0]['lon']), float(data[0]['lat']))
+                                result = [float(data[0]['lon']), float(data[0]['lat'])]
                             else:
                                 result = None
                     except Exception as e:
                         logger.debug("  Nominatim error for '%s': %s", query, e)
                         result = None
 
+                    # Save to persistent cache (including None for failed lookups)
                     nominatim_cache[query] = result
 
                 if result:
@@ -671,15 +750,22 @@ def stage_geocode(validated_path: str, config: PipelineConfig, stats: PipelineSt
                     nominatim_hits += 1
                     geocoded_count += 1
 
-                # Progress logging every 25 records
-                if (nominatim_hits + 1) % 25 == 0:
-                    logger.info("  Nominatim progress: %d geocoded so far...", nominatim_hits)
+                # Progress logging every 25 API calls
+                if api_calls > 0 and api_calls % 25 == 0:
+                    logger.info("  Nominatim progress: %d API calls, %d geocoded so far...",
+                                api_calls, nominatim_hits)
 
             if nominatim_hits:
-                logger.info("  Nominatim: geocoded %d records", nominatim_hits)
+                logger.info("  Nominatim: geocoded %d records (%d API calls, %d from cache)",
+                            nominatim_hits, api_calls, cache_hits)
 
         except ImportError:
             logger.warning("  urllib not available for Nominatim geocoding")
+
+    # Save persistent cache
+    cache_data['nodes'] = node_cache
+    cache_data['nominatim'] = nominatim_cache
+    _save_geocode_cache(cache_path, cache_data)
 
     # Save geocoded data
     df.to_csv(validated_path, index=False)
@@ -695,7 +781,8 @@ def stage_geocode(validated_path: str, config: PipelineConfig, stats: PipelineSt
     stats.rows_without_gps = final_missing
     stats.stages_completed.append('geocode')
 
-    logger.info("  Total geocoded: %d / %d missing", geocoded_count, missing_count)
+    logger.info("  Total geocoded: %d / %d missing (cache hits: %d)",
+                geocoded_count, missing_count, cache_hits)
     logger.info("  Remaining without GPS: %d (%.1f%%)",
                 final_missing, final_missing / max(len(df), 1) * 100)
 
