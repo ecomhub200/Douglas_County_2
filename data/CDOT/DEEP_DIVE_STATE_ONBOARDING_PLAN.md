@@ -1,65 +1,123 @@
-# Deep Dive Tab — State Onboarding Plan
+# Deep Dive Tab — Claude Code Instructions for New State Onboarding
 
-## Overview
+## Purpose
 
-When onboarding a new state's crash data, some columns will be standard (used across all states) and some will be state-specific (unused by the core tool). The Deep Dive tab automatically detects state-specific columns and creates analysis panels for them.
+When the user says something like "onboard [State] crash data for Deep Dive" or "set up unused columns for [State]", follow these instructions step by step.
 
-This document is the step-by-step guide for Claude Code (or a developer) to onboard a new state's unused columns into the Deep Dive tab.
+The Deep Dive tab in `app/index.html` displays analysis panels for state-specific crash data columns that aren't used by the core tool. Each new state's data will have different unused columns. Your job is to identify them, map them to panels, and update the code so the Deep Dive tab works for that state.
 
 ---
 
-## Phase 1: Discovery & Classification
+## Step 1: Identify Unused Columns
 
-### Step 1.1 — Read the validated CSV and identify all columns
+Read the new state's validated CSV file header:
 
 ```bash
-head -1 data/<STATE>/<file>.csv | tr ',' '\n' | cat -n
+head -1 data/<STATE_FOLDER>/<filename>.csv | tr ',' '\n' | cat -n
 ```
 
-### Step 1.2 — Compare against the COL object
+Then read the `COL` object in `app/index.html` (search for `const COL = {`). This lists every column the core tool uses.
 
-The `COL` object in `index.html` defines all standard columns. Any column NOT in COL and NOT a derived/metadata column is a candidate for Deep Dive.
+**Compare the two lists.** Any CSV column NOT in the COL object is an "unused column" — a candidate for Deep Dive.
 
-**Standard columns (always utilized):**
-- ID, YEAR, DATE, TIME, SEVERITY, K, A, B, C
-- COLLISION, WEATHER, LIGHT, SURFACE, ALIGNMENT
-- ROAD_DESC, INT_TYPE, TRAFFIC_CTRL, CTRL_STATUS
-- WORKZONE, SCHOOL, ALCOHOL, BIKE, PED, SPEED
-- DISTRACTED, DROWSY, HITRUN, SENIOR, YOUNG, NIGHT
-- UNRESTRAINED, MOTORCYCLE, FUNC_CLASS, AREA_TYPE
-- ROUTE, NODE, MP, X, Y, JURISDICTION
-- VEHICLE_COUNT, PERSONS_INJURED, PED_KILLED, PED_INJURED
+**Skip these columns** (metadata, not useful for analysis):
+- `_source_state`
+- `_source_file`
 
-**Metadata columns (skip):**
-- `_source_state`, `_source_file`
-
-### Step 1.3 — Classify unused columns into categories
-
-Map each unused column to one of the 9 Deep Dive categories:
-
-| Category | Panel ID | Typical Column Patterns |
-|----------|----------|------------------------|
-| Driver Demographics | `DriverDemo` | age, sex, gender, dob for each transport unit |
-| Speed Intelligence | `Speed` | speed_limit, estimated_speed, stated_speed, travel_speed |
-| Driver Behavior | `Behavior` | driver_action, human_factor, contributing_factor, driver_condition |
-| Vehicle Fleet | `Vehicle` | vehicle_type, vehicle_make, vehicle_model, vehicle_year |
-| Non-Motorist | `NonMotorist` | nm_type, nm_action, nm_location, nm_facility, nm_contributing |
-| Crash Sequence | `Sequence` | most_harmful_event, second_harmful, third_harmful, secondary_crash |
-| Location Detail | `Location` | city, community, lane_position, location_description |
-| Animal Specifics | `Animal` | animal_type, wild_animal, animal_species |
-| Agency Metadata | `Agency` | system_code, agency_id, reporting_agency, road_system |
-
-If a column doesn't fit any existing category, consider:
-- Adding it to the closest existing category
-- Creating a new category (requires HTML panel + JS render function)
+Report the findings to the user: how many unused columns found, grouped by category.
 
 ---
 
-## Phase 2: Configuration
+## Step 2: Classify Each Unused Column
 
-### Step 2.1 — Create/update enhancements.json
+Map every unused column into one of these 9 Deep Dive panel categories:
 
-Create `states/<state>/enhancements.json`:
+| Panel ID | Category | Look for columns containing these keywords |
+|----------|----------|-------------------------------------------|
+| `DriverDemo` | Driver Demographics | `age`, `sex`, `gender`, `dob` for transport units (`tu1`, `tu2`, etc.) |
+| `Speed` | Speed Intelligence | `speed_limit`, `estimated_speed`, `stated_speed`, `travel_speed` |
+| `Behavior` | Driver Behavior | `driver_action`, `human_factor`, `contributing`, `driver_condition` |
+| `Vehicle` | Vehicle Fleet | `vehicle_type`, `vehicle_make`, `vehicle_model` |
+| `NonMotorist` | Non-Motorist | `nm1_type`, `nm_action`, `nm_location`, `nm_facility`, `nm_contributing` |
+| `Sequence` | Crash Sequence | `mhe`, `most_harmful`, `second_he`, `third_he`, `secondary_crash` |
+| `Location` | Location & Community | `city`, `community`, `lane_position`, `location` (not lat/lon) |
+| `Animal` | Animal Specifics | `wild_animal`, `animal_type`, `animal_species` |
+| `Agency` | Agency Metadata | `system_code`, `agency_id`, `reporting_agency` |
+
+If a column doesn't fit any category, add it to the closest match or ask the user if a new panel is needed.
+
+---
+
+## Step 3: Check Data Quality
+
+For each unused column, check how much data it actually has:
+
+```bash
+python3 -c "
+import csv
+with open('data/<STATE_FOLDER>/<filename>.csv', 'r') as f:
+    rows = list(csv.DictReader(f))
+    print(f'Total rows: {len(rows)}')
+    for col in [<LIST_OF_UNUSED_COLUMNS>]:
+        non_empty = sum(1 for r in rows if r.get(col, '').strip())
+        unique = set(r.get(col, '').strip() for r in rows if r.get(col, '').strip())
+        sample = list(unique)[:5]
+        print(f'{col}: {non_empty}/{len(rows)} non-empty, samples: {sample}')
+"
+```
+
+**Flag these issues and fix them in the render functions:**
+
+| Issue | How to detect | How to fix |
+|-------|--------------|------------|
+| Outlier values | Speed > 200 mph, Age > 120 | Add max threshold filter in render function |
+| Coded values | Lane = "N01", "WLS" | Add a decoder function (like `ddDecodeLanePos`) |
+| Low population (< 10%) | Column has data for very few rows | Add context note in the insight text ("Note: Only X% of crashes have this data") |
+| Cross-column gaps | Facility data exists but NM type doesn't | Query each column independently, never pre-filter one column by another |
+| Boolean format | "TRUE"/"FALSE" vs "Yes"/"No" vs "1"/"0" | Use `.toUpperCase()` and check all variants |
+
+---
+
+## Step 4: Update `panelConfig` in `index.html`
+
+Find the `deepDiveState` object in `app/index.html` (search for `const deepDiveState`).
+
+Update the `panelConfig` — replace the column names with the new state's columns:
+
+```javascript
+panelConfig: {
+    DriverDemo: { columns: ['_<st>_tu1_age','_<st>_tu1_sex','_<st>_tu2_age','_<st>_tu2_sex'], label: 'Driver Demographics', icon: '👤' },
+    Speed:      { columns: ['_<st>_tu1_speed_limit','_<st>_tu1_estimated_speed'], label: 'Speed Intelligence', icon: '🏎️' },
+    // ... only include panels that have matching columns in the data
+}
+```
+
+Where `<st>` is the state abbreviation prefix used in the CSV columns (e.g., `_co_` for Colorado, `_nc_` for North Carolina).
+
+**Important:** Only include panel entries where the data actually has matching columns. Remove panel entries that have no matching data.
+
+---
+
+## Step 5: Update Render Functions
+
+Each panel has a render function: `renderDDDriverDemo(rows)`, `renderDDSpeed(rows)`, etc.
+
+Inside each render function, find all hardcoded column references like `r['_co_tu1_age']` and update them to the new state's column names.
+
+**Search pattern:** Search `app/index.html` for `'_co_` to find all Colorado-specific column references in the Deep Dive section.
+
+**Critical rules for render functions:**
+1. Never pre-filter rows by one column when rendering a different column's chart (the NM facility bug)
+2. Add outlier filters for any numeric data (speed, age)
+3. Use `.toUpperCase()` when checking boolean/flag values
+4. Add a "no data" message if a chart's data array is empty
+5. Scale heat map colors to actual data max, not a hardcoded number
+
+---
+
+## Step 6: Update the `enhancements.json`
+
+Create `states/<state>/enhancements.json` documenting which panels are available:
 
 ```json
 {
@@ -69,12 +127,10 @@ Create `states/<state>/enhancements.json`:
       "enabled": true,
       "columns": ["_<st>_tu1_age", "_<st>_tu1_sex"],
       "label": "Driver Demographics",
-      "description": "Age and gender analysis"
+      "description": "Age and gender analysis of drivers involved in crashes"
     }
-    // ... repeat for each detected category
   },
   "standardUnused": {
-    "_description": "Standard columns utilized in Dashboard/Ped-Bike tabs",
     "vehicleCount": { "column": "Vehicle Count", "enriches": "Dashboard" },
     "personsInjured": { "column": "Persons Injured", "enriches": "Dashboard" },
     "pedestriansKilled": { "column": "Pedestrians Killed", "enriches": "Ped/Bike" },
@@ -83,172 +139,66 @@ Create `states/<state>/enhancements.json`:
 }
 ```
 
-### Step 2.2 — Update panelConfig in index.html
-
-In the `deepDiveState.panelConfig` object, update column names to match the new state's prefix:
-
-```javascript
-DriverDemo: { columns: ['_<st>_tu1_age','_<st>_tu1_sex',...], label: 'Driver Demographics', icon: '👤' }
-```
-
-**Convention:** State-specific columns use prefix `_<state_abbrev>_` (e.g., `_co_`, `_va_`, `_nc_`).
-
-### Step 2.3 — Update state config.json
-
-Ensure `states/<state>/config.json` includes mappings for:
-- `VEHICLE_COUNT`, `PERSONS_INJURED`, `PED_KILLED`, `PED_INJURED` (if available)
-
 ---
 
-## Phase 3: Data Quality Checks
+## Step 7: Update State `config.json`
 
-Before deploying, verify each column:
+If the new state's CSV has these standard columns, add them to `states/<state>/config.json` under `columnMapping`:
 
-### Step 3.1 — Check data population rates
-
-```python
-for col in state_specific_columns:
-    non_empty = sum(1 for r in rows if r[col].strip())
-    print(f"{col}: {non_empty}/{total} ({non_empty/total*100:.1f}%)")
-```
-
-### Step 3.2 — Check for data quality issues
-
-| Issue | Example | Fix |
-|-------|---------|-----|
-| Outlier values | Speed = 510 mph | Filter: `est <= 150` |
-| Coded values | Lane = "N01" | Decode: `ddDecodeLanePos()` |
-| Low population | City only 3% populated | Add context note in insight |
-| Cross-column dependency | Facility data without NM type | Query columns independently |
-| Inconsistent casing | "TRUE" vs "True" vs "true" | Normalize: `.toUpperCase()` |
-
-### Step 3.3 — Validate severity mapping
-
-Ensure the state's severity values map correctly to K/A/B/C/O. Check:
-```python
-set(r['Crash Severity'] for r in rows)
+```json
+"VEHICLE_COUNT": "<actual CSV column header>",
+"PERSONS_INJURED": "<actual CSV column header>",
+"PED_KILLED": "<actual CSV column header>",
+"PED_INJURED": "<actual CSV column header>"
 ```
 
 ---
 
-## Phase 4: Render Function Adaptation
+## Step 8: Verify Everything Works
 
-Each panel has a render function `renderDD<PanelId>(rows)`. When adapting for a new state:
+After making all changes, verify:
 
-### Key patterns that may differ by state:
-
-1. **Column names** — Update all `r['_co_...']` references to new state prefix
-2. **Value formats** — Different states encode values differently:
-   - Boolean: "TRUE"/"FALSE" vs "Yes"/"No" vs "1"/"0"
-   - Age: numeric vs range string
-   - Speed: mph vs km/h
-3. **Data availability** — Some states may have TU3, TU4 (3rd, 4th transport unit); others only TU1
-4. **NM data structure** — Some states have NM2 (second non-motorist); others only NM1
-
-### Adaptation checklist:
-
-- [ ] Update column name references in render functions
-- [ ] Verify boolean/flag value parsing
-- [ ] Adjust outlier thresholds for state's data range
-- [ ] Add state-specific value decoders if needed (like `ddDecodeLanePos`)
-- [ ] Test each chart renders with actual data
-- [ ] Verify KPI calculations use correct columns
-- [ ] Check insight text makes sense with state's data patterns
+1. **All panels that should appear DO appear** — check `deepDiveState.detectedColumns` has entries for each category with data
+2. **No charts are empty** — every visible chart has data bars/slices
+3. **KPI values are reasonable** — no NaN, no obviously wrong numbers
+4. **Date filter works** — applying 1Y filter reduces crash counts
+5. **Export works** — CSV download has the state-specific columns; PDF has insight text
+6. **No console errors** — open browser dev tools, check for JavaScript errors
 
 ---
 
-## Phase 5: Testing
+## Reference: Files You'll Edit
 
-### Test matrix:
-
-| Test | What to verify |
+| File | What to change |
 |------|---------------|
-| Panel detection | Correct panels show/hide based on available columns |
-| Chart rendering | All charts display data (no empty charts) |
-| KPI accuracy | KPI values match manual calculation |
-| Date filtering | Filter panel correctly restricts data |
-| Export CSV | Exported file contains correct columns and data |
-| Export PDF | PDF contains insights from all active panels |
-| Responsive | Layout works on mobile/tablet |
-| No console errors | No JavaScript errors in browser console |
+| `app/index.html` — `deepDiveState.panelConfig` | Column names for the new state |
+| `app/index.html` — `renderDD*()` functions | Column name references (`r['_co_...']` → `r['_<st>_...']`) |
+| `app/index.html` — `ddDecodeLanePos()` | Add state-specific value decoders if needed |
+| `states/<state>/enhancements.json` | Create — documents available panels |
+| `states/<state>/config.json` | Add standard unused column mappings if available |
 
-### Automated validation:
+## Reference: Existing Panel Render Functions
 
-```javascript
-// Run in browser console after data loads
-console.log('Deep Dive State:', deepDiveState);
-console.log('Detected columns:', deepDiveState.detectedColumns);
-console.log('Active panels:', deepDiveState.activePanels);
-console.log('Filtered rows:', deepDiveState.filteredRows.length);
-```
+| Function | What it renders | Key columns it reads |
+|----------|----------------|---------------------|
+| `renderDDDriverDemo(rows)` | Age histogram, age×severity, gender doughnut, age×crash type matrix | `*_tu1_age`, `*_tu1_sex`, `*_tu2_age`, `*_tu2_sex` |
+| `renderDDSpeed(rows)` | Speed scatter, differential bar, severity bar, route table | `*_tu1_speed_limit`, `*_tu1_estimated_speed`, `*_tu1_stated_speed` |
+| `renderDDBehavior(rows)` | Driver actions bar, human factors bar, action×crash type matrix | `*_tu1_driver_action`, `*_tu1_human_factor` |
+| `renderDDVehicle(rows)` | Vehicle type doughnut, type×severity stacked bar | `*_tu1_vehicle_type`, `*_tu2_vehicle_type` |
+| `renderDDNonMotorist(rows)` | NM type doughnut, action bar, facility bar, contributing factors bar | `*_nm1_type`, `*_nm1_action`, `*_nm1_facility`, `*_nm1_contributing_factor` |
+| `renderDDSequence(rows)` | Event count doughnut, secondary crash doughnut, event chain table | `*_mhe`, `*_second_he`, `*_third_he`, `*_secondary_crash` |
+| `renderDDLocation(rows)` | City horizontal bar, lane position doughnut | `*_city`, `*_lane_position` |
+| `renderDDAnimal(rows)` | Animal type doughnut, monthly seasonality bar | `*_wild_animal` |
+| `renderDDAgency(rows)` | Agency/system table with K/A/EPDO columns | `*_system_code`, `*_agency_id` |
 
----
+## Reference: Colorado Example (current implementation)
 
-## Phase 6: Making panelConfig State-Agnostic (Future)
+The current implementation uses Colorado CDOT data with prefix `_co_`. Column examples:
+- `_co_tu1_age`, `_co_tu1_sex`, `_co_tu1_speed_limit`, `_co_tu1_estimated_speed`
+- `_co_tu1_driver_action`, `_co_tu1_human_factor`, `_co_tu1_vehicle_type`
+- `_co_nm1_type`, `_co_nm1_action`, `_co_nm1_facility`
+- `_co_mhe`, `_co_second_he`, `_co_third_he`, `_co_secondary_crash`
+- `_co_city`, `_co_lane_position`, `_co_wild_animal`
+- `_co_system_code`, `_co_agency_id`
 
-Currently, `panelConfig` hardcodes `_co_` prefixed columns. To make this truly state-agnostic:
-
-### Option A — Pattern-based detection
-
-Instead of exact column names, detect by pattern:
-```javascript
-// Detect any column matching *_tu1_age, *_tu1_sex, etc.
-const ageCol = allCols.find(c => c.match(/_tu1_age$/));
-const sexCol = allCols.find(c => c.match(/_tu1_sex$/));
-```
-
-### Option B — Config-driven
-
-Load panel config from `enhancements.json`:
-```javascript
-const config = await fetch(`states/${state}/enhancements.json`).then(r => r.json());
-deepDiveState.panelConfig = buildPanelConfig(config.stateEnhancements);
-```
-
-### Option C — Auto-categorize by naming convention
-
-If the state conversion pipeline consistently names columns:
-- `_<st>_tu<N>_*` → Transport unit fields → DriverDemo, Speed, Behavior, Vehicle
-- `_<st>_nm<N>_*` → Non-motorist fields → NonMotorist
-- `_<st>_mhe`, `_<st>_*_he` → Harmful events → Sequence
-- `_<st>_city`, `_<st>_location*` → Location
-- `_<st>_wild_animal*` → Animal
-- `_<st>_system_code`, `_<st>_agency*` → Agency
-
----
-
-## Quick Reference: Current Implementation
-
-### Files modified:
-- `app/index.html` — Deep Dive HTML (tab content), CSS (panel styles), JavaScript (state management, 9 render functions, filtering, export)
-- `states/<state>/config.json` — Column mappings for standard unused columns
-- `states/<state>/enhancements.json` — Deep Dive panel configuration
-
-### Key functions:
-| Function | Purpose |
-|----------|---------|
-| `detectDeepDiveColumns()` | Scan CSV headers for state-specific columns |
-| `initDeepDiveTab()` | Initialize tab, show panels, first render |
-| `applyDeepDiveFilters()` | Apply date filters and re-render |
-| `renderAllDeepDivePanels()` | Orchestrate rendering all active panels |
-| `renderDD<PanelId>(rows)` | Render individual panel (charts, KPIs, tables, insights) |
-| `ddRenderKpiRow(id, kpis)` | Render KPI card row following Hotspots pattern |
-| `ddDecodeLanePos(code)` | Decode lane position codes to human-readable labels |
-| `exportDeepDiveCSV()` | Export state-specific data to CSV |
-| `exportDeepDivePDF()` | Generate PDF report with all panel insights |
-
-### Data flow:
-```
-crashState.sampleRows
-    → ddGetFilteredRows() (apply date filter)
-    → renderAllDeepDivePanels()
-        → Top-level KPI summary
-        → Each panel: KPI row → Charts → Tables → Insight text
-```
-
-### Bugs fixed in current implementation:
-1. **NM facility chart empty** — Was pre-filtering all NM data by nm1_type; now queries each column independently
-2. **Speed outliers** — Added max speed filter (150 mph) to exclude data errors
-3. **Lane position codes** — Added `ddDecodeLanePos()` to translate coded values
-4. **City data context** — Added note when < 50% of crashes have city data
-5. **Heat map intensity** — Matrix heat maps now scale to actual data max, not hardcoded threshold
+When onboarding a new state, replace `_co_` with the new state's prefix everywhere in the Deep Dive code section.
