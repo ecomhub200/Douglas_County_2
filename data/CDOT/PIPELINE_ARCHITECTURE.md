@@ -1,6 +1,6 @@
-# CDOT Pipeline Architecture Reference
+# Crash Data Pipeline Architecture
 
-> **Purpose:** This document captures the complete pipeline architecture used to process Colorado (CDOT) crash data. Use it as a blueprint when adding support for a new state.
+> **Purpose:** Complete reference guide for converting any state's crash data into the CRASH LENS standardized format. Use Colorado (CDOT) as the worked example when adding a new state.
 
 ---
 
@@ -9,23 +9,25 @@
 1. [Pipeline Overview](#1-pipeline-overview)
 2. [File Structure](#2-file-structure)
 3. [Stage-by-Stage Walkthrough](#3-stage-by-stage-walkthrough)
-4. [State Detection System](#4-state-detection-system)
-5. [Column Mapping (Raw CDOT -> Standardized)](#5-column-mapping-raw-cdot---standardized)
-6. [Derived Fields (Fields That Don't Exist in Raw Data)](#6-derived-fields-fields-that-dont-exist-in-raw-data)
-7. [Road System Classification](#7-road-system-classification)
-8. [Crash Type / Collision Mapping](#8-crash-type--collision-mapping)
-9. [Boolean Flag Derivation](#9-boolean-flag-derivation)
-10. [Validation Rules](#10-validation-rules)
-11. [Geocoding Strategy](#11-geocoding-strategy)
-12. [Split / Road-Type Filtering](#12-split--road-type-filtering)
-13. [Configuration Files Required](#13-configuration-files-required)
-14. [Output Files Produced](#14-output-files-produced)
-15. [Execution Paths (Browser vs Server)](#15-execution-paths-browser-vs-server)
-16. [Auto-Trigger Workflow (GitHub Actions)](#16-auto-trigger-workflow-github-actions)
-17. [Step-by-Step: Adding a New State](#17-step-by-step-adding-a-new-state)
-18. [Appendix A: Raw CDOT Columns](#appendix-a-raw-cdot-columns)
-19. [Appendix B: Standardized Output Columns](#appendix-b-standardized-output-columns)
-20. [Appendix C: Command-Line Reference](#appendix-c-command-line-reference)
+4. [Target Output Format (VDOT Reference)](#4-target-output-format-vdot-reference)
+5. [State Detection System](#5-state-detection-system)
+6. [Column Mapping (Raw State -> Standardized)](#6-column-mapping-raw-state---standardized)
+7. [VDOT Value Format Compliance](#7-vdot-value-format-compliance)
+8. [Derived Fields](#8-derived-fields)
+9. [Road System Classification](#9-road-system-classification)
+10. [Boolean Flag Derivation](#10-boolean-flag-derivation)
+11. [State-Specific Detail Columns](#11-state-specific-detail-columns)
+12. [Validation Rules](#12-validation-rules)
+13. [Geocoding Strategy](#13-geocoding-strategy)
+14. [Split / Road-Type Filtering](#14-split--road-type-filtering)
+15. [Configuration Files Required](#15-configuration-files-required)
+16. [Execution Paths (Browser vs Server)](#16-execution-paths-browser-vs-server)
+17. [Auto-Trigger Workflow (GitHub Actions)](#17-auto-trigger-workflow-github-actions)
+18. [Step-by-Step: Adding a New State](#18-step-by-step-adding-a-new-state)
+19. [Colorado (CDOT) Complete Example](#19-colorado-cdot-complete-example)
+20. [Appendix A: Standardized Output Columns](#appendix-a-standardized-output-columns)
+21. [Appendix B: VDOT Value Reference Tables](#appendix-b-vdot-value-reference-tables)
+22. [Appendix C: Command-Line Reference](#appendix-c-command-line-reference)
 
 ---
 
@@ -48,7 +50,20 @@ Raw CSV(s) from State DOT
                                                                                     + pipeline_report.json
 ```
 
-**Core Design Principle:** All state data is normalized to a single "Virginia-compatible" internal format. The browser tool only understands this one format. Adding a new state means writing a normalizer that transforms that state's raw CSV into the same standardized columns.
+### Core Design Principle
+
+**All state data is normalized to the Henrico (Virginia) VDOT reference format.** The browser tool only understands this one format. Adding a new state means writing a normalizer that transforms that state's raw CSV into identical column names AND value formats.
+
+### Key Lesson Learned (Colorado)
+
+It is NOT enough to map column names. **You must also map column VALUES to match the VDOT vocabulary.** For example:
+
+| What went wrong | Raw value | What tool expects |
+|----------------|-----------|-------------------|
+| Missing numbered prefixes | `Rear End` | `1. Rear End` |
+| Different vocabulary | `Clear` | `1. No Adverse Condition (Clear/Cloudy)` |
+| Wrong semantic meaning | `Non-Intersection` in Roadway Description | `1. Two-Way, Not Divided` |
+| Different granularity | `Curve Right, Downhill` | `4. Grade - Curve` |
 
 ---
 
@@ -63,33 +78,32 @@ project_root/
 |   +-- validate-data.yml             # Scheduled data validation
 |   +-- send-notifications.yml        # Email notifications
 |
-+-- scripts/                          # Python processing scripts
-|   +-- process_crash_data.py         # Main pipeline orchestrator (962 lines)
-|   +-- state_adapter.py              # State detection + normalization (642 lines)
-|   +-- split_cdot_data.py            # Road-type filtering (243 lines)
-|   +-- pipeline_server.py            # HTTP server for browser uploads (361 lines)
++-- scripts/
+|   +-- process_crash_data.py         # Main pipeline orchestrator
+|   +-- state_adapter.py              # State detection + normalization (THE KEY FILE)
+|   +-- split_cdot_data.py            # Road-type filtering
+|   +-- pipeline_server.py            # HTTP server for browser uploads
+|   +-- fix_douglas_conversion.py     # One-time correction script (reference only)
 |
 +-- states/                           # Per-state configuration
 |   +-- colorado/
-|   |   +-- config.json               # Column mappings, derived fields, road systems, bounds
-|   |   +-- jurisdictions.json        # County definitions (FIPS, bbox, cities, agencies)
+|   |   +-- config.json               # Column mappings, bounds, road systems
+|   |   +-- jurisdictions.json        # County definitions (FIPS, bbox, cities)
 |   +-- virginia/
 |   |   +-- config.json               # Virginia config (reference baseline)
 |   +-- state_adapter.js              # Browser-side normalization (JS version)
-|   +-- fips_database.js              # FIPS code lookups
-|   +-- us_counties_db.js             # US county database
-|   +-- INTEGRATION_GUIDE.md          # Integration guide for browser
 |
 +-- data/
-|   +-- CDOT/                         # Colorado data folder (named after DOT)
-|   |   +-- *.csv                     # Raw input files
-|   |   +-- douglas_standardized.csv  # Stage 1 output
-|   |   +-- douglas_all_roads.csv     # Stage 4 output
-|   |   +-- douglas_county_roads.csv  # Stage 4 output
-|   |   +-- douglas_no_interstate.csv # Stage 4 output
+|   +-- {DOT_NAME}/                   # State data folder (e.g., CDOT, TxDOT)
+|   |   +-- *.csv                     # Raw input + processed output
+|   |   +-- {jurisdiction}_standardized.csv  # Stage 1 output
+|   |   +-- {jurisdiction}_all_roads.csv     # Stage 4 output
+|   |   +-- {jurisdiction}_county_roads.csv  # Stage 4 output
+|   |   +-- {jurisdiction}_no_interstate.csv # Stage 4 output
 |   |   +-- crashes.csv               # Default fallback (copy of county_roads)
 |   |   +-- .validation/
 |   |       +-- pipeline_report.json  # Processing report
+|   +-- henrico_all_roads.csv         # VDOT REFERENCE dataset (Henrico County, VA)
 |
 +-- app/
     +-- index.html                    # Browser UI with inline pipeline JS
@@ -101,105 +115,37 @@ project_root/
 
 ### Stage 0: MERGE (Optional)
 
-**Script:** `process_crash_data.py` -> `stage_merge()`
-**When:** Multiple input files (e.g., one CSV per year)
-**What it does:** Concatenates CSVs, keeping only the header from the first file
-**Output:** `{jurisdiction}_merged_raw.csv`
+Concatenates multiple year-files into one CSV. Skip if you have a single input file.
 
-```bash
-# Example: merge 4 years of Douglas County data
-python process_crash_data.py -i "data/CDOT/202*.csv" -j douglas --merge
-```
+### Stage 1: CONVERT (Normalization) -- THE CRITICAL STAGE
 
-**Skip if:** You have a single input file.
+**Script:** `state_adapter.py` -> `{State}Normalizer.normalize_row()`
 
----
+This stage does ALL of the following in a single pass per row:
 
-### Stage 1: CONVERT (Normalization)
+1. **Rename columns** (e.g., `CUID` -> `Document Nbr`)
+2. **Derive missing fields** (e.g., severity from injury counts)
+3. **Map values to VDOT format** (e.g., `Clear` -> `1. No Adverse Condition (Clear/Cloudy)`)
+4. **Fix semantic mismatches** (e.g., CO "Road Description" -> Relation To Roadway)
+5. **Derive boolean flags** (13 Yes/No flags from raw detail fields)
+6. **Preserve state-specific detail** (raw fields as `_xx_` prefixed columns)
 
-**Script:** `state_adapter.py` -> `convert_file()` + `ColoradoNormalizer.normalize_row()`
-**What it does:**
-1. Auto-detects state format from CSV headers
-2. Instantiates the correct normalizer class
-3. Transforms every row to standardized Virginia-compatible format
-4. Tracks GPS coordinate coverage
-
-**Output:** `{jurisdiction}_standardized.csv` (70+ columns)
-
-**This is the most critical stage.** Each row goes through:
-
-```
-Raw CDOT Row (48+ columns)
-    |
-    +-- Map direct columns (CUID -> Document Nbr, etc.)
-    +-- Derive severity from Injury 00-04 counts
-    +-- Map collision type via COLLISION_MAP
-    +-- Map road system via ROAD_SYSTEM_MAP
-    +-- Build route name from System Code + Rd_Number + Location 1
-    +-- Build intersection Node ID from Location 1 + Location 2
-    +-- Derive 13 boolean flags (ped, bike, alcohol, speed, etc.)
-    +-- Preserve original columns with _co_ prefix
-    |
-    v
-Standardized Row (57 columns)
-```
-
----
+**Output:** `{jurisdiction}_standardized.csv`
 
 ### Stage 2: VALIDATE (QA/QC)
 
-**Script:** `process_crash_data.py` -> `stage_validate()`
-**What it does:** Quality checks with auto-correction
-
-| Check | Action |
-|-------|--------|
-| Severity not in K/A/B/C/O | Auto-correct (F->K, P->O) |
-| Year outside 2015-current | Flag as issue |
-| Coordinates out of state bounds | Flag as out-of-bounds |
-| Lat/lon transposed | Auto-swap |
-| Fatal crash (K) with K_People=0 | Set K_People=1 |
-| Ped collision but Pedestrian?=No | Set Pedestrian?=Yes |
-| Bike collision but Bike?=No | Set Bike?=Yes |
-| Duplicate rows (date+location+type) | Remove |
-| Boolean inconsistency (Y vs Yes) | Normalize to Yes/No |
-
-**Output:** Validated CSV + `.validation/pipeline_report.json`
-
-**Sample report:**
-```json
-{
-  "timestamp": "2026-02-06T22:36:06.525535Z",
-  "state": "colorado",
-  "jurisdiction": "douglas",
-  "input_rows": 4323,
-  "output_rows": 4296,
-  "corrections": 0,
-  "issues": 0,
-  "duplicates_removed": 27,
-  "gps_coverage": "95.7%"
-}
-```
-
----
+Quality checks with auto-correction. See [Section 12](#12-validation-rules).
 
 ### Stage 3: GEOCODE (Fill Missing GPS)
 
-**Script:** `process_crash_data.py` -> `stage_geocode()`
-**What it does:** Two strategies applied sequentially:
-
-1. **Node Lookup** -- Rows with GPS at known intersection Nodes form a lookup table. Rows missing GPS but sharing the same Node ID get coordinates copied.
-2. **Nominatim/OpenStreetMap** -- Free geocoding service, querying `"{Location 1} and {Location 2}, {jurisdiction}, {state}"`. Rate-limited to 1 req/sec.
-
-**Only runs in server pipeline** (Python path). Browser path skips this.
-
----
+Node lookup + Nominatim. See [Section 13](#13-geocoding-strategy).
 
 ### Stage 4: SPLIT (Road-Type Filtering)
 
 **Script:** `split_cdot_data.py` + `process_crash_data.py` -> `stage_split()`
-**What it does:** Creates three filtered views per jurisdiction.
+**What it does:** Creates three filtered views per jurisdiction. See [Section 14](#14-split--road-type-filtering).
 
-**Colorado filtering logic:**
+**Colorado filtering example:**
 
 | Output File | Filter |
 |-------------|--------|
@@ -207,29 +153,56 @@ Standardized Row (57 columns)
 | `{jurisdiction}_county_roads.csv` | Agency Id matches county agency code |
 | `{jurisdiction}_no_interstate.csv` | System Code != "Interstate Highway" |
 
-**Agency-to-county mapping:**
-```python
-COUNTY_AGENCY_MAP = {
-    'douglas':  'DSO',   # Douglas County Sheriff's Office
-    'arapahoe': 'ASO',
-    'jefferson': 'JSO',
-    'elpaso':   'EPSO',
-    'denver':   'DPD',
-    'adams':    'ACSO',
-}
-```
-
-Also copies `county_roads.csv` to `data/CDOT/crashes.csv` as the UI default fallback.
+Also copies `county_roads.csv` to `data/{DOT}/crashes.csv` as the UI default fallback.
 
 ---
 
-## 4. State Detection System
+## 4. Target Output Format (VDOT Reference)
+
+The **Henrico County, Virginia** dataset (`data/henrico_all_roads.csv`) is the reference format. Every column value in your converted output must match the vocabulary and format used in this file.
+
+### Reference Dataset Quick Facts
+
+- 48,074 rows, 69 columns
+- Years: 2017-present
+- All values use **numbered prefixes** (e.g., `1. Rear End`, `2. Daylight`)
+- Source: Virginia TREDS (Traffic Records Electronic Data System)
+
+### Why This Matters
+
+The CRASH LENS browser tool (`index.html`) performs string matching, filtering, and aggregation on these exact values. If your converted data uses `Rear End` instead of `1. Rear End`, the tool's collision type charts, CMF lookups, and safety analysis will all break.
+
+### How to Audit Your Output
+
+After converting a new state's data, compare every categorical column against the Henrico reference:
+
+```python
+import csv
+
+# Load your converted output
+with open('data/{DOT}/{jurisdiction}_all_roads.csv') as f:
+    converted = list(csv.DictReader(f))
+
+# Load Henrico reference
+with open('data/henrico_all_roads.csv') as f:
+    henrico = list(csv.DictReader(f))
+
+# Compare unique values per column
+for col in ['Collision Type', 'Weather Condition', 'Light Condition', ...]:
+    my_vals = set(r.get(col, '') for r in converted if r.get(col))
+    ref_vals = set(r.get(col, '') for r in henrico if r.get(col))
+    unmatched = my_vals - ref_vals
+    if unmatched:
+        print(f"WARNING: {col} has values not in reference: {unmatched}")
+```
+
+---
+
+## 5. State Detection System
 
 **File:** `state_adapter.py` -> `StateDetector`
 
-The pipeline auto-detects which state a CSV came from by examining column headers against known signatures.
-
-### Signature Definitions
+Auto-detects which state a CSV came from by examining column headers.
 
 ```python
 STATE_SIGNATURES = {
@@ -248,260 +221,331 @@ STATE_SIGNATURES = {
 }
 ```
 
-### Detection Logic
-
-1. Read CSV headers
-2. For each known state: check if ALL `required` columns exist
-3. If exact match found -> return that state key
-4. If no exact match: calculate partial match score (required columns found / total required)
-5. Score > 50% -> return that state as a tentative match
-6. Otherwise -> return `'unknown'`
-
-### Adding a new state detection
-
-Add a new entry to `STATE_SIGNATURES` with 3-4 columns that are unique to that state's CSV format. Choose columns that NO other state would have.
+Pick 3-4 columns that ONLY your state's CSV would have.
 
 ---
 
-## 5. Column Mapping (Raw CDOT -> Standardized)
+## 6. Column Mapping (Raw State -> Standardized)
 
-These are the direct column renames (1-to-1 mapping):
+### Direct Renames
 
-| Raw CDOT Column | Standardized Column | Notes |
-|-----------------|---------------------|-------|
-| `CUID` | `Document Nbr` | Unique crash ID |
-| `Crash Date` | `Crash Date` | Same name, format M/D/YYYY |
-| `Crash Time` | `Crash Military Time` | Same name |
-| `Latitude` | `y` | Virginia convention: y = latitude |
-| `Longitude` | `x` | Virginia convention: x = longitude |
-| `County` | `Physical Juris Name` | Jurisdiction name |
-| `Injury 04` | `K_People` | Fatal count |
-| `Injury 03` | `A_People` | Serious injury count |
-| `Injury 02` | `B_People` | Minor injury count |
-| `Injury 01` | `C_People` | Possible injury count |
-| `Number Injured` | `Persons Injured` | Total injured |
-| `Road Condition` | `Roadway Surface Condition` | Surface condition |
-| `Lighting Conditions` | `Light Condition` | Lighting |
-| `Weather Condition` | `Weather Condition` | Same name |
-| `Construction Zone` | `Work Zone Related` | Work zone flag |
-| `School Zone` | `School Zone` | Same name |
-| `First HE` | `First Harmful Event` | First harmful event |
+Every state will need a mapping from its raw column names to the standardized names:
 
-### Preserved Colorado-Specific Columns (with `_co_` prefix)
+| Standardized Column | Colorado (CDOT) | Virginia (TREDS) | Your State |
+|---------------------|-----------------|------------------|------------|
+| `Document Nbr` | `CUID` | `Document Nbr` | ? |
+| `Crash Date` | `Crash Date` | `Crash Date` | ? |
+| `Crash Military Time` | `Crash Time` (strip colons) | `Crash Military Time` | ? |
+| `Crash Severity` | **Derived** from Injury 00-04 | `Crash Severity` | ? |
+| `K_People` | `Injury 04` | `K_People` | ? |
+| `A_People` | `Injury 03` | `A_People` | ? |
+| `B_People` | `Injury 02` | `B_People` | ? |
+| `C_People` | `Injury 01` | `C_People` | ? |
+| `x` (longitude) | `Longitude` | `x` | ? |
+| `y` (latitude) | `Latitude` | `y` | ? |
+| `Physical Juris Name` | `County` | `Physical Juris Name` | ? |
+| `Persons Injured` | `Number Injured` | `Persons Injured` | ? |
+| `Vehicle Count` | `Total Vehicles` | `Vehicle Count` | ? |
 
-| Preserved Column | Source |
-|-----------------|--------|
-| `_co_system_code` | `System Code` |
-| `_co_agency_id` | `Agency Id` |
-| `_co_rd_number` | `Rd_Number` |
-| `_co_location1` | `Location 1` |
-| `_co_location2` | `Location 2` |
-| `_co_city` | `City` |
-| `_source_state` | Always `"colorado"` |
-| `_source_file` | Input filename |
+### Columns That Require Value Mapping (Not Just Rename)
+
+These columns need their values transformed -- see [Section 7](#7-vdot-value-format-compliance):
+
+- Collision Type
+- Weather Condition
+- Light Condition
+- Roadway Surface Condition
+- Roadway Alignment
+- Roadway Description
+- Intersection Type
+- Relation To Roadway
+- First Harmful Event
+- First Harmful Event Loc
+- Ownership
 
 ---
 
-## 6. Derived Fields (Fields That Don't Exist in Raw Data)
+## 7. VDOT Value Format Compliance
 
-These fields must be **computed** because CDOT data doesn't have them directly.
+This is the section most likely to be missed. **Every categorical column must output values in the exact VDOT format.**
 
-### Severity (Most Critical Derivation)
+### Pattern: Numbered Prefix
 
-Colorado has NO single severity column. Derive from highest injury level:
+Most VDOT columns use a `{number}. {description}` format:
 
 ```
-If Injury 04 > 0 -> K (Fatal)
-Else if Injury 03 > 0 -> A (Suspected Serious Injury)
-Else if Injury 02 > 0 -> B (Suspected Minor Injury)
-Else if Injury 01 > 0 -> C (Possible Injury)
-Else -> O (Property Damage Only)
+1. Rear End
+2. Angle
+3. Head On
+4. Sideswipe - Same Direction
+...
 ```
+
+### Column-by-Column VDOT Value Requirements
+
+#### Collision Type
+
+| VDOT Value | Description |
+|------------|-------------|
+| `1. Rear End` | Rear-end collision |
+| `2. Angle` | Angle/broadside/turning |
+| `3. Head On` | Head-on collision |
+| `4. Sideswipe - Same Direction` | Same-direction sideswipe |
+| `5. Sideswipe - Opposite Direction` | Opposite-direction sideswipe |
+| `8. Non-Collision` | Rollover, fell from vehicle |
+| `9. Fixed Object - Off Road` | Hit fixed object off roadway |
+| `10. Deer/Animal` | Animal collision |
+| `11. Fixed Object in Road` | Hit object in roadway |
+| `12. Ped` | Pedestrian collision |
+| `13. Bicycle` | Bicycle collision |
+| `16. Other` | Everything else |
+
+**Colorado example (two-step mapping):**
+```
+Raw CO "MHE": "Front to Rear"
+  -> Step 1 (COLLISION_MAP): "Rear End"
+  -> Step 2 (COLLISION_VDOT_MAP): "1. Rear End"
+```
+
+#### Weather Condition
+
+| VDOT Value | Colorado Values That Map Here |
+|------------|-------------------------------|
+| `1. No Adverse Condition (Clear/Cloudy)` | `Clear`, `Cloudy` |
+| `3. Fog/Smog/Smoke` | `Fog` |
+| `4. Snow` | `Snow`, `Blowing Snow` |
+| `5. Rain` | `Rain` |
+| `6. Sleet/Hail/Freezing` | `Freezing Rain or Freezing Drizzle`, `Sleet or Hail` |
+| `7. Blowing Sand/Dust` | `Dust`, `Blowing Sand, Soil, Dirt` |
+| `8. Severe Crosswinds` | `Severe Crosswinds`, `Wind` |
+
+#### Light Condition
+
+| VDOT Value | Colorado Values That Map Here |
+|------------|-------------------------------|
+| `1. Dawn` | `Dawn or Dusk` (if time < 1200) |
+| `2. Daylight` | `Daylight` |
+| `3. Dusk` | `Dawn or Dusk` (if time >= 1200) |
+| `4. Darkness - Road Lighted` | `Dark - Lighted`, `Dark \u2013 Lighted` |
+| `5. Darkness - Road Not Lighted` | `Dark - Unlighted`, `Dark \u2013 Unlighted` |
+
+**Note:** Colorado combines Dawn and Dusk into one value. Split by military time.
+
+#### Roadway Surface Condition
+
+| VDOT Value | Colorado Values That Map Here |
+|------------|-------------------------------|
+| `1. Dry` | `Dry`, `Dry W/Visible Icy Road Treatment` |
+| `2. Wet` | `Wet`, `Wet W/Visible Icy Road Treatment` |
+| `3. Snow` | `Snowy`, `Snowy W/Visible Icy Road Treatment` |
+| `4. Slush` | `Slushy`, `Slushy W/Visible Icy Road Treatment` |
+| `5. Ice` | `Icy`, `Icy W/Visible Icy Road Treatment` |
+| `6. Sand/Mud/Dirt/Oil/Gravel` | `Sand/Gravel`, `Muddy` |
+| `16. Other` | `Roto-Milled`, `Other` |
+
+#### Roadway Alignment
+
+| VDOT Value | Derivation |
+|------------|------------|
+| `1. Straight - Level` | Straight + Level (or Unknown) |
+| `2. Curve - Level` | Curve Right/Left + Level |
+| `3. Grade - Straight` | Straight + Uphill/Downhill/Hill Crest |
+| `4. Grade - Curve` | Curve + Uphill/Downhill/Hill Crest |
+
+**Colorado:** Derived from two separate fields: `Road Contour Curves` + `Road Contour Grade`.
+
+#### Roadway Description (SEMANTIC MISMATCH WARNING)
+
+| VDOT Value | Meaning |
+|------------|---------|
+| `1. Two-Way, Not Divided` | Road geometry: undivided two-way |
+| `2. Two-Way, Divided, Unprotected Median` | Road geometry: divided, no barrier |
+| `3. Two-Way, Divided, Positive Median Barrier` | Road geometry: divided with barrier |
+| `4. One-Way, Not Divided` | One-way road |
+
+**CRITICAL:** Colorado's `Road Description` field describes intersection location (`Non-Intersection`, `At Intersection`), NOT road geometry. This is a **semantic mismatch**. The Colorado normalizer derives Roadway Description from `System Code` instead:
+
+```
+Interstate Highway -> "3. Two-Way, Divided, Positive Median Barrier"
+State Highway      -> "2. Two-Way, Divided, Unprotected Median"
+County Road        -> "1. Two-Way, Not Divided"
+City Street        -> "1. Two-Way, Not Divided"
+```
+
+The original CO `Road Description` value goes to `Relation To Roadway` instead.
+
+#### Intersection Type
+
+| VDOT Value | Colorado Road Description Values |
+|------------|----------------------------------|
+| `1. Not at Intersection` | `Non-Intersection`, `Ramp`, `Ramp-related`, `Crossover-Related`, etc. |
+| `2. Two Approaches` | `Driveway Access Related`, `Railroad Crossing Related` |
+| `4. Four Approaches` | `At Intersection`, `Intersection Related`, `Alley Related` |
+| `5. Roundabout` | `Roundabout` |
+
+#### Relation To Roadway (NEW -- not in original Henrico, added for completeness)
+
+| VDOT Value | Colorado Road Description Values |
+|------------|----------------------------------|
+| `1. Main-Line Roadway` | `Crossover-Related`, `Express/Managed/HOV Lane` |
+| `2. Acceleration/Deceleration Lanes` | `Ramp`, `Ramp-related` |
+| `8. Non-Intersection` | `Non-Intersection`, `Driveway Access Related` |
+| `9. Within Intersection` | `At Intersection`, `Roundabout` |
+| `10. Intersection Related - Within 150 Feet` | `Intersection Related` |
+
+#### First Harmful Event
+
+| VDOT Value | Colorado First HE Values |
+|------------|--------------------------|
+| `2. Trees` | `Tree` |
+| `3. Utility Pole` | `Light Pole/Utility Pole`, `Traffic Signal Pole`, `Electrical/Utility Box` |
+| `5. Guard Rail` | `Guardrail Face`, `Guardrail End`, `Cable Rail` |
+| `6. Parked Vehicle` | `Parked Motor Vehicle` |
+| `8. Fence` | `Fence` |
+| `14. Ditch` | `Ditch` |
+| `15. Concrete Traffic Barrier` | `Concrete Highway Barrier` |
+| `19. Ped` | `Pedestrian`, `School Age To/From School` |
+| `20. Motor Vehicle In Transport` | `Front to Rear`, `Front to Side`, `Side to Side-*`, etc. |
+| `21. Animal` | `Wild Animal`, `Domestic Animal` |
+| `22. Bicycle` | `Bicycle/Motorized Bicycle` |
+| `24. Other Fixed Object` | `Large Rocks or Boulder`, `Delineator/Milepost`, `Barricade` |
+| `27. Curb` | `Curb` |
+| `30. Overturn (Rollover)` | `Overturning/Rollover`, `Ground` |
+
+(See `FIRST_HE_VDOT_MAP` in `state_adapter.py` for the complete 42-value mapping.)
+
+#### First Harmful Event Location
+
+| VDOT Value | Colorado Location Values |
+|------------|--------------------------|
+| `1. On Roadway` | `On Roadway`, `In Parking Lane` |
+| `2. Shoulder` | `Shoulder` |
+| `3. Median` | `Center median/ Island`, `Vehicle crossed center median...` |
+| `4. Roadside` | `Ran off left side`, `Ran off right side`, `Ran off "T" intersection` |
+| `5. Gore` | `Gore` |
+| `9. Outside Right-of-Way` | `On private property` |
+
+#### Ownership
+
+| VDOT Value | Colorado System Code |
+|------------|----------------------|
+| `1. State Hwy Agency` | `Interstate Highway`, `State Highway`, `Frontage Road` |
+| `2. County Hwy Agency` | `County Road` |
+| `3. City or Town Hwy Agency` | `City Street` |
+
+---
+
+## 8. Derived Fields
+
+### Severity (KABCO)
+
+If the state doesn't have a single severity column, derive from injury counts:
+
+```
+If fatal_count > 0   -> K
+Elif serious_count > 0 -> A
+Elif minor_count > 0   -> B
+Elif possible_count > 0 -> C
+Else                    -> O
+```
+
+**Colorado:** `Injury 04` (K), `Injury 03` (A), `Injury 02` (B), `Injury 01` (C)
 
 ### Year
 
-Extracted from `Crash Date` (format `M/D/YYYY`):
-```
-"3/15/2023" -> "2023"
-```
+Extract from date: `"3/15/2023"` -> `"2023"`
 
 ### Route Name (RTE Name)
 
-Built from multiple fields based on road system:
+Build from road system + route number + location:
 
-| System Code | Route Name Construction | Example |
-|-------------|------------------------|---------|
-| Interstate Highway | `I-{Rd_Number}` (strip trailing letter) | `I-25` |
-| State Highway | `Location 1` or `CO-{Rd_Number}` | `S PARKER RD` |
-| Frontage Road | `{Location 1} (Frontage)` | `I-25 FRONTAGE (Frontage)` |
-| County Road | `Location 1` | `CASTLE PINES PKWY` |
-| City Street | `Location 1` | `PLUM CREEK BLVD` |
+| Colorado System | Construction | Example |
+|----------------|--------------|---------|
+| Interstate Highway | `I-{Rd_Number stripped}` | `I-25` |
+| State Highway | `Location 1` or `CO-{number}` | `S PARKER RD` |
+| County Road / City Street | `Location 1` | `PLUM CREEK BLVD` |
 
 ### Node (Intersection ID)
 
-Built from intersection location fields:
+For intersection crashes, build from cross-street names:
 ```
-If Road Description in ("At Intersection", "Intersection Related", "Roundabout"):
-    Node = "{Location 1} & {Location 2}" (alphabetically sorted)
+If "At Intersection" or "Intersection Related":
+    Node = "{sorted Location 1} & {sorted Location 2}"
 Else:
-    Node = "" (non-intersection crash)
+    Node = "" (non-intersection)
 ```
 
-### Road System (SYSTEM)
+### Pedestrians Killed / Injured
 
-Mapped via `ROAD_SYSTEM_MAP`:
-
-| Colorado System Code | -> Standardized SYSTEM |
-|---------------------|------------------------|
-| City Street | NonVDOT secondary |
-| County Road | NonVDOT secondary |
-| State Highway | Primary |
-| Frontage Road | Secondary |
-| Interstate Highway | Interstate |
-
-### Collision Type
-
-Mapped via `COLLISION_MAP` from `Crash Type` or fallback `MHE`:
-
-| Colorado Crash Type | -> Standardized Collision Type |
-|--------------------|-----------------------------|
-| Rear-End | Rear End |
-| Broadside | Angle |
-| Approach Turn | Angle |
-| Head-On | Head On |
-| Sideswipe Same Direction | Sideswipe - Same Direction |
-| Sideswipe Opposite Direction | Sideswipe - Opposite Direction |
-| Overturning/Rollover | Non-Collision |
-| Pedestrian | Pedestrian |
-| Bicycle/Motorized Bicycle | Bicyclist |
-| Wild Animal | Other Animal |
-| Tree, Guardrail, Pole, etc. | Fixed Object - Off Road |
-| Vehicle Debris or Cargo | Fixed Object in Road |
-
-### Intersection Type
-
-Mapped via `INTERSECTION_MAP` from `Road Description`:
-
-| Colorado Road Description | -> Standardized Intersection Type |
-|--------------------------|----------------------------------|
-| Non-Intersection | Non-Intersection |
-| At Intersection | Intersection |
-| Intersection Related | Intersection |
-| Driveway Access Related | Driveway |
-| Ramp / Ramp-related | Ramp |
-| Roundabout | Roundabout |
-| Railroad Crossing Related | Railroad Crossing |
-
-### Roadway Alignment
-
-Derived from `Road Contour Curves` + `Road Contour Grade`:
+Derive from non-motorist (NM) type + injury severity:
 ```
-If curves != "Straight" -> "Curve"
-Else if grade != "Level" -> "Grade"
-Else -> "Straight/Level"
+If any TU NM Type contains "Pedestrian":
+    If fatal crash -> Pedestrians Killed = 1
+    If injury crash -> Pedestrians Injured = 1
 ```
 
 ---
 
-## 7. Road System Classification
+## 9. Road System Classification
 
-### Colorado Road Systems
+Map the state's road system values to the standardized SYSTEM categories:
 
-```json
-{
-  "City Street":        { "category": "local",      "isInterstate": false },
-  "County Road":        { "category": "local",      "isInterstate": false },
-  "State Highway":      { "category": "state",      "isInterstate": false },
-  "Frontage Road":      { "category": "state",      "isInterstate": false },
-  "Interstate Highway": { "category": "interstate", "isInterstate": true  }
-}
-```
-
-### Filter Profiles (3 standard views)
-
-| Profile | What's Included | Use Case |
-|---------|----------------|----------|
-| `countyOnly` | City Street + County Road | Locally-maintained roads only |
-| `countyPlusState` | Above + State Highway + Frontage Road | All non-interstate |
-| `allRoads` | Everything including Interstate | Complete picture |
-
-### Douglas County Route Distribution
-
-```
-City Street:          1,142 crashes (26.4%)
-County Road:          1,037 crashes (24.0%)
-State Highway:        1,143 crashes (26.4%)
-Interstate Highway:     992 crashes (22.9%)
-Frontage Road:            8 crashes (0.2%)
-```
+| Standardized | Description | Colorado |
+|-------------|-------------|----------|
+| `Interstate` | Interstate highways | `Interstate Highway` |
+| `Primary` | State routes | `State Highway` |
+| `Secondary` | Frontage roads | `Frontage Road` |
+| `NonVDOT secondary` | Local roads | `County Road`, `City Street` |
 
 ---
 
-## 8. Crash Type / Collision Mapping
+## 10. Boolean Flag Derivation
 
-Full mapping from Colorado `Crash Type` / `MHE` to standardized `Collision Type`:
+All 13 boolean flags output as `"Yes"` or `"No"` (string).
 
-```
-Rear-End                                    -> Rear End
-Broadside                                   -> Angle
-Head-On                                     -> Head On
-Sideswipe Same Direction                    -> Sideswipe - Same Direction
-Sideswipe Opposite Direction                -> Sideswipe - Opposite Direction
-Approach Turn                               -> Angle
-Overtaking Turn                             -> Angle
-Overturning/Rollover                        -> Non-Collision
-Pedestrian                                  -> Pedestrian
-Bicycle/Motorized Bicycle                   -> Bicyclist
-Wild Animal                                 -> Other Animal
-Parked Motor Vehicle                        -> Other
-Light Pole/Utility Pole                     -> Fixed Object - Off Road
-Concrete Highway Barrier                    -> Fixed Object - Off Road
-Guardrail Face                              -> Fixed Object - Off Road
-Guardrail End                               -> Fixed Object - Off Road
-Cable Rail                                  -> Fixed Object - Off Road
-Tree                                        -> Fixed Object - Off Road
-Fence                                       -> Fixed Object - Off Road
-Sign                                        -> Fixed Object - Off Road
-Curb                                        -> Fixed Object - Off Road
-Embankment                                  -> Fixed Object - Off Road
-Ditch                                       -> Fixed Object - Off Road
-Large Rocks or Boulder                      -> Fixed Object - Off Road
-Electrical/Utility Box                      -> Fixed Object - Off Road
-Vehicle Debris or Cargo                     -> Fixed Object in Road
-Other Fixed Object (Describe in Narrative)  -> Fixed Object - Off Road
-Other Non-Fixed Object (Describe ...)       -> Other
-Other Non-Collision                         -> Non-Collision
-```
-
-**Unmapped values** default to the raw value passed through.
+| Flag | Colorado Derivation |
+|------|---------------------|
+| `Pedestrian?` | NM Type contains "Pedestrian" OR Crash Type = "Pedestrian" |
+| `Bike?` | NM Type contains "Bicycle" |
+| `Alcohol?` | Alcohol Suspected in {Yes-SFST, Yes-BAC, Yes-Both, Yes-Observation} |
+| `Speed?` | Driver Action in {Too Fast for Conditions, Exceeded Speed Limit, Speeding} |
+| `Hitrun?` | Hit And Run = TRUE |
+| `Motorcycle?` | TU Type = "Motorcycle" |
+| `Night?` | Lighting in {Dark-Lighted, Dark-Unlighted} |
+| `Distracted?` | Driver Action/Human Factor contains distraction keywords |
+| `Drowsy?` | Human Factor in {Asleep or Fatigued, Fatigued/Asleep, ...} |
+| `Drug Related?` | Marijuana or Drugs Suspected = positive value |
+| `Young?` | Any driver age 16-20 |
+| `Senior?` | Any driver age >= 65 |
+| `Unrestrained?` | Restraint Use in {Not Used, Improperly Used} |
 
 ---
 
-## 9. Boolean Flag Derivation
+## 11. State-Specific Detail Columns
 
-Colorado derives all boolean flags from Traffic Unit (TU) fields. Each flag checks TU-1 and TU-2 columns.
+Preserve raw state fields that provide richer detail than the boolean flags. Prefix with `_{state_abbrev}_`.
 
-| Flag | How Derived | Source Columns |
-|------|-------------|---------------|
-| `Pedestrian?` | TU NM Type contains "Pedestrian" OR Crash Type = "Pedestrian" | `TU-1 NM Type`, `TU-2 NM Type`, `Crash Type` |
-| `Bike?` | TU NM Type contains "Bicycle" | `TU-1 NM Type`, `TU-2 NM Type` |
-| `Alcohol?` | TU Alcohol Suspected in {Yes-SFST, Yes-BAC, Yes-Both, Yes-Observation} | `TU-1 Alcohol Suspected`, `TU-2 Alcohol Suspected` |
-| `Speed?` | TU Driver Action in {Too Fast for Conditions, Exceeded Speed Limit} | `TU-1 Driver Action`, `TU-2 Driver Action` |
-| `Hitrun?` | TU Hit And Run = TRUE | `TU-1 Hit And Run`, `TU-2 Hit And Run` |
-| `Motorcycle?` | TU Type = "Motorcycle" | `TU-1 Type`, `TU-2 Type` |
-| `Night?` | Lighting in {Dark-Lighted, Dark-Unlighted, Dark-Lighted, Dark-Unlighted} | `Lighting Conditions` |
-| `Distracted?` | Driver Action or Human Factor in distraction set | `TU-1 Driver Action`, `TU-1 Human Contributing Factor`, etc. |
-| `Drowsy?` | Human Factor in {Asleep/Fatigued, Fatigued/Asleep, Ill/Asleep/Fatigued} | `TU-1 Human Contributing Factor`, `TU-2 Human Contributing Factor` |
-| `Drug Related?` | Marijuana or Drugs Suspected in positive set | `TU-1 Marijuana Suspected`, `TU-1 Other Drugs Suspected`, etc. |
-| `Young?` | Any TU Age between 16-20 | `TU-1 Age`, `TU-2 Age` |
-| `Senior?` | Any TU Age >= 65 | `TU-1 Age`, `TU-2 Age` |
-| `Unrestrained?` | Safety Restraint Use in {Not Used, Improperly Used} | `TU-1 Safety restraint Use`, `TU-2 Safety restraint Use` |
+### Colorado Example (46 columns)
 
-**All booleans output as `"Yes"` or `"No"` (string).**
+| Category | Columns Preserved |
+|----------|-------------------|
+| **Crash context** | `_co_total_vehicles`, `_co_mhe`, `_co_crash_type`, `_co_link`, `_co_second_he`, `_co_third_he`, `_co_wild_animal`, `_co_secondary_crash`, `_co_weather2`, `_co_lane_position`, `_co_injury00_uninjured` |
+| **TU-1 (Vehicle 1)** | `_co_tu1_direction`, `_co_tu1_movement`, `_co_tu1_vehicle_type`, `_co_tu1_speed_limit`, `_co_tu1_estimated_speed`, `_co_tu1_stated_speed`, `_co_tu1_driver_action`, `_co_tu1_human_factor`, `_co_tu1_age`, `_co_tu1_sex` |
+| **TU-2 (Vehicle 2)** | Same fields as TU-1 with `_co_tu2_` prefix |
+| **Non-Motorist 1** | `_co_nm1_type`, `_co_nm1_age`, `_co_nm1_sex`, `_co_nm1_action`, `_co_nm1_movement`, `_co_nm1_location`, `_co_nm1_facility`, `_co_nm1_contributing_factor` |
+| **Non-Motorist 2** | Same fields with `_co_nm2_` prefix |
+| **Source tracking** | `_co_system_code`, `_co_agency_id`, `_co_rd_number`, `_co_location1`, `_co_location2`, `_co_city` |
+
+### Why Preserve These?
+
+- **Speed data** (`_co_tu1_speed_limit`, `_co_tu1_estimated_speed`) -- essential for speed management analysis; the boolean `Speed?` flag loses all detail
+- **Driver action** (`_co_tu1_driver_action`) -- "Failed to Yield ROW" vs "Too Fast for Conditions" is critical for countermeasure selection
+- **Vehicle type** (`_co_tu1_vehicle_type`) -- truck involvement analysis
+- **Non-motorist detail** -- pedestrian/bicycle age, sex, action, crosswalk facility availability
 
 ---
 
-## 10. Validation Rules
+## 12. Validation Rules
 
 ### State Coordinate Bounds
 
@@ -512,155 +556,83 @@ Colorado derives all boolean flags from Traffic Unit (TU) fields. Each flag chec
 }
 ```
 
-### Validation Checks (Applied in Order)
+### Checks Applied
 
-1. **Format normalization** -- Strip whitespace, normalize case
-2. **Severity validation** -- Must be K/A/B/C/O; auto-correct F->K, P->O
-3. **Date validation** -- Year must be 2015 to current year
-4. **Coordinate bounds** -- Must fall within state bounds (above)
-5. **Transposed coordinate detection** -- If lat/lon are swapped but fall within bounds when corrected, auto-swap
-6. **Boolean normalization** -- Y/N/TRUE/FALSE -> Yes/No
-7. **Cross-field consistency:**
-   - Fatal (K) crash must have K_People > 0
-   - Pedestrian collision must have Pedestrian? = Yes
-   - Bicycle collision must have Bike? = Yes
-8. **Duplicate detection** -- Same date + coordinates + collision type -> remove
-9. **Injury count normalization** -- Ensure non-negative integers
+1. Severity must be K/A/B/C/O (auto-correct F->K, P->O)
+2. Year must be 2015-current
+3. Coordinates within state bounds
+4. Transposed lat/lon auto-swap
+5. Boolean normalization: Y/N/TRUE/FALSE -> Yes/No
+6. Fatal (K) must have K_People > 0
+7. Pedestrian collision must have Pedestrian? = Yes
+8. Duplicate detection: same date + GPS + collision type -> remove
 
 ---
 
-## 11. Geocoding Strategy
+## 13. Geocoding Strategy
 
-**Only available in server pipeline (Python).**
+### Strategy 1: Node Lookup (Free, Fast)
 
-### Strategy 1: Node Lookup (Fast, Free, No API)
+Rows with GPS at known intersection Nodes form a lookup table. Rows missing GPS but sharing the same Node ID get coordinates copied.
 
-1. Scan all rows with valid GPS coordinates
-2. Build a lookup: `{ Node_ID: (lat, lon) }`
-3. For rows missing GPS but having a known Node ID, copy coordinates
-4. Cache saved to `data/.validation/geocache/node_coordinates.json`
+### Strategy 2: Nominatim/OpenStreetMap (Free, Rate-Limited)
 
-### Strategy 2: Nominatim / OpenStreetMap (Slow, Free, Rate-Limited)
-
-1. For remaining rows without GPS
-2. Query: `"{Location 1} and {Location 2}, {jurisdiction}, {state}"`
-3. Rate limit: 1 request per second (free tier compliance)
-4. Results cached in memory per session
+Query: `"{Location 1} and {Location 2}, {jurisdiction}, {state}"`
+Rate: 1 request/second
 
 ---
 
-## 12. Split / Road-Type Filtering
+## 14. Split / Road-Type Filtering
 
-### Three Output Files Per Jurisdiction
+Three output files per jurisdiction:
 
-| File | Description | Colorado Filter | Virginia Filter |
-|------|-------------|----------------|-----------------|
-| `*_all_roads.csv` | Everything | No filter | No filter |
-| `*_county_roads.csv` | County-maintained only | `Agency Id` matches county code | `SYSTEM` in {NonVDOT secondary, NONVDOT, Non-VDOT} |
-| `*_no_interstate.csv` | No interstates | `System Code` != "Interstate Highway" | `SYSTEM` != "Interstate" |
+| File | Colorado Filter | Virginia Filter |
+|------|----------------|-----------------|
+| `*_all_roads.csv` | No filter | No filter |
+| `*_county_roads.csv` | `_co_agency_id` matches county code | `SYSTEM` in NonVDOT |
+| `*_no_interstate.csv` | `_co_system_code` != "Interstate Highway" | `SYSTEM` != "Interstate" |
 
 ### Colorado County Agency Codes
 
 ```
-douglas   -> DSO  (Douglas County Sheriff's Office)
-arapahoe  -> ASO
-jefferson -> JSO
-elpaso    -> EPSO
-denver    -> DPD
-adams     -> ACSO
+douglas -> DSO    arapahoe -> ASO    jefferson -> JSO
+elpaso  -> EPSO   denver   -> DPD    adams     -> ACSO
 ```
-
-**For standardized files**, the `_co_agency_id` preserved column is used for filtering.
 
 ---
 
-## 13. Configuration Files Required
+## 15. Configuration Files Required
 
-For each state, you need two config files under `states/{state_key}/`:
-
-### config.json (Required)
+### states/{state_key}/config.json
 
 ```json
 {
   "state": {
-    "name": "State Name",
-    "abbreviation": "XX",
-    "fips": "00",
-    "dotName": "XDOT",
-    "dotFullName": "State Department of Transportation",
-    "coordinateBounds": {
-      "latMin": 0.0, "latMax": 0.0,
-      "lonMin": 0.0, "lonMax": 0.0
-    },
-    "dataDir": "XDOT"
+    "name": "Colorado",
+    "abbreviation": "CO",
+    "fips": "08",
+    "dotName": "CDOT",
+    "coordinateBounds": { "latMin": 36.99, "latMax": 41.01, "lonMin": -109.06, "lonMax": -102.04 },
+    "dataDir": "CDOT"
   },
-
-  "columnMapping": {
-    "ID": "their_crash_id_column",
-    "DATE": "their_date_column",
-    "SEVERITY": "their_severity_column",
-    "ROUTE": "their_route_column",
-    "LAT": "their_latitude_column",
-    "LON": "their_longitude_column"
-    // ... full mapping (see colorado/config.json for complete example)
-  },
-
-  "derivedFields": {
-    "SEVERITY": {
-      "method": "direct|fromInjuryCounts|custom",
-      "description": "How severity is obtained",
-      "sources": ["col1", "col2"]
-    }
-    // ... one entry per field that needs derivation
-  },
-
-  "roadSystems": {
-    "values": {
-      "Their System Value": {
-        "category": "local|state|interstate",
-        "isStateDOT": true/false,
-        "isInterstate": true/false,
-        "displayName": "Display Name"
-      }
-    },
-    "filterProfiles": {
-      "countyOnly": { "systemValues": ["..."] },
-      "countyPlusState": { "systemValues": ["..."] },
-      "allRoads": { "systemValues": ["..."] }
-    }
-  },
-
-  "crashTypeMapping": {
-    "Their Crash Type": "Standardized Collision Type"
-  },
-
-  "epdoWeights": { "K": 462, "A": 62, "B": 12, "C": 5, "O": 1 },
-
-  "validValues": {
-    "severity": { "K": "Fatal", "A": "Serious", "B": "Minor", "C": "Possible", "O": "PDO" }
-  }
+  "columnMapping": { "ID": "CUID", "DATE": "Crash Date", ... },
+  "roadSystems": { ... },
+  "crashTypeMapping": { ... },
+  "epdoWeights": { "K": 462, "A": 62, "B": 12, "C": 5, "O": 1 }
 }
 ```
 
-### jurisdictions.json (Required for Multi-County Support)
+### states/{state_key}/jurisdictions.json
 
 ```json
 {
-  "defaults": {
-    "jurisdiction": "county_key",
-    "filterProfile": "countyOnly"
-  },
   "jurisdictions": {
-    "county_key": {
-      "name": "County Name",
-      "type": "county",
-      "fips": "000",
-      "stateCountyFips": "00000",
-      "namePatterns": ["COUNTY", "County Name"],
-      "mapCenter": [lat, lon],
+    "douglas": {
+      "name": "Douglas County",
+      "fips": "035",
+      "mapCenter": [39.33, -104.92],
       "mapZoom": 11,
-      "bbox": [west, south, east, north],
-      "cities": ["CITY1", "CITY2"]
+      "cities": ["CASTLE ROCK", "PARKER", "LONE TREE"]
     }
   }
 }
@@ -668,24 +640,9 @@ For each state, you need two config files under `states/{state_key}/`:
 
 ---
 
-## 14. Output Files Produced
+## 16. Execution Paths (Browser vs Server)
 
-After running the full pipeline for jurisdiction `douglas`:
-
-```
-data/CDOT/
-  douglas_standardized.csv       # Stage 1: Normalized format (1.5 MB)
-  douglas_all_roads.csv          # Stage 4: Complete dataset (1.5 MB)
-  douglas_county_roads.csv       # Stage 4: County roads only (383 KB)
-  douglas_no_interstate.csv      # Stage 4: No interstate (1.2 MB)
-  crashes.csv                    # Copy of county_roads (UI default fallback)
-  .validation/
-    pipeline_report.json         # Processing statistics
-```
-
----
-
-## 15. Execution Paths (Browser Upload → Server Save → Pipeline)
+### Path A: Browser-Only (JavaScript)
 
 Both paths start from the same Upload UI. The browser always processes the file locally for instant analysis, then attempts to save it to the server for persistent storage and the full pipeline.
 
@@ -735,7 +692,7 @@ UI shows save status (saved / offline / error)
 ### Path A: Manual File Drop (No Browser)
 
 ```
-User drops CSV file into data/CDOT/ manually
+User drops CSV file into data/{DOT}/ manually
     |
     v
 git add + commit + push to main
@@ -744,7 +701,7 @@ git add + commit + push to main
 GitHub Actions workflow triggers
     |
     v
-process-cdot-data.yml detects new CSV
+process-{dot}-data.yml detects new CSV
     |
     v
 Merges all raw CSVs -> full pipeline
@@ -799,22 +756,22 @@ When the server saves an uploaded file, it uses the original filename if descrip
 
 ---
 
-## 16. Auto-Trigger Workflow (GitHub Actions)
+## 17. Auto-Trigger Workflow (GitHub Actions)
 
-The pipeline can run automatically when a new CSV is pushed to `data/CDOT/`.
+The pipeline can run automatically when a new CSV is pushed to `data/{DOT}/`.
 
-**Workflow file:** `.github/workflows/process-cdot-data.yml`
+**Workflow file (Colorado example):** `.github/workflows/process-cdot-data.yml`
 
 ### How It Triggers
 
 | Trigger | When | Behavior |
 |---------|------|----------|
-| **Push to main** | A `.csv` file is added/changed under `data/CDOT/` | Auto-detects new raw CSVs, merges all raw files, runs full pipeline |
+| **Push to main** | A `.csv` file is added/changed under `data/{DOT}/` | Auto-detects new raw CSVs, merges all raw files, runs full pipeline |
 | **Manual dispatch** | Click "Run workflow" in GitHub Actions UI | Choose jurisdiction, input files, merge mode, geocode, dry-run |
 
 ### Push Trigger: What Counts as "New Data"
 
-The workflow watches for CSV changes in `data/CDOT/` but **ignores pipeline output files**:
+The workflow watches for CSV changes in the state data folder but **ignores pipeline output files**:
 
 ```yaml
 paths:
@@ -830,9 +787,9 @@ paths:
 
 So dropping `2024 douglas.csv` into `data/CDOT/` and pushing to main will trigger it. But the pipeline's own output commits will **not** re-trigger (no infinite loop).
 
-### Adding a New Year of CDOT Data
+### Adding a New Year of Data
 
-**Step-by-step:**
+**Step-by-step (Colorado example):**
 
 1. Get the new CSV from CDOT (e.g., `2024 douglas.csv`)
 2. Drop it into `data/CDOT/`
@@ -881,12 +838,12 @@ Go to **Actions** > **Process CDOT Crash Data** > **Run workflow**:
 ### Output Commit
 
 The workflow commits only pipeline output files:
-- `data/CDOT/{jurisdiction}_standardized.csv`
-- `data/CDOT/{jurisdiction}_all_roads.csv`
-- `data/CDOT/{jurisdiction}_county_roads.csv`
-- `data/CDOT/{jurisdiction}_no_interstate.csv`
-- `data/CDOT/crashes.csv`
-- `data/CDOT/.validation/pipeline_report.json`
+- `data/{DOT}/{jurisdiction}_standardized.csv`
+- `data/{DOT}/{jurisdiction}_all_roads.csv`
+- `data/{DOT}/{jurisdiction}_county_roads.csv`
+- `data/{DOT}/{jurisdiction}_no_interstate.csv`
+- `data/{DOT}/crashes.csv`
+- `data/{DOT}/.validation/pipeline_report.json`
 
 Commit message format:
 ```
@@ -902,196 +859,196 @@ The workflow only triggers on raw CSV changes and explicitly excludes output fil
 
 ---
 
-## 17. Step-by-Step: Adding a New State
 
-### What You Need
+## 18. Step-by-Step: Adding a New State
 
-1. A sample CSV export from the new state's DOT
-2. The state's data dictionary (column definitions)
+### Prerequisites
+
+1. Sample CSV export from the state's DOT
+2. Data dictionary (column definitions + valid values)
 3. State FIPS code and coordinate bounding box
-4. Knowledge of their road system classification
+4. Henrico reference dataset for value comparison
 
-### Steps
-
-#### Step 1: Create State Config Directory
-
-```
-states/{state_key}/
-  config.json
-  jurisdictions.json
-```
-
-Use `states/colorado/config.json` as your template. Fill in:
-- `state.*` metadata (name, abbreviation, FIPS, DOT name, coordinate bounds)
-- `columnMapping` -- map their column names to internal field codes
-- `derivedFields` -- document how each derived field is computed
-- `roadSystems` -- classify their road types into local/state/interstate
-- `crashTypeMapping` -- map their collision types to standardized types
-- `validValues` -- enumerate their valid values for key fields
-
-#### Step 2: Add Detection Signature
-
-In `scripts/state_adapter.py`, add to `STATE_SIGNATURES`:
+### Step 1: Analyze the Raw Data
 
 ```python
+import csv
+with open('raw_state_data.csv', 'r', encoding='utf-8-sig') as f:
+    rows = list(csv.DictReader(f))
+
+# List all columns
+print("COLUMNS:", list(rows[0].keys()))
+
+# For each column, show unique values
+for col in rows[0].keys():
+    vals = set(r.get(col, '') for r in rows if r.get(col))
+    print(f"\n{col} ({len(vals)} unique):")
+    for v in sorted(vals)[:10]:
+        print(f"  '{v}'")
+```
+
+### Step 2: Map Columns to Standardized Names
+
+Create a mapping table (see [Section 6](#6-column-mapping-raw-state---standardized)). Identify:
+- Direct renames (same data, different column name)
+- Derived fields (not in raw data, must be computed)
+- Semantic mismatches (same name but different meaning)
+
+### Step 3: Build VDOT Value Mapping Tables
+
+**This is the most important step.** For every categorical column:
+
+1. List all unique values in your raw data
+2. List all VDOT reference values from Henrico
+3. Create a mapping from each raw value to the correct VDOT value
+4. Handle unmapped values (default to `16. Other` or pass through with prefix)
+
+See [Section 7](#7-vdot-value-format-compliance) for the complete reference.
+
+### Step 4: Add Detection Signature
+
+```python
+# In state_adapter.py
 STATE_SIGNATURES['newstate'] = {
-    'required': ['UniqueCol1', 'UniqueCol2', 'UniqueCol3'],  # 3-4 columns unique to this state
+    'required': ['UniqueCol1', 'UniqueCol2', 'UniqueCol3'],
     'optional': ['OptionalCol1'],
-    'display_name': 'State Name (DOT Name)',
+    'display_name': 'State Name (DOT)',
     'config_dir': 'newstate'
 }
 ```
 
-Pick columns that ONLY this state's CSV would have.
-
-#### Step 3: Create Normalizer Class
-
-In `scripts/state_adapter.py`, create a new class:
+### Step 5: Create Normalizer Class
 
 ```python
 class NewStateNormalizer(BaseNormalizer):
-    # Define mapping dictionaries as class constants
-    COLLISION_MAP = { ... }
-    ROAD_SYSTEM_MAP = { ... }
+    """New state normalizer -- follow ColoradoNormalizer as template."""
 
-    def normalize_row(self, row: Dict[str, str]) -> Dict[str, str]:
-        """Transform one raw row to standardized format."""
-        out = {}
+    # VALUE MAPPING TABLES (raw -> VDOT format)
+    COLLISION_MAP = { 'Their Rear End': '1. Rear End', ... }
+    WEATHER_MAP = { 'Their Clear': '1. No Adverse Condition (Clear/Cloudy)', ... }
+    LIGHT_MAP = { ... }
+    SURFACE_MAP = { ... }
+    FIRST_HE_MAP = { ... }
+    FIRST_HE_LOC_MAP = { ... }
+    INTERSECTION_MAP = { ... }
+    ROAD_DESC_MAP = { ... }
+    OWNERSHIP_MAP = { ... }
 
-        # 1. Direct column renames
-        out['Document Nbr'] = row.get('their_id_col', '')
-        out['Crash Date'] = row.get('their_date_col', '')
+    # State-specific detail columns to preserve
+    EXTRA_COLUMNS = [
+        ('_xx_speed_limit', 'Their Speed Limit Column'),
+        ('_xx_driver_action', 'Their Driver Action Column'),
+        ...
+    ]
 
-        # 2. Derive severity
-        out['Crash Severity'] = self._derive_severity(row)
-
-        # 3. Map collision type
-        raw_type = row.get('their_collision_col', '')
-        out['Collision Type'] = self.COLLISION_MAP.get(raw_type, raw_type)
-
-        # 4. Map road system
-        raw_system = row.get('their_system_col', '')
-        out['SYSTEM'] = self.ROAD_SYSTEM_MAP.get(raw_system, raw_system)
-
-        # 5. Build route name
-        out['RTE Name'] = self._build_route_name(row)
-
-        # 6. Coordinates (x=longitude, y=latitude -- Virginia convention!)
-        out['x'] = row.get('their_lon_col', '')
-        out['y'] = row.get('their_lat_col', '')
-
-        # 7. Boolean flags
-        out['Pedestrian?'] = 'Yes' if self._check_pedestrian(row) else 'No'
-        # ... repeat for all 13 boolean flags
-
-        # 8. Preserve original columns
-        out['_source_state'] = 'newstate'
-        out['_ns_original_col'] = row.get('their_col', '')
-
-        return out
+    def normalize_row(self, row):
+        n = {}
+        # 1. ID, date, time
+        # 2. Severity (direct or derived)
+        # 3. Collision Type (mapped to VDOT format)
+        # 4. Weather, Light, Surface (mapped to VDOT format)
+        # 5. Alignment (mapped to 4-category VDOT format)
+        # 6. Road Description (road geometry, NOT intersection type)
+        # 7. Intersection Type (approach counts)
+        # 8. Relation To Roadway (intersection location relationship)
+        # 9. First Harmful Event + Location (VDOT numbered codes)
+        # 10. Route name, system, node, coordinates
+        # 11. Boolean flags (13 total)
+        # 12. Ownership, Vehicle Count, Pedestrians Killed/Injured
+        # 13. State-specific detail columns
+        return n
 ```
 
-#### Step 4: Register Normalizer
-
-In `scripts/state_adapter.py`:
+### Step 6: Register and Test
 
 ```python
+# Register
 _NORMALIZERS['newstate'] = NewStateNormalizer
+
+# Test
+python -c "
+from scripts.state_adapter import convert_file
+state, total, gps = convert_file('data/XDOT/raw.csv', '/tmp/test.csv')
+print(f'{total} rows, {gps} with GPS')
+"
+
+# Verify against Henrico reference (see Section 4 audit script)
 ```
 
-#### Step 5: Add Split Logic
+### Step 7: Add Split Logic
 
-In `scripts/split_cdot_data.py`, add the new state's county/interstate filtering rules:
+In `split_cdot_data.py`, add filtering rules for county roads and interstate exclusion.
 
-```python
-# In detect_format():
-if '_ns_original_col' in headers:
-    return 'standardized_newstate'
+### Step 8: Create Config Files
 
-# In split_data():
-elif fmt == 'standardized_newstate':
-    county_rows = [r for r in rows if r.get('_ns_county_col') == county_value]
-    no_interstate = [r for r in rows if r.get('SYSTEM') != 'Interstate']
-```
+Create `states/{state_key}/config.json` and `jurisdictions.json`.
 
-#### Step 6: Add Browser-Side Adapter (Optional)
+### Verification Checklist
 
-In `states/state_adapter.js`, add the detection signature and normalizer for browser-side processing.
-
-#### Step 7: Update Pipeline UI
-
-In `app/index.html`, add the state to the `PIPELINE_STATE_MAP`:
-
-```javascript
-const PIPELINE_STATE_MAP = {
-    '08': { key: 'colorado', name: 'Colorado (CO)', dotName: 'CDOT' },
-    '51': { key: 'virginia', name: 'Virginia (VA)', dotName: 'VDOT' },
-    'XX': { key: 'newstate', name: 'State Name (XX)', dotName: 'XDOT' },
-};
-```
-
-#### Step 8: Test
-
-```bash
-# Run full pipeline
-python scripts/process_crash_data.py \
-    -i "data/XDOT/sample.csv" \
-    -s newstate \
-    -j jurisdiction_name \
-    -v
-
-# Verify output
-head -2 data/XDOT/jurisdiction_standardized.csv
-wc -l data/XDOT/jurisdiction_*.csv
-cat data/XDOT/.validation/pipeline_report.json
-```
-
-Verify:
+- [ ] All categorical columns have VDOT numbered prefixes
+- [ ] No unmapped values in Collision Type, Weather, Light, Surface
+- [ ] Roadway Description contains road geometry (not intersection type)
+- [ ] Intersection Type uses approach counts (1/2/3/4/5. ...)
+- [ ] First Harmful Event uses VDOT codes (not raw state values)
 - [ ] Severity distribution looks reasonable (not all O)
-- [ ] GPS coverage percentage matches expectations
-- [ ] Collision type distribution has recognizable categories
-- [ ] Route names are meaningful
+- [ ] GPS coverage > 90%
 - [ ] Boolean flags are populated (not all No)
-- [ ] Split files have correct row counts
-- [ ] county_roads < all_roads (some filtering happened)
-- [ ] No duplicate function names introduced
+- [ ] State-specific detail columns have data
+- [ ] Split files: county_roads < all_roads
+- [ ] Pipeline is idempotent (running twice produces same output)
 
 ---
 
-## Appendix A: Raw CDOT Columns
+## 19. Colorado (CDOT) Complete Example
 
-Full list of columns in a raw CDOT CSV export (48 columns):
+### Raw Data Profile
+
+- **Source:** CDOT Crash Reporting Module (CRM) exports
+- **Format:** 110 columns per row, one row per crash
+- **Key columns:** CUID, System Code, Injury 00-04, Crash Type, MHE, Road Description, TU-1/TU-2 fields
+- **Severity:** No single column -- derived from Injury 00 (O) through Injury 04 (K)
+- **Data dictionary:** `CDOTRM_CD_Crash_Data_Dictionary_-_9-20-2023.csv`
+
+### Conversion Challenges Solved
+
+| Challenge | Solution |
+|-----------|----------|
+| No single severity column | Derived from Injury 00-04 counts |
+| 50+ collision type values | Two-step mapping: CO -> intermediate -> VDOT numbered |
+| `Road Description` = intersection type, not road geometry | Map to `Relation To Roadway`; derive `Roadway Description` from System Code |
+| Combined `Dawn or Dusk` lighting | Split by military time (before/after 1200) |
+| `Road Contour Curves` + `Grade` as separate fields | Combine into VDOT's 4-category alignment |
+| Colorado-specific surface conditions (Icy, Slushy, "W/Visible Treatment") | Map all variants to VDOT categories |
+| 42 First HE values (raw impact descriptions) | Map each to VDOT numbered codes |
+| Source data typo (`Electical/Utility Box`) | Added to mapping table |
+| Boolean flags from 26+ TU detail fields | Check both TU-1 and TU-2 for each flag |
+| Rich detail lost in boolean reduction | Preserved as 46 `_co_*` columns |
+
+### Douglas County Baseline Stats
 
 ```
-CUID, System Code, Rd_Number, Rd_Section, City_Street,
-Crash Date, Crash Time, Agency Id, City, County,
-Latitude, Longitude, Location 1, Link, Location 2,
-Location, Road Description, First HE, Second HE, Third HE,
-Fourth HE, MHE, Crash Type, Approach Overtaking Turn, Wild Animal,
-Number Killed, Number Injured, Injury 00, Injury 01, Injury 02,
-Injury 03, Injury 04, Total Vehicles, Secondary Crash, Construction Zone,
-School Zone, Road Contour Curves, Road Contour Grade, Road Condition,
-Lighting Conditions, Weather Condition, Weather Condition 2, Lane Position,
-TU-1 Direction, TU-2 Direction, TU-1 Movement, TU-2 Movement,
-TU-1 Type, TU-2 Type, TU-1 Special Function, TU-2 Special Function,
-TU-1 Speed Limit, TU-1 Estimated Speed, TU-2 Speed Limit, TU-2 Estimated Speed,
-TU-1 Driver Action, TU-2 Driver Action,
-TU-1 Human Contributing Factor, TU-2 Human Contributing Factor,
-TU-1 Age, TU-2 Age, TU-1 Sex, TU-2 Sex,
-TU-1 Alcohol Suspected, TU-2 Alcohol Suspected,
-TU-1 Marijuana Suspected, TU-2 Marijuana Suspected,
-TU-1 Other Drugs Suspected, TU-2 Other Drugs Suspected,
-TU-1 Hit And Run, TU-2 Hit And Run,
-TU-1 NM Type, TU-2 NM Type, TU-1 NM Age, TU-2 NM Age,
-TU-1 Safety restraint Use, TU-2 Safety restraint Use,
-Record Status, Processing Status, Last Updated
+Input:  4,323 rows (2021-2025), 110 columns
+Output: 4,296 rows (27 duplicates removed), 103 columns
+GPS:    99.1% coverage (147 recovered via node lookup)
+Time:   ~40 seconds full pipeline
+```
+
+### Files Produced
+
+```
+data/CDOT/
+  douglas_standardized.csv       # 4,296 rows, normalized
+  douglas_all_roads.csv          # 4,296 rows, all roads
+  douglas_county_roads.csv       # 1,061 rows, county-maintained only
+  douglas_no_interstate.csv      # 3,310 rows, no interstate
+  .validation/pipeline_report.json
 ```
 
 ---
 
-## Appendix B: Standardized Output Columns
+## Appendix A: Standardized Output Columns
 
-Full list of columns in the standardized output (57 columns):
+### Core VDOT-Compatible Columns (51)
 
 ```
 Document Nbr, Crash Date, Crash Year, Crash Military Time,
@@ -1109,85 +1066,134 @@ School Zone, Work Zone Related,
 Traffic Control Type, Traffic Control Status,
 Functional Class, Area Type, Facility Type, Ownership,
 First Harmful Event, First Harmful Event Loc,
+Relation To Roadway, Vehicle Count,
 Persons Injured, Pedestrians Killed, Pedestrians Injured,
-_source_state,
+_source_state, _source_file
+```
+
+### Colorado-Specific Columns (52)
+
+```
 _co_system_code, _co_agency_id, _co_rd_number,
 _co_location1, _co_location2, _co_city,
-_source_file
+_co_total_vehicles, _co_mhe, _co_crash_type, _co_link,
+_co_second_he, _co_third_he, _co_wild_animal,
+_co_secondary_crash, _co_weather2, _co_lane_position,
+_co_injury00_uninjured,
+_co_tu1_direction, _co_tu1_movement, _co_tu1_vehicle_type,
+_co_tu1_speed_limit, _co_tu1_estimated_speed, _co_tu1_stated_speed,
+_co_tu1_driver_action, _co_tu1_human_factor, _co_tu1_age, _co_tu1_sex,
+_co_tu2_direction, _co_tu2_movement, _co_tu2_vehicle_type,
+_co_tu2_speed_limit, _co_tu2_estimated_speed, _co_tu2_stated_speed,
+_co_tu2_driver_action, _co_tu2_human_factor, _co_tu2_age, _co_tu2_sex,
+_co_nm1_type, _co_nm1_age, _co_nm1_sex, _co_nm1_action,
+_co_nm1_movement, _co_nm1_location, _co_nm1_facility, _co_nm1_contributing_factor,
+_co_nm2_type, _co_nm2_age, _co_nm2_sex, _co_nm2_action,
+_co_nm2_movement, _co_nm2_location, _co_nm2_facility, _co_nm2_contributing_factor
+```
+
+---
+
+## Appendix B: VDOT Value Reference Tables
+
+These are the exact values used in the Henrico reference dataset. Your converted output must use these values.
+
+### Collision Type (17 values in Henrico)
+
+```
+1. Rear End, 2. Angle, 3. Head On,
+4. Sideswipe - Same Direction, 5. Sideswipe - Opposite Direction,
+6. Backed Into, 7. Non-Collision (Runaway),
+8. Non-Collision, 9. Fixed Object - Off Road,
+10. Deer/Animal, 11. Fixed Object in Road,
+12. Ped, 13. Bicycle, 14. Train,
+15. Non-Collision (Other), 16. Other, 17. Unknown
+```
+
+### Weather Condition (10 values)
+
+```
+1. No Adverse Condition (Clear/Cloudy), 2. Blowing Sand/Dust,
+3. Fog/Smog/Smoke, 4. Snow, 5. Rain,
+6. Sleet/Hail/Freezing, 7. Blowing Sand/Dust,
+8. Severe Crosswinds, 9. Other, 16. Other
+```
+
+### Light Condition (8 values)
+
+```
+1. Dawn, 2. Daylight, 3. Dusk,
+4. Darkness - Road Lighted, 5. Darkness - Road Not Lighted,
+6. Darkness - Unknown Lighting, 7. Other, 8. Unknown
+```
+
+### Roadway Surface Condition (11 values)
+
+```
+1. Dry, 2. Wet, 3. Snow, 4. Slush, 5. Ice,
+6. Sand/Mud/Dirt/Oil/Gravel, 7. Water,
+8. Other, 9. Unknown, 16. Other
+```
+
+### Roadway Alignment (4+)
+
+```
+1. Straight - Level, 2. Curve - Level,
+3. Grade - Straight, 4. Grade - Curve
+```
+
+### SYSTEM (5 values)
+
+```
+VDOT Interstate, VDOT Primary, VDOT Secondary,
+NonVDOT primary, NonVDOT secondary
 ```
 
 ---
 
 ## Appendix C: Command-Line Reference
 
-### process_crash_data.py
+### Full Pipeline
 
 ```bash
-# Full pipeline (auto-detect state)
-python scripts/process_crash_data.py -i data/CDOT/Douglas_County.csv -j douglas
-
-# Explicit state
-python scripts/process_crash_data.py -i data/CDOT/Douglas_County.csv -s colorado -j douglas
-
-# Merge multiple year files
-python scripts/process_crash_data.py -i "data/CDOT/202*.csv" -j douglas --merge
-
-# Convert only (skip validate/geocode/split)
-python scripts/process_crash_data.py -i data/CDOT/Douglas_County.csv -j douglas --convert-only
-
-# Skip specific stages
-python scripts/process_crash_data.py -i data/CDOT/Douglas_County.csv -j douglas --skip-geocode
-python scripts/process_crash_data.py -i data/CDOT/Douglas_County.csv -j douglas --skip-split
-
-# Dry run (preview without writing)
-python scripts/process_crash_data.py -i data/CDOT/Douglas_County.csv -j douglas --dry-run
-
-# Verbose logging
-python scripts/process_crash_data.py -i data/CDOT/Douglas_County.csv -j douglas -v
-
-# Force overwrite existing files
-python scripts/process_crash_data.py -i data/CDOT/Douglas_County.csv -j douglas -f
+python scripts/process_crash_data.py -i data/CDOT/Douglas_County.csv -j douglas -s colorado -v
 ```
 
-### split_cdot_data.py
+### Convert Only
 
 ```bash
-# Auto-detect source file
-python scripts/split_cdot_data.py -j douglas
+python scripts/process_crash_data.py -i data/CDOT/Douglas_County.csv -j douglas --convert-only
+```
 
-# Explicit source
-python scripts/split_cdot_data.py -j douglas --source data/CDOT/douglas_standardized.csv
+### Split Only
 
-# Explicit state
+```bash
 python scripts/split_cdot_data.py -j douglas -s colorado
 ```
 
-### pipeline_server.py
+### Pipeline Server
 
 ```bash
-# Start server
 python scripts/pipeline_server.py --port 5050
 
-# Custom host/port
-python scripts/pipeline_server.py --host 127.0.0.1 --port 8080
-```
-
-### Server API Usage
-
-```bash
-# Health check
-curl http://localhost:5050/health
-
-# List supported states
-curl http://localhost:5050/api/pipeline/states
-
-# Check pipeline status
-curl http://localhost:5050/api/pipeline/status
-
-# Upload and process
+# Upload via API
 curl -X POST \
   -F "state=colorado" \
   -F "jurisdiction=douglas" \
   -F "file=@data/CDOT/Douglas_County.csv" \
   http://localhost:5050/api/pipeline/run
+```
+
+### Quick Verification Script
+
+```bash
+python3 -c "
+from scripts.state_adapter import convert_file
+state, total, gps = convert_file(
+    'data/CDOT/Douglas_County.csv',
+    '/tmp/test_output.csv',
+    state='colorado'
+)
+print(f'State: {state}, Rows: {total}, GPS: {gps}')
+"
 ```
