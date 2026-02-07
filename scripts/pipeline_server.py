@@ -97,8 +97,9 @@ def _build_save_filename(original_name, jurisdiction):
     """
     import re
     name = original_name.strip()
-    # Sanitize: keep alphanumeric, spaces, hyphens, underscores, dots
+    # Sanitize: keep alphanumeric, hyphens, underscores, dots; replace spaces
     name = re.sub(r'[^\w\s\-.]', '', name)
+    name = name.replace(' ', '_')
     # Ensure .csv extension
     if not name.lower().endswith('.csv'):
         name += '.csv'
