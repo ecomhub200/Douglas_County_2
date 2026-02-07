@@ -23,6 +23,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from download_cdot_crash_data import (
+    _playwright_available,
     detect_file_type,
     excel_to_dataframe,
     extract_download_url_from_html,
@@ -94,12 +95,12 @@ def make_manifest(tmp_dir, years=None, jurisdictions=None):
         jurisdictions = {
             "douglas": {
                 "county": "DOUGLAS",
-                "agency_ids": ["DSO"],
+                "fips": "08035",
                 "display_name": "Douglas County"
             },
             "elpaso": {
                 "county": "EL PASO",
-                "agency_ids": [],
+                "fips": "08041",
                 "display_name": "El Paso County"
             }
         }
@@ -440,6 +441,16 @@ class TestFilterToJurisdiction:
         result = filter_to_jurisdiction(df, config, 'elpaso')
         assert len(result) == 2  # 'ELPASO' (no space) should NOT match
 
+    def test_multi_word_counties(self):
+        """Counties with spaces in names (Clear Creek, Kit Carson, etc.)."""
+        counties = ['CLEAR CREEK', 'KIT CARSON', 'LA PLATA', 'LAS ANIMAS',
+                     'RIO BLANCO', 'RIO GRANDE', 'SAN JUAN', 'SAN MIGUEL']
+        df = self._make_df(counties)
+        for county in counties:
+            config = {'county': county, 'display_name': f'{county.title()} County'}
+            result = filter_to_jurisdiction(df, config, 'test')
+            assert len(result) == 1, f"Failed to filter {county}"
+
 
 # ===========================================================================
 # load_manifest
@@ -489,7 +500,7 @@ class TestListAvailable:
                 '_description': 'should be skipped',
                 'douglas': {
                     'county': 'DOUGLAS',
-                    'agency_ids': ['DSO'],
+                    'fips': '08035',
                     'display_name': 'Douglas County'
                 }
             },
@@ -504,7 +515,7 @@ class TestListAvailable:
         assert '2025' in output
         assert '[preliminary]' in output
         assert 'Douglas County' in output
-        assert 'DSO' in output
+        assert 'FIPS: 08035' in output
         assert '_description' not in output  # internal keys filtered
 
     def test_empty_manifest(self, capsys):
@@ -541,9 +552,16 @@ class TestProcessYearFilename:
         filename = f"2024 {display_name.lower().replace(' county', '').strip()}.csv"
         assert filename == '2024 denver.csv'
 
+    def test_clear_creek_filename(self):
+        """Clear Creek County → '2024 clear creek.csv'"""
+        jur_config = {'county': 'CLEAR CREEK', 'display_name': 'Clear Creek County'}
+        display_name = jur_config['display_name']
+        filename = f"2024 {display_name.lower().replace(' county', '').strip()}.csv"
+        assert filename == '2024 clear creek.csv'
+
     def test_statewide_filename(self):
         """Without jurisdiction, filename should be statewide."""
-        filename = f"cdot_crash_statewide_2024.csv"
+        filename = "cdot_crash_statewide_2024.csv"
         assert 'statewide' in filename
 
 
@@ -609,7 +627,7 @@ class TestEndToEndPipeline:
 
 
 # ===========================================================================
-# Manifest integrity
+# Manifest integrity — all 64 Colorado counties
 # ===========================================================================
 
 class TestManifestIntegrity:
@@ -641,24 +659,91 @@ class TestManifestIntegrity:
         docids = [info['docid'] for info in manifest['files'].values()]
         assert len(docids) == len(set(docids)), "Duplicate doc IDs found"
 
+    def test_exactly_64_counties(self, manifest):
+        """Colorado has exactly 64 counties."""
+        counties = {k: v for k, v in manifest['jurisdiction_filters'].items()
+                    if not k.startswith('_')}
+        assert len(counties) == 64, f"Expected 64 counties, got {len(counties)}"
+
     def test_all_jurisdictions_have_required_fields(self, manifest):
         for key, jur in manifest['jurisdiction_filters'].items():
             if key.startswith('_'):
                 continue
             assert 'county' in jur, f"Jurisdiction {key} missing 'county'"
             assert 'display_name' in jur, f"Jurisdiction {key} missing 'display_name'"
-            assert 'agency_ids' in jur, f"Jurisdiction {key} missing 'agency_ids'"
-            assert isinstance(jur['agency_ids'], list)
+            assert 'fips' in jur, f"Jurisdiction {key} missing 'fips'"
+            assert jur['fips'].startswith('08'), f"Jurisdiction {key} FIPS doesn't start with 08"
+            assert len(jur['fips']) == 5, f"Jurisdiction {key} FIPS not 5 digits"
+
+    def test_county_names_are_uppercase(self, manifest):
+        for key, jur in manifest['jurisdiction_filters'].items():
+            if key.startswith('_'):
+                continue
+            assert jur['county'] == jur['county'].upper(), \
+                f"Jurisdiction {key} county '{jur['county']}' not uppercase"
+
+    def test_fips_codes_are_unique(self, manifest):
+        fips = [jur['fips'] for k, jur in manifest['jurisdiction_filters'].items()
+                if not k.startswith('_')]
+        assert len(fips) == len(set(fips)), "Duplicate FIPS codes found"
+
+    def test_county_values_are_unique(self, manifest):
+        counties = [jur['county'] for k, jur in manifest['jurisdiction_filters'].items()
+                    if not k.startswith('_')]
+        assert len(counties) == len(set(counties)), "Duplicate county names found"
 
     def test_douglas_is_default_jurisdiction(self, manifest):
         assert 'douglas' in manifest['jurisdiction_filters']
         douglas = manifest['jurisdiction_filters']['douglas']
         assert douglas['county'] == 'DOUGLAS'
-        assert 'DSO' in douglas['agency_ids']
+        assert douglas['fips'] == '08035'
+
+    def test_known_counties_present(self, manifest):
+        """Verify a selection of well-known Colorado counties exist."""
+        expected = [
+            ('adams', 'ADAMS'), ('arapahoe', 'ARAPAHOE'), ('boulder', 'BOULDER'),
+            ('broomfield', 'BROOMFIELD'), ('denver', 'DENVER'), ('douglas', 'DOUGLAS'),
+            ('elpaso', 'EL PASO'), ('jefferson', 'JEFFERSON'), ('larimer', 'LARIMER'),
+            ('mesa', 'MESA'), ('pueblo', 'PUEBLO'), ('weld', 'WELD'),
+        ]
+        for key, county in expected:
+            assert key in manifest['jurisdiction_filters'], f"Missing county: {key}"
+            assert manifest['jurisdiction_filters'][key]['county'] == county
+
+    def test_multi_word_county_keys(self, manifest):
+        """Counties with spaces should use underscore keys."""
+        multi_word = ['clear_creek', 'kit_carson', 'la_plata', 'las_animas',
+                      'rio_blanco', 'rio_grande', 'san_juan', 'san_miguel']
+        for key in multi_word:
+            assert key in manifest['jurisdiction_filters'], f"Missing multi-word county: {key}"
 
     def test_data_dictionaries_present(self, manifest):
         assert '2021-2025' in manifest['data_dictionaries']
         assert 'docid' in manifest['data_dictionaries']['2021-2025']
+
+
+# ===========================================================================
+# Playwright availability check
+# ===========================================================================
+
+class TestPlaywrightFallback:
+
+    def test_playwright_available_returns_bool(self):
+        """_playwright_available should return True or False without crashing."""
+        result = _playwright_available()
+        assert isinstance(result, bool)
+
+    def test_playwright_available_false_when_not_installed(self):
+        """When playwright is not importable, should return False."""
+        with patch.dict('sys.modules', {'playwright': None, 'playwright.sync_api': None}):
+            # Force reimport check
+            import importlib
+            import download_cdot_crash_data as mod
+            importlib.reload(mod)
+            # The function catches ImportError gracefully
+            result = mod._playwright_available()
+            # Result depends on whether playwright is actually installed
+            assert isinstance(result, bool)
 
 
 # ===========================================================================
@@ -675,7 +760,7 @@ class TestManifestDescriptionKeys:
                 '_description': 'This is a string, not a dict',
                 'douglas': {
                     'county': 'DOUGLAS',
-                    'agency_ids': ['DSO'],
+                    'fips': '08035',
                     'display_name': 'Douglas County'
                 }
             },

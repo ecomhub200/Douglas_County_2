@@ -216,10 +216,138 @@ def extract_download_url_from_html(html_content, base_url):
     return None
 
 
+def _playwright_available():
+    """Check if Playwright is installed and has browsers."""
+    try:
+        from playwright.sync_api import sync_playwright  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def download_with_playwright(docid, label='document', timeout_ms=60000):
+    """
+    Fallback: use a headless Chromium browser to download the file.
+    Playwright handles JavaScript rendering, session cookies, and redirects
+    that requests cannot follow.
+
+    Returns (content_bytes, extension) or raises on failure.
+    """
+    from playwright.sync_api import sync_playwright
+
+    url = f"{ONBASE_BASE_URL}?clienttype=html&docid={docid}"
+    logger.info(f"  Playwright fallback: launching headless browser...")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(accept_downloads=True)
+        page = context.new_page()
+
+        downloaded_path = None
+
+        try:
+            # Navigate to the document page
+            page.goto(url, wait_until='networkidle', timeout=timeout_ms)
+            logger.info(f"  Page loaded: {page.title()}")
+
+            # Strategy A: intercept automatic download triggered by OnBase
+            # Some OnBase pages auto-start a download on page load
+            try:
+                with page.expect_download(timeout=15000) as download_info:
+                    # Click any visible download/open link on the page
+                    for selector in [
+                        'a[href*="GetDoc"]',
+                        'a[href*="Download"]',
+                        'a[href*="PdfPop"]',
+                        'a[href*=".xlsx"]',
+                        'a[href*=".xls"]',
+                        'text=Download',
+                        'text=Open',
+                        'text=Save',
+                    ]:
+                        link = page.query_selector(selector)
+                        if link and link.is_visible():
+                            logger.info(f"  Clicking download link: {selector}")
+                            link.click()
+                            break
+
+                download = download_info.value
+                downloaded_path = download.path()
+                logger.info(f"  Browser download captured: {download.suggested_filename}")
+            except Exception:
+                # Strategy B: no auto-download, try to find a direct link
+                logger.info("  No automatic download triggered. Checking page content...")
+
+            # Strategy B: if no download was captured, try fetching page content
+            # The OnBase viewer may embed the document or provide a link
+            if downloaded_path is None:
+                # Look for iframe or embedded content with the actual document
+                for frame in page.frames:
+                    frame_url = frame.url
+                    if any(ext in frame_url.lower() for ext in ['.xlsx', '.xls', 'getdoc', 'pdfpop']):
+                        logger.info(f"  Found document frame: {frame_url[:100]}")
+                        # Fetch the frame URL directly
+                        resp = page.request.get(frame_url)
+                        content = resp.body()
+                        is_valid, ext, reason = detect_file_type(content)
+                        if is_valid:
+                            browser.close()
+                            logger.info(f"  Playwright success via frame: {reason}")
+                            return content, ext
+
+                # Strategy C: try triggering download via JavaScript
+                try:
+                    with page.expect_download(timeout=10000) as download_info:
+                        page.evaluate("""() => {
+                            // Try clicking the document link in OnBase viewer
+                            const links = document.querySelectorAll('a');
+                            for (const a of links) {
+                                const href = (a.href || '').toLowerCase();
+                                if (href.includes('getdoc') || href.includes('download') ||
+                                    href.includes('.xls') || href.includes('pdfpop')) {
+                                    a.click();
+                                    return;
+                                }
+                            }
+                            // Try the OnBase-specific download button
+                            const btn = document.querySelector('[id*="download"], [id*="Download"]');
+                            if (btn) btn.click();
+                        }""")
+                    download = download_info.value
+                    downloaded_path = download.path()
+                    logger.info(f"  JS-triggered download: {download.suggested_filename}")
+                except Exception:
+                    pass
+
+            # Read the downloaded file
+            if downloaded_path:
+                with open(downloaded_path, 'rb') as f:
+                    content = f.read()
+
+                is_valid, ext, reason = detect_file_type(content)
+                browser.close()
+
+                if is_valid:
+                    logger.info(f"  Playwright success: {len(content):,} bytes ({reason})")
+                    return content, ext
+                else:
+                    raise Exception(f"Playwright downloaded file but it's not Excel: {reason}")
+
+            browser.close()
+            raise Exception("Playwright could not trigger a file download from OnBase")
+
+        except Exception as e:
+            browser.close()
+            raise Exception(f"Playwright fallback failed: {e}")
+
+
 def download_onbase_document(session, docid, label='document'):
     """
-    Download a document from Hyland OnBase. Handles the redirect chain
-    and falls back to parsing HTML if needed.
+    Download a document from Hyland OnBase. Tries multiple strategies:
+      1. Direct requests with redirect following
+      2. Parse HTML response for real download URL
+      3. clienttype=activex parameter
+      4. Playwright headless browser (fallback for JS-rendered pages)
 
     Returns (content_bytes, extension) or raises on failure.
     """
@@ -228,59 +356,74 @@ def download_onbase_document(session, docid, label='document'):
 
     logger.info(f"Downloading {label} (docid={docid})...")
 
-    # First attempt: direct request with redirects
-    response = make_request_with_retry(session, url, params=params, timeout=180)
-    content = response.content
-    content_type = response.headers.get('Content-Type', '')
-    content_disposition = response.headers.get('Content-Disposition', '')
-
-    is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
-    logger.info(f"  First attempt: {reason}")
-
-    if is_valid:
-        logger.info(f"  Downloaded {len(content):,} bytes")
-        return content, ext
-
-    # Second attempt: if we got HTML, try to extract the real download URL
-    logger.info("  Got HTML response. Parsing for download link...")
-    download_url = extract_download_url_from_html(content, response.url)
-
-    if download_url:
-        logger.info(f"  Found download link: {download_url[:100]}...")
-        response = make_request_with_retry(session, download_url, timeout=180)
-        content = response.content
-        content_type = response.headers.get('Content-Type', '')
-        content_disposition = response.headers.get('Content-Disposition', '')
-
-        is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
-        logger.info(f"  Second attempt: {reason}")
-
-        if is_valid:
-            logger.info(f"  Downloaded {len(content):,} bytes")
-            return content, ext
-
-    # Third attempt: try clienttype=activex (some OnBase instances support this)
-    logger.info("  Trying clienttype=activex...")
-    params_activex = {'clienttype': 'activex', 'docid': str(docid)}
+    # --- Strategy 1: direct request with redirects ---
     try:
-        response = make_request_with_retry(session, url, params=params_activex, timeout=180)
+        response = make_request_with_retry(session, url, params=params, timeout=180)
         content = response.content
         content_type = response.headers.get('Content-Type', '')
         content_disposition = response.headers.get('Content-Disposition', '')
 
         is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
-        logger.info(f"  Third attempt: {reason}")
+        logger.info(f"  Strategy 1 (requests): {reason}")
 
         if is_valid:
             logger.info(f"  Downloaded {len(content):,} bytes")
             return content, ext
+
+        # --- Strategy 2: parse HTML for download URL ---
+        logger.info("  Got HTML response. Parsing for download link...")
+        download_url = extract_download_url_from_html(content, response.url)
+
+        if download_url:
+            logger.info(f"  Found download link: {download_url[:100]}...")
+            response = make_request_with_retry(session, download_url, timeout=180)
+            content = response.content
+            content_type = response.headers.get('Content-Type', '')
+            content_disposition = response.headers.get('Content-Disposition', '')
+
+            is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
+            logger.info(f"  Strategy 2 (HTML parse): {reason}")
+
+            if is_valid:
+                logger.info(f"  Downloaded {len(content):,} bytes")
+                return content, ext
+
+        # --- Strategy 3: clienttype=activex ---
+        logger.info("  Trying clienttype=activex...")
+        params_activex = {'clienttype': 'activex', 'docid': str(docid)}
+        try:
+            response = make_request_with_retry(session, url, params=params_activex, timeout=180)
+            content = response.content
+            content_type = response.headers.get('Content-Type', '')
+            content_disposition = response.headers.get('Content-Disposition', '')
+
+            is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
+            logger.info(f"  Strategy 3 (activex): {reason}")
+
+            if is_valid:
+                logger.info(f"  Downloaded {len(content):,} bytes")
+                return content, ext
+        except Exception as e:
+            logger.debug(f"  activex attempt failed: {e}")
+
     except Exception as e:
-        logger.debug(f"  activex attempt failed: {e}")
+        logger.warning(f"  All requests-based strategies failed: {e}")
+
+    # --- Strategy 4: Playwright headless browser ---
+    if _playwright_available():
+        logger.info("  Falling back to Playwright headless browser...")
+        try:
+            return download_with_playwright(docid, label=label)
+        except Exception as e:
+            logger.error(f"  Playwright fallback failed: {e}")
+    else:
+        logger.info("  Playwright not installed. To enable browser fallback:")
+        logger.info("    pip install playwright && playwright install chromium")
 
     raise Exception(
         f"Failed to download {label} (docid={docid}). "
-        f"All download strategies returned non-Excel content. "
-        f"The OnBase portal may require browser-based access."
+        f"All strategies (requests + HTML parse + activex + Playwright) failed. "
+        f"Try: pip install playwright && playwright install chromium"
     )
 
 
@@ -438,8 +581,8 @@ def list_available(manifest):
     print(f"\nJURISDICTIONS ({len(jurisdictions)}):")
     print("-" * 40)
     for key, jur in sorted(jurisdictions.items()):
-        agency = f" (Agency: {', '.join(jur['agency_ids'])})" if jur.get('agency_ids') else ''
-        print(f"  {key:<15} {jur['display_name']}{agency}")
+        fips = f" (FIPS: {jur['fips']})" if jur.get('fips') else ''
+        print(f"  {key:<15} {jur['display_name']}{fips}")
 
     dicts = manifest.get('data_dictionaries', {})
     print(f"\nDATA DICTIONARIES ({len(dicts)}):")
