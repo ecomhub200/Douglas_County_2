@@ -32,6 +32,11 @@ on:
         required: false
         type: boolean
         default: false
+      force_download:
+        description: 'Force re-download even for finalized years that already exist'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -82,6 +87,11 @@ jobs:
 
           if [ "$SKIP_DICT" = "true" ]; then
             ARGS="$ARGS --no-dict"
+          fi
+
+          FORCE="${{ github.event.inputs.force_download }}"
+          if [ "$FORCE" = "true" ]; then
+            ARGS="$ARGS --force"
           fi
 
           echo "args=$ARGS" >> $GITHUB_OUTPUT

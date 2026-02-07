@@ -23,13 +23,16 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from download_cdot_crash_data import (
+    _get_output_filename,
     _playwright_available,
+    CUID_COLUMN,
     detect_file_type,
     excel_to_dataframe,
     extract_download_url_from_html,
     filter_to_jurisdiction,
     list_available,
     load_manifest,
+    merge_with_existing,
     MIN_VALID_FILE_SIZE,
 )
 
@@ -744,6 +747,306 @@ class TestPlaywrightFallback:
             result = mod._playwright_available()
             # Result depends on whether playwright is actually installed
             assert isinstance(result, bool)
+
+
+# ===========================================================================
+# merge_with_existing — CUID-based deduplication
+# ===========================================================================
+
+class TestMergeWithExisting:
+    """Tests for the merge strategy that protects validated data."""
+
+    def _make_csv(self, tmp_path, filename, data):
+        """Helper: write a DataFrame dict to a CSV file."""
+        df = pd.DataFrame(data)
+        path = tmp_path / filename
+        df.to_csv(path, index=False)
+        return path
+
+    def test_append_new_records(self, tmp_path):
+        """New CUIDs should be appended to existing data."""
+        existing_path = self._make_csv(tmp_path, 'existing.csv', {
+            'CUID': [100, 200, 300],
+            'County': ['DOUGLAS'] * 3,
+            'Crash Date': ['1/1/2025', '1/2/2025', '1/3/2025'],
+        })
+        new_df = pd.DataFrame({
+            'CUID': [300, 400, 500],
+            'County': ['DOUGLAS'] * 3,
+            'Crash Date': ['1/3/2025', '1/4/2025', '1/5/2025'],
+        })
+
+        merged, stats = merge_with_existing(new_df, existing_path)
+
+        assert stats['existing_count'] == 3
+        assert stats['new_download_count'] == 3
+        assert stats['new_records'] == 2  # 400 and 500 are new
+        assert stats['merged_count'] == 5  # 3 existing + 2 new
+        assert set(merged['CUID'].tolist()) == {100, 200, 300, 400, 500}
+
+    def test_no_new_records(self, tmp_path):
+        """When all CUIDs already exist, nothing should change."""
+        existing_path = self._make_csv(tmp_path, 'existing.csv', {
+            'CUID': [100, 200, 300],
+            'County': ['DOUGLAS'] * 3,
+        })
+        new_df = pd.DataFrame({
+            'CUID': [100, 200, 300],
+            'County': ['DOUGLAS'] * 3,
+        })
+
+        merged, stats = merge_with_existing(new_df, existing_path)
+
+        assert stats['new_records'] == 0
+        assert stats['merged_count'] == 3  # unchanged
+        assert len(merged) == 3
+
+    def test_all_new_records(self, tmp_path):
+        """When no CUIDs overlap, all new records should be appended."""
+        existing_path = self._make_csv(tmp_path, 'existing.csv', {
+            'CUID': [100, 200],
+            'County': ['DOUGLAS'] * 2,
+        })
+        new_df = pd.DataFrame({
+            'CUID': [300, 400, 500],
+            'County': ['DOUGLAS'] * 3,
+        })
+
+        merged, stats = merge_with_existing(new_df, existing_path)
+
+        assert stats['new_records'] == 3
+        assert stats['merged_count'] == 5
+
+    def test_existing_records_preserved_exactly(self, tmp_path):
+        """Existing rows should not be modified during merge."""
+        existing_path = self._make_csv(tmp_path, 'existing.csv', {
+            'CUID': [100, 200],
+            'County': ['DOUGLAS', 'DOUGLAS'],
+            'Latitude': [39.5, 39.6],
+            'Custom_Field': ['validated_a', 'validated_b'],
+        })
+        new_df = pd.DataFrame({
+            'CUID': [100, 300],
+            'County': ['DOUGLAS', 'DOUGLAS'],
+            'Latitude': [99.9, 39.7],  # 100's latitude differs in new data
+            'Custom_Field': ['changed', 'new_c'],
+        })
+
+        merged, stats = merge_with_existing(new_df, existing_path)
+
+        # Existing CUID=100 should keep original values, not be overwritten
+        row_100 = merged[merged['CUID'] == 100].iloc[0]
+        assert row_100['Latitude'] == 39.5  # original, not 99.9
+        assert row_100['Custom_Field'] == 'validated_a'  # original, not 'changed'
+
+    def test_no_cuid_column_falls_back_to_replace(self, tmp_path):
+        """If CUID column is missing, fall back to full replacement."""
+        existing_path = self._make_csv(tmp_path, 'existing.csv', {
+            'ID': [1, 2, 3],
+            'County': ['DOUGLAS'] * 3,
+        })
+        new_df = pd.DataFrame({
+            'ID': [4, 5],
+            'County': ['DOUGLAS'] * 2,
+        })
+
+        merged, stats = merge_with_existing(new_df, existing_path)
+
+        # Falls back to replacement — returns new_df as-is
+        assert len(merged) == 2
+        assert stats['merged_count'] == 2
+
+    def test_empty_existing_file(self, tmp_path):
+        """Merging into an empty existing CSV should return all new records."""
+        existing_path = self._make_csv(tmp_path, 'existing.csv', {
+            'CUID': pd.Series([], dtype=int),
+            'County': pd.Series([], dtype=str),
+        })
+        new_df = pd.DataFrame({
+            'CUID': [100, 200],
+            'County': ['DOUGLAS'] * 2,
+        })
+
+        merged, stats = merge_with_existing(new_df, existing_path)
+
+        assert stats['existing_count'] == 0
+        assert stats['new_records'] == 2
+        assert stats['merged_count'] == 2
+
+    def test_cuid_as_string(self, tmp_path):
+        """CUID comparison should work even with mixed int/string types."""
+        existing_path = self._make_csv(tmp_path, 'existing.csv', {
+            'CUID': ['100', '200'],  # strings in CSV
+            'County': ['DOUGLAS'] * 2,
+        })
+        new_df = pd.DataFrame({
+            'CUID': [200, 300],  # ints in download
+            'County': ['DOUGLAS'] * 2,
+        })
+
+        merged, stats = merge_with_existing(new_df, existing_path)
+
+        # 200 exists (as string vs int), 300 is new
+        assert stats['new_records'] == 1
+        assert stats['merged_count'] == 3
+
+    def test_merge_stats_accuracy(self, tmp_path):
+        """Verify all stats fields are populated correctly."""
+        existing_path = self._make_csv(tmp_path, 'existing.csv', {
+            'CUID': [1, 2, 3, 4, 5],
+            'County': ['DOUGLAS'] * 5,
+        })
+        new_df = pd.DataFrame({
+            'CUID': [3, 4, 5, 6, 7, 8],
+            'County': ['DOUGLAS'] * 6,
+        })
+
+        merged, stats = merge_with_existing(new_df, existing_path)
+
+        assert stats['existing_count'] == 5
+        assert stats['new_download_count'] == 6
+        assert stats['new_records'] == 3  # 6, 7, 8
+        assert stats['merged_count'] == 8  # 1-8
+
+
+class TestGetOutputFilename:
+    """Tests for the filename helper function."""
+
+    def test_douglas_filename(self):
+        manifest = {'jurisdiction_filters': {
+            'douglas': {'county': 'DOUGLAS', 'display_name': 'Douglas County'}
+        }}
+        assert _get_output_filename('2024', 'douglas', manifest) == '2024 douglas.csv'
+
+    def test_el_paso_filename(self):
+        manifest = {'jurisdiction_filters': {
+            'elpaso': {'county': 'EL PASO', 'display_name': 'El Paso County'}
+        }}
+        assert _get_output_filename('2024', 'elpaso', manifest) == '2024 el paso.csv'
+
+    def test_statewide_filename(self):
+        manifest = {'jurisdiction_filters': {}}
+        assert _get_output_filename('2024', None, manifest) == 'cdot_crash_statewide_2024.csv'
+
+    def test_unknown_jurisdiction_returns_statewide(self):
+        manifest = {'jurisdiction_filters': {'douglas': {}}}
+        assert _get_output_filename('2024', 'bogus', manifest) == 'cdot_crash_statewide_2024.csv'
+
+
+class TestProcessYearSkipLogic:
+    """Tests for skip-if-final and merge-if-preliminary behavior."""
+
+    def test_skip_final_when_exists(self, tmp_path):
+        """Final year with existing CSV should be skipped."""
+        # Create an existing CSV
+        existing = tmp_path / '2024 douglas.csv'
+        pd.DataFrame({'CUID': [1, 2, 3], 'County': ['DOUGLAS'] * 3}).to_csv(existing, index=False)
+
+        manifest = {
+            'jurisdiction_filters': {
+                'douglas': {'county': 'DOUGLAS', 'display_name': 'Douglas County', 'fips': '08035'}
+            },
+            'files': {'2024': {'docid': 35111742, 'status': 'final'}}
+        }
+        year_info = {'docid': 35111742, 'status': 'final'}
+
+        # Import process_year
+        from download_cdot_crash_data import process_year
+
+        # Should skip without trying to download (session won't be used)
+        mock_session = MagicMock()
+        year, success, path = process_year(
+            mock_session, '2024', year_info, manifest, tmp_path, 'douglas', force=False
+        )
+
+        assert success is True
+        assert str(existing) == path
+        # Session should NOT have been called (skipped download)
+        mock_session.get.assert_not_called()
+
+    def test_force_overrides_skip(self, tmp_path):
+        """With --force, even final years should attempt download."""
+        existing = tmp_path / '2024 douglas.csv'
+        pd.DataFrame({'CUID': [1], 'County': ['DOUGLAS']}).to_csv(existing, index=False)
+
+        manifest = {
+            'jurisdiction_filters': {
+                'douglas': {'county': 'DOUGLAS', 'display_name': 'Douglas County', 'fips': '08035'}
+            },
+            'files': {'2024': {'docid': 35111742, 'status': 'final'}}
+        }
+        year_info = {'docid': 35111742, 'status': 'final'}
+
+        from download_cdot_crash_data import process_year
+
+        mock_session = MagicMock()
+        # The download will fail (mock session), but it should ATTEMPT it
+        year, success, error = process_year(
+            mock_session, '2024', year_info, manifest, tmp_path, 'douglas', force=True
+        )
+
+        # It tried to download (and failed because session is mocked)
+        assert success is False  # download failed
+        # But it didn't skip — that's the important part
+
+    def test_missing_file_always_downloads(self, tmp_path):
+        """If the CSV doesn't exist, always download regardless of status."""
+        manifest = {
+            'jurisdiction_filters': {
+                'douglas': {'county': 'DOUGLAS', 'display_name': 'Douglas County', 'fips': '08035'}
+            },
+            'files': {'2024': {'docid': 35111742, 'status': 'final'}}
+        }
+        year_info = {'docid': 35111742, 'status': 'final'}
+
+        from download_cdot_crash_data import process_year
+
+        mock_session = MagicMock()
+        year, success, error = process_year(
+            mock_session, '2024', year_info, manifest, tmp_path, 'douglas', force=False
+        )
+
+        # It tried to download (file doesn't exist, so it didn't skip)
+        assert success is False  # download fails due to mock
+
+    def test_preliminary_year_always_downloads(self, tmp_path):
+        """Preliminary years should always attempt download even if file exists."""
+        existing = tmp_path / '2025 douglas.csv'
+        pd.DataFrame({'CUID': [1], 'County': ['DOUGLAS']}).to_csv(existing, index=False)
+
+        manifest = {
+            'jurisdiction_filters': {
+                'douglas': {'county': 'DOUGLAS', 'display_name': 'Douglas County', 'fips': '08035'}
+            },
+            'files': {'2025': {'docid': 54973381, 'status': 'preliminary'}}
+        }
+        year_info = {'docid': 54973381, 'status': 'preliminary'}
+
+        from download_cdot_crash_data import process_year
+
+        mock_session = MagicMock()
+        year, success, error = process_year(
+            mock_session, '2025', year_info, manifest, tmp_path, 'douglas', force=False
+        )
+
+        # It tried to download (preliminary status, not skipped)
+        assert success is False  # download fails due to mock
+
+
+class TestCuidColumn:
+    """Verify the CUID column constant matches actual data."""
+
+    def test_cuid_column_name(self):
+        assert CUID_COLUMN == 'CUID'
+
+    def test_cuid_in_actual_data(self):
+        """CUID column exists in existing data files."""
+        data_dir = PROJECT_ROOT / 'data' / 'CDOT'
+        for csv_file in data_dir.glob('20?? *.csv'):
+            df = pd.read_csv(csv_file, nrows=1)
+            # Handle BOM in column names
+            cols = [c.strip('\ufeff').strip() for c in df.columns]
+            assert 'CUID' in cols, f"CUID missing from {csv_file.name}: {cols[:5]}"
 
 
 # ===========================================================================

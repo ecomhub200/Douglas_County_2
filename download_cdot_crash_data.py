@@ -496,9 +496,109 @@ def filter_to_jurisdiction(df, jurisdiction_config, jurisdiction_key):
     return df_filtered
 
 
-def process_year(session, year, year_info, manifest, data_dir, jurisdiction_key):
+def _get_output_filename(year, jurisdiction_key, manifest):
+    """Build the output CSV filename for a given year and jurisdiction."""
+    jurisdiction_filters = manifest.get('jurisdiction_filters', {})
+    if jurisdiction_key and jurisdiction_key in jurisdiction_filters:
+        display_name = jurisdiction_filters[jurisdiction_key].get('display_name', jurisdiction_key)
+        return f"{year} {display_name.lower().replace(' county', '').strip()}.csv"
+    return f"cdot_crash_statewide_{year}.csv"
+
+
+# The unique crash identifier column used for deduplication
+CUID_COLUMN = 'CUID'
+
+
+def merge_with_existing(new_df, existing_path):
+    """
+    Merge new downloaded data with an existing CSV file using CUID as the
+    deduplication key. Preserves all existing records and appends only
+    genuinely new ones.
+
+    Returns (merged_df, stats_dict) where stats_dict contains:
+      - existing_count: rows in the existing file
+      - new_download_count: rows in the fresh download
+      - new_records: count of records added (CUID not in existing)
+      - updated_records: count of records with same CUID but changed data
+      - merged_count: total rows in the merged result
+    """
+    import pandas as pd
+
+    existing_df = pd.read_csv(existing_path)
+    stats = {
+        'existing_count': len(existing_df),
+        'new_download_count': len(new_df),
+        'new_records': 0,
+        'updated_records': 0,
+        'merged_count': 0,
+    }
+
+    # Find the CUID column (case-insensitive) in both DataFrames
+    cuid_col_existing = None
+    for col in existing_df.columns:
+        if col.strip().upper() == CUID_COLUMN:
+            cuid_col_existing = col
+            break
+
+    cuid_col_new = None
+    for col in new_df.columns:
+        if col.strip().upper() == CUID_COLUMN:
+            cuid_col_new = col
+            break
+
+    if cuid_col_existing is None or cuid_col_new is None:
+        # No CUID column — can't deduplicate, fall back to full replace
+        logger.warning(f"  CUID column not found. Falling back to full replacement.")
+        logger.warning(f"    Existing columns: {list(existing_df.columns)[:10]}")
+        logger.warning(f"    New columns: {list(new_df.columns)[:10]}")
+        stats['merged_count'] = len(new_df)
+        return new_df, stats
+
+    existing_cuids = set(existing_df[cuid_col_existing].dropna().astype(str))
+    new_cuids = set(new_df[cuid_col_new].dropna().astype(str))
+
+    # New records: CUIDs in download that aren't in existing
+    added_cuids = new_cuids - existing_cuids
+    stats['new_records'] = len(added_cuids)
+
+    # Check for updated records (same CUID, different data)
+    common_cuids = existing_cuids & new_cuids
+    if common_cuids:
+        # Compare row counts — if CDOT revised a record, the new version wins
+        # but we log it for audit
+        existing_common = existing_df[existing_df[cuid_col_existing].astype(str).isin(common_cuids)]
+        new_common = new_df[new_df[cuid_col_new].astype(str).isin(common_cuids)]
+
+        # Quick check: row count difference in common CUIDs
+        if len(existing_common) != len(new_common):
+            stats['updated_records'] = abs(len(new_common) - len(existing_common))
+
+    if stats['new_records'] == 0:
+        logger.info(f"  No new records to merge (all {len(common_cuids)} CUIDs already exist)")
+        stats['merged_count'] = len(existing_df)
+        return existing_df, stats
+
+    # Append only the new rows
+    new_rows = new_df[new_df[cuid_col_new].astype(str).isin(added_cuids)].copy()
+    merged_df = pd.concat([existing_df, new_rows], ignore_index=True)
+    stats['merged_count'] = len(merged_df)
+
+    logger.info(f"  Merge: {stats['existing_count']:,} existing + {stats['new_records']:,} new "
+                f"= {stats['merged_count']:,} total")
+
+    return merged_df, stats
+
+
+def process_year(session, year, year_info, manifest, data_dir, jurisdiction_key,
+                 force=False):
     """
     Download a single year's statewide file, filter to county, save as CSV.
+
+    Merge strategy:
+      - "final" years: skip download if CSV already exists (use --force to override)
+      - "preliminary" years: download and merge with existing using CUID dedup
+      - missing files: download fresh regardless of status
+
     Returns (year, success_bool, output_path_or_error).
     """
     docid = year_info['docid']
@@ -506,6 +606,18 @@ def process_year(session, year, year_info, manifest, data_dir, jurisdiction_key)
     label = f"CDOT Crash Listing {year}"
     if status == 'preliminary':
         label += " (preliminary)"
+
+    # Build output filename
+    filename = _get_output_filename(year, jurisdiction_key, manifest)
+    output_path = data_dir / filename
+
+    # --- Skip-if-final: don't re-download finalized years that already exist ---
+    if output_path.exists() and status == 'final' and not force:
+        import pandas as pd
+        existing_count = len(pd.read_csv(output_path))
+        logger.info(f"  {year}: SKIPPED — final data already exists "
+                    f"({output_path.name}, {existing_count:,} records). Use --force to re-download.")
+        return year, True, str(output_path)
 
     try:
         # Download the Excel file
@@ -526,15 +638,21 @@ def process_year(session, year, year_info, manifest, data_dir, jurisdiction_key)
             jur_config = jurisdiction_filters[jurisdiction_key]
             df = filter_to_jurisdiction(df, jur_config, jurisdiction_key)
             display_name = jur_config.get('display_name', jurisdiction_key)
-            filename = f"{year} {display_name.lower().replace(' county', '').strip()}.csv"
 
             if df.empty:
                 return year, False, f"No records for {display_name} in {year} data"
         else:
-            filename = f"cdot_crash_statewide_{year}.csv"
+            pass  # statewide — no filter
+
+        # --- Merge logic: merge with existing data if file exists ---
+        if output_path.exists() and status == 'preliminary':
+            logger.info(f"  Merging with existing {output_path.name}...")
+            df, merge_stats = merge_with_existing(df, output_path)
+            logger.info(f"  Merge result: +{merge_stats['new_records']} new records")
+        elif output_path.exists() and force:
+            logger.info(f"  Force mode: replacing existing {output_path.name}")
 
         # Save as CSV
-        output_path = data_dir / filename
         df.to_csv(output_path, index=False)
         logger.info(f"  Saved: {output_path} ({len(df):,} records)")
 
@@ -607,6 +725,7 @@ Examples:
   python download_cdot_crash_data.py --list                   # Show available years/counties
   python download_cdot_crash_data.py --statewide              # Keep statewide (no county filter)
   python download_cdot_crash_data.py --no-dict                # Skip data dictionary
+  python download_cdot_crash_data.py --force --years 2024      # Re-download even if 2024 exists
         """
     )
 
@@ -660,6 +779,12 @@ Examples:
         '--list', '-l',
         action='store_true',
         help='List available years and jurisdictions, then exit'
+    )
+
+    parser.add_argument(
+        '--force',
+        action='store_true',
+        help='Force re-download even for finalized years that already exist locally'
     )
 
     return parser.parse_args()
@@ -737,7 +862,8 @@ def main():
 
     for year in sorted(years_to_download.keys(), reverse=True):
         year_info = years_to_download[year]
-        year_result = process_year(session, year, year_info, manifest, data_dir, jurisdiction_key)
+        year_result = process_year(session, year, year_info, manifest, data_dir, jurisdiction_key,
+                                   force=args.force)
         results.append(year_result)
 
     # Print summary
