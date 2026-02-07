@@ -25,9 +25,10 @@
 17. [Auto-Trigger Workflow (GitHub Actions)](#17-auto-trigger-workflow-github-actions)
 18. [Step-by-Step: Adding a New State](#18-step-by-step-adding-a-new-state)
 19. [Colorado (CDOT) Complete Example](#19-colorado-cdot-complete-example)
-20. [Appendix A: Standardized Output Columns](#appendix-a-standardized-output-columns)
-21. [Appendix B: VDOT Value Reference Tables](#appendix-b-vdot-value-reference-tables)
-22. [Appendix C: Command-Line Reference](#appendix-c-command-line-reference)
+20. [CDOT Auto-Downloader & Merge Strategy](#20-cdot-auto-downloader--merge-strategy)
+21. [Appendix A: Standardized Output Columns](#appendix-a-standardized-output-columns)
+22. [Appendix B: VDOT Value Reference Tables](#appendix-b-vdot-value-reference-tables)
+23. [Appendix C: Command-Line Reference](#appendix-c-command-line-reference)
 
 ---
 
@@ -74,9 +75,13 @@ project_root/
 |
 +-- .github/workflows/
 |   +-- process-cdot-data.yml         # Auto-trigger pipeline on new CSV push
+|   +-- download-cdot-crash-data.yml  # CDOT auto-downloader (monthly + manual)
 |   +-- download-data.yml             # Scheduled Virginia data downloads
 |   +-- validate-data.yml             # Scheduled data validation
 |   +-- send-notifications.yml        # Email notifications
+|
++-- download_cdot_crash_data.py       # CDOT OnBase downloader + county filter + merge
++-- requirements.txt                  # Python deps (requests, pandas, openpyxl)
 |
 +-- scripts/
 |   +-- process_crash_data.py         # Main pipeline orchestrator
@@ -93,9 +98,14 @@ project_root/
 |   |   +-- config.json               # Virginia config (reference baseline)
 |   +-- state_adapter.js              # Browser-side normalization (JS version)
 |
++-- tests/
+|   +-- test_cdot_downloader.py       # 152 tests for downloader + merge logic
+|
 +-- data/
 |   +-- {DOT_NAME}/                   # State data folder (e.g., CDOT, TxDOT)
+|   |   +-- source_manifest.json      # CDOT OnBase doc ID registry (64 counties)
 |   |   +-- *.csv                     # Raw input + processed output
+|   |   +-- {year} {county}.csv       # Per-year county-filtered crash data
 |   |   +-- {jurisdiction}_standardized.csv  # Stage 1 output
 |   |   +-- {jurisdiction}_all_roads.csv     # Stage 4 output
 |   |   +-- {jurisdiction}_county_roads.csv  # Stage 4 output
@@ -1090,6 +1100,311 @@ data/CDOT/
 
 ---
 
+## 20. CDOT Auto-Downloader & Merge Strategy
+
+### Overview
+
+The auto-downloader fetches statewide crash data from CDOT's Hyland OnBase document portal, filters it to a specific county, and saves it as a CSV that feeds into the pipeline.
+
+```
+CDOT Hyland OnBase (statewide Excel files)
+        |
+        v
++--------------------+     +--------------------+     +--------------------+
+|  DOWNLOAD          |     |  FILTER            |     |  MERGE             |
+|  Multi-strategy    |---->|  County filter     |---->|  CUID dedup        |
+|  (requests/PW)     |     |  (DOUGLAS, etc.)   |     |  (append-only)     |
++--------------------+     +--------------------+     +--------------------+
+        |                                                       |
+        v                                                       v
+  Statewide .xlsx                                   data/CDOT/{year} {county}.csv
+  (discarded after                                          |
+   filtering)                                               v
+                                                  Pipeline auto-triggers
+                                                  (process-cdot-data.yml)
+```
+
+### Data Source: Hyland OnBase
+
+CDOT publishes statewide crash data as Excel files on their Hyland OnBase document management system:
+
+- **URL:** `https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx`
+- **File format:** `.xlsx` (MS Excel), one file per year
+- **Scope:** Entire state of Colorado (~150,000+ crashes/year)
+- **Update cadence:** Annual (final), with preliminary data for current year
+- **Access:** Public, no authentication required
+
+Each year's file has a unique **doc ID** that CDOT assigns when uploading. These IDs are unpredictable and must be manually discovered from the OnBase portal.
+
+### Source Manifest
+
+All doc IDs are stored in `data/CDOT/source_manifest.json` — a config-driven registry that humans update when new data becomes available.
+
+```json
+{
+  "files": {
+    "2025": {"docid": 54973381, "status": "preliminary", "note": "Subject to revision"},
+    "2024": {"docid": 35111742, "status": "final"},
+    "2023": {"docid": 24805487, "status": "final"},
+    "2022": {"docid": 17470642, "status": "final"},
+    "2021": {"docid": 13118621, "status": "final"}
+  },
+  "jurisdiction_filters": {
+    "douglas":  {"county": "DOUGLAS",  "fips": "08035", "display_name": "Douglas County"},
+    "elpaso":   {"county": "EL PASO",  "fips": "08041", "display_name": "El Paso County"},
+    "...": "all 64 Colorado counties"
+  }
+}
+```
+
+**Key fields:**
+- `status`: `"final"` (won't change) or `"preliminary"` (CDOT may add/revise records)
+- `docid`: OnBase document ID — the only way to fetch a specific year's file
+- `fips`: 5-digit FIPS code (state 08 + 3-digit county)
+
+**When to update:** When CDOT publishes a new year or changes a doc ID (usually once a year).
+
+### Download Strategy (4-Level Cascade)
+
+OnBase is an enterprise document portal with unpredictable response behavior. The downloader tries 4 strategies in order:
+
+| Strategy | Method | When It Works |
+|----------|--------|---------------|
+| **1. Direct Request** | `requests.get(docpop.aspx?docid=X)` with browser headers | OnBase returns the Excel file directly |
+| **2. HTML Parse** | Parse HTML response for download links (`PdfPop.aspx`, `GetDoc.aspx`) | OnBase returns a viewer page with embedded download link |
+| **3. ActiveX Mode** | Retry with `clienttype=activex` parameter | OnBase serves different content to programmatic clients |
+| **4. Playwright** | Headless Chromium renders the page, clicks download | JavaScript-rendered pages that `requests` can't handle |
+
+Each strategy validates the response using:
+- **Magic byte detection:** XLSX starts with `PK` (ZIP), XLS starts with `\xd0\xcf` (OLE2)
+- **Content-Type/Disposition headers** as fallback
+- **HTML/XML rejection** to prevent saving error pages as data
+
+### Merge Strategy: Protecting Validated Data
+
+**Problem:** You have 2021-2025 data that's already been validated, corrected, and fed through the pipeline. A naive re-download would overwrite everything.
+
+**Solution:** The downloader uses a two-tier merge strategy based on the `status` field in the manifest:
+
+```
+                         Does CSV exist locally?
+                        /                        \
+                      NO                          YES
+                      |                            |
+                 Download fresh              Check status
+                      |                     /            \
+                      v                  "final"      "preliminary"
+                 Save new CSV              |               |
+                                       SKIP            MERGE
+                                    (don't touch    (CUID dedup,
+                                     validated      append only)
+                                     data)
+```
+
+#### Tier 1: Skip Finalized Years
+
+Files marked `"status": "final"` (2021-2024) that already exist locally are **not re-downloaded**. The validated data is preserved exactly as-is.
+
+```
+$ python download_cdot_crash_data.py
+  2024: SKIPPED — final data already exists (2024 douglas.csv, 5,497 records)
+  2023: SKIPPED — final data already exists (2023 douglas county.csv, 5,382 records)
+  ...
+```
+
+Override with `--force` if you specifically need to re-download a finalized year.
+
+#### Tier 2: CUID-Based Merge for Preliminary Years
+
+Files marked `"status": "preliminary"` (2025) are downloaded fresh and **merged** with existing data using `CUID` as the deduplication key.
+
+**CUID** (Crash Unique Identifier) is the first column in every CDOT crash file. Each crash report has a unique CUID that never changes.
+
+```
+Existing 2025 file:        New download:
+  CUID  County  Date         CUID  County  Date
+  1001  DOUGLAS 1/5/25       1001  DOUGLAS 1/5/25    ← already exists, SKIP
+  1002  DOUGLAS 1/8/25       1002  DOUGLAS 1/8/25    ← already exists, SKIP
+  1003  DOUGLAS 2/1/25       1003  DOUGLAS 2/1/25    ← already exists, SKIP
+                              1004  DOUGLAS 3/15/25   ← NEW, APPEND
+                              1005  DOUGLAS 3/20/25   ← NEW, APPEND
+
+Result: 5 records (3 original + 2 new)
+```
+
+**Key guarantees:**
+- Existing records are **never modified or overwritten**
+- Only genuinely new CUIDs are appended
+- If CDOT revises a record (same CUID, different data), the **original version is kept** — the change is logged but not applied
+- Stats are logged: `Merge: 1,065 existing + 47 new = 1,112 total`
+
+#### Merge Decision Matrix
+
+| Year Status | File Exists? | `--force`? | Action |
+|-------------|-------------|-----------|--------|
+| `final` | Yes | No | **SKIP** — validated data untouched |
+| `final` | Yes | Yes | Re-download and **REPLACE** |
+| `final` | No | — | Download fresh |
+| `preliminary` | Yes | No | Download + **MERGE** (CUID dedup) |
+| `preliminary` | Yes | Yes | Re-download and **REPLACE** |
+| `preliminary` | No | — | Download fresh |
+
+#### What if CUID Is Missing?
+
+If the CUID column isn't found in either the existing or new data (unlikely for CDOT, but possible for other states), the merge **falls back to full replacement** and logs a warning. This prevents silent data corruption.
+
+### County Filtering
+
+Each statewide Excel contains all ~150,000+ crashes across Colorado. The downloader filters to a single county:
+
+```python
+# Filter uses the County column (case-insensitive, whitespace-trimmed)
+mask = df['County'].str.strip().str.upper() == 'DOUGLAS'
+```
+
+The `jurisdiction_filters` section in the manifest maps all 64 Colorado counties. This means the same downloader works for any county — just change `--jurisdiction`:
+
+```bash
+python download_cdot_crash_data.py --jurisdiction elpaso    # El Paso County
+python download_cdot_crash_data.py --jurisdiction denver    # Denver County
+python download_cdot_crash_data.py --statewide              # No filter (all CO)
+```
+
+### GitHub Actions Workflow
+
+**File:** `.github/workflows/download-cdot-crash-data.yml`
+
+#### Automatic (Monthly)
+
+Runs on the 1st of every month at 6:00 AM UTC. Uses `--latest` to check only the most recent year for new data.
+
+```yaml
+schedule:
+  - cron: '0 6 1 * *'
+```
+
+**Why monthly?** CDOT publishes annual data. Monthly checks catch preliminary-year updates without excessive runs.
+
+#### Manual Dispatch
+
+Go to **Actions** > **Download CDOT Crash Data** > **Run workflow**:
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| years | _(empty = latest)_ | Comma-separated years (e.g., `2024,2025`) |
+| jurisdiction | `douglas` | Any of 64 Colorado counties |
+| latest_only | `true` | Download only the most recent year |
+| skip_dictionaries | `false` | Skip data dictionary download |
+| force_download | `false` | Force re-download even for finalized years |
+
+#### Workflow Steps
+
+```
+1. Checkout repo
+2. Install Python + deps (requests, pandas, openpyxl, playwright)
+3. Install Playwright chromium browser (for fallback strategy)
+4. Build CLI arguments from workflow inputs
+5. Run download_cdot_crash_data.py
+6. Check for changed/new files via git diff
+7. Commit + push if data changed (with retry logic)
+```
+
+#### Integration with Pipeline
+
+The download workflow commits new/updated CSVs to `data/CDOT/`. This triggers `process-cdot-data.yml` which runs the full pipeline (Convert → Validate → Geocode → Split). The two workflows chain automatically:
+
+```
+download-cdot-crash-data.yml          process-cdot-data.yml
+  (monthly cron or manual)              (auto-triggers on push)
+         |                                       |
+         v                                       v
+  Downloads from OnBase              Detects new CSV in data/CDOT/
+  Filters to county                  Merges all year files
+  Merges with existing               Converts to VDOT format
+  Commits CSV                        Validates, Geocodes, Splits
+         |                           Commits pipeline outputs
+         +--- push triggers -------->|
+```
+
+### How Data Flows Through the System
+
+Here's the complete lifecycle from OnBase to CRASH LENS:
+
+```
+CDOT Hyland OnBase
+    |
+    | download_cdot_crash_data.py
+    | (Strategy 1-4 cascade)
+    v
+Statewide .xlsx (150K+ rows)
+    |
+    | filter_to_jurisdiction()
+    | (County == DOUGLAS)
+    v
+~5,000 Douglas rows
+    |
+    | merge_with_existing()
+    | (CUID dedup, append-only)
+    v
+data/CDOT/2025 douglas.csv ← committed to repo
+    |
+    | process-cdot-data.yml auto-triggers
+    v
+Stage 0: Merge all year CSVs (2021-2025)
+    |
+    v
+Stage 1: Convert (CO raw → VDOT format)
+    |
+    v
+Stage 2: Validate (QA/QC, dedup)
+    |
+    v
+Stage 3: Geocode (fill missing GPS)
+    |
+    v
+Stage 4: Split (all_roads, county_roads, no_interstate)
+    |
+    v
+data/CDOT/douglas_county_roads.csv → crashes.csv
+    |
+    v
+CRASH LENS browser tool loads crashes.csv
+```
+
+### Test Coverage
+
+The downloader has **152 automated tests** (`tests/test_cdot_downloader.py`):
+
+| Test Area | Count | What It Validates |
+|-----------|-------|-------------------|
+| File detection | 15 | Magic bytes, HTML rejection, headers, size thresholds |
+| URL extraction | 10 | Parsing download links from OnBase HTML pages |
+| Excel parsing | 5 | XLSX → DataFrame conversion, corrupt file handling |
+| County filtering | 12 | Case/whitespace handling, multi-word counties, NaN values |
+| Manifest loading | 3 | Valid manifest, missing file, real manifest validation |
+| CLI output | 2 | `--list` command formatting |
+| Filename generation | 9 | County names → filenames, statewide fallback |
+| End-to-end pipeline | 3 | Excel → filter → CSV → read-back roundtrip |
+| Manifest integrity | 13 | All 64 counties, FIPS codes, status values |
+| Playwright fallback | 2 | Availability check, ImportError handling |
+| **CUID merge** | **8** | Append, no-change, all-new, preserve existing, no-CUID fallback |
+| **Merge edge cases** | **6** | BOM, NaN CUIDs, duplicates, column mismatch, 10K perf |
+| **Skip/force logic** | **4** | Final-skip, force-override, missing-downloads, preliminary-always |
+| **Download cascade** | **5** | 4 strategies + all-fail error |
+| **HTTP session** | **7** | Adapters, retries, backoff, headers |
+| **Retry logic** | **8** | Timeout, connection, 429, 4xx non-retry, backoff timing |
+| **Data dictionary** | **3** | Success, failure, missing description |
+| **CLI parsing** | **11** | All flags + combined flags |
+| **main() integration** | **4** | --list, invalid inputs, --latest selection |
+| **Real data validation** | **9** | CUID uniqueness, Douglas-only, date/year match, cross-year overlap |
+| **Constants** | **5** | URLs, retries, magic bytes |
+| CUID actual data | 2 | CUID column exists in real data files |
+| Regression | 1 | `_description` key bug fix |
+
+Run with: `python -m pytest tests/test_cdot_downloader.py -v`
+
+---
+
 ## Appendix A: Standardized Output Columns
 
 ### Core VDOT-Compatible Columns (51)
@@ -1197,6 +1512,54 @@ NonVDOT primary, NonVDOT secondary
 
 ## Appendix C: Command-Line Reference
 
+### CDOT Auto-Downloader
+
+```bash
+# Download latest year, default county (Douglas)
+python download_cdot_crash_data.py --latest
+
+# Download all years (2021-2025)
+python download_cdot_crash_data.py
+
+# Download specific years
+python download_cdot_crash_data.py --years 2024 2025
+
+# Download for a different county
+python download_cdot_crash_data.py --latest -j elpaso
+
+# Force re-download finalized years (overrides skip)
+python download_cdot_crash_data.py --force --years 2024
+
+# Download statewide (no county filter)
+python download_cdot_crash_data.py --statewide --latest
+
+# List available years, counties, and doc IDs
+python download_cdot_crash_data.py --list
+
+# Skip data dictionary download
+python download_cdot_crash_data.py --latest --no-dict
+
+# Custom manifest and output directory
+python download_cdot_crash_data.py -m /path/to/manifest.json -d /tmp/output
+
+# Quick smoke test (list mode, no network required)
+python download_cdot_crash_data.py --list
+```
+
+#### All Flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--years` | `-y` | all years | Specific years to download |
+| `--latest` | — | off | Download only the most recent year |
+| `--jurisdiction` | `-j` | `douglas` | County to filter to (any of 64 CO counties) |
+| `--statewide` | — | off | Save statewide data without county filtering |
+| `--force` | — | off | Force re-download even for finalized years |
+| `--data-dir` | `-d` | `data/CDOT` | Output directory |
+| `--manifest` | `-m` | `data/CDOT/source_manifest.json` | Path to manifest JSON |
+| `--no-dict` | — | off | Skip data dictionary download |
+| `--list` | `-l` | off | List available years/counties and exit |
+
 ### Full Pipeline
 
 ```bash
@@ -1226,6 +1589,19 @@ curl -X POST \
   -F "jurisdiction=douglas" \
   -F "file=@data/CDOT/Douglas_County.csv" \
   http://localhost:5050/api/pipeline/run
+```
+
+### Run Downloader Tests
+
+```bash
+# Run all 152 tests
+python -m pytest tests/test_cdot_downloader.py -v
+
+# Run only merge tests
+python -m pytest tests/test_cdot_downloader.py -v -k "merge"
+
+# Run only real data validation
+python -m pytest tests/test_cdot_downloader.py -v -k "RealData"
 ```
 
 ### Quick Verification Script
