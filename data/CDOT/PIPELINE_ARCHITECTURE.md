@@ -21,10 +21,11 @@
 13. [Configuration Files Required](#13-configuration-files-required)
 14. [Output Files Produced](#14-output-files-produced)
 15. [Execution Paths (Browser vs Server)](#15-execution-paths-browser-vs-server)
-16. [Step-by-Step: Adding a New State](#16-step-by-step-adding-a-new-state)
-17. [Appendix A: Raw CDOT Columns](#appendix-a-raw-cdot-columns)
-18. [Appendix B: Standardized Output Columns](#appendix-b-standardized-output-columns)
-19. [Appendix C: Command-Line Reference](#appendix-c-command-line-reference)
+16. [Auto-Trigger Workflow (GitHub Actions)](#16-auto-trigger-workflow-github-actions)
+17. [Step-by-Step: Adding a New State](#17-step-by-step-adding-a-new-state)
+18. [Appendix A: Raw CDOT Columns](#appendix-a-raw-cdot-columns)
+19. [Appendix B: Standardized Output Columns](#appendix-b-standardized-output-columns)
+20. [Appendix C: Command-Line Reference](#appendix-c-command-line-reference)
 
 ---
 
@@ -55,6 +56,12 @@ Raw CSV(s) from State DOT
 
 ```
 project_root/
+|
++-- .github/workflows/
+|   +-- process-cdot-data.yml         # Auto-trigger pipeline on new CSV push
+|   +-- download-data.yml             # Scheduled Virginia data downloads
+|   +-- validate-data.yml             # Scheduled data validation
+|   +-- send-notifications.yml        # Email notifications
 |
 +-- scripts/                          # Python processing scripts
 |   +-- process_crash_data.py         # Main pipeline orchestrator (962 lines)
@@ -737,7 +744,110 @@ Client polls GET /api/pipeline/status
 
 ---
 
-## 16. Step-by-Step: Adding a New State
+## 16. Auto-Trigger Workflow (GitHub Actions)
+
+The pipeline can run automatically when a new CSV is pushed to `data/CDOT/`.
+
+**Workflow file:** `.github/workflows/process-cdot-data.yml`
+
+### How It Triggers
+
+| Trigger | When | Behavior |
+|---------|------|----------|
+| **Push to main** | A `.csv` file is added/changed under `data/CDOT/` | Auto-detects new raw CSVs, merges all raw files, runs full pipeline |
+| **Manual dispatch** | Click "Run workflow" in GitHub Actions UI | Choose jurisdiction, input files, merge mode, geocode, dry-run |
+
+### Push Trigger: What Counts as "New Data"
+
+The workflow watches for CSV changes in `data/CDOT/` but **ignores pipeline output files**:
+
+```yaml
+paths:
+  - 'data/CDOT/**/*.csv'
+  - 'data/CDOT/*.csv'
+  # Ignored (pipeline outputs):
+  - '!data/CDOT/*_standardized.csv'
+  - '!data/CDOT/*_all_roads.csv'
+  - '!data/CDOT/*_county_roads.csv'
+  - '!data/CDOT/*_no_interstate.csv'
+  - '!data/CDOT/crashes.csv'
+```
+
+So dropping `2024 douglas.csv` into `data/CDOT/` and pushing to main will trigger it. But the pipeline's own output commits will **not** re-trigger (no infinite loop).
+
+### Adding a New Year of CDOT Data
+
+**Step-by-step:**
+
+1. Get the new CSV from CDOT (e.g., `2024 douglas.csv`)
+2. Drop it into `data/CDOT/`
+3. Commit and push to main:
+   ```bash
+   git add "data/CDOT/2024 douglas.csv"
+   git commit -m "Add 2024 Douglas County crash data"
+   git push origin main
+   ```
+4. The workflow auto-triggers and:
+   - Detects the new CSV
+   - Collects ALL raw CSVs in `data/CDOT/` (existing years + new year)
+   - Merges them into one dataset
+   - Runs Convert -> Validate -> Geocode -> Split
+   - Commits the updated output files back to the repo
+5. Check results in the Actions tab or in `data/CDOT/.validation/pipeline_report.json`
+
+### Manual Trigger Options
+
+Go to **Actions** > **Process CDOT Crash Data** > **Run workflow**:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| Jurisdiction | `douglas` | Which county to process |
+| Input files | _(empty = all raw CSVs)_ | Glob pattern, e.g., `data/CDOT/2024*.csv` |
+| Merge | `true` | Combine all matching files before pipeline |
+| Skip geocode | `false` | Set `true` for faster processing |
+| Dry run | `false` | Preview without writing output |
+
+### What the Workflow Does
+
+```
+1. Checkout repo
+2. Install Python + dependencies (pandas, requests)
+3. Detect input files:
+   - Push trigger: diff HEAD~1 for changed CSVs, filter out outputs
+   - Manual trigger: use provided glob or all raw CSVs
+4. Run process_crash_data.py with flags:
+   -i <files> -s colorado -j <jurisdiction> -f -v [--merge] [--skip-geocode] [--dry-run]
+5. Display pipeline report (input/output rows, GPS coverage, duplicates)
+6. Verify output files exist with correct row counts
+7. Commit output files only (not raw input CSVs)
+8. Push with retry logic (4 attempts, exponential backoff)
+```
+
+### Output Commit
+
+The workflow commits only pipeline output files:
+- `data/CDOT/{jurisdiction}_standardized.csv`
+- `data/CDOT/{jurisdiction}_all_roads.csv`
+- `data/CDOT/{jurisdiction}_county_roads.csv`
+- `data/CDOT/{jurisdiction}_no_interstate.csv`
+- `data/CDOT/crashes.csv`
+- `data/CDOT/.validation/pipeline_report.json`
+
+Commit message format:
+```
+Auto-process: CDOT douglas pipeline - 2026-02-07
+
+Pipeline: 8646 input -> 8592 output | GPS: 95.7%
+Trigger: push
+```
+
+### Preventing Infinite Loops
+
+The workflow only triggers on raw CSV changes and explicitly excludes output filenames in the `paths` filter. The commit step only stages output files. Since output filenames (`*_standardized.csv`, `*_all_roads.csv`, etc.) are in the ignore list, the output commit does NOT re-trigger the workflow.
+
+---
+
+## 17. Step-by-Step: Adding a New State
 
 ### What You Need
 

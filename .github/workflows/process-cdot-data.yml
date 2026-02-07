@@ -1,0 +1,341 @@
+name: Process CDOT Crash Data
+
+# Triggers:
+#   1. Auto-trigger when a new CSV is pushed to data/CDOT/
+#   2. Manual trigger with configurable options
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/CDOT/**/*.csv'
+      - 'data/CDOT/*.csv'
+      # Ignore pipeline output files (only trigger on raw data)
+      - '!data/CDOT/*_standardized.csv'
+      - '!data/CDOT/*_all_roads.csv'
+      - '!data/CDOT/*_county_roads.csv'
+      - '!data/CDOT/*_no_interstate.csv'
+      - '!data/CDOT/crashes.csv'
+
+  workflow_dispatch:
+    inputs:
+      jurisdiction:
+        description: 'Jurisdiction to process'
+        required: false
+        default: 'douglas'
+        type: choice
+        options:
+          - douglas
+          - arapahoe
+          - jefferson
+          - elpaso
+          - denver
+          - adams
+      input_files:
+        description: 'Input CSV file(s) glob pattern (e.g., "data/CDOT/2024*.csv")'
+        required: false
+        default: ''
+        type: string
+      merge:
+        description: 'Merge all matching input files before processing'
+        required: false
+        type: boolean
+        default: true
+      skip_geocode:
+        description: 'Skip geocoding stage (faster)'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Dry run (preview only, no output files)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  process-cdot-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Detect new/changed CSV files
+        id: detect
+        run: |
+          set -e
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # --- Manual trigger ---
+            JURISDICTION="${{ github.event.inputs.jurisdiction }}"
+            echo "jurisdiction=$JURISDICTION" >> $GITHUB_OUTPUT
+
+            INPUT_PATTERN="${{ github.event.inputs.input_files }}"
+            if [ -z "$INPUT_PATTERN" ]; then
+              # Default: all raw CSVs in data/CDOT/ that aren't pipeline outputs
+              INPUT_FILES=$(find data/CDOT/ -maxdepth 1 -name '*.csv' \
+                ! -name '*_standardized.csv' \
+                ! -name '*_all_roads.csv' \
+                ! -name '*_county_roads.csv' \
+                ! -name '*_no_interstate.csv' \
+                ! -name 'crashes.csv' \
+                | sort | tr '\n' ' ')
+            else
+              INPUT_FILES=$(ls $INPUT_PATTERN 2>/dev/null | tr '\n' ' ')
+            fi
+
+            MERGE="${{ github.event.inputs.merge }}"
+            echo "merge=$MERGE" >> $GITHUB_OUTPUT
+            echo "skip_geocode=${{ github.event.inputs.skip_geocode }}" >> $GITHUB_OUTPUT
+            echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
+
+          else
+            # --- Push trigger: detect which CSVs changed ---
+            JURISDICTION="douglas"  # Default; can be extended with detection logic
+
+            # Get changed CSV files from the commit
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD -- 'data/CDOT/*.csv' 2>/dev/null || echo "")
+
+            # Filter out pipeline output files
+            INPUT_FILES=""
+            for f in $CHANGED_FILES; do
+              case "$f" in
+                *_standardized.csv|*_all_roads.csv|*_county_roads.csv|*_no_interstate.csv|*/crashes.csv)
+                  echo "Skipping pipeline output: $f"
+                  ;;
+                *)
+                  INPUT_FILES="$INPUT_FILES $f"
+                  ;;
+              esac
+            done
+
+            # If no raw CSV changes detected, collect all raw CSVs for merge
+            if [ -z "$(echo "$INPUT_FILES" | tr -d ' ')" ]; then
+              echo "No new raw CSVs in this push. Checking for all raw CSVs..."
+              INPUT_FILES=$(find data/CDOT/ -maxdepth 1 -name '*.csv' \
+                ! -name '*_standardized.csv' \
+                ! -name '*_all_roads.csv' \
+                ! -name '*_county_roads.csv' \
+                ! -name '*_no_interstate.csv' \
+                ! -name 'crashes.csv' \
+                | sort | tr '\n' ' ')
+            fi
+
+            echo "jurisdiction=$JURISDICTION" >> $GITHUB_OUTPUT
+            echo "merge=true" >> $GITHUB_OUTPUT
+            echo "skip_geocode=false" >> $GITHUB_OUTPUT
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Trim whitespace
+          INPUT_FILES=$(echo "$INPUT_FILES" | xargs)
+
+          if [ -z "$INPUT_FILES" ]; then
+            echo "No input CSV files found. Exiting."
+            echo "has_files=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_files=true" >> $GITHUB_OUTPUT
+            echo "input_files=$INPUT_FILES" >> $GITHUB_OUTPUT
+            FILE_COUNT=$(echo "$INPUT_FILES" | wc -w)
+            echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+
+            echo "=========================================="
+            echo "Detected $FILE_COUNT input file(s):"
+            for f in $INPUT_FILES; do
+              SIZE=$(wc -c < "$f" 2>/dev/null || echo "0")
+              ROWS=$(wc -l < "$f" 2>/dev/null || echo "0")
+              echo "  $f ($ROWS rows, $(numfmt --to=iec $SIZE 2>/dev/null || echo "${SIZE}B"))"
+            done
+            echo "=========================================="
+          fi
+
+      - name: Run pipeline
+        if: steps.detect.outputs.has_files == 'true'
+        id: pipeline
+        run: |
+          JURISDICTION="${{ steps.detect.outputs.jurisdiction }}"
+          INPUT_FILES="${{ steps.detect.outputs.input_files }}"
+          MERGE="${{ steps.detect.outputs.merge }}"
+          SKIP_GEOCODE="${{ steps.detect.outputs.skip_geocode }}"
+          DRY_RUN="${{ steps.detect.outputs.dry_run }}"
+
+          echo "=========================================="
+          echo "CDOT Pipeline - Processing $JURISDICTION"
+          echo "Started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+          # Build command
+          CMD="python scripts/process_crash_data.py"
+          CMD="$CMD -i $INPUT_FILES"
+          CMD="$CMD -s colorado"
+          CMD="$CMD -j $JURISDICTION"
+          CMD="$CMD -f -v"
+
+          if [ "$MERGE" = "true" ]; then
+            CMD="$CMD --merge"
+            echo "Mode: Merge all files before processing"
+          fi
+
+          if [ "$SKIP_GEOCODE" = "true" ]; then
+            CMD="$CMD --skip-geocode"
+            echo "Geocoding: Skipped"
+          fi
+
+          if [ "$DRY_RUN" = "true" ]; then
+            CMD="$CMD --dry-run"
+            echo "Mode: Dry run (no output)"
+          fi
+
+          echo "Running: $CMD"
+          echo ""
+          eval $CMD
+
+          echo "=========================================="
+          echo "Pipeline complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+      - name: Display pipeline report
+        if: steps.detect.outputs.has_files == 'true'
+        run: |
+          REPORT="data/CDOT/.validation/pipeline_report.json"
+          if [ -f "$REPORT" ]; then
+            echo "=========================================="
+            echo "Pipeline Report"
+            echo "=========================================="
+            cat "$REPORT" | python -m json.tool
+
+            # Extract key metrics for summary
+            INPUT=$(python -c "import json; print(json.load(open('$REPORT'))['input_rows'])")
+            OUTPUT=$(python -c "import json; print(json.load(open('$REPORT'))['output_rows'])")
+            DUPES=$(python -c "import json; print(json.load(open('$REPORT'))['duplicates_removed'])")
+            GPS=$(python -c "import json; print(json.load(open('$REPORT'))['gps_coverage'])")
+
+            echo ""
+            echo "Summary: $INPUT input -> $OUTPUT output | $DUPES duplicates removed | GPS: $GPS"
+          else
+            echo "No pipeline report found"
+          fi
+
+      - name: Verify output files
+        if: steps.detect.outputs.has_files == 'true' && steps.detect.outputs.dry_run != 'true'
+        run: |
+          JURISDICTION="${{ steps.detect.outputs.jurisdiction }}"
+          echo "=========================================="
+          echo "Output Files"
+          echo "=========================================="
+
+          for suffix in standardized all_roads county_roads no_interstate; do
+            FILE="data/CDOT/${JURISDICTION}_${suffix}.csv"
+            if [ -f "$FILE" ]; then
+              ROWS=$(wc -l < "$FILE")
+              SIZE=$(ls -lh "$FILE" | awk '{print $5}')
+              echo "  $FILE: $((ROWS - 1)) rows ($SIZE)"
+            else
+              echo "  $FILE: MISSING"
+            fi
+          done
+
+          FALLBACK="data/CDOT/crashes.csv"
+          if [ -f "$FALLBACK" ]; then
+            ROWS=$(wc -l < "$FALLBACK")
+            echo "  $FALLBACK: $((ROWS - 1)) rows (fallback)"
+          fi
+
+      - name: Generate workflow summary
+        if: steps.detect.outputs.has_files == 'true'
+        run: |
+          JURISDICTION="${{ steps.detect.outputs.jurisdiction }}"
+          REPORT="data/CDOT/.validation/pipeline_report.json"
+
+          echo "## CDOT Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Jurisdiction | $JURISDICTION |" >> $GITHUB_STEP_SUMMARY
+          echo "| Input Files | ${{ steps.detect.outputs.file_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Merge Mode | ${{ steps.detect.outputs.merge }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "$REPORT" ]; then
+            echo "### Pipeline Report" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Input Rows | $(python -c "import json; print(json.load(open('$REPORT'))['input_rows'])") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Output Rows | $(python -c "import json; print(json.load(open('$REPORT'))['output_rows'])") |" >> $GITHUB_STEP_SUMMARY
+            echo "| Duplicates Removed | $(python -c "import json; print(json.load(open('$REPORT'))['duplicates_removed'])") |" >> $GITHUB_STEP_SUMMARY
+            echo "| GPS Coverage | $(python -c "import json; print(json.load(open('$REPORT'))['gps_coverage'])") |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Commit and push processed data
+        if: steps.detect.outputs.has_files == 'true' && steps.detect.outputs.dry_run != 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          JURISDICTION="${{ steps.detect.outputs.jurisdiction }}"
+
+          # Stage only pipeline output files (not the raw input CSVs)
+          git add \
+            "data/CDOT/${JURISDICTION}_standardized.csv" \
+            "data/CDOT/${JURISDICTION}_all_roads.csv" \
+            "data/CDOT/${JURISDICTION}_county_roads.csv" \
+            "data/CDOT/${JURISDICTION}_no_interstate.csv" \
+            "data/CDOT/crashes.csv" \
+            "data/CDOT/.validation/" \
+            2>/dev/null || true
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          # Build commit message with report data
+          REPORT="data/CDOT/.validation/pipeline_report.json"
+          if [ -f "$REPORT" ]; then
+            INPUT=$(python -c "import json; print(json.load(open('$REPORT'))['input_rows'])")
+            OUTPUT=$(python -c "import json; print(json.load(open('$REPORT'))['output_rows'])")
+            GPS=$(python -c "import json; print(json.load(open('$REPORT'))['gps_coverage'])")
+            COMMIT_MSG="Auto-process: CDOT $JURISDICTION pipeline - $(date +'%Y-%m-%d')
+
+Pipeline: $INPUT input -> $OUTPUT output | GPS: $GPS
+Trigger: ${{ github.event_name }}"
+          else
+            COMMIT_MSG="Auto-process: CDOT $JURISDICTION pipeline - $(date +'%Y-%m-%d')"
+          fi
+
+          git commit -m "$COMMIT_MSG"
+
+          # Push with retry logic
+          MAX_RETRIES=4
+          for i in $(seq 1 $MAX_RETRIES); do
+            if git push; then
+              echo "Push successful"
+              exit 0
+            fi
+            echo "Push failed (attempt $i/$MAX_RETRIES), pulling latest changes..."
+            sleep $((2 ** i))
+            git fetch origin main
+            git rebase origin/main || {
+              git rebase --abort 2>/dev/null || true
+              git pull --no-edit origin main
+            }
+          done
+
+          echo "ERROR: Push failed after $MAX_RETRIES attempts"
+          exit 1
