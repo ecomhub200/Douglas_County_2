@@ -685,53 +685,90 @@ data/CDOT/
 
 ---
 
-## 15. Execution Paths (Browser vs Server)
+## 15. Execution Paths (Browser Upload → Server Save → Pipeline)
 
-### Path A: Browser-Only (JavaScript in index.html)
+Both paths start from the same Upload UI. The browser always processes the file locally for instant analysis, then attempts to save it to the server for persistent storage and the full pipeline.
 
-```
-User uploads CSV in Upload tab
-    |
-    v
-Papa.parse reads CSV in chunks
-    |
-    v
-StateAdapter.detect(headers)  -- auto-detect state
-    |
-    v
-StateAdapter.normalizeRow(row) -- per-row transformation
-    |
-    v
-processRow(normalizedRow) -- build aggregates + sampleRows
-    |
-    v
-Data cached in IndexedDB -> UI loads Dashboard
-```
-
-**Pros:** Fast, no server needed, works offline
-**Cons:** No geocoding, no file output, no split files
-
-### Path B: Server Pipeline (Python)
+### Combined Path: Browser + Server (Recommended)
 
 ```
+User uploads CSV via Upload tab (selects State + Jurisdiction)
+    |
+    v
+Browser reads file (FileReader)
+    |
+    +-------- Immediate: browser-side processing --------+
+    |                                                      |
+    v                                                      |
+Papa.parse in chunks                                       |
+    |                                                      |
+    v                                                      |
+StateAdapter.detect() + normalizeRow()                     |
+    |                                                      |
+    v                                                      |
+processRow() builds aggregates -> Dashboard loads          |
+    |                                                      |
+    +-------- Background: server save + pipeline ---------+
+    |
+    v
 POST /api/pipeline/run (file + state + jurisdiction)
     |
     v
-pipeline_server.py saves temp file
+pipeline_server.py saves raw CSV to data/{DOT}/
+  (e.g., data/CDOT/2024 douglas.csv)
     |
     v
-Background thread runs process_crash_data.py
+Collects ALL raw CSVs in data/{DOT}/ for merging
     |
     v
-Stage 0 -> 1 -> 2 -> 3 -> 4
+Runs process_crash_data.py --merge -f
+  Merge -> Convert -> Validate -> Geocode -> Split
     |
     v
 Output files written to data/{DOT}/
-Client polls GET /api/pipeline/status
+UI shows save status (saved / offline / error)
 ```
 
-**Pros:** Full geocoding, validation report, persistent output files
-**Cons:** Requires Python + server running
+**If server is running:** File is saved permanently to `data/{DOT}/`, full pipeline runs with merge.
+**If server is not running:** Browser-only mode — data loads in UI but is not saved to disk. A toast message indicates "Server offline."
+
+### Path A: Manual File Drop (No Browser)
+
+```
+User drops CSV file into data/CDOT/ manually
+    |
+    v
+git add + commit + push to main
+    |
+    v
+GitHub Actions workflow triggers
+    |
+    v
+process-cdot-data.yml detects new CSV
+    |
+    v
+Merges all raw CSVs -> full pipeline
+    |
+    v
+Output files committed back to repo
+```
+
+### Path B: Server-Only (curl / API)
+
+```
+curl -X POST -F "state=colorado" -F "jurisdiction=douglas" \
+     -F "file=@data/CDOT/new_data.csv" \
+     http://localhost:5050/api/pipeline/run
+    |
+    v
+Server saves to data/CDOT/new_data.csv
+    |
+    v
+Merges all raw CSVs -> full pipeline
+    |
+    v
+Output files written to data/CDOT/
+```
 
 ### Server API Endpoints
 
@@ -740,7 +777,25 @@ Client polls GET /api/pipeline/status
 | GET | `/health` | Server health check |
 | GET | `/api/pipeline/status` | Current pipeline progress |
 | GET | `/api/pipeline/states` | List supported states |
-| POST | `/api/pipeline/run` | Upload file and start processing |
+| POST | `/api/pipeline/run` | Upload CSV, save to `data/{DOT}/`, trigger pipeline |
+
+### POST /api/pipeline/run Response
+
+```json
+{
+  "status": "started",
+  "message": "Pipeline started for colorado/douglas",
+  "savedAs": "data/CDOT/2024 douglas.csv",
+  "outputDir": "data/CDOT/",
+  "merging": true,
+  "rawFileCount": 4,
+  "pollUrl": "/api/pipeline/status"
+}
+```
+
+### File Naming Convention
+
+When the server saves an uploaded file, it uses the original filename if descriptive (e.g., `2024 douglas.csv`). Generic names like `data.csv` or `upload.csv` are renamed to `{jurisdiction}_{date}.csv`. If a file with the same name already exists, a timestamp suffix is appended to prevent overwriting.
 
 ---
 
