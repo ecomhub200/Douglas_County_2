@@ -16,6 +16,7 @@ on:
       - '!data/CDOT/*_county_roads.csv'
       - '!data/CDOT/*_no_interstate.csv'
       - '!data/CDOT/crashes.csv'
+      - '!data/CDOT/*_merged_raw.csv'
 
   workflow_dispatch:
     inputs:
@@ -79,87 +80,95 @@ jobs:
         run: |
           set -e
 
+          # Helper: check if a filename is a pipeline output
+          is_pipeline_output() {
+            local name
+            name=$(basename "$1" | tr '[:upper:]' '[:lower:]')
+            case "$name" in
+              *_standardized.csv|*_all_roads.csv|*_county_roads.csv|*_no_interstate.csv|*_merged_raw.csv|crashes.csv)
+                return 0 ;;
+              *)
+                return 1 ;;
+            esac
+          }
+
+          # File list: one path per line (handles spaces in filenames)
+          FILE_LIST="${RUNNER_TEMP}/input_files.txt"
+          > "$FILE_LIST"
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # --- Manual trigger ---
             JURISDICTION="${{ github.event.inputs.jurisdiction }}"
-            echo "jurisdiction=$JURISDICTION" >> $GITHUB_OUTPUT
+            echo "jurisdiction=$JURISDICTION" >> "$GITHUB_OUTPUT"
 
             INPUT_PATTERN="${{ github.event.inputs.input_files }}"
             if [ -z "$INPUT_PATTERN" ]; then
               # Default: all raw CSVs in data/CDOT/ that aren't pipeline outputs
-              INPUT_FILES=$(find data/CDOT/ -maxdepth 1 -name '*.csv' \
-                ! -name '*_standardized.csv' \
-                ! -name '*_all_roads.csv' \
-                ! -name '*_county_roads.csv' \
-                ! -name '*_no_interstate.csv' \
-                ! -name 'crashes.csv' \
-                | sort | tr '\n' ' ')
+              while IFS= read -r -d '' f; do
+                if ! is_pipeline_output "$f"; then
+                  echo "$f" >> "$FILE_LIST"
+                fi
+              done < <(find data/CDOT/ -maxdepth 1 -name '*.csv' -print0 | sort -z)
             else
-              INPUT_FILES=$(ls $INPUT_PATTERN 2>/dev/null | tr '\n' ' ')
+              # Expand the user-provided glob pattern
+              for f in $INPUT_PATTERN; do
+                if [ -f "$f" ]; then
+                  echo "$f" >> "$FILE_LIST"
+                fi
+              done
             fi
 
-            MERGE="${{ github.event.inputs.merge }}"
-            echo "merge=$MERGE" >> $GITHUB_OUTPUT
-            echo "skip_geocode=${{ github.event.inputs.skip_geocode }}" >> $GITHUB_OUTPUT
-            echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
+            echo "merge=${{ github.event.inputs.merge }}" >> "$GITHUB_OUTPUT"
+            echo "skip_geocode=${{ github.event.inputs.skip_geocode }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=${{ github.event.inputs.dry_run }}" >> "$GITHUB_OUTPUT"
 
           else
             # --- Push trigger: detect which CSVs changed ---
-            JURISDICTION="douglas"  # Default; can be extended with detection logic
+            JURISDICTION="douglas"
 
-            # Get changed CSV files from the commit
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD -- 'data/CDOT/*.csv' 2>/dev/null || echo "")
-
-            # Filter out pipeline output files
-            INPUT_FILES=""
-            for f in $CHANGED_FILES; do
-              case "$f" in
-                *_standardized.csv|*_all_roads.csv|*_county_roads.csv|*_no_interstate.csv|*/crashes.csv)
-                  echo "Skipping pipeline output: $f"
-                  ;;
-                *)
-                  INPUT_FILES="$INPUT_FILES $f"
-                  ;;
-              esac
+            # Get changed CSV files from the commit (one per line, handles spaces)
+            git diff --name-only HEAD~1 HEAD -- 'data/CDOT/*.csv' 2>/dev/null | while IFS= read -r f; do
+              if [ -n "$f" ] && ! is_pipeline_output "$f"; then
+                echo "$f" >> "$FILE_LIST"
+              fi
             done
 
             # If no raw CSV changes detected, collect all raw CSVs for merge
-            if [ -z "$(echo "$INPUT_FILES" | tr -d ' ')" ]; then
-              echo "No new raw CSVs in this push. Checking for all raw CSVs..."
-              INPUT_FILES=$(find data/CDOT/ -maxdepth 1 -name '*.csv' \
-                ! -name '*_standardized.csv' \
-                ! -name '*_all_roads.csv' \
-                ! -name '*_county_roads.csv' \
-                ! -name '*_no_interstate.csv' \
-                ! -name 'crashes.csv' \
-                | sort | tr '\n' ' ')
+            if [ ! -s "$FILE_LIST" ]; then
+              echo "No new raw CSVs in this push. Collecting all raw CSVs..."
+              while IFS= read -r -d '' f; do
+                if ! is_pipeline_output "$f"; then
+                  echo "$f" >> "$FILE_LIST"
+                fi
+              done < <(find data/CDOT/ -maxdepth 1 -name '*.csv' -print0 | sort -z)
             fi
 
-            echo "jurisdiction=$JURISDICTION" >> $GITHUB_OUTPUT
-            echo "merge=true" >> $GITHUB_OUTPUT
-            echo "skip_geocode=false" >> $GITHUB_OUTPUT
-            echo "dry_run=false" >> $GITHUB_OUTPUT
+            echo "jurisdiction=$JURISDICTION" >> "$GITHUB_OUTPUT"
+            echo "merge=true" >> "$GITHUB_OUTPUT"
+            echo "skip_geocode=false" >> "$GITHUB_OUTPUT"
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # Trim whitespace
-          INPUT_FILES=$(echo "$INPUT_FILES" | xargs)
-
-          if [ -z "$INPUT_FILES" ]; then
+          # Count files and report
+          if [ ! -s "$FILE_LIST" ]; then
             echo "No input CSV files found. Exiting."
-            echo "has_files=false" >> $GITHUB_OUTPUT
+            echo "has_files=false" >> "$GITHUB_OUTPUT"
           else
-            echo "has_files=true" >> $GITHUB_OUTPUT
-            echo "input_files=$INPUT_FILES" >> $GITHUB_OUTPUT
-            FILE_COUNT=$(echo "$INPUT_FILES" | wc -w)
-            echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+            FILE_COUNT=$(wc -l < "$FILE_LIST")
+            echo "has_files=true" >> "$GITHUB_OUTPUT"
+            echo "file_count=$FILE_COUNT" >> "$GITHUB_OUTPUT"
 
             echo "=========================================="
             echo "Detected $FILE_COUNT input file(s):"
-            for f in $INPUT_FILES; do
-              SIZE=$(wc -c < "$f" 2>/dev/null || echo "0")
-              ROWS=$(wc -l < "$f" 2>/dev/null || echo "0")
-              echo "  $f ($ROWS rows, $(numfmt --to=iec $SIZE 2>/dev/null || echo "${SIZE}B"))"
-            done
+            while IFS= read -r f; do
+              if [ -f "$f" ]; then
+                SIZE=$(wc -c < "$f")
+                ROWS=$(wc -l < "$f")
+                echo "  $f ($ROWS rows, $(numfmt --to=iec "$SIZE" 2>/dev/null || echo "${SIZE}B"))"
+              else
+                echo "  $f (FILE NOT FOUND)"
+              fi
+            done < "$FILE_LIST"
             echo "=========================================="
           fi
 
@@ -168,41 +177,45 @@ jobs:
         id: pipeline
         run: |
           JURISDICTION="${{ steps.detect.outputs.jurisdiction }}"
-          INPUT_FILES="${{ steps.detect.outputs.input_files }}"
           MERGE="${{ steps.detect.outputs.merge }}"
           SKIP_GEOCODE="${{ steps.detect.outputs.skip_geocode }}"
           DRY_RUN="${{ steps.detect.outputs.dry_run }}"
+          FILE_LIST="${RUNNER_TEMP}/input_files.txt"
 
           echo "=========================================="
           echo "CDOT Pipeline - Processing $JURISDICTION"
           echo "Started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
 
-          # Build command
-          CMD="python scripts/process_crash_data.py"
-          CMD="$CMD -i $INPUT_FILES"
-          CMD="$CMD -s colorado"
-          CMD="$CMD -j $JURISDICTION"
-          CMD="$CMD -f -v"
+          # Build command as a bash array (handles spaces in filenames)
+          CMD=(python scripts/process_crash_data.py)
+
+          # Add each input file individually with proper quoting
+          CMD+=(-i)
+          while IFS= read -r f; do
+            CMD+=("$f")
+          done < "$FILE_LIST"
+
+          CMD+=(-s colorado -j "$JURISDICTION" -f -v)
 
           if [ "$MERGE" = "true" ]; then
-            CMD="$CMD --merge"
+            CMD+=(--merge)
             echo "Mode: Merge all files before processing"
           fi
 
           if [ "$SKIP_GEOCODE" = "true" ]; then
-            CMD="$CMD --skip-geocode"
+            CMD+=(--skip-geocode)
             echo "Geocoding: Skipped"
           fi
 
           if [ "$DRY_RUN" = "true" ]; then
-            CMD="$CMD --dry-run"
+            CMD+=(--dry-run)
             echo "Mode: Dry run (no output)"
           fi
 
-          echo "Running: $CMD"
+          echo "Running: ${CMD[*]}"
           echo ""
-          eval $CMD
+          "${CMD[@]}"
 
           echo "=========================================="
           echo "Pipeline complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
@@ -216,7 +229,7 @@ jobs:
             echo "=========================================="
             echo "Pipeline Report"
             echo "=========================================="
-            cat "$REPORT" | python -m json.tool
+            python -m json.tool "$REPORT"
 
             # Extract key metrics for summary
             INPUT=$(python -c "import json; print(json.load(open('$REPORT'))['input_rows'])")
@@ -261,26 +274,28 @@ jobs:
           JURISDICTION="${{ steps.detect.outputs.jurisdiction }}"
           REPORT="data/CDOT/.validation/pipeline_report.json"
 
-          echo "## CDOT Pipeline Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Jurisdiction | $JURISDICTION |" >> $GITHUB_STEP_SUMMARY
-          echo "| Input Files | ${{ steps.detect.outputs.file_count }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Merge Mode | ${{ steps.detect.outputs.merge }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Trigger | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## CDOT Pipeline Results"
+            echo ""
+            echo "| Parameter | Value |"
+            echo "|-----------|-------|"
+            echo "| Jurisdiction | $JURISDICTION |"
+            echo "| Input Files | ${{ steps.detect.outputs.file_count }} |"
+            echo "| Merge Mode | ${{ steps.detect.outputs.merge }} |"
+            echo "| Trigger | ${{ github.event_name }} |"
+            echo ""
 
-          if [ -f "$REPORT" ]; then
-            echo "### Pipeline Report" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Input Rows | $(python -c "import json; print(json.load(open('$REPORT'))['input_rows'])") |" >> $GITHUB_STEP_SUMMARY
-            echo "| Output Rows | $(python -c "import json; print(json.load(open('$REPORT'))['output_rows'])") |" >> $GITHUB_STEP_SUMMARY
-            echo "| Duplicates Removed | $(python -c "import json; print(json.load(open('$REPORT'))['duplicates_removed'])") |" >> $GITHUB_STEP_SUMMARY
-            echo "| GPS Coverage | $(python -c "import json; print(json.load(open('$REPORT'))['gps_coverage'])") |" >> $GITHUB_STEP_SUMMARY
-          fi
+            if [ -f "$REPORT" ]; then
+              echo "### Pipeline Report"
+              echo ""
+              echo "| Metric | Value |"
+              echo "|--------|-------|"
+              echo "| Input Rows | $(python -c "import json; print(json.load(open('$REPORT'))['input_rows'])") |"
+              echo "| Output Rows | $(python -c "import json; print(json.load(open('$REPORT'))['output_rows'])") |"
+              echo "| Duplicates Removed | $(python -c "import json; print(json.load(open('$REPORT'))['duplicates_removed'])") |"
+              echo "| GPS Coverage | $(python -c "import json; print(json.load(open('$REPORT'))['gps_coverage'])") |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Commit and push processed data
         if: steps.detect.outputs.has_files == 'true' && steps.detect.outputs.dry_run != 'true'
@@ -311,13 +326,11 @@ jobs:
             INPUT=$(python -c "import json; print(json.load(open('$REPORT'))['input_rows'])")
             OUTPUT=$(python -c "import json; print(json.load(open('$REPORT'))['output_rows'])")
             GPS=$(python -c "import json; print(json.load(open('$REPORT'))['gps_coverage'])")
-            git commit -m "$(cat <<EOFMSG
-          Auto-process: CDOT $JURISDICTION pipeline - $(date +'%Y-%m-%d')
+            TRIGGER="${{ github.event_name }}"
+            git commit -m "Auto-process: CDOT $JURISDICTION pipeline - $(date +'%Y-%m-%d')
 
           Pipeline: $INPUT input -> $OUTPUT output | GPS: $GPS
-          Trigger: ${{ github.event_name }}
-          EOFMSG
-          )"
+          Trigger: $TRIGGER"
           else
             git commit -m "Auto-process: CDOT $JURISDICTION pipeline - $(date +'%Y-%m-%d')"
           fi
