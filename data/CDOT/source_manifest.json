@@ -1,0 +1,73 @@
+{
+  "_description": "CDOT Hyland OnBase document registry for statewide crash data downloads",
+  "_note": "Doc IDs are manually obtained from https://oitco.hylandcloud.com/cdotrmpop/docpop/docpop.aspx — CDOT assigns arbitrary IDs when uploading new files each year. Update this file when new years become available.",
+  "_updated": "2026-02-07",
+
+  "source": {
+    "name": "CDOT Hyland OnBase",
+    "base_url": "https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx",
+    "file_title_prefix": "CDOTRM CD Crash Listing",
+    "file_format": "MS Excel Spreadsheet (.xlsx)"
+  },
+
+  "jurisdiction_filters": {
+    "_description": "Filter statewide data to specific counties using County column and optionally Agency Id",
+    "douglas": {
+      "county": "DOUGLAS",
+      "agency_ids": ["DSO"],
+      "display_name": "Douglas County"
+    },
+    "arapahoe": {
+      "county": "ARAPAHOE",
+      "agency_ids": [],
+      "display_name": "Arapahoe County"
+    },
+    "jefferson": {
+      "county": "JEFFERSON",
+      "agency_ids": [],
+      "display_name": "Jefferson County"
+    },
+    "elpaso": {
+      "county": "EL PASO",
+      "agency_ids": [],
+      "display_name": "El Paso County"
+    },
+    "denver": {
+      "county": "DENVER",
+      "agency_ids": [],
+      "display_name": "Denver County"
+    },
+    "adams": {
+      "county": "ADAMS",
+      "agency_ids": [],
+      "display_name": "Adams County"
+    }
+  },
+
+  "files": {
+    "2025": {"docid": 54973381, "status": "preliminary", "note": "Subject to revision"},
+    "2024": {"docid": 35111742, "status": "final"},
+    "2023": {"docid": 24805487, "status": "final"},
+    "2022": {"docid": 17470642, "status": "final"},
+    "2021": {"docid": 13118621, "status": "final"},
+    "2020": {"docid": 9760262,  "status": "final"},
+    "2019": {"docid": 8077600,  "status": "final"},
+    "2018": {"docid": 8077599,  "status": "final"},
+    "2017": {"docid": 8077593,  "status": "final"},
+    "2016": {"docid": 8077592,  "status": "final"},
+    "2015": {"docid": 8077587,  "status": "final"},
+    "2014": {"docid": 8077585,  "status": "final"},
+    "2013": {"docid": 8077584,  "status": "final"},
+    "2012": {"docid": 8077581,  "status": "final"},
+    "2011": {"docid": 8077576,  "status": "final"},
+    "2010": {"docid": 8077574,  "status": "final"},
+    "2009": {"docid": 9760231,  "status": "final"},
+    "2008": {"docid": 9760169,  "status": "final"},
+    "2007": {"docid": 9760108,  "status": "final"}
+  },
+
+  "data_dictionaries": {
+    "2021-2025": {"docid": 17470635, "description": "Data dictionary for 2021+ crash listings"},
+    "2007-2020": {"docid": 13094548, "description": "Data dictionary for 2007-2020 crash listings"}
+  }
+}

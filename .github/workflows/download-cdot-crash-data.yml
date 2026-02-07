@@ -1,0 +1,161 @@
+name: Download CDOT Crash Data
+
+# Separate workflow for Colorado CDOT crash data downloads from Hyland OnBase.
+# This is kept separate from download-data.yml because:
+#   1. Different data source (OnBase document portal vs ArcGIS API / Grants.gov)
+#   2. Different cadence (CDOT publishes annually, not monthly)
+#   3. Different failure modes (OnBase may require manual intervention)
+
+on:
+  schedule:
+    # 1st of every month at 6:00 AM UTC — checks for new data
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+    inputs:
+      years:
+        description: 'Comma-separated years to download (e.g., "2024,2025"). Leave empty for latest only.'
+        required: false
+        default: ''
+        type: string
+      jurisdiction:
+        description: 'County to filter to'
+        required: false
+        default: 'douglas'
+        type: choice
+        options:
+          - douglas
+          - arapahoe
+          - jefferson
+          - elpaso
+          - denver
+          - adams
+      latest_only:
+        description: 'Download only the most recent year'
+        required: false
+        type: boolean
+        default: true
+      skip_dictionaries:
+        description: 'Skip downloading data dictionaries'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  download-cdot-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build download arguments
+        id: build-args
+        run: |
+          ARGS="--data-dir data/CDOT"
+
+          # Jurisdiction
+          JURISDICTION="${{ github.event.inputs.jurisdiction || 'douglas' }}"
+          ARGS="$ARGS --jurisdiction $JURISDICTION"
+
+          # Years or latest
+          YEARS="${{ github.event.inputs.years }}"
+          LATEST="${{ github.event.inputs.latest_only }}"
+          SKIP_DICT="${{ github.event.inputs.skip_dictionaries }}"
+
+          if [ -n "$YEARS" ]; then
+            # Convert comma-separated to space-separated
+            YEARS_SPACED=$(echo "$YEARS" | tr ',' ' ')
+            ARGS="$ARGS --years $YEARS_SPACED"
+          elif [ "$LATEST" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+            # Scheduled runs always use --latest to check for updates
+            ARGS="$ARGS --latest"
+          fi
+
+          if [ "$SKIP_DICT" = "true" ]; then
+            ARGS="$ARGS --no-dict"
+          fi
+
+          echo "args=$ARGS" >> $GITHUB_OUTPUT
+          echo "jurisdiction=$JURISDICTION" >> $GITHUB_OUTPUT
+          echo "Download arguments: $ARGS"
+
+      - name: Download CDOT crash data
+        id: download
+        run: |
+          echo "=========================================="
+          echo "Downloading CDOT Crash Data"
+          echo "Started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+          python download_cdot_crash_data.py ${{ steps.build-args.outputs.args }}
+          echo "=========================================="
+          echo "Download complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+      - name: Generate download statistics
+        id: stats
+        run: |
+          echo "=========================================="
+          echo "Download Statistics"
+          echo "=========================================="
+          echo ""
+          echo "Files in data/CDOT/:"
+          ls -lh data/CDOT/*.csv 2>/dev/null || echo "  No CSV files found"
+          echo ""
+
+          # Count new/changed files
+          CHANGED=$(git diff --name-only data/CDOT/ 2>/dev/null | wc -l | tr -d ' ')
+          UNTRACKED=$(git ls-files --others --exclude-standard data/CDOT/ 2>/dev/null | wc -l | tr -d ' ')
+          echo "Changed files: $CHANGED"
+          echo "New files: $UNTRACKED"
+          echo "changed=$CHANGED" >> $GITHUB_OUTPUT
+          echo "untracked=$UNTRACKED" >> $GITHUB_OUTPUT
+          echo "=========================================="
+
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/CDOT/
+
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit — data is already up to date"
+            exit 0
+          fi
+
+          JURISDICTION="${{ steps.build-args.outputs.jurisdiction }}"
+          git commit -m "chore: update CDOT crash data ($JURISDICTION) [$(date +'%Y-%m-%d')]"
+
+          # Push with retry logic
+          MAX_RETRIES=4
+          for i in $(seq 1 $MAX_RETRIES); do
+            if git push; then
+              echo "Push successful"
+              exit 0
+            fi
+            echo "Push failed (attempt $i/$MAX_RETRIES), pulling latest changes..."
+            sleep $((2 ** i))
+            git fetch origin main
+            git rebase origin/main || {
+              echo "Rebase failed, trying merge..."
+              git rebase --abort 2>/dev/null || true
+              git pull --no-edit origin main
+            }
+          done
+
+          echo "ERROR: Push failed after $MAX_RETRIES attempts"
+          exit 1
