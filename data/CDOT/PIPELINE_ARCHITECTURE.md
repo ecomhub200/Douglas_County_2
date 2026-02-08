@@ -624,20 +624,35 @@ Rate: 1 request/second
 
 ## 14. Split / Road-Type Filtering
 
-Three output files per jurisdiction:
+Three output files per jurisdiction, filtered from the standardized source:
 
-| File | Colorado Filter | Virginia Filter |
-|------|----------------|-----------------|
-| `*_all_roads.csv` | No filter | No filter |
-| `*_county_roads.csv` | `_co_agency_id` matches county code | `SYSTEM` in NonVDOT |
-| `*_no_interstate.csv` | `_co_system_code` != "Interstate Highway" | `SYSTEM` != "Interstate" |
+| File | Filter Column | Colorado Include Values | Virginia Filter |
+|------|--------------|------------------------|-----------------|
+| `*_all_roads.csv` | `_co_system_code` | All valid system codes | No filter |
+| `*_county_roads.csv` | `_co_system_code` | `City Street`, `County Road` | `SYSTEM` in NonVDOT |
+| `*_no_interstate.csv` | `_co_system_code` | `City Street`, `County Road`, `State Highway`, `Frontage Road` | `SYSTEM` != "Interstate" |
 
-### Colorado County Agency Codes
+### CRITICAL: Filter on Original State Column, NOT Normalized Column
 
+**Always filter on `_co_system_code` (the original Colorado value), NOT on `SYSTEM` (the Virginia-normalized value).** The `SYSTEM` column maps multiple CO values to the same VA value (e.g., both "City Street" and "County Road" map to "NonVDOT secondary"), making it impossible to do precise filtering.
+
+### Data Quality Rules During Split
+
+Before writing output files, the split script MUST:
+1. **Remove ghost rows** — rows with empty `Crash Year` AND empty `Crash Date`
+2. **Remove duplicates** — rows with duplicate `Document Nbr` (keep first occurrence)
+3. **Verify subset relationships** — `county_roads ⊂ no_interstate ⊂ all_roads`
+4. **Verify filter accuracy** — every row's `_co_system_code` must be in the include set
+5. **Log row counts** — for audit trail
+
+### Rebuild Script
+
+```bash
+python3 scripts/rebuild_road_type_csvs.py
 ```
-douglas -> DSO    arapahoe -> ASO    jefferson -> JSO
-elpaso  -> EPSO   denver   -> DPD    adams     -> ACSO
-```
+
+This script reads `douglas_standardized.csv` and produces all three output files
+with strict filtering, ghost row removal, and deduplication.
 
 ---
 
@@ -1715,4 +1730,72 @@ state, total, gps = convert_file(
 )
 print(f'State: {state}, Rows: {total}, GPS: {gps}')
 "
+```
+
+---
+
+## 24. Lessons Learned & Data Quality Checklist for New States
+
+> **This section documents bugs found during the Colorado onboarding (Feb 2026) and the mandatory checks to prevent them when adding any new state.**
+
+### Bug 1: CRITICAL — `resetState()` Missing Aggregate Properties
+
+**What happened:** `processRow()` in `index.html` was updated to aggregate `vehicleCount`, `pedCasualties`, and `personsInjured`, but `resetState()` was NOT updated to initialize these properties. Result: `agg.vehicleCount.total++` threw a TypeError for 99.6% of rows. The try/catch silently ate the error, so `rowCount++` never executed — but the severity/route/node aggregates that were updated BEFORE the throw were kept.
+
+**Visible symptom:** Dashboard showed "27 Total Crashes" (only the 27 rows with Vehicle Count = 0 survived) while severity counts correctly summed to 6,139.
+
+**Prevention rule:** When adding ANY new property to `processRow()`, you MUST also add it to the `resetState()` aggregates initialization. Run the accuracy test (`tests/cdot_data_accuracy_test.py`) to verify `totalRows` matches the sum of all severity counts.
+
+### Bug 2: HIGH — Road Type CSV Filter Used Wrong Column
+
+**What happened:** The split script filtered `county_roads.csv` on the Virginia-normalized `SYSTEM` column or on `_co_agency_id` instead of `_co_system_code`. Since both "City Street" and "County Road" normalize to `NonVDOT secondary`, the filter included some State Highway rows (which also normalize to `Primary`) that leaked through.
+
+**Visible symptom:** `county_roads.csv` had 201 non-county rows (162 State Highway, 35 Interstate, 4 Frontage Road). Conversely, it was MISSING most City Street rows (only 164 of 6,870).
+
+**Prevention rule:** ALWAYS filter on the original state-specific system code column (`_co_system_code`), never on the Virginia-normalized `SYSTEM` column. Use `scripts/rebuild_road_type_csvs.py` as the reference implementation.
+
+### Bug 3: HIGH — Wrong `crashes.csv` in Data Folder
+
+**What happened:** `data/CDOT/crashes.csv` contained Virginia/Henrico County data (24,597 rows) instead of Colorado data. If the primary road-type CSV fetch failed, the app fell back to this file and loaded completely wrong data.
+
+**Prevention rule:** Never commit a generic `crashes.csv` to a state data folder. The fallback path should point to `{jurisdiction}_all_roads.csv`, not a separate file. Delete stale files from previous states when onboarding a new one.
+
+### Bug 4: MEDIUM — Ghost Rows (Empty Date/Year)
+
+**What happened:** 392 rows in `douglas_standardized.csv` had empty `Crash Year` and `Crash Date`. These rows had empty `_co_system_code` too, so they weren't filtered by any road type. They appeared in `no_interstate` and `all_roads` but inflated counts with invalid data.
+
+**Prevention rule:** The rebuild script must reject rows where both `Crash Year` and `Crash Date` are empty. Add this as a validation step in every pipeline.
+
+---
+
+### Mandatory Checklist: Adding a New State
+
+Run these checks AFTER processing a new state's data, BEFORE deploying:
+
+#### Data Pipeline Checks
+- [ ] All 3 road-type CSVs exist: `{jurisdiction}_county_roads.csv`, `{jurisdiction}_no_interstate.csv`, `{jurisdiction}_all_roads.csv`
+- [ ] No `crashes.csv` file exists in the state data folder (use road-type CSVs only)
+- [ ] `county_roads ⊂ no_interstate ⊂ all_roads` (proper subset relationships)
+- [ ] No ghost rows (empty Crash Year AND empty Crash Date)
+- [ ] No duplicate Document Nbr values within any file
+- [ ] `county_roads` contains ONLY local road system codes (no state highways or interstates)
+- [ ] All severity values are exactly K/A/B/C/O (no blanks, no variations)
+- [ ] GPS coverage > 90% (valid lat/lon within state bounds)
+- [ ] Year distribution covers expected range (e.g., 2021-2025)
+- [ ] `_co_system_code` (or equivalent) preserved for each row
+
+#### App Integration Checks
+- [ ] `resetState()` aggregates initialization includes ALL properties accessed by `processRow()`
+- [ ] `totalRows` equals the sum of K+A+B+C+O severity counts
+- [ ] Dashboard KPI percentages are < 100% (sanity check: K% should be < 5% for most jurisdictions)
+- [ ] All 3 road type radio buttons load the correct CSV file
+- [ ] Fallback path points to `{jurisdiction}_all_roads.csv`, not `crashes.csv`
+- [ ] Road type filter labels use state-neutral language (not "VDOT" or "NonVDOT")
+- [ ] StateAdapter correctly detects the state from CSV headers
+- [ ] `config.json` `roadSystems.filterProfiles` match actual SYSTEM column values
+
+#### Automated Test
+```bash
+python3 tests/cdot_data_accuracy_test.py
+# Must pass 100% — any CRITICAL or HIGH failure blocks deployment
 ```
