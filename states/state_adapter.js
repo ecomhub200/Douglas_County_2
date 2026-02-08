@@ -27,7 +27,7 @@ const StateAdapter = (() => {
             requiredColumns: ['CUID', 'System Code', 'Injury 00', 'Injury 04'],
             optionalColumns: ['Rd_Number', 'Rd_Section', 'MHE'],
             displayName: 'Colorado (CDOT)',
-            configPath: 'states/colorado/config.json'
+            configPath: 'data/CDOT/config.json'
         },
         virginia: {
             requiredColumns: ['Document Nbr', 'Crash Severity', 'RTE Name', 'SYSTEM'],
