@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generatedAt": "2026-02-09T07:18:21.144165Z",
+    "generatedAt": "2026-02-09T11:47:17.844635Z",
     "jurisdiction": "henrico",
     "validationVersion": "1.3.0",
     "runType": "incremental"
@@ -18,13 +18,5 @@
   "errorRate": 0.0,
   "issuesByCategory": {},
   "correctionsByField": {},
-  "flaggedRecordsList": [],
-  "spatialProcessing": {
-    "geocoding": {},
-    "validation": {},
-    "correction": {},
-    "issues": [],
-    "records_processed": 0,
-    "records_skipped": 48476
-  }
+  "flaggedRecordsList": []
 }
