@@ -163,6 +163,14 @@ const StateAdapter = (() => {
             normalized['School Zone'] = (row['School Zone'] === 'TRUE' || row['School Zone'] === 'True') ? 'Y' : 'N';
             normalized['Work Zone Related'] = (row['Construction Zone'] === 'TRUE' || row['Construction Zone'] === 'True') ? 'Y' : 'N';
 
+            // ── Derived safety fields (for Safety Focus tab) ──
+            normalized['Animal Related?'] = this._checkAnimal(row) ? 'Yes' : 'No';
+            normalized['Guardrail Related?'] = this._checkGuardrail(row) ? 'Yes' : 'No';
+            normalized['Lgtruck?'] = this._checkLargeTruck(row) ? 'Yes' : 'No';
+            normalized['RoadDeparture Type'] = this._deriveRoadDepartureType(row);
+            normalized['Intersection Analysis'] = this._deriveIntersectionAnalysis(row);
+            normalized['Max Speed Diff'] = this._calcSpeedDiff(row);
+
             // ── Traffic Control (not directly available in CO data - mark as N/A) ──
             normalized['Traffic Control Type'] = 'N/A';
             normalized['Traffic Control Status'] = 'N/A';
@@ -459,6 +467,61 @@ const StateAdapter = (() => {
         _isNighttime(lighting) {
             const night = ['Dark – Lighted', 'Dark – Unlighted', 'Dark - Lighted', 'Dark - Unlighted'];
             return night.includes((lighting || '').trim());
+        },
+
+        // ── Helper: Check animal involvement ──
+        _checkAnimal(row) {
+            const wildAnimal = (row['Wild Animal'] || '').trim();
+            if (wildAnimal !== '') return true;
+            const ct = (row['Crash Type'] || row['MHE'] || '').trim();
+            return ct === 'Wild Animal' || ct === 'Domestic Animal';
+        },
+
+        // ── Helper: Check guardrail involvement ──
+        _checkGuardrail(row) {
+            const fields = [row['MHE'] || '', row['Crash Type'] || '', row['First HE'] || ''];
+            return fields.some(f => f.includes('Guardrail'));
+        },
+
+        // ── Helper: Check large truck involvement ──
+        _checkLargeTruck(row) {
+            const truckTypes = ['Medium/Heavy Truck', 'Truck/Tractor', 'Truck Tractor',
+                'Semi-Trailer', 'Bus', 'Working Vehicle', 'Farm Equipment'];
+            const tu1 = (row['TU-1 Type'] || '').trim();
+            const tu2 = (row['TU-2 Type'] || '').trim();
+            return truckTypes.some(t => tu1.includes(t) || tu2.includes(t));
+        },
+
+        // ── Helper: Derive road departure type from crash data ──
+        _deriveRoadDepartureType(row) {
+            const mhe = (row['MHE'] || '').trim();
+            const firstHE = (row['First HE'] || '').trim();
+            const rdIndicators = ['Tree', 'Utility Pole', 'Guard Rail', 'Guardrail', 'Fence',
+                'Embankment', 'Ditch', 'Concrete Highway Barrier', 'Cable Rail', 'Culvert',
+                'Overturning', 'Rollover', 'Large Rocks', 'Sign', 'Mailbox',
+                'Crash Cushion', 'Wall or Building', 'Barricade', 'Bridge Structure'];
+            if (rdIndicators.some(ind => mhe.includes(ind) || firstHE.includes(ind))) {
+                return 'RD_UNKNOWN';
+            }
+            return 'NOT_RD';
+        },
+
+        // ── Helper: Derive intersection analysis from road description ──
+        _deriveIntersectionAnalysis(row) {
+            const rd = (row['Road Description'] || '').trim();
+            if (rd === 'At Intersection' || rd === 'Intersection Related' || rd === 'Roundabout' ||
+                rd === 'Alley Related' || rd === 'Mid-Block Crosswalk') {
+                return 'Urban Intersection';
+            }
+            return 'Not Intersection';
+        },
+
+        // ── Helper: Calculate speed differential ──
+        _calcSpeedDiff(row) {
+            const limit = parseInt(row['TU-1 Speed Limit']) || 0;
+            const est = parseInt(row['TU-1 Estimated Speed']) || 0;
+            if (limit > 0 && est > 0) return String(est - limit);
+            return '';
         }
     };
 

@@ -633,6 +633,14 @@ class ColoradoNormalizer(BaseNormalizer):
         n['School Zone'] = 'Yes' if row.get('School Zone', '').strip() in ('TRUE', 'True') else 'No'
         n['Work Zone Related'] = 'Yes' if row.get('Construction Zone', '').strip() in ('TRUE', 'True') else 'No'
 
+        # --- Derived safety fields (for Safety Focus tab) ---
+        n['Animal Related?'] = 'Yes' if self._check_animal(row) else 'No'
+        n['Guardrail Related?'] = 'Yes' if self._check_guardrail(row) else 'No'
+        n['Lgtruck?'] = 'Yes' if self._check_large_truck(row) else 'No'
+        n['RoadDeparture Type'] = self._derive_road_departure_type(row)
+        n['Intersection Analysis'] = self._derive_intersection_analysis(row)
+        n['Max Speed Diff'] = self._calc_speed_diff(row)
+
         # --- Traffic Control (not available in CDOT data) ---
         n['Traffic Control Type'] = ''
         n['Traffic Control Status'] = ''
@@ -843,6 +851,52 @@ class ColoradoNormalizer(BaseNormalizer):
         tu1 = row.get('TU-1 Safety restraint Use', '').strip()
         tu2 = row.get('TU-2 Safety restraint Use', '').strip()
         return tu1 in unrestrained or tu2 in unrestrained
+
+    def _check_animal(self, row: Dict[str, str]) -> bool:
+        wild = row.get('Wild Animal', '').strip()
+        if wild:
+            return True
+        ct = (row.get('Crash Type', '') or row.get('MHE', '')).strip()
+        return ct in ('Wild Animal', 'Domestic Animal')
+
+    def _check_guardrail(self, row: Dict[str, str]) -> bool:
+        for f in ('MHE', 'Crash Type', 'First HE'):
+            if 'Guardrail' in row.get(f, ''):
+                return True
+        return False
+
+    def _check_large_truck(self, row: Dict[str, str]) -> bool:
+        truck_keywords = ('Medium/Heavy Truck', 'Truck/Tractor', 'Truck Tractor',
+                          'Semi-Trailer', 'Bus', 'Working Vehicle', 'Farm Equipment')
+        tu1 = row.get('TU-1 Type', '').strip()
+        tu2 = row.get('TU-2 Type', '').strip()
+        return any(k in tu1 or k in tu2 for k in truck_keywords)
+
+    def _derive_road_departure_type(self, row: Dict[str, str]) -> str:
+        mhe = row.get('MHE', '').strip()
+        first_he = row.get('First HE', '').strip()
+        indicators = ('Tree', 'Utility Pole', 'Guard Rail', 'Guardrail', 'Fence',
+                      'Embankment', 'Ditch', 'Concrete Highway Barrier', 'Cable Rail',
+                      'Culvert', 'Overturning', 'Rollover', 'Large Rocks', 'Sign',
+                      'Mailbox', 'Crash Cushion', 'Wall or Building', 'Barricade',
+                      'Bridge Structure')
+        if any(ind in mhe or ind in first_he for ind in indicators):
+            return 'RD_UNKNOWN'
+        return 'NOT_RD'
+
+    def _derive_intersection_analysis(self, row: Dict[str, str]) -> str:
+        rd = row.get('Road Description', '').strip()
+        if rd in ('At Intersection', 'Intersection Related', 'Roundabout',
+                  'Alley Related', 'Mid-Block Crosswalk'):
+            return 'Urban Intersection'
+        return 'Not Intersection'
+
+    def _calc_speed_diff(self, row: Dict[str, str]) -> str:
+        limit = self._int(row.get('TU-1 Speed Limit', ''))
+        est = self._int(row.get('TU-1 Estimated Speed', ''))
+        if limit > 0 and est > 0:
+            return str(est - limit)
+        return ''
 
 
 # --- Normalizer Registry ---
