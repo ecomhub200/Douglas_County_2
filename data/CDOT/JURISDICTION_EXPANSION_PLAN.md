@@ -26,7 +26,7 @@
 14. [Statewide View (CDOT HQ)](#14-statewide-view-cdot-hq)
 15. [Multi-State Scaling Strategy](#15-multi-state-scaling-strategy)
 16. [Database & Storage Strategy](#16-database--storage-strategy)
-17. [API & Backend Architecture](#17-api--backend-architecture)
+17. [Data Pipeline & Query Architecture (Zero-Backend)](#17-data-pipeline--query-architecture-zero-backend)
 18. [Phased Implementation Roadmap](#18-phased-implementation-roadmap)
 19. [Risk Assessment & Mitigations](#19-risk-assessment--mitigations)
 20. [Appendix A: Complete Colorado County-to-Region Mapping](#appendix-a-complete-colorado-county-to-region-mapping)
@@ -58,7 +58,7 @@ Build a **hierarchical jurisdiction model** with a **dynamic aggregation engine*
 2. **Hierarchical by nature** — County → Region/District → MPO → State are first-class concepts
 3. **Data flows up, context flows down** — Raw data lives at the county level; aggregation is computed dynamically
 4. **One tool, many views** — The same CRASH LENS instance serves county engineers, regional planners, and state HQ
-5. **Offline-first** — Large CSV datasets work without a backend server; optional API layer for scale
+5. **Zero-backend by design** — Pre-processed Parquet files + DuckDB-WASM in-browser SQL eliminates the need for backend servers; IndexedDB provides offline caching; edge SQLite available only if auth is needed
 
 ---
 
@@ -1566,193 +1566,415 @@ For FHWA or multi-state organizations:
 
 ## 16. Database & Storage Strategy
 
-### Tier 1: File-Based (Current + Enhanced) — For Small-Medium Deployments
+### Design Rationale
+
+CRASH LENS crash data is **static and read-only**, with new data added **once per month**. This eliminates the need for traditional server-side databases (PostgreSQL, Supabase, etc.) which are designed for frequently-mutating, real-time, multi-writer workloads. Instead, we invest in **build-time pre-processing** during the monthly data pipeline and keep the runtime architecture **zero-backend** — no servers to manage, no databases to maintain, no ongoing hosting costs.
+
+### Data Profile
+
+| Metric | Value |
+|--------|-------|
+| Crash records per county (5 years) | ~20,000-50,000 rows |
+| Raw CSV size per county | ~15-50 MB |
+| Colorado total (64 counties, 5yr) | ~1.3-3.2 GB raw CSV |
+| Update frequency | **Once per month** |
+| Data access pattern | **Read-only** |
+| Users per deployment | 1-50 concurrent |
+
+### Tier 1: Pre-Processed Static Files — "Smarter CSVs" (Current + Enhanced)
 
 ```
-Approach: CSV files + JSON configs on disk/CDN
+Approach: CSV → Parquet conversion + pre-aggregated JSON summaries
 Best for: Single county to ~10 counties
-Performance: Fast for 1 county, acceptable for 5-10 counties
-Storage: ~20-50MB per county per 5 years
-Deployment: Static hosting (GitHub Pages, S3, Netlify)
+Performance: Instant dashboards (pre-computed), fast drill-down
+Storage: ~2-5MB per county (Parquet, 10x smaller than CSV)
+Deployment: Static hosting (GitHub Pages, S3, Netlify, Cloudflare Pages)
+Cost: $0
 ```
 
-### Tier 2: IndexedDB + Service Worker — For Medium Deployments
+**What happens during the monthly data pipeline (Python scripts):**
+
+1. Download raw CSV from CDOT
+2. Convert to **Apache Parquet** format (columnar, compressed, 10x smaller)
+3. Pre-compute per-county aggregates: severity counts, EPDO, by-route breakdowns, hotspot rankings
+4. Pre-compute per-region rollups: Region 1-5 summaries
+5. Pre-compute statewide totals
+6. Output compact **JSON summary files** alongside Parquet data
+7. Deploy static files to hosting
+
+**What happens at runtime (browser):**
+
+1. App loads small JSON summary (~50KB) → instant dashboard
+2. User drills into county → lazy-load that county's Parquet/CSV on demand
+3. No server queries, no API calls, no database connections
+
+**Why Parquet over CSV:**
+
+| Feature | CSV | Parquet |
+|---------|-----|---------|
+| File size (Douglas County 5yr) | ~17 MB | ~1.7 MB |
+| Column-selective reading | No (must parse entire row) | Yes (read only needed columns) |
+| Typed data | No (everything is strings) | Yes (dates, numbers, booleans) |
+| Compression | None | Snappy/GZIP built-in |
+| Browser support | Native (Papa Parse) | Via DuckDB-WASM or Apache Arrow JS |
+
+### Tier 2: IndexedDB + Service Worker — Browser-Side Caching
 
 ```
-Approach: Load CSVs once, cache in browser IndexedDB
-Best for: 10-64 counties (full state)
-Performance: First load slow, subsequent loads instant
-Storage: Up to ~2GB in IndexedDB per origin
-Deployment: Static hosting + Service Worker for offline
+Approach: Load Parquet/CSV once from CDN, cache parsed data in browser IndexedDB
+Best for: 10-64 counties (full state), repeat users
+Performance: First load moderate, all subsequent loads instant
+Storage: Up to ~2GB in IndexedDB per browser origin
+Deployment: Static hosting + Service Worker for offline capability
+Cost: $0
 ```
 
-### Tier 3: Backend API + Database — For Large/Enterprise Deployments
+**How it works:**
+
+1. First visit: fetch county Parquet from static hosting, parse, store in IndexedDB
+2. Subsequent visits: load directly from IndexedDB (instant, works offline)
+3. Service Worker checks monthly for updated data (ETag / Last-Modified headers)
+4. User switches counties → load from IndexedDB if cached, fetch if not
+5. LRU eviction when approaching storage limits (~40-100 counties fit in 2GB)
+
+**Recommended libraries:**
+
+| Library | Size | Notes |
+|---------|------|-------|
+| **Dexie.js** | ~45 KB | Clean IndexedDB wrapper, excellent query API, widely used |
+| **idb** | ~1.2 KB | Minimal Promise wrapper by Jake Archibald (Google Chrome team) |
+| **localForage** | ~8 KB | Simple key-value API, automatic fallback to localStorage |
+
+Recommendation: **Dexie.js** for its query capabilities and developer ergonomics.
+
+### Tier 3: DuckDB-WASM — In-Browser Analytical Database
 
 ```
-Approach: PostgreSQL/PostGIS backend, REST/GraphQL API
-Best for: Multi-state, real-time data, many concurrent users
-Performance: Sub-second queries on millions of records
-Storage: Unlimited (server-side)
-Deployment: Cloud (AWS, Azure, GCP) or on-premise
-
-Stack:
-  Backend: Python FastAPI or Node.js Express
-  Database: PostgreSQL + PostGIS
-  Cache: Redis
-  API: REST or GraphQL
-  Hosting: Docker containers on cloud
+Approach: Full SQL analytical engine running in the browser via WebAssembly
+Best for: Statewide analysis (64 counties), ad-hoc cross-county queries, multi-state
+Performance: Sub-second analytical queries on millions of rows, directly on Parquet files
+Storage: Queries remote Parquet files via HTTP range requests (no full download needed)
+Deployment: Static hosting (same as Tier 1) + DuckDB-WASM library (~3-5MB, cached)
+Cost: $0
 ```
+
+**Why DuckDB-WASM is the ideal fit for CRASH LENS:**
+
+1. **Runs entirely in the browser** — no server, no API, no database to manage
+2. **Queries remote Parquet files directly** — HTTP range requests fetch only the columns/rows needed
+3. **Full SQL support** — complex analytical queries that would be impossible with plain JavaScript:
+   ```sql
+   SELECT route, county,
+          COUNT(*) as total,
+          SUM(CASE WHEN severity IN ('K','A') THEN 1 ELSE 0 END) as ka_crashes,
+          SUM(epdo) as epdo_score
+   FROM 'data/CDOT/counties/*/crashes.parquet'
+   WHERE crash_year >= 2022
+   GROUP BY route, county
+   ORDER BY epdo_score DESC
+   LIMIT 50
+   ```
+4. **Handles millions of rows** efficiently (columnar execution engine, vectorized processing)
+5. **No data duplication** — Parquet files on CDN are the single source of truth
+6. **Composable with IndexedDB** — cache query results for instant repeat access
+
+**DuckDB-WASM integration pattern:**
+
+```javascript
+// Initialize DuckDB-WASM (one-time, cached by browser)
+import * as duckdb from '@duckdb/duckdb-wasm';
+
+const db = await duckdb.createWorker();
+
+// Query remote Parquet files directly (HTTP range requests)
+const result = await db.query(`
+    SELECT route, COUNT(*) as crashes, SUM(epdo) as epdo
+    FROM 'https://crashlens.org/data/CDOT/counties/035/crashes.parquet'
+    WHERE severity IN ('K', 'A', 'B')
+    GROUP BY route
+    ORDER BY epdo DESC
+`);
+
+// Cross-county analysis (glob pattern queries multiple files)
+const regionHotspots = await db.query(`
+    SELECT county_name, route, node, SUM(epdo) as epdo
+    FROM 'https://crashlens.org/data/CDOT/regions/region_1/*.parquet'
+    GROUP BY county_name, route, node
+    ORDER BY epdo DESC
+    LIMIT 25
+`);
+```
+
+**Trade-off:** DuckDB-WASM bundle is ~3-5 MB (one-time download, browser-cached). For a professional tool used repeatedly by traffic engineers, this is negligible.
+
+### Tier 4 (Emergency Only): Edge SQLite — Lightweight Serverless Backend
+
+```
+Approach: SQLite at the edge via Cloudflare D1 or Turso (only if Tiers 1-3 prove insufficient)
+Best for: Multi-state with 500+ concurrent users, or if auth/access control is required
+Performance: Sub-10ms queries at the edge (CDN-level latency)
+Storage: 5-10 GB free tier
+Deployment: Serverless (no containers, no servers)
+Cost: $0-5/month (generous free tiers)
+```
+
+**When to consider this (and only then):**
+- You need **server-side authentication** (e.g., role-based access for CDOT vs. public)
+- You have **500+ concurrent users** and CDN bandwidth costs become a concern
+- You need **write capabilities** (user annotations, saved analyses, shared reports)
+
+| Service | Free Tier | Technology | Managed |
+|---------|-----------|------------|---------|
+| **Cloudflare D1** | 5 GB storage, 5M reads/day | SQLite at edge | Yes |
+| **Turso** | 9 GB storage, 1B reads/month | LibSQL (SQLite fork) | Yes |
+
+Both are **dramatically simpler** than PostgreSQL — no connection pools, no migrations, no Docker containers. SQLite is a single file, deployed to CDN edge nodes.
 
 ### Recommended Progression
 
 ```
-Phase 1 (Now)     → Tier 1: File-based (CSV + JSON)
-Phase 2 (6 months) → Tier 2: IndexedDB caching for multi-county
-Phase 3 (12+ months) → Tier 3: Backend API for statewide/multi-state
+Phase 1 (Now)        → Tier 1: Pre-processed Parquet + JSON on static hosting ($0)
+Phase 2 (3-6 months) → Tier 2: Add IndexedDB caching for multi-county repeat visits ($0)
+Phase 3 (6-12 months)→ Tier 3: Add DuckDB-WASM for statewide ad-hoc SQL analysis ($0)
+Phase 4 (Only if needed) → Tier 4: Edge SQLite for auth/multi-state at scale ($0-5/mo)
 ```
+
+**Total infrastructure cost through Phase 3: $0**
 
 ---
 
-## 17. API & Backend Architecture
+## 17. Data Pipeline & Query Architecture (Zero-Backend)
 
-### Optional REST API Design (Phase 3)
+### Design Philosophy: Compute at Build Time, Not at Runtime
 
-When file-based loading becomes too slow (100+ counties, multiple states), introduce an API:
+Since crash data is static and updates monthly, the **monthly Python data pipeline** does all the heavy lifting. The browser receives pre-computed results and only performs computation when users request ad-hoc analysis.
 
 ```
-GET /api/v1/states
-  → List all available states
-
-GET /api/v1/states/08/regions
-  → List CDOT regions
-
-GET /api/v1/states/08/regions/region_1/summary
-  → Aggregated stats for Region 1
-
-GET /api/v1/states/08/counties/035/crashes
-  ?year=2024
-  &severity=K,A
-  &road_type=all
-  &limit=1000
-  → Douglas County crash records
-
-GET /api/v1/states/08/counties/035/hotspots
-  ?top=20
-  &method=epdo
-  → Top 20 hotspots in Douglas County
-
-GET /api/v1/states/08/tprs/drcog/crashes
-  ?year=2024
-  → All crashes in DRCOG MPO area
-
-GET /api/v1/states/08/corridors/I-25/crashes
-  ?from_county=101&to_county=069
-  → I-25 crashes from Pueblo to Larimer
-
-GET /api/v1/compare
-  ?entities=08:035,08:005,08:031
-  &metrics=total,fatal,epdo
-  → Compare Douglas, Arapahoe, Denver
+┌─────────────────────────────────────────────────────────────────┐
+│              MONTHLY DATA PIPELINE (Python)                       │
+│              Runs once/month on developer machine or CI           │
+│                                                                   │
+│  ┌──────────┐    ┌───────────────┐    ┌──────────────────────┐  │
+│  │ Raw CSV  │───▶│ Process &     │───▶│ OUTPUT:              │  │
+│  │ from CDOT│    │ Standardize   │    │                      │  │
+│  │          │    │ (existing     │    │ ├─ counties/          │  │
+│  │          │    │  scripts)     │    │ │  ├─ 035/            │  │
+│  │          │    │               │    │ │  │  ├─ crashes.parquet │
+│  │          │    │               │    │ │  │  └─ summary.json │  │
+│  │          │    │               │    │ │  ├─ 041/            │  │
+│  │          │    │               │    │ │  │  ├─ crashes.parquet │
+│  │          │    │               │    │ │  │  └─ summary.json │  │
+│  │          │    │               │    │ │  └─ ...             │  │
+│  │          │    │               │    │ ├─ regions/           │  │
+│  │          │    │               │    │ │  ├─ region_1.json   │  │
+│  │          │    │               │    │ │  ├─ region_2.json   │  │
+│  │          │    │               │    │ │  └─ ...             │  │
+│  │          │    │               │    │ ├─ statewide.json     │  │
+│  │          │    │               │    │ └─ manifest.json      │  │
+│  └──────────┘    └───────────────┘    └──────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                    Deploy to static hosting
+                    (GitHub Pages / S3 / Netlify)
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              BROWSER RUNTIME (Zero Backend)                       │
+│                                                                   │
+│  ┌────────────┐   ┌─────────────────┐   ┌──────────────────┐   │
+│  │ Load JSON  │──▶│ Render Dashboard│──▶│ User drills into │   │
+│  │ summaries  │   │ (instant)       │   │ specific county  │   │
+│  │ (~50 KB)   │   │                 │   │                  │   │
+│  └────────────┘   └─────────────────┘   └────────┬─────────┘   │
+│                                                    │             │
+│                    ┌───────────────────────────────▼──────────┐  │
+│                    │ Tier 2: Load from IndexedDB (if cached)  │  │
+│                    │ OR fetch Parquet from CDN                 │  │
+│                    │ → Cache in IndexedDB for next time       │  │
+│                    └───────────────────────────────┬──────────┘  │
+│                                                    │             │
+│                    ┌───────────────────────────────▼──────────┐  │
+│                    │ Tier 3: DuckDB-WASM for ad-hoc SQL      │  │
+│                    │ (cross-county queries, custom filters)   │  │
+│                    └─────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Database Schema (PostgreSQL + PostGIS)
+### Pre-Computed Output File Structure
 
-```sql
--- States
-CREATE TABLE states (
-    fips CHAR(2) PRIMARY KEY,
-    name VARCHAR(100),
-    abbreviation CHAR(2),
-    dot_name VARCHAR(50),
-    config JSONB
-);
-
--- Regions (CDOT Engineering Regions, VDOT Districts, etc.)
-CREATE TABLE regions (
-    id VARCHAR(50) PRIMARY KEY,
-    state_fips CHAR(2) REFERENCES states(fips),
-    name VARCHAR(200),
-    office_address TEXT,
-    boundary GEOMETRY(MultiPolygon, 4326),
-    config JSONB
-);
-
--- TPRs / MPOs
-CREATE TABLE planning_regions (
-    id VARCHAR(50) PRIMARY KEY,
-    state_fips CHAR(2) REFERENCES states(fips),
-    name VARCHAR(200),
-    type VARCHAR(20), -- 'mpo' or 'rural_tpr'
-    admin_org VARCHAR(200),
-    boundary GEOMETRY(MultiPolygon, 4326),
-    config JSONB
-);
-
--- Counties
-CREATE TABLE counties (
-    state_fips CHAR(2),
-    county_fips CHAR(3),
-    name VARCHAR(200),
-    region_id VARCHAR(50) REFERENCES regions(id),
-    boundary GEOMETRY(MultiPolygon, 4326),
-    config JSONB,
-    PRIMARY KEY (state_fips, county_fips)
-);
-
--- County ↔ TPR/MPO (many-to-many, handles partial counties)
-CREATE TABLE county_tpr_membership (
-    state_fips CHAR(2),
-    county_fips CHAR(3),
-    tpr_id VARCHAR(50) REFERENCES planning_regions(id),
-    coverage VARCHAR(20) DEFAULT 'full', -- 'full' or 'partial'
-    notes TEXT,
-    PRIMARY KEY (state_fips, county_fips, tpr_id)
-);
-
--- Crashes (partitioned by state for performance)
-CREATE TABLE crashes (
-    id BIGSERIAL,
-    state_fips CHAR(2),
-    county_fips CHAR(3),
-    crash_date DATE,
-    crash_year SMALLINT,
-    severity CHAR(1), -- K/A/B/C/O
-    collision_type VARCHAR(100),
-    route VARCHAR(200),
-    node VARCHAR(200),
-    location GEOMETRY(Point, 4326),
-    weather VARCHAR(100),
-    lighting VARCHAR(100),
-    pedestrian BOOLEAN,
-    bicycle BOOLEAN,
-    alcohol BOOLEAN,
-    speed BOOLEAN,
-    raw_data JSONB, -- Original row for state-specific fields
-    PRIMARY KEY (state_fips, id)
-) PARTITION BY LIST (state_fips);
-
--- Partition per state
-CREATE TABLE crashes_co PARTITION OF crashes FOR VALUES IN ('08');
-CREATE TABLE crashes_va PARTITION OF crashes FOR VALUES IN ('51');
-
--- Spatial index for map queries
-CREATE INDEX idx_crashes_location ON crashes USING GIST (location);
-
--- Pre-aggregated summaries (refreshed nightly)
-CREATE MATERIALIZED VIEW mv_county_summary AS
-SELECT
-    state_fips, county_fips, crash_year,
-    COUNT(*) as total_crashes,
-    SUM(CASE WHEN severity = 'K' THEN 1 ELSE 0 END) as fatal,
-    SUM(CASE WHEN severity = 'A' THEN 1 ELSE 0 END) as serious_injury,
-    SUM(CASE WHEN severity = 'K' THEN 462
-             WHEN severity = 'A' THEN 62
-             WHEN severity = 'B' THEN 12
-             WHEN severity = 'C' THEN 5
-             ELSE 1 END) as epdo_score
-FROM crashes
-GROUP BY state_fips, county_fips, crash_year;
 ```
+data/CDOT/
+├── manifest.json                    # Data freshness metadata
+│   {
+│     "lastUpdated": "2026-02-01",
+│     "dataVersion": "2026.02",
+│     "counties": { "035": { "rows": 24598, "years": [2021,2022,2023,2024,2025] } },
+│     "checksums": { "035/crashes.parquet": "sha256:abc123..." }
+│   }
+│
+├── statewide.json                   # ~20 KB — statewide aggregates
+│   {
+│     "totalCrashes": 142567,
+│     "bySeverity": { "K": 698, "A": 2134, "B": 8901, "C": 42567, "O": 88267 },
+│     "epdo": 512340,
+│     "byYear": { "2021": {...}, "2022": {...}, ... },
+│     "topCounties": [...]
+│   }
+│
+├── regions/
+│   ├── region_1.json                # ~10 KB — Region 1 aggregate
+│   ├── region_2.json
+│   ├── region_3.json
+│   ├── region_4.json
+│   └── region_5.json
+│
+├── tprs/
+│   ├── drcog.json                   # ~10 KB — DRCOG MPO aggregate
+│   ├── nfrmpo.json
+│   └── ...
+│
+├── counties/
+│   ├── 035/                         # Douglas County
+│   │   ├── crashes.parquet          # ~1.7 MB (vs ~17 MB CSV)
+│   │   ├── summary.json             # ~5 KB — pre-computed aggregates
+│   │   └── hotspots.json            # ~3 KB — top 25 hotspot locations
+│   ├── 041/                         # El Paso County
+│   │   ├── crashes.parquet
+│   │   ├── summary.json
+│   │   └── hotspots.json
+│   └── .../
+│
+└── corridors/
+    ├── I-25.json                    # ~5 KB — I-25 corridor summary
+    ├── I-70.json
+    └── ...
+```
+
+### Pre-Aggregated JSON Schema (summary.json per county)
+
+```json
+{
+  "county": { "fips": "035", "name": "Douglas County" },
+  "period": { "startYear": 2021, "endYear": 2025, "totalMonths": 49 },
+  "totals": {
+    "crashes": 24598,
+    "K": 42, "A": 187, "B": 1203, "C": 5432, "O": 17734,
+    "epdo": 67891,
+    "pedestrian": 234, "bicycle": 89, "impaired": 1567
+  },
+  "byYear": {
+    "2021": { "crashes": 5000, "K": 8, "A": 35, "B": 240, "C": 1100, "O": 3617 },
+    "2022": { "crashes": 4638, "K": 7, "A": 32, "B": 220, "C": 980, "O": 3399 }
+  },
+  "byRoute": {
+    "I 25": { "total": 3456, "K": 12, "A": 45, "epdo": 12340 },
+    "LINCOLN AVE": { "total": 890, "K": 3, "A": 18, "epdo": 3210 }
+  },
+  "topHotspots": [
+    { "route": "I 25", "node": "CASTLE PINES PKWY", "total": 234, "epdo": 4560 }
+  ],
+  "collisionTypes": { "Rear End": 8900, "Broadside": 3400, "Sideswipe": 2100 },
+  "weatherDist": { "Clear": 18000, "Rain": 3200, "Snow": 2100 },
+  "lightDist": { "Daylight": 16000, "Dark - Lighted": 4500, "Dark - Not Lighted": 2100 }
+}
+```
+
+### DuckDB-WASM Query Layer (Tier 3)
+
+When users need analysis beyond pre-computed summaries (ad-hoc cross-county queries, custom filters), DuckDB-WASM provides full SQL in the browser:
+
+```javascript
+// queryEngine.js — Thin wrapper around DuckDB-WASM
+
+const QueryEngine = (() => {
+    'use strict';
+
+    let db = null;
+
+    return {
+        /**
+         * Initialize DuckDB-WASM (lazy — only loaded when first query requested)
+         * Bundle is ~3-5MB, cached by browser after first load
+         */
+        async init() {
+            if (db) return;
+            const duckdb = await import('@duckdb/duckdb-wasm');
+            db = await duckdb.createWorker();
+            // Register remote Parquet file paths
+            await db.query(`CREATE VIEW crashes AS
+                SELECT * FROM read_parquet('data/CDOT/counties/*/crashes.parquet',
+                                           hive_partitioning=true)`);
+        },
+
+        /**
+         * Run analytical SQL query on crash data
+         * Works on remote Parquet files via HTTP range requests
+         */
+        async query(sql) {
+            await this.init();
+            return await db.query(sql);
+        },
+
+        /**
+         * Pre-built queries for common operations
+         */
+        async getRegionHotspots(regionId, topN = 25) {
+            const counties = HierarchyRegistry.getCountiesInRegion(regionId);
+            const paths = counties.map(c =>
+                `'data/CDOT/counties/${c}/crashes.parquet'`
+            ).join(', ');
+            return await this.query(`
+                SELECT route, node, county_fips,
+                       COUNT(*) as total,
+                       SUM(CASE WHEN severity = 'K' THEN 462
+                                WHEN severity = 'A' THEN 62
+                                WHEN severity = 'B' THEN 12
+                                WHEN severity = 'C' THEN 5
+                                ELSE 1 END) as epdo
+                FROM read_parquet([${paths}])
+                GROUP BY route, node, county_fips
+                ORDER BY epdo DESC
+                LIMIT ${topN}
+            `);
+        },
+
+        async getCorridorAnalysis(routePattern, yearStart, yearEnd) {
+            return await this.query(`
+                SELECT county_fips, crash_year,
+                       COUNT(*) as total,
+                       SUM(CASE WHEN severity IN ('K','A') THEN 1 ELSE 0 END) as ka,
+                       SUM(CASE WHEN pedestrian THEN 1 ELSE 0 END) as ped
+                FROM read_parquet('data/CDOT/counties/*/crashes.parquet')
+                WHERE route LIKE '${routePattern}%'
+                  AND crash_year BETWEEN ${yearStart} AND ${yearEnd}
+                GROUP BY county_fips, crash_year
+                ORDER BY county_fips, crash_year
+            `);
+        }
+    };
+})();
+```
+
+### Why NOT a Traditional Backend API
+
+| Concern | Traditional Backend | Our Zero-Backend Approach |
+|---------|--------------------|-----------------------------|
+| Server costs | $25-200+/month | $0 (static hosting) |
+| Operational burden | Database backups, migrations, monitoring, security patches | None |
+| Latency | Network round-trip to server | Local computation (instant) |
+| Offline support | No | Yes (IndexedDB + Service Worker) |
+| Scalability | Must provision for peak load | Each browser is its own "server" |
+| Data freshness | Real-time (unnecessary — data is monthly) | Monthly deploy (matches data cadence) |
+| Deployment | Docker, CI/CD, cloud provider | `git push` to GitHub Pages |
+| Single point of failure | Server goes down → app is down | CDN-distributed, no SPOF |
+
+A backend API becomes justified **only** when:
+- You need **server-side authentication** with role-based access control
+- You have **500+ concurrent users** where CDN bandwidth costs exceed $50/month
+- You need **real-time write operations** (user annotations, collaborative features)
+- You expand to **10+ states** where even Parquet files exceed practical CDN size
+
+At that point, use **Cloudflare D1** or **Turso** (edge SQLite) — not PostgreSQL. SQLite at the edge provides sub-10ms queries with zero infrastructure management.
 
 ---
 
@@ -1855,21 +2077,41 @@ GROUP BY state_fips, county_fips, crash_year;
 
 **Deliverable:** `python onboard_jurisdiction.py --state texas --setup` creates a working Texas instance.
 
-### Phase 7: Backend API (Weeks 31-40) — Optional
+### Phase 7: DuckDB-WASM + Parquet Query Layer (Weeks 31-36)
 
-**Goal:** Scale to multi-state with real-time data and many users.
+**Goal:** Enable ad-hoc cross-county and statewide SQL analysis entirely in the browser — no backend needed.
 
 | # | Task | Effort | Dependencies |
 |---|------|--------|--------------|
-| 7.1 | Design and implement REST API (FastAPI) | 10 days | — |
-| 7.2 | PostgreSQL + PostGIS database setup | 5 days | — |
-| 7.3 | Data import pipeline (CSV → PostgreSQL) | 5 days | 7.2 |
-| 7.4 | Modify frontend to use API when available, files as fallback | 5 days | 7.1 |
-| 7.5 | Authentication and role-based access | 5 days | 7.1 |
-| 7.6 | Docker containerization | 3 days | 7.1, 7.2 |
-| 7.7 | CI/CD for automated deployment | 3 days | 7.6 |
+| 7.1 | Add CSV → Parquet conversion to monthly data pipeline (`pyarrow`) | 3 days | 1.4 |
+| 7.2 | Integrate DuckDB-WASM library into app (lazy-loaded, ~3-5MB cached) | 3 days | — |
+| 7.3 | Build `QueryEngine` wrapper with pre-built queries (hotspots, corridors, comparisons) | 5 days | 7.2 |
+| 7.4 | Add "Custom Query" UI for power users (SQL input with safety constraints) | 3 days | 7.3 |
+| 7.5 | Connect cross-county hotspot analysis to DuckDB-WASM queries | 3 days | 7.3, 3.2 |
+| 7.6 | Performance testing: 64-county statewide queries in DuckDB-WASM | 2 days | 7.1, 7.3 |
+| 7.7 | Add query result caching (IndexedDB) for repeat cross-county queries | 2 days | 2.3, 7.3 |
 
-**Deliverable:** Production-grade backend supporting unlimited states and concurrent users.
+**Deliverable:** Full statewide analytical SQL capability running entirely in the browser with zero backend infrastructure.
+
+### Phase 8: Edge Database (Weeks 37+) — Only If Required
+
+**Goal:** Add server-side capabilities only if specific triggers are met.
+
+**Triggers (implement Phase 8 only if ANY of these become true):**
+- Need for **server-side authentication** (role-based access: CDOT HQ vs. public)
+- **500+ concurrent users** where CDN bandwidth exceeds $50/month
+- **Write capabilities** needed (user annotations, saved analyses, shared reports)
+- Expansion to **10+ states** where Parquet files exceed practical CDN hosting size
+
+| # | Task | Effort | Dependencies |
+|---|------|--------|--------------|
+| 8.1 | Set up Cloudflare D1 or Turso (edge SQLite) | 2 days | — |
+| 8.2 | Data import: Parquet → edge SQLite (monthly automated) | 2 days | 8.1 |
+| 8.3 | Lightweight API routes via Cloudflare Workers or Turso HTTP API | 3 days | 8.1 |
+| 8.4 | Frontend: detect API availability, use API or Parquet files transparently | 3 days | 8.3 |
+| 8.5 | Optional: Add authentication via Cloudflare Access or simple API keys | 2 days | 8.3 |
+
+**Deliverable:** Lightweight edge-hosted query layer with zero Docker, zero PostgreSQL, $0-5/month cost.
 
 ---
 
@@ -1881,7 +2123,7 @@ GROUP BY state_fips, county_fips, crash_year;
 | **CDOT data access** restricted or format changes | Medium | Pipeline breaks | Multiple download methods; format detection in StateAdapter auto-adapts |
 | **Overlapping TPR/Region boundaries** cause double-counting | Medium | Incorrect stats | Clearly document: each crash belongs to exactly one county; aggregation is county-based |
 | **Partial county TPR membership** hard to implement | Medium | Incorrect MPO stats | Start with full-county approximation; add point-in-polygon for precision later |
-| **Performance degradation** at scale | Medium | Poor UX | WebWorkers, IndexedDB caching, pre-aggregation, pagination |
+| **Performance degradation** at scale | Medium | Poor UX | Pre-aggregated JSON for dashboards, Parquet for 10x smaller files, IndexedDB caching, DuckDB-WASM for efficient SQL, WebWorkers for heavy computation |
 | **Stale data** across many counties | Low | Outdated analysis | Automated weekly GitHub Actions for scheduled counties; manifest tracks freshness |
 | **Cross-county intersection naming** inconsistent | Medium | Node matching fails | Normalize intersection names; use coordinates for proximity matching |
 | **GeoJSON boundaries** too large for browser | Low | Slow map | Simplify geometries (turf.simplify); use vector tiles at scale |
@@ -2125,7 +2367,7 @@ GROUP BY state_fips, county_fips, crash_year;
 
 7. **Multiple overlapping groupings** — A county simultaneously belongs to a CDOT Region AND a TPR/MPO AND corridors. The hierarchy model supports this natively via the DAG (not tree) structure.
 
-8. **Progressive enhancement** — Start with CSV files (works today), add IndexedDB caching (Phase 2), optionally add a backend API (Phase 3). The frontend code works identically in all three modes.
+8. **Progressive enhancement** — Start with pre-processed Parquet + JSON files (Phase 1, $0), add IndexedDB caching for repeat visits (Phase 2, $0), add DuckDB-WASM for ad-hoc statewide SQL (Phase 3, $0). Optionally add edge SQLite only if auth or 500+ concurrent users are needed (Phase 4, $0-5/mo). The frontend code works identically in all modes with zero backend infrastructure through Phase 3.
 
 ---
 
