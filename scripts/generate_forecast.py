@@ -539,26 +539,13 @@ def build_summary_stats(df, matrices):
     }
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Generate crash forecasts with Chronos-2")
-    parser.add_argument("--data", default="data/CDOT/douglas_all_roads.csv", help="Path to crash CSV")
-    parser.add_argument("--output", default="data/forecasts.json", help="Output JSON path")
-    parser.add_argument("--horizon", type=int, default=DEFAULT_HORIZON, help="Forecast horizon (months)")
-    parser.add_argument("--dry-run", action="store_true", help="Generate synthetic forecasts without SageMaker")
-    args = parser.parse_args()
-
-    # Resolve paths relative to project root
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    csv_path = os.path.join(project_root, args.data) if not os.path.isabs(args.data) else args.data
-    output_path = os.path.join(project_root, args.output) if not os.path.isabs(args.output) else args.output
-
-    # Load data
+def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_label=None):
+    """Generate forecast for a single crash data file."""
     df = load_crash_data(csv_path)
 
     # Set up endpoint caller or synthetic generator
-    if args.dry_run:
-        print("\n*** DRY RUN MODE — generating synthetic forecasts ***\n")
-        call_endpoint = lambda series, horizon: generate_synthetic_forecast(series, horizon)
+    if dry_run:
+        call_endpoint = lambda series, h: generate_synthetic_forecast(series, h)
     else:
         try:
             import boto3
@@ -571,10 +558,9 @@ def main():
             aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
             region_name=os.environ.get("AWS_REGION", "us-east-1"),
         )
-        call_endpoint = lambda series, horizon: invoke_endpoint(session, series, horizon)
+        call_endpoint = lambda series, h: invoke_endpoint(session, series, h)
 
     # Build all 6 matrices
-    horizon = args.horizon
     matrices = {}
 
     m01 = build_matrix_01(df, horizon, call_endpoint)
@@ -605,10 +591,11 @@ def main():
     # Assemble final output
     output = {
         "generated": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "model": "amazon/chronos-2" if not args.dry_run else "synthetic-demo",
+        "model": "amazon/chronos-2" if not dry_run else "synthetic-demo",
         "horizon": horizon,
         "quantileLevels": QUANTILE_LEVELS,
         "epdoWeights": EPDO_WEIGHTS,
+        "roadType": road_type_label or "all_roads",
         "summary": summary,
         "matrices": matrices,
     }
@@ -619,10 +606,92 @@ def main():
         json.dump(output, f, indent=2, default=str)
 
     print(f"\nForecast written to {output_path}")
+    print(f"  Road type: {road_type_label or 'all_roads'}")
     print(f"  Matrices generated: {list(matrices.keys())}")
     print(f"  Horizon: {horizon} months")
     file_size = os.path.getsize(output_path)
     print(f"  File size: {file_size:,} bytes")
+
+
+# Road type configurations matching CRASH LENS UI filter options
+ROAD_TYPE_CONFIGS = {
+    "county_roads": {
+        "label": "County/City Roads Only",
+        "suffix": "county_roads",
+        "output": "forecasts_county_roads.json",
+    },
+    "no_interstate": {
+        "label": "All Roads (No Interstate)",
+        "suffix": "no_interstate",
+        "output": "forecasts_no_interstate.json",
+    },
+    "all_roads": {
+        "label": "All Roads (Including Interstates)",
+        "suffix": "all_roads",
+        "output": "forecasts_all_roads.json",
+    },
+}
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate crash forecasts with Chronos-2")
+    parser.add_argument("--data", default="data/CDOT/douglas_all_roads.csv", help="Path to crash CSV")
+    parser.add_argument("--output", default="data/forecasts.json", help="Output JSON path")
+    parser.add_argument("--horizon", type=int, default=DEFAULT_HORIZON, help="Forecast horizon (months)")
+    parser.add_argument("--dry-run", action="store_true", help="Generate synthetic forecasts without SageMaker")
+    parser.add_argument("--all-road-types", action="store_true",
+                        help="Generate forecasts for all 3 road type datasets (county_roads, no_interstate, all_roads)")
+    parser.add_argument("--jurisdiction", default="douglas",
+                        help="Jurisdiction name prefix for data files (default: douglas)")
+    parser.add_argument("--data-dir", default="data/CDOT",
+                        help="Directory containing road-type CSV files (default: data/CDOT)")
+    args = parser.parse_args()
+
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    if args.dry_run:
+        print("\n*** DRY RUN MODE — generating synthetic forecasts ***\n")
+
+    if args.all_road_types:
+        # Generate forecasts for all 3 road type datasets
+        data_dir = os.path.join(project_root, args.data_dir) if not os.path.isabs(args.data_dir) else args.data_dir
+        output_dir = os.path.join(project_root, "data")
+        generated = 0
+
+        for road_type, config in ROAD_TYPE_CONFIGS.items():
+            csv_file = os.path.join(data_dir, f"{args.jurisdiction}_{config['suffix']}.csv")
+            out_file = os.path.join(output_dir, config["output"])
+
+            if not os.path.exists(csv_file):
+                print(f"\n[SKIP] {csv_file} not found — skipping {road_type}")
+                continue
+
+            print(f"\n{'='*60}")
+            print(f"  Generating forecast: {config['label']}")
+            print(f"  Data: {csv_file}")
+            print(f"  Output: {out_file}")
+            print(f"{'='*60}")
+
+            generate_single_forecast(csv_file, out_file, args.horizon, args.dry_run, road_type)
+            generated += 1
+
+        print(f"\n{'='*60}")
+        print(f"  Generated {generated} forecast files for {generated} road types")
+        print(f"{'='*60}")
+    else:
+        # Single file mode (backward compatible)
+        csv_path = os.path.join(project_root, args.data) if not os.path.isabs(args.data) else args.data
+        output_path = os.path.join(project_root, args.output) if not os.path.isabs(args.output) else args.output
+
+        # Detect road type from filename
+        road_type = "all_roads"
+        for rt, config in ROAD_TYPE_CONFIGS.items():
+            if config["suffix"] in os.path.basename(csv_path):
+                road_type = rt
+                break
+
+        generate_single_forecast(csv_path, output_path, args.horizon, args.dry_run, road_type)
+
     print("\nDone!")
 
 
