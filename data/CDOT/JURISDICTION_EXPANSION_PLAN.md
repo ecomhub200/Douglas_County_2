@@ -234,12 +234,19 @@ https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropoli
 
 **Integration with Existing Architecture:**
 
-This endpoint should be added to `API_AVAILABILITY` in `index.html`:
+These endpoints should be added to `API_AVAILABILITY` in `index.html`:
 ```javascript
-btsMPOBoundaries: { scope: 'national', label: 'MPO Boundaries (BTS NTAD)' }
+// Add to existing API_AVAILABILITY object:
+btsMPOBoundaries:     { scope: 'national', label: 'MPO Boundaries (BTS NTAD)' },
+tigerwebPlaces:       { scope: 'national', label: 'City/Place Boundaries (TIGERweb)' },
+tigerwebTracts:       { scope: 'national', label: 'Census Tracts (TIGERweb)' },
+tigerwebUrbanAreas:   { scope: 'national', label: 'Urban Areas (TIGERweb)' },
+tigerwebSchoolDist:   { scope: 'national', label: 'School District Boundaries (TIGERweb)' },
+tigerwebStates:       { scope: 'national', label: 'State Boundaries (TIGERweb)' }
+// Note: tigerwebCounties and tigerwebCouSub already implicitly used via existing tigerweb config
 ```
 
-And to the `config.json` transit/boundary configuration for runtime use.
+And to the `config.json` boundary configuration for runtime use (see Section 8 for full layer catalog).
 
 ### Key Insight: Overlapping Hierarchies
 
@@ -565,7 +572,128 @@ const AggregationEngine = (() => {
 
 ## 8. State-Level Configuration System
 
-### Proposed Directory Structure
+### TIGERweb API — Complete Boundary Layer Catalog
+
+The tool already uses TIGERweb for county boundaries (layer 82) and county subdivisions (magisterial districts). TIGERweb provides **many more boundary layers** that are critical for the jurisdiction expansion — all free, national, and queryable via the same ArcGIS REST pattern we already use.
+
+**Base URLs (already in `config.json`):**
+```
+Census 2020:  https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer
+Current 2025: https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer
+Places:       https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer
+```
+
+**Important:** TIGERweb does **NOT** have MPO boundary polygons. MPOs are federal DOT planning designations, not Census geographies. Use BTS NTAD for MPO boundaries (see Section 4).
+
+#### HIGH VALUE — Required for Jurisdiction Expansion
+
+| Layer Name | ID (Current) | ID (Census2020) | Geometry | Use Case in Expansion Plan |
+|------------|-------------|-----------------|----------|---------------------------|
+| **States** | 80 | 80 | Polygon | State outline for statewide view choropleth. Replaces static `state_outline.geojson` |
+| **Counties** | 82 | 82 | Polygon | Already using. Core boundary for every county view |
+| **County Subdivisions** | 22 | 20 | Polygon | Already using (`countySubdivisionsUrl`). VA magisterial districts, CO precincts |
+| **Incorporated Places** | 28 | 26 | Polygon | **City/town boundaries — unlocks City/Place level in hierarchy model.** Castle Rock, Lone Tree, Parker boundaries for Douglas Co. |
+| **Census Designated Places** | 30 | 28 | Polygon | Unincorporated community boundaries (e.g., Highlands Ranch, Roxborough Park). Complements Incorporated Places |
+| **Census Tracts** | 8 | 6 | Polygon | Equity analysis (EJScreen, CDC SVI, Justice40). Crash rate per capita at sub-county level. Required for MPO-specific feature "Equity analysis" (Section 13) |
+| **Urban Areas (2020 Corrected)** | 88 | 88 | Polygon | Official Census urban/rural classification. Required for urban vs. rural crash pattern comparisons at state level, transit safety relevance filtering, ped/bike analysis |
+
+#### MEDIUM VALUE — Useful for Future Features
+
+| Layer Name | ID (Current) | ID (Census2020) | Geometry | Use Case |
+|------------|-------------|-----------------|----------|----------|
+| **Metropolitan Statistical Areas** | 93 | 76 | Polygon | MSA boundaries (Census-defined metro areas, NOT the same as MPOs). Useful for federal statistical comparisons |
+| **Combined Statistical Areas** | 97 | 72 | Polygon | Larger metro groupings (e.g., Denver-Aurora CSA). Corridor-level analysis spanning MSAs |
+| **119th Congressional Districts** | 54 | 52 (116th) | Polygon | Legislative advocacy — "crashes in your district, Representative Smith" |
+| **2024 State Legislative Districts (Upper)** | 56 | 54 (2018) | Polygon | State-level legislative advocacy |
+| **2024 State Legislative Districts (Lower)** | 58 | 56 (2018) | Polygon | State-level legislative advocacy |
+| **ZIP Code Tabulation Areas** | 2 | 84 | Polygon | Crash analysis by ZIP code (common user request) |
+| **School Districts (Unified)** | 14 | 12 | Polygon | School district boundary overlay for school safety analysis. Complements LEA ID school location data |
+| **School Districts (Secondary)** | 16 | 14 | Polygon | Secondary school district boundaries |
+| **School Districts (Elementary)** | 18 | 16 | Polygon | Elementary school district boundaries |
+| **Census Block Groups** | 10 | 8 | Polygon | Fine-grained equity analysis (EJScreen uses block groups) |
+
+#### Query Pattern (Same as Existing County Boundary Query)
+
+All layers use the same ArcGIS REST query pattern already implemented in `addJurisdictionBoundaryLayer()`:
+
+```javascript
+// Example: Get all Incorporated Places in Douglas County, CO
+const apiUrl = `${tigerwebConfig.baseUrl}/28/query?` +
+    `where=${encodeURIComponent("STATE='08' AND COUNTY='035'")}` +
+    `&outFields=NAME,PLACEFP,LSAD,FUNCSTAT` +
+    `&returnGeometry=true&outSR=4326&f=geojson`;
+
+// Example: Get Colorado state outline
+const apiUrl = `${tigerwebConfig.baseUrl}/80/query?` +
+    `where=${encodeURIComponent("STATE='08'")}` +
+    `&outFields=NAME,STATE,GEOID` +
+    `&returnGeometry=true&outSR=4326&f=geojson`;
+
+// Example: Get Census Tracts in Douglas County for equity analysis
+const apiUrl = `${tigerwebConfig.baseUrl}/8/query?` +
+    `where=${encodeURIComponent("STATE='08' AND COUNTY='035'")}` +
+    `&outFields=NAME,TRACT,GEOID` +
+    `&returnGeometry=true&outSR=4326&f=geojson`;
+
+// Example: Get 2020 Urban Areas intersecting Colorado
+const apiUrl = `${tigerwebConfig.baseUrl}/88/query?` +
+    `where=1=1` +
+    `&geometry=${encodeURIComponent(JSON.stringify(coloradoBbox))}` +
+    `&geometryType=esriGeometryEnvelope` +
+    `&spatialRel=esriSpatialRelIntersects` +
+    `&outFields=NAME10,UATYP10,GEOID10` +
+    `&returnGeometry=true&outSR=4326&f=geojson`;
+```
+
+#### Proposed `config.json` Layer Configuration (Enhanced)
+
+```json
+{
+  "apis": {
+    "tigerweb": {
+      "enabled": true,
+      "baseUrl": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer",
+      "census2020Url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer",
+      "placesUrl": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer",
+      "stateFips": "08",
+      "layers": {
+        "states": 80,
+        "counties": 82,
+        "countySubdivisions": 22,
+        "incorporatedPlaces": 28,
+        "censusDesignatedPlaces": 30,
+        "censusTracts": 8,
+        "censusBlockGroups": 10,
+        "urbanAreas": 88,
+        "metroStatisticalAreas": 93,
+        "combinedStatisticalAreas": 97,
+        "congressionalDistricts": 54,
+        "stateLegislativeUpper": 56,
+        "stateLegislativeLower": 58,
+        "schoolDistrictsUnified": 14,
+        "schoolDistrictsSecondary": 16,
+        "schoolDistrictsElementary": 18,
+        "zipCodeTabAreas": 2
+      }
+    }
+  }
+}
+```
+
+#### Which Layers Replace Static GeoJSON Files
+
+| Static File | TIGERweb Replacement | Query |
+|-------------|---------------------|-------|
+| `state_outline.geojson` | Layer 80 (States) | `STATE='08'` |
+| `counties.geojson` | Layer 82 (Counties) | `STATE='08'` → returns all 64 |
+| `counties_full/{fips}.geojson` | Layer 82 (Counties) | `STATE='08' AND COUNTY='{fips}'` |
+| `tpr_boundaries.geojson` | **BTS NTAD MPO API** (not TIGERweb) | `STATE='CO'` |
+| `regions.geojson` | **No TIGERweb equivalent** — CDOT regions are custom | Must remain static |
+| City/Place boundaries (new) | Layer 28 + 30 (Places + CDPs) | `STATE='08' AND COUNTY='{fips}'` |
+
+> **Note:** TIGERweb replaces the need for most static GeoJSON files in the boundary directory. Only CDOT Region boundaries and corridor geometries must remain as static files since they are DOT-specific administrative boundaries that Census does not define.
+
+### Proposed Directory Structure (Updated)
 
 ```
 states/
@@ -578,15 +706,15 @@ states/
 ├── 08/                           # Colorado (by FIPS code)
 │   ├── config.json               # State config (move from data/CDOT/config.json)
 │   ├── hierarchy.json            # NEW: Region/MPO/county mappings
-│   ├── regions.geojson           # NEW: CDOT region boundaries
-│   ├── counties.geojson          # NEW: County boundaries (from Census)
-│   ├── tpr_boundaries.geojson    # NEW: TPR/MPO boundaries
+│   ├── regions.geojson           # CDOT region boundaries (static — no Census equivalent)
 │   └── corridors.json            # NEW: Major corridor definitions
+│   # NOTE: County, state, place, tract boundaries all fetched live from TIGERweb API
+│   # NOTE: MPO/TPR boundaries fetched live from BTS NTAD MPO API (see Section 4)
 │
 ├── 51/                           # Virginia (by FIPS code)
 │   ├── config.json               # Existing (moved from states/virginia/)
 │   ├── hierarchy.json            # NEW: VDOT district/MPO mappings
-│   ├── regions.geojson           # VDOT district boundaries
+│   ├── regions.geojson           # VDOT district boundaries (static — no Census equivalent)
 │   └── corridors.json            # Major corridor definitions
 │
 └── template/                     # NEW: Template for new states
@@ -986,10 +1114,14 @@ data/
 │   │       ├── douglas.json
 │   │       └── ...
 │   │
-│   └── boundaries/                # GeoJSON boundaries (NEW)
-│       ├── counties.geojson
-│       ├── regions.geojson
-│       └── tprs.geojson           # Fallback; prefer BTS NTAD MPO API (see Section 4)
+│   └── boundaries/                # Static GeoJSON boundaries (reduced — most come from TIGERweb API)
+│       ├── regions.geojson        # CDOT region boundaries (static — no Census/TIGERweb equivalent)
+│       └── corridors/             # Major route geometries (static — from CDOT/OSM)
+│           ├── I-25.geojson
+│           └── I-70.geojson
+│       # County, state, place, tract, urban area boundaries → fetched live from TIGERweb API
+│       # MPO/TPR boundaries → fetched live from BTS NTAD MPO API (see Section 4)
+│       # All cached in IndexedDB after first fetch
 │
 ├── VA/                            # Virginia state data (restructured)
 │   ├── counties/
@@ -999,6 +1131,7 @@ data/
 │   │   └── .../
 │   ├── aggregates/
 │   └── boundaries/
+│       └── regions.geojson        # VDOT district boundaries (static)
 │
 └── README.md                      # Data directory documentation
 ```
@@ -2419,9 +2552,25 @@ At that point, use **Cloudflare D1** or **Turso** (edge SQLite) — not PostgreS
     "enabled": true,
     "hierarchyFile": "states/08/hierarchy.json",
     "boundaryFiles": {
-      "counties": "states/08/counties.geojson",
-      "regions": "states/08/regions.geojson",
-      "tprs": "states/08/tprs.geojson"
+      "regions": "states/08/regions.geojson"  // Only static file — CDOT-specific
+      // All other boundaries fetched from TIGERweb/BTS APIs:
+      // Counties, state outline, places, tracts → TIGERweb API (see Section 8)
+      // MPO/TPR boundaries → BTS NTAD MPO API (see Section 4)
+    },
+    "boundaryApis": {
+      "tigerweb": {
+        "stateOutline": { "layer": 80, "where": "STATE='{stateFips}'" },
+        "counties": { "layer": 82, "where": "STATE='{stateFips}'" },
+        "places": { "layer": 28, "where": "STATE='{stateFips}' AND COUNTY='{countyFips}'" },
+        "cdps": { "layer": 30, "where": "STATE='{stateFips}' AND COUNTY='{countyFips}'" },
+        "censusTracts": { "layer": 8, "where": "STATE='{stateFips}' AND COUNTY='{countyFips}'" },
+        "urbanAreas": { "layer": 88, "spatialQuery": true },
+        "schoolDistricts": { "layer": 14, "where": "STATE='{stateFips}'" }
+      },
+      "btsMPO": {
+        "endpoint": "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0/query",
+        "where": "STATE='{stateAbbrev}' OR STATE_2='{stateAbbrev}' OR STATE_3='{stateAbbrev}'"
+      }
     },
     "aggregateDir": "data/CDOT/aggregates",
     "countyDataDir": "data/CDOT/counties",
@@ -2464,3 +2613,7 @@ At that point, use **Cloudflare D1** or **Turso** (edge SQLite) — not PostgreS
 - [BTS NTAD Metropolitan Planning Organizations (Boundary Polygons)](https://geodata.bts.gov/datasets/usdot::metropolitan-planning-organizations/about)
 - [BTS NTAD MPO ArcGIS Feature Service](https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0)
 - [BTS National Transportation Atlas Database](https://www.bts.gov/ntad)
+- [TIGERweb Census 2020 MapServer (Layer Catalog)](https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer)
+- [TIGERweb Current (2025) MapServer (Layer Catalog)](https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer)
+- [TIGERweb REST Services](https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html)
+- [TIGER/Line Shapefiles Documentation](https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html)

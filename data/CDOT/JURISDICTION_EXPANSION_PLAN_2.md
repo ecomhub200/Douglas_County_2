@@ -955,38 +955,87 @@ This is the definitive reference for how each tab behaves at each jurisdiction l
 
 ## 21. Boundary & GeoJSON Loading Strategy
 
-### File Organization
+### Design Philosophy: Live APIs Over Static Files
+
+The original design assumed static GeoJSON files for all boundaries. With TIGERweb (already integrated) and BTS NTAD APIs available, **most boundaries should be fetched live from federal APIs** rather than maintained as static files. This eliminates manual boundary file creation when onboarding new states and ensures boundaries stay current.
+
+**API Sources for Boundaries:**
+
+| Boundary Type | API Source | Why Not the Other? |
+|---------------|-----------|-------------------|
+| State outline | **TIGERweb** layer 80 | Census is authoritative source for state boundaries |
+| County boundaries | **TIGERweb** layer 82 | Already using this. Census is authoritative |
+| County subdivisions | **TIGERweb** layer 22 | Already using this (`countySubdivisionsUrl`) |
+| City/Place boundaries | **TIGERweb** layer 28 + 30 | Census Incorporated Places + CDPs |
+| Census Tracts | **TIGERweb** layer 8 | For equity analysis overlays |
+| Urban Areas | **TIGERweb** layer 88 | For urban/rural classification |
+| School Districts | **TIGERweb** layer 14/16/18 | Boundary complement to LEA ID school locations |
+| MPO/TPR boundaries | **BTS NTAD** MPO API | TIGERweb does NOT have MPO layers — MPOs are DOT planning designations, not Census geographies |
+| DOT Regions (CDOT/VDOT) | **Static GeoJSON** | State DOT regions are custom administrative boundaries — no federal API |
+| Corridors | **Static GeoJSON** | Route geometries from state DOT or OSM |
+
+### Static Files (Reduced — Only DOT-Specific Boundaries)
 
 ```
 data/CDOT/boundaries/
-├── state_outline.geojson           # ~50 KB — Colorado state boundary
-├── counties_simplified.geojson     # ~500 KB — All 64 counties (simplified for state view)
-├── counties_full/                  # Full-detail county boundaries (loaded on demand)
-│   ├── 001_adams.geojson           # ~30 KB each
-│   ├── 005_arapahoe.geojson
-│   ├── 035_douglas.geojson
-│   └── .../
-├── regions.geojson                 # ~100 KB — 5 CDOT region boundaries
-├── tprs.geojson                    # ~200 KB — 15 TPR/MPO boundaries
+├── regions.geojson                 # ~100 KB — 5 CDOT region boundaries (static — no federal API)
 └── corridors/                      # Major route geometries
     ├── I-25.geojson
     ├── I-70.geojson
     └── .../
 ```
 
-### Loading Sequence
+> **Why so few static files?** County boundaries, state outlines, city/place boundaries, census tracts, urban areas, and school districts are all available from TIGERweb. MPO boundaries come from BTS NTAD. Only CDOT-specific region boundaries and corridor route geometries have no federal API source. This means onboarding a new state requires only **one static GeoJSON file** (the state DOT's region/district boundaries) plus the corridor routes.
 
-| User Action | GeoJSON Loaded | Total Size |
-|------------|----------------|------------|
-| Opens state view | `state_outline` + `counties_simplified` + `regions` | ~650 KB |
-| Selects Region 1 | `counties_full/` for 10 counties in Region 1 | ~300 KB additional |
-| Drills into Douglas County | Already loaded from Region step | 0 additional |
-| Selects corridor I-25 | `corridors/I-25.geojson` | ~50 KB additional |
-| Selects TPR view | `tprs.geojson` (if not already loaded) | ~200 KB |
+### Loading Sequence (Updated with API Sources)
 
-### Live API Alternative: BTS NTAD MPO Boundary Service
+| User Action | Boundary Data Source | API / File | Estimated Size |
+|------------|---------------------|-----------|----------------|
+| Opens state view | State outline | TIGERweb layer 80: `STATE='08'` | ~50 KB |
+| | All 64 county boundaries (simplified) | TIGERweb layer 82: `STATE='08'` + simplify client-side | ~500 KB |
+| | 5 CDOT region outlines | Static `regions.geojson` | ~100 KB |
+| Selects Region 1 | 10 county boundaries (full detail) | TIGERweb layer 82: `STATE='08' AND COUNTY IN (...)` | ~300 KB |
+| Drills into Douglas County | County boundary | Already cached from Region step | 0 additional |
+| | City/Place boundaries | TIGERweb layer 28: `STATE='08' AND COUNTY='035'` | ~40 KB |
+| | Census tracts (for equity overlay) | TIGERweb layer 8: `STATE='08' AND COUNTY='035'` | ~80 KB |
+| Selects TPR/MPO view | All CO MPO boundaries | BTS NTAD MPO API: `STATE='CO'` | ~200 KB |
+| Selects specific MPO (DRCOG) | DRCOG polygon | Cached from previous step | 0 additional |
+| Selects corridor I-25 | Corridor route geometry | Static `corridors/I-25.geojson` | ~50 KB |
+| Toggles Urban Areas overlay | Urban area polygons | TIGERweb layer 88: spatial query within state bbox | ~150 KB |
+| Toggles School Districts overlay | School district boundaries | TIGERweb layer 14: `STATE='08'` | ~200 KB |
+| Onboards new state (e.g., Texas) | All TX boundaries | TIGERweb + BTS NTAD — zero manual GeoJSON needed | Auto |
 
-Instead of maintaining static `tprs.geojson` files per state, MPO/TPR boundaries can be loaded dynamically from the BTS National Transportation Atlas Database:
+### TIGERweb Query Pattern (Same as Existing Implementation)
+
+All boundary layers use the identical ArcGIS REST query pattern already implemented for county boundaries in `addJurisdictionBoundaryLayer()`:
+
+```javascript
+// Generic boundary loader — works for any TIGERweb layer
+async function loadTigerWebBoundary(layerId, whereClause, outFields) {
+    const apiUrl = `${tigerwebConfig.baseUrl}/${layerId}/query?` +
+        `where=${encodeURIComponent(whereClause)}` +
+        `&outFields=${outFields}` +
+        `&returnGeometry=true&outSR=4326&f=geojson`;
+    const response = await fetch(apiUrl);
+    return await response.json();
+}
+
+// State outline
+loadTigerWebBoundary(80, "STATE='08'", "NAME,STATE,GEOID");
+
+// All places in Douglas County
+loadTigerWebBoundary(28, "STATE='08' AND COUNTY='035'", "NAME,PLACEFP,LSAD");
+
+// Census tracts for equity analysis
+loadTigerWebBoundary(8, "STATE='08' AND COUNTY='035'", "NAME,TRACT,GEOID");
+
+// Urban areas (spatial query for state bbox)
+loadTigerWebBoundary(88, "1=1", "NAME10,UATYP10,GEOID10");  // + geometry envelope
+```
+
+### BTS NTAD MPO Boundary Service
+
+For MPO/TPR boundaries — **NOT available from TIGERweb** (MPOs are DOT planning designations, not Census geographies):
 
 **API Endpoint:**
 ```
@@ -1006,23 +1055,17 @@ https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropoli
 | User Action | Data Source | Fallback |
 |------------|------------|----------|
 | Opens state view | Static `regions.geojson` (CDOT regions) | Always available |
-| Selects TPR/MPO view | **BTS MPO API** → query `?where=STATE='CO'&f=geojson` | Static `tprs.geojson` |
+| Selects TPR/MPO view | **BTS MPO API** → query `?where=STATE='CO'&f=geojson` | Generate from county boundaries |
 | Selects specific MPO (e.g., DRCOG) | **BTS MPO API** → query `?where=ACRONYM='DRCOG'&f=geojson` | Cached from previous query |
 | Onboards new state | **BTS MPO API** → auto-discover all MPOs for that state | Manual GeoJSON creation |
 
-**Advantages Over Static GeoJSON:**
-- No manual boundary maintenance when MPOs change (expansions, mergers, redesignations)
-- Automatically works for any US state during jurisdiction onboarding
-- Includes metadata (population, designation date, website) alongside geometry
-- Solves the partial-county problem with precise polygon boundaries (see Part 1, Section 13)
-
 ### Caching Strategy
 
-- All GeoJSON files cached in IndexedDB after first load
-- **BTS MPO boundaries:** Cache in IndexedDB with quarterly expiration (aligned with NTAD updates)
-- Cache invalidation: check ETag monthly (boundaries rarely change)
-- Simplified boundaries for state view are ALWAYS loaded (fast)
-- Full-detail boundaries loaded on demand and cached
+- **TIGERweb boundaries:** Cache in IndexedDB with **annual** expiration (Census boundaries change only on decennial or annual BAS updates)
+- **BTS MPO boundaries:** Cache in IndexedDB with **quarterly** expiration (aligned with NTAD updates)
+- **Static GeoJSON** (regions, corridors): Cache in IndexedDB, invalidate when `hierarchy.json` version changes
+- All cached boundaries are loaded instantly on repeat visits — API calls only on first visit or cache expiration
+- State-level view requires ~650 KB total on first load — instant on any connection after caching
 
 ---
 
