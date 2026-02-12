@@ -26,9 +26,10 @@
 18. [Step-by-Step: Adding a New State](#18-step-by-step-adding-a-new-state)
 19. [Colorado (CDOT) Complete Example](#19-colorado-cdot-complete-example)
 20. [CDOT Auto-Downloader & Merge Strategy](#20-cdot-auto-downloader--merge-strategy)
-21. [Appendix A: Standardized Output Columns](#appendix-a-standardized-output-columns)
-22. [Appendix B: VDOT Value Reference Tables](#appendix-b-vdot-value-reference-tables)
-23. [Appendix C: Command-Line Reference](#appendix-c-command-line-reference)
+21. [Stage 5: Prediction Forecasting](#21-stage-5-prediction-forecasting)
+22. [Appendix A: Standardized Output Columns](#appendix-a-standardized-output-columns)
+23. [Appendix B: VDOT Value Reference Tables](#appendix-b-vdot-value-reference-tables)
+24. [Appendix C: Command-Line Reference](#appendix-c-command-line-reference)
 
 ---
 
@@ -40,15 +41,16 @@ The pipeline converts raw state-specific crash CSVs into a normalized, validated
 Raw CSV(s) from State DOT
       |
       v
-+----------------+    +----------------+    +----------------+    +----------------+    +----------------+
-|   STAGE 0      |    |   STAGE 1      |    |   STAGE 2      |    |   STAGE 3      |    |   STAGE 4      |
-|   MERGE        |--->|   CONVERT      |--->|   VALIDATE     |--->|   GEOCODE      |--->|   SPLIT        |
-|   (optional)   |    |   (normalize)  |    |   (QA/QC)      |    |   (fill GPS)   |    |   (road type)  |
-+----------------+    +----------------+    +----------------+    +----------------+    +----------------+
-                                                                                              |
-                                                                                              v
-                                                                                    3 output CSV files
-                                                                                    + pipeline_report.json
++----------------+    +----------------+    +----------------+    +----------------+    +----------------+    +----------------+
+|   STAGE 0      |    |   STAGE 1      |    |   STAGE 2      |    |   STAGE 3      |    |   STAGE 4      |    |   STAGE 5      |
+|   MERGE        |--->|   CONVERT      |--->|   VALIDATE     |--->|   GEOCODE      |--->|   SPLIT        |--->|   PREDICT      |
+|   (optional)   |    |   (normalize)  |    |   (QA/QC)      |    |   (fill GPS)   |    |   (road type)  |    |   (forecast)   |
++----------------+    +----------------+    +----------------+    +----------------+    +----------------+    +----------------+
+                                                                                                                     |
+                                                                                                                     v
+                                                                                                           3 output CSV files
+                                                                                                           + pipeline_report.json
+                                                                                                           + 3 forecast JSON files
 ```
 
 ### Core Design Principle
@@ -87,6 +89,8 @@ project_root/
 |   +-- process_crash_data.py         # Main pipeline orchestrator
 |   +-- state_adapter.py              # State detection + normalization (THE KEY FILE)
 |   +-- split_cdot_data.py            # Road-type filtering
+|   +-- generate_forecast.py          # Stage 5: Prediction forecast generator
+|   +-- deploy_chronos_endpoint.py    # SageMaker Chronos-2 endpoint lifecycle
 |   +-- pipeline_server.py            # HTTP server for browser uploads
 |   +-- fix_douglas_conversion.py     # One-time correction script (reference only)
 |
@@ -111,6 +115,9 @@ project_root/
 |   |   +-- {jurisdiction}_county_roads.csv  # Stage 4 output
 |   |   +-- {jurisdiction}_no_interstate.csv # Stage 4 output
 |   |   +-- crashes.csv               # Default fallback (copy of county_roads)
+|   |   +-- forecasts_county_roads.json   # Stage 5: Prediction forecast (county roads)
+|   |   +-- forecasts_no_interstate.json  # Stage 5: Prediction forecast (no interstate)
+|   |   +-- forecasts_all_roads.json      # Stage 5: Prediction forecast (all roads)
 |   |   +-- .geocode_cache.json      # Persistent geocode cache
 |   |   +-- .validation/
 |   |       +-- pipeline_report.json  # Processing report
@@ -194,6 +201,26 @@ Also see [Section 13](#13-geocoding-strategy) for detailed strategy documentatio
 | `{jurisdiction}_no_interstate.csv` | System Code != "Interstate Highway" |
 
 Also copies `county_roads.csv` to `data/{DOT}/crashes.csv` as the UI default fallback.
+
+### Stage 5: PREDICT (Forecast Generation) — Optional
+
+**Script:** `generate_forecast.py`
+**What it does:** Reads the 3 split CSVs from Stage 4, aggregates crash data into monthly time series, and generates probabilistic forecasts using Amazon SageMaker Chronos-2 (or synthetic fallback). Produces one JSON forecast file per road type.
+
+**Inputs:** Stage 4 split CSVs (`{jurisdiction}_county_roads.csv`, `{jurisdiction}_no_interstate.csv`, `{jurisdiction}_all_roads.csv`)
+**Outputs:** `forecasts_county_roads.json`, `forecasts_no_interstate.json`, `forecasts_all_roads.json`
+
+See [Section 21](#21-stage-5-prediction-forecasting) for full details.
+
+**Execution modes:**
+
+| Mode | Flag | When | AWS Required? |
+|------|------|------|---------------|
+| Live | _(default)_ | CI/CD with AWS secrets | Yes |
+| Dry-run | `--dry-run` | Local dev, no AWS credentials | No |
+| Skip | _(omit `--predict`)_ | Data corrections, no need for new forecasts | No |
+
+**Stage 5 failure is non-fatal.** If the SageMaker endpoint is down or credentials are missing, Stages 0-4 still produce valid CSV outputs. Stage 5 logs a warning and falls back to dry-run mode.
 
 ---
 
@@ -706,6 +733,9 @@ data/CDOT/
   douglas_county_roads.csv       # Stage 4: County roads only (383 KB)
   douglas_no_interstate.csv      # Stage 4: No interstate (1.2 MB)
   crashes.csv                    # Copy of county_roads (UI default fallback)
+  forecasts_county_roads.json    # Stage 5: Prediction forecast (~200 KB)
+  forecasts_no_interstate.json   # Stage 5: Prediction forecast (~230 KB)
+  forecasts_all_roads.json       # Stage 5: Prediction forecast (~230 KB)
   .geocode_cache.json            # Persistent geocode cache (grows over time)
   .validation/
     pipeline_report.json         # Processing statistics
@@ -1519,6 +1549,293 @@ Run with: `python -m pytest tests/test_cdot_downloader.py -v`
 
 ---
 
+## 21. Stage 5: Prediction Forecasting
+
+> **Purpose:** Generate crash forecasts from the pipeline's split CSV outputs so the CRASH LENS Prediction tab has data for any state/jurisdiction that completes Stages 0-4.
+
+### Why Stage 5 Belongs in the Pipeline
+
+Without Stage 5, prediction is a separate manual step. When onboarding a new state (e.g., TxDOT, GDOT), someone must remember to run `generate_forecast.py` separately — and if they forget, the Prediction tab shows nothing. By making prediction a pipeline stage:
+
+1. **New state = automatic predictions.** Completing Stage 4 automatically triggers Stage 5
+2. **New data year = updated forecasts.** Pushing a new year CSV re-runs the full pipeline including fresh predictions
+3. **Single pipeline.** No separate workflow to maintain or coordinate
+4. **Data consistency.** Forecasts always reflect the latest validated, geocoded, split data
+
+### Pipeline Position: After SPLIT
+
+```
+Stage 4: SPLIT                      Stage 5: PREDICT
+3 road-type CSVs                    3 forecast JSONs
+     |                                   |
+     v                                   v
+{jurisdiction}_county_roads.csv  →  forecasts_county_roads.json
+{jurisdiction}_no_interstate.csv →  forecasts_no_interstate.json
+{jurisdiction}_all_roads.csv     →  forecasts_all_roads.json
+```
+
+**Why not earlier?**
+- After MERGE/CONVERT: Data isn't validated or geocoded — garbage in, garbage forecast
+- After VALIDATE: Road-type splits don't exist yet; predictions are road-type-specific
+- After SPLIT: Clean, validated, geocoded, road-type-filtered data — perfect input
+
+### Input & Output
+
+**Inputs (from Stage 4):**
+
+| File | Used For |
+|------|----------|
+| `{jurisdiction}_county_roads.csv` | County/city road forecasts |
+| `{jurisdiction}_no_interstate.csv` | Non-interstate forecasts |
+| `{jurisdiction}_all_roads.csv` | All-roads forecasts |
+
+**Outputs (to `data/{DOT}/`):**
+
+| File | Size (typical) | Contents |
+|------|---------------|----------|
+| `forecasts_county_roads.json` | ~200 KB | 6 matrices + 10 derived metrics for county roads |
+| `forecasts_no_interstate.json` | ~230 KB | 6 matrices + 10 derived metrics for no-interstate |
+| `forecasts_all_roads.json` | ~230 KB | 6 matrices + 10 derived metrics for all roads |
+
+### The 6 Prediction Matrices
+
+Each forecast JSON contains 6 matrices built from the crash time series:
+
+| Matrix | ID | What It Forecasts | Input Columns |
+|--------|----|-------------------|---------------|
+| Total Crash Frequency | `m01` | County-wide monthly crash count | `Crash Date` |
+| Severity-Level Multivariate | `m02` | K/A/B/C/O monthly counts + EPDO | `Crash Severity` |
+| Corridor Cross-Learning | `m03` | Top 10 routes (auto-detected) | `RTE Name` |
+| Crash Type Distribution | `m04` | Rear-end, angle, sideswipe, etc. | `Collision Type` |
+| Contributing Factor Trends | `m05` | Speed, alcohol, ped, bike, night | Boolean flags |
+| Intersection vs Segment | `m06` | Location type split | `Intersection Type` |
+
+### The 10 Derived Metrics
+
+Built from the 6 matrices, these provide higher-order analytics:
+
+| Metric | Source | What It Tells You |
+|--------|--------|-------------------|
+| `confidenceWidth` | M01 | How uncertain are forecasts? (CV% → low/moderate/high) |
+| `epdoForecast` | M02 | EPDO-weighted risk forecast (safety cost, not just crash count) |
+| `kaForecast` | M01 + M02 | Fatal + serious injury rate prediction |
+| `severityShift` | M02 | Is the severity mix getting worse or better? |
+| `corridorRankMovement` | M03 | Which corridors are rising/falling in risk ranking? |
+| `crashTypeMomentum` | M04 | Which crash types are accelerating/decelerating? |
+| `factorTrends` | M05 | Contributing factor slopes (e.g., alcohol involvement rising?) |
+| `seasonalRiskCalendar` | M01 + M02 | Highest/lowest risk months in the forecast window |
+| `compositeRiskScore` | All | Blended risk index: EPDO (50%) + trend (30%) + severity shift (20%) |
+| `locationTypeSplit` | M06 | Intersection vs segment predicted share |
+
+### Forecast JSON Structure
+
+```json
+{
+  "generated": "2026-02-12T01:51:21",
+  "model": "amazon/chronos-2" | "synthetic-demo",
+  "horizon": 12,
+  "quantileLevels": [0.1, 0.25, 0.5, 0.75, 0.9],
+  "epdoWeights": {"K": 462, "A": 62, "B": 12, "C": 5, "O": 1},
+  "roadType": "county_roads" | "no_interstate" | "all_roads",
+  "summary": {
+    "totalCrashes": 12788,
+    "years": [2021, 2022, 2023, 2024, 2025],
+    "dateRange": {"start": "2021-01", "end": "2025-11"},
+    "severity": {"K": 48, "A": 336, "B": 1036, "C": 1068, "O": 10300},
+    "epdo": 71080,
+    "monthlyAvg": 216.7,
+    "recentTrend": {"recent6mo": 1164, "prev6mo": 1233, "changePct": -5.6}
+  },
+  "matrices": {
+    "m01": { "history": [...], "forecast": {"months": [...], "p10": [...], "p50": [...], "p90": [...]} },
+    "m02": { "history": {...}, "forecast": {...}, "epdoHistory": [...] },
+    "m03": { "corridors": { "I-25": { "history": [...], "forecast": {...}, "stats": {...} }, ... } },
+    "m04": { "types": { "rear_end": { "history": [...], "forecast": {...}, "total": N }, ... } },
+    "m05": { "factors": { "speed": { "total": N, "history": [...], "forecast": {...} }, ... } },
+    "m06": { "locationTypes": { "segment": { "history": [...], "forecast": {...} }, ... } }
+  },
+  "derivedMetrics": {
+    "confidenceWidth": {...},
+    "epdoForecast": {...},
+    "kaForecast": {...},
+    "severityShift": {...},
+    "corridorRankMovement": {...},
+    "crashTypeMomentum": {...},
+    "factorTrends": {...},
+    "seasonalRiskCalendar": {...},
+    "compositeRiskScore": {...},
+    "locationTypeSplit": {...}
+  }
+}
+```
+
+### Execution Modes
+
+#### Mode 1: Live (SageMaker Chronos-2)
+
+```bash
+python scripts/generate_forecast.py --all-road-types --jurisdiction douglas --data-dir data/CDOT
+```
+
+Requires `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` environment variables and a running SageMaker endpoint (`crashlens-chronos2-endpoint`).
+
+#### Mode 2: Dry-Run (Synthetic Forecasts)
+
+```bash
+python scripts/generate_forecast.py --all-road-types --dry-run --jurisdiction douglas --data-dir data/CDOT
+```
+
+Generates plausible synthetic forecasts using seasonal decomposition + noise. No AWS credentials needed. Uses `random.seed(42)` for reproducible output. Output JSON marks `"model": "synthetic-demo"`.
+
+#### Mode 3: Skip (No Prediction)
+
+Simply omit Stage 5. Stages 0-4 produce valid CSV outputs. The Prediction tab will show "No forecast data available" if no JSON exists.
+
+### Auto-Detection: Corridors for Any State
+
+The hardcoded `TOP_CORRIDORS` list in `generate_forecast.py` is Colorado-specific (I-25, C-470, etc.). For multi-state support, corridors should be auto-detected from the data:
+
+```python
+# Auto-detect top corridors from crash data (no configuration needed)
+top_routes = df.groupby('RTE Name').size().nlargest(10).index.tolist()
+```
+
+This means **zero corridor configuration** when onboarding a new state — the pipeline discovers which routes matter from the data itself.
+
+### State-Specific vs Universal Configuration
+
+| Configuration | Source | State-Specific? |
+|--------------|--------|-----------------|
+| Top corridors | Auto-detected from `RTE Name` crash counts | No (auto) |
+| EPDO weights | `states/{state}/config.json` → `epdoWeights` | Potentially (most DOTs use same) |
+| Crash type mapping | Uses VDOT-normalized `Collision Type` values | No (Stage 1 already normalized) |
+| Boolean flag names | `Speed?`, `Alcohol?`, etc. (standardized) | No (Stage 1 already normalized) |
+| Intersection types | Uses VDOT-normalized `Intersection Type` values | No (Stage 1 already normalized) |
+| Output directory | `data/{DOT}/` from pipeline args | Yes (per-DOT folder) |
+
+**Key insight:** Because Stage 1 normalizes ALL state data to VDOT format, the forecast generator reads the same standardized column names regardless of state. The only truly state-specific inputs are the top corridors (auto-detected) and EPDO weights (usually identical nationally).
+
+### Multi-DOT Output Structure
+
+Each DOT's forecast data lives alongside its source CSVs:
+
+```
+data/
+├── CDOT/                               # Colorado
+│   ├── douglas_county_roads.csv        # Stage 4 output
+│   ├── douglas_no_interstate.csv
+│   ├── douglas_all_roads.csv
+│   ├── forecasts_county_roads.json     # Stage 5 output
+│   ├── forecasts_no_interstate.json
+│   └── forecasts_all_roads.json
+│
+├── TxDOT/                              # Texas (future)
+│   ├── harris_county_roads.csv
+│   ├── harris_no_interstate.csv
+│   ├── harris_all_roads.csv
+│   ├── forecasts_county_roads.json
+│   ├── forecasts_no_interstate.json
+│   └── forecasts_all_roads.json
+│
+└── GDOT/                               # Georgia (future)
+    ├── fulton_county_roads.csv
+    └── forecasts_county_roads.json
+```
+
+The CRASH LENS frontend loads forecasts from the active DOT's data directory, so no frontend changes are needed for new states.
+
+### CI/CD Integration
+
+#### How Stage 5 Chains with Stages 0-4
+
+```
+process-cdot-data.yml (auto-triggers on CSV push to data/CDOT/)
+    |
+    v
+  Stages 0-4: Merge → Convert → Validate → Geocode → Split
+    |
+    v
+  Stage 5: generate_forecast.py --all-road-types --dry-run
+    |                           (or live if AWS secrets available)
+    v
+  Commit: data/CDOT/forecasts*.json + pipeline outputs
+```
+
+#### Existing Separate Workflow
+
+The `generate-forecast.yml` workflow also exists as a standalone trigger (monthly cron + manual dispatch). This is useful for:
+- Regenerating forecasts with a different horizon (6 vs 12 vs 24 months)
+- Switching from dry-run to live SageMaker when the endpoint is deployed
+- Running forecasts without re-processing the full pipeline
+
+Both approaches produce identical output files in `data/{DOT}/`.
+
+### When to Regenerate Forecasts
+
+| Event | Regenerate? | Why |
+|-------|-------------|-----|
+| New year of data added | **Yes** | New data materially changes time series |
+| GPS coordinates corrected | No | GPS doesn't affect monthly aggregates |
+| Duplicate rows removed | Maybe | Only if >5% of rows affected |
+| Value mapping fix | Maybe | Only if it changes severity, collision type, or boolean flags |
+| New state onboarded | **Yes** | First-time forecast generation |
+| Analyst tuned parameters | No | Use `--predict-force` to explicitly overwrite |
+
+### Overwrite Protection
+
+If `forecasts_*.json` already exists, Stage 5 will overwrite by default (same as Stages 0-4 overwriting their outputs). To prevent accidental overwrites of manually-tuned forecasts, the pipeline can be invoked without Stage 5 by omitting the `--predict` flag.
+
+### Verification
+
+After Stage 5, verify forecast quality:
+
+```bash
+# Run prediction accuracy test
+python3 tests/test_prediction_accuracy.py
+
+# Quick manual check
+python3 -c "
+import json
+with open('data/CDOT/forecasts_county_roads.json') as f:
+    d = json.load(f)
+print(f'Model: {d[\"model\"]}')
+print(f'Matrices: {list(d[\"matrices\"].keys())}')
+print(f'Derived: {list(d[\"derivedMetrics\"].keys())}')
+print(f'Total crashes: {d[\"summary\"][\"totalCrashes\"]:,}')
+print(f'Severity sum: {sum(d[\"summary\"][\"severity\"].values()):,}')
+"
+```
+
+### Adding Stage 5 for a New State
+
+When you've completed Stages 0-4 for a new state:
+
+1. **No corridor config needed** — auto-detected from `RTE Name`
+2. **No type mapping needed** — Stage 1 already normalized to VDOT format
+3. **Check EPDO weights** — add to `states/{state}/config.json` if different from default
+4. **Run**: `python scripts/generate_forecast.py --all-road-types --dry-run --jurisdiction {jurisdiction} --data-dir data/{DOT}`
+5. **Verify**: `python3 tests/test_prediction_accuracy.py`
+6. **Deploy live**: Replace `--dry-run` with AWS credentials for SageMaker endpoint
+
+### Prediction Verification Checklist
+
+After generating forecasts for any state:
+
+- [ ] All 3 forecast JSONs exist: `forecasts_county_roads.json`, `forecasts_no_interstate.json`, `forecasts_all_roads.json`
+- [ ] Each JSON has all 6 matrices (m01-m06)
+- [ ] Each JSON has all 10 derived metrics
+- [ ] `summary.totalCrashes` matches the source CSV row count
+- [ ] `summary.severity` sum equals `summary.totalCrashes`
+- [ ] EPDO calculation: `sum(severity[s] * weight[s])` matches `summary.epdo`
+- [ ] Forecast `p10 ≤ p25 ≤ p50 ≤ p75 ≤ p90` quantile ordering holds
+- [ ] All forecast values are non-negative
+- [ ] History months match the source CSV date range
+- [ ] Forecast months extend `horizon` months beyond the last history month
+- [ ] Corridor names in M03 exist in the source CSV's `RTE Name` column
+- [ ] `county_roads` forecast total < `all_roads` forecast total (subset relationship)
+
+---
+
 ## Appendix A: Standardized Output Columns
 
 ### Core VDOT-Compatible Columns (51)
@@ -1794,8 +2111,21 @@ Run these checks AFTER processing a new state's data, BEFORE deploying:
 - [ ] StateAdapter correctly detects the state from CSV headers
 - [ ] `config.json` `roadSystems.filterProfiles` match actual SYSTEM column values
 
-#### Automated Test
+#### Prediction Forecast Checks (Stage 5)
+- [ ] All 3 forecast JSONs exist in `data/{DOT}/`
+- [ ] Each JSON has all 6 matrices (m01-m06) and all 10 derived metrics
+- [ ] `summary.totalCrashes` matches source CSV row count
+- [ ] `summary.severity` sum equals `summary.totalCrashes`
+- [ ] EPDO calculation is consistent (`sum(severity * weight) == summary.epdo`)
+- [ ] Quantile ordering holds: `p10 ≤ p25 ≤ p50 ≤ p75 ≤ p90` for every forecast point
+- [ ] Forecast horizon extends correct number of months from last history month
+- [ ] Corridor names in M03 exist in the source CSV
+
+#### Automated Tests
 ```bash
 python3 tests/cdot_data_accuracy_test.py
 # Must pass 100% — any CRITICAL or HIGH failure blocks deployment
+
+python3 tests/test_prediction_accuracy.py
+# Validates all forecast JSONs against source CSVs
 ```
