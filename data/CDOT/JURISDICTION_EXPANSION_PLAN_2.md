@@ -32,10 +32,11 @@
 19. [Reports Section — No Expansion (Single-Jurisdiction Only)](#19-reports-section--no-expansion-single-jurisdiction-only)
 20. [Complete View Adaptation Matrix](#20-complete-view-adaptation-matrix)
 21. [Boundary & GeoJSON Loading Strategy](#21-boundary--geojson-loading-strategy)
-22. [Progressive Detail Rendering Philosophy](#22-progressive-detail-rendering-philosophy)
-23. [Scope Selector Interaction with Non-Explore Tabs](#23-scope-selector-interaction-with-non-explore-tabs)
-24. [Performance Constraints by Jurisdiction Level](#24-performance-constraints-by-jurisdiction-level)
-25. [Amendments to Part 1](#25-amendments-to-part-1)
+22. [Spatial Accuracy: Bbox-Fetch + Polygon-Clip](#22-spatial-accuracy-bbox-fetch--polygon-clip)
+23. [Progressive Detail Rendering Philosophy](#23-progressive-detail-rendering-philosophy)
+24. [Scope Selector Interaction with Non-Explore Tabs](#24-scope-selector-interaction-with-non-explore-tabs)
+25. [Performance Constraints by Jurisdiction Level](#25-performance-constraints-by-jurisdiction-level)
+26. [Amendments to Part 1](#26-amendments-to-part-1)
 
 ---
 
@@ -83,7 +84,7 @@ Part 1, Section 10 (line 1044-1051) shows a table where **CMF, AI Assistant, and
 > | CMF | Select intersection in county | Select intersection across any county in region | Select intersection anywhere in state |
 > | Grants | County HSIP ranking | Regional HSIP project prioritization | Statewide HSIP allocation by region |
 
-**This should be corrected.** CMF and Grants do NOT expand. The cross-county intersection selection behavior described for CMF at region level is actually part of the **Hot Spots** or **Intersections** tab under Explore, not the CMF/Solutions tab. See [Section 25: Amendments to Part 1](#25-amendments-to-part-1) for the corrections.
+**This should be corrected.** CMF and Grants do NOT expand. The cross-county intersection selection behavior described for CMF at region level is actually part of the **Hot Spots** or **Intersections** tab under Explore, not the CMF/Solutions tab. See [Section 26: Amendments to Part 1](#26-amendments-to-part-1) for the corrections.
 
 ### AI Assistant Exception
 
@@ -1069,7 +1070,72 @@ https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropoli
 
 ---
 
-## 22. Progressive Detail Rendering Philosophy
+## 22. Spatial Accuracy: Bbox-Fetch + Polygon-Clip
+
+### Problem Statement
+
+All external spatial API calls (BTS Transit, Overpass/OSM, Mapillary) use **bounding box envelopes** — rectangular queries that always include area outside the actual jurisdiction polygon. For irregularly-shaped jurisdictions, this means 15-60% of returned data belongs to **neighboring jurisdictions**.
+
+This is especially problematic for tabs that display counts or statistics (Road Inventory mileage, transit stop counts, signal counts), where bbox overshoot directly inflates reported numbers.
+
+### Solution: Client-Side Polygon Clipping
+
+**Strategy:** Keep the bbox for the API query (fast, universally supported), then clip results client-side using the actual TIGERweb polygon that is already fetched and cached by `addJurisdictionBoundaryLayer()`.
+
+### How It Applies to Each Tab
+
+| Tab | Data Source | Bbox API | Clip Method | Impact |
+|-----|------------|----------|-------------|--------|
+| **Transit** (Analysis) | BTS National Transit Map | `esriGeometryEnvelope` | `pointInFeature()` per stop | Removes stops from neighboring counties |
+| **Road Inventory** (Analysis) | Overpass/OSM | `bbox` in Overpass QL | `turf.booleanIntersects()` per way | Removes road segments outside boundary |
+| **School Safety** (Analysis) | NCES/CCD API | Potential bbox query | `pointInFeature()` per school | Removes schools outside boundary |
+| **Infrastructure Assets** (Analysis) | Mapillary Graph | `bbox` parameter | `pointInFeature()` per feature | Removes signs/features outside boundary |
+| **Mapillary Assets** (Analysis) | Mapillary Graph | `bbox` parameter | `pointInFeature()` per feature | Removes assets outside boundary |
+| **Map Tab** (signals, roads) | Overpass/OSM | `bbox` in Overpass QL | `pointInFeature()` for nodes, `turf.booleanIntersects()` for ways | Clean signal/road display |
+
+### Required Loading Sequence
+
+```
+1. User selects jurisdiction
+       │
+       ├──► Fetch TIGERweb polygon (if not cached)     ──► Cache in geojsonCache
+       │         [addJurisdictionBoundaryLayer()]
+       │
+       └──► Fetch data from bbox API (in parallel)      ──► Raw results
+                  [transitTryStatewideData(), etc.]
+       │
+       ▼
+2. BOTH responses received
+       │
+       ▼
+3. Clip raw results to polygon
+       │   pointInFeature() for points
+       │   turf.booleanIntersects() for lines
+       │   turf.intersect() for polygons
+       │
+       ▼
+4. Display clipped results (accurate to jurisdiction boundary)
+```
+
+**Key dependency:** Steps 1a and 1b run in **parallel** (no waiting). Step 3 waits for both. If polygon fetch fails, fallback to unclipped bbox results with a UI warning.
+
+### Existing Codebase Infrastructure
+
+All required components **already exist** in `index.html`:
+
+- `turf.js` loaded at line 52
+- `pointInFeature(lng, lat, feature)` at line 113584 — handles Polygon + MultiPolygon with bbox pre-filter
+- `computeFeatureBoundingBox(feature)` at line 113541 — caches bbox for fast rejection
+- `builtInLayersState.jurisdictionBoundary.geojsonCache[id]` — stores TIGERweb county polygon
+- `computeDistrictCrashStatistics()` at line 113617 — already uses this exact pipeline (100K+ crash points assigned to district polygons)
+
+### Cross-Reference
+
+Full technical specification including `SpatialClipService` module design, three-tier clipping strategy, performance benchmarks, and integration points: **See Part 1, Section 16 — Spatial Accuracy: Bbox-Fetch + Polygon-Clip Strategy**.
+
+---
+
+## 23. Progressive Detail Rendering Philosophy
 
 ### The Core Principle
 
@@ -1112,7 +1178,7 @@ The **100x+ memory difference** between state and county views is why progressiv
 
 ---
 
-## 23. Scope Selector Interaction with Non-Explore Tabs
+## 24. Scope Selector Interaction with Non-Explore Tabs
 
 ### Problem
 
@@ -1154,7 +1220,7 @@ When in Solutions tab:
 
 ---
 
-## 24. Performance Constraints by Jurisdiction Level
+## 25. Performance Constraints by Jurisdiction Level
 
 ### Memory Budget
 
@@ -1177,7 +1243,7 @@ Total: **~390 KB** for full statewide dashboard rendering. Instant on any connec
 
 ---
 
-## 25. Amendments to Part 1
+## 26. Amendments to Part 1
 
 The following corrections should be applied to `JURISDICTION_EXPANSION_PLAN.md` (Part 1):
 

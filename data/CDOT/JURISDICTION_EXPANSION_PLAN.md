@@ -25,12 +25,13 @@
 13. [MPO/Regional Aggregation Engine](#13-mporegional-aggregation-engine)
 14. [Statewide View (CDOT HQ)](#14-statewide-view-cdot-hq)
 15. [Multi-State Scaling Strategy](#15-multi-state-scaling-strategy)
-16. [Database & Storage Strategy](#16-database--storage-strategy)
-17. [Data Pipeline & Query Architecture (Zero-Backend)](#17-data-pipeline--query-architecture-zero-backend)
-18. [Phased Implementation Roadmap](#18-phased-implementation-roadmap)
-19. [Risk Assessment & Mitigations](#19-risk-assessment--mitigations)
-20. [Appendix A: Complete Colorado County-to-Region Mapping](#appendix-a-complete-colorado-county-to-region-mapping)
-21. [Appendix B: Configuration Schema Reference](#appendix-b-configuration-schema-reference)
+16. [Spatial Accuracy: Bbox-Fetch + Polygon-Clip Strategy](#16-spatial-accuracy-bbox-fetch--polygon-clip-strategy)
+17. [Database & Storage Strategy](#17-database--storage-strategy)
+18. [Data Pipeline & Query Architecture (Zero-Backend)](#18-data-pipeline--query-architecture-zero-backend)
+19. [Phased Implementation Roadmap](#19-phased-implementation-roadmap)
+20. [Risk Assessment & Mitigations](#20-risk-assessment--mitigations)
+21. [Appendix A: Complete Colorado County-to-Region Mapping](#appendix-a-complete-colorado-county-to-region-mapping)
+22. [Appendix B: Configuration Schema Reference](#appendix-b-configuration-schema-reference)
 
 ---
 
@@ -1971,7 +1972,337 @@ For FHWA or multi-state organizations:
 
 ---
 
-## 16. Database & Storage Strategy
+## 16. Spatial Accuracy: Bbox-Fetch + Polygon-Clip Strategy
+
+### The Problem
+
+All external spatial API queries in CRASH LENS use **bounding box (bbox) envelopes** — rectangular queries that fetch data within a geographic rectangle. However, actual jurisdiction boundaries are **irregular polygons** (counties have winding borders along rivers, mountain ridges, historical survey lines). The bbox rectangle always includes area **outside** the actual jurisdiction, meaning API results contain data from neighboring jurisdictions.
+
+**Impact of bbox overshoot by jurisdiction shape:**
+
+| Jurisdiction Shape | Bbox Overshoot | Example |
+|---|---|---|
+| Compact/square county | ~15-25% | Arapahoe County, CO |
+| Elongated county | ~40-60% | Augusta County, VA; Grand County, CO |
+| Independent city (irregular) | ~50-70% | Richmond City, VA; Denver City/County, CO |
+| Coastal/river boundary | ~30-50% | Any county bounded by rivers |
+
+A county with 40% bbox overshoot shows **40% false data** — transit stops, traffic signals, road segments, and Mapillary features from neighboring jurisdictions that do not belong to the selected jurisdiction.
+
+### Current API Calls Using Bbox
+
+**14 distinct bbox-based API call patterns** across 3 API families:
+
+#### ArcGIS Feature Services (`esriGeometryEnvelope`)
+
+| API | Purpose | Current Code |
+|-----|---------|--------------|
+| BTS National Transit Map | Transit stops | `transitTryStatewideData()` — `esriGeometryEnvelope` spatial query |
+| BTS Transit fallback | Transit stops (spatial) | Fallback spatial query — `esriGeometryEnvelope` |
+
+#### Overpass/OSM API (`bbox` parameter)
+
+| API | Purpose | Current Code |
+|-----|---------|--------------|
+| Road network | Road centerlines | Overpass `way["highway"]({bbox})` |
+| Traffic signals | Signal locations | Overpass `node["highway"="traffic_signals"]({bbox})` |
+| Speed limits | Speed data | Overpass `way["maxspeed"]({bbox})` |
+| Bike/ped facilities | Multimodal infrastructure | Overpass `way["cycleway"]({bbox})` etc. |
+| Road Inventory | Full road inventory | Overpass with chunked bbox |
+| Segment Analysis | Road segments for analysis | Overpass bbox query |
+
+#### Mapillary Graph API (`bbox` parameter)
+
+| API | Purpose | Current Code |
+|-----|---------|--------------|
+| Traffic signs | Sign detection | `mapillary/map_features?bbox=` |
+| Map features | Road features | `mapillary/map_features?bbox=` |
+| Location assets | Intersection assets | `mapillary/map_features?bbox=` |
+| Custom selection assets | User-selected area | `mapillary/map_features?bbox=` |
+| Street signs | Street signs | `mapillary/map_features?bbox=` |
+
+#### Config-based bbox matching
+
+| API | Purpose | Current Code |
+|-----|---------|--------------|
+| Jurisdiction crash counting | Multi-jurisdiction counts | `config.bbox` rectangle matching |
+
+### The Solution: Two-Step Bbox-Fetch + Polygon-Clip
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SPATIAL ACCURACY PIPELINE                      │
+│                                                                   │
+│  STEP 1: Bbox Fetch (Server-Side — FAST)                         │
+│  ┌─────────────────────────────────────────────────────────┐     │
+│  │  API Request: esriGeometryEnvelope / OSM bbox / Mapillary│     │
+│  │  Returns: All features in RECTANGULAR area               │     │
+│  │  Speed: Hits server's spatial index — milliseconds        │     │
+│  │  Result: 100% recall, but ~15-60% false positives         │     │
+│  └─────────────────────────────────────────────────────────┘     │
+│                          │                                        │
+│                          ▼                                        │
+│  STEP 2: Polygon Clip (Client-Side — PRECISE)                    │
+│  ┌─────────────────────────────────────────────────────────┐     │
+│  │  Jurisdiction polygon: TIGERweb county boundary (cached)  │     │
+│  │  Filter: pointInFeature(lng, lat, jurisdictionPolygon)    │     │
+│  │  For lines: turf.booleanIntersects(line, polygon)         │     │
+│  │  For areas: turf.intersect(area, polygon)                 │     │
+│  │  Result: 100% recall, 100% precision                      │     │
+│  └─────────────────────────────────────────────────────────┘     │
+│                          │                                        │
+│                          ▼                                        │
+│  DISPLAY: Only features within actual jurisdiction boundary       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Existing Infrastructure (Already Built)
+
+The codebase already has **all components needed** for this pipeline:
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| **turf.js library** | Line 52: `<script src="turf.min.js">` | Already loaded |
+| **`pointInFeature(lng, lat, feature)`** | Line 113584 | Already works for Polygon + MultiPolygon |
+| **`pointInPolygon(point, ring)`** | Line 113505 | Ray-casting algorithm, proven |
+| **`computeFeatureBoundingBox(feature)`** | Line 113541 | Pre-computes bbox for fast rejection |
+| **`pointInBoundingBox(lng, lat, bbox)`** | Line 113574 | Fast rectangular pre-filter |
+| **TIGERweb polygon cache** | `builtInLayersState.jurisdictionBoundary.geojsonCache[id]` | Cached after first fetch |
+| **District crash assignment** | Line 113617: `computeDistrictCrashStatistics()` | Already uses this exact pipeline on 100K+ rows |
+
+### Three-Tier Clipping Strategy
+
+Different geometry types require different clipping methods:
+
+#### Tier 1: Point Data (transit stops, signals, crossings, Mapillary features)
+
+```javascript
+// After bbox API fetch returns pointFeatures[]
+const jurisdictionPolygon = builtInLayersState.jurisdictionBoundary
+    .geojsonCache[currentJurisdictionId]?.features?.[0];
+
+const clippedPoints = pointFeatures.filter(f => {
+    const [lng, lat] = f.geometry.coordinates || [f.geometry.x, f.geometry.y];
+    return pointInFeature(lng, lat, jurisdictionPolygon);
+});
+// clippedPoints contains ONLY points inside the actual jurisdiction boundary
+```
+
+**Performance:** Sub-millisecond for typical datasets (<5,000 points). The bbox pre-filter inside `pointInFeature()` rejects 30-50% of candidates before the expensive ray-casting test.
+
+#### Tier 2: Line Data (road segments, speed limit ways, bike/ped facilities)
+
+```javascript
+// After bbox API fetch returns lineFeatures[]
+const jurisdictionTurf = turf.feature(jurisdictionPolygon.geometry);
+
+const clippedLines = lineFeatures.filter(f => {
+    return turf.booleanIntersects(turf.feature(f.geometry), jurisdictionTurf);
+});
+// For partial overlap, optionally clip to boundary:
+// const clippedLine = turf.lineSplit(lineFeature, jurisdictionTurf);
+```
+
+**Performance:** 10-50ms for typical road networks (1,000-5,000 segments). `booleanIntersects` is fast; `lineSplit` is slower but only needed for display precision.
+
+#### Tier 3: Polygon Data (urban areas, school districts, census tracts)
+
+```javascript
+// After bbox API fetch returns polygonFeatures[]
+const jurisdictionTurf = turf.feature(jurisdictionPolygon.geometry);
+
+const clippedPolygons = polygonFeatures.map(f => {
+    const intersection = turf.intersect(
+        turf.featureCollection([turf.feature(f.geometry), jurisdictionTurf])
+    );
+    return intersection ? { ...f, geometry: intersection.geometry } : null;
+}).filter(Boolean);
+// clippedPolygons shows ONLY the portions within the jurisdiction boundary
+```
+
+**Performance:** 50-200ms for typical polygon datasets (10-50 features). `turf.intersect` is the most expensive operation but polygon datasets are small.
+
+### Why NOT Server-Side Polygon Query
+
+ArcGIS REST API supports `esriGeometryPolygon` as an alternative to `esriGeometryEnvelope`, which would let the server do the clipping. However:
+
+| Factor | Server-Side Polygon | Client-Side Bbox+Clip |
+|--------|---------------------|----------------------|
+| **Request size** | 5,000-20,000 coordinate pairs per county polygon | 4 numbers (bbox) |
+| **Server processing** | Slower — complex polygon intersection | Fast — spatial index envelope lookup |
+| **Network payload** | Large POST body | Small GET URL |
+| **Caching** | Cannot cache (unique polygon per request) | Bbox queries are highly cacheable |
+| **OSM/Mapillary support** | NOT supported (bbox only) | Works for ALL APIs |
+| **Recommendation** | Not recommended | **Recommended** |
+
+The client-side approach works **universally** across all three API families (ArcGIS, Overpass, Mapillary), while server-side polygon queries only work for ArcGIS.
+
+### Implementation Priority
+
+| Priority | API Target | Data Type | Clip Method | Impact |
+|----------|-----------|-----------|-------------|--------|
+| **P0 (Critical)** | BTS Transit Stops | Points | `pointInFeature()` | Transit tab shows wrong jurisdiction stops |
+| **P0 (Critical)** | Road Inventory (OSM) | Lines | `turf.booleanIntersects()` | Road stats include neighbor roads |
+| **P1 (High)** | Traffic Signals (OSM) | Points | `pointInFeature()` | Signal counts inflated |
+| **P1 (High)** | Mapillary Traffic Signs | Points | `pointInFeature()` | Sign inventory includes neighbors |
+| **P2 (Medium)** | Bike/Ped Facilities (OSM) | Lines | `turf.booleanIntersects()` | Facility counts inflated |
+| **P2 (Medium)** | Speed Limit Ways (OSM) | Lines | `turf.booleanIntersects()` | Speed data includes neighbor roads |
+| **P3 (Enhancement)** | Jurisdiction Crash Counting | Points | `pointInFeature()` | Multi-jurisdiction selector accuracy |
+
+### Proposed `SpatialClipService` Module
+
+```javascript
+/**
+ * SpatialClipService — Clips API results to actual jurisdiction polygon
+ * Uses bbox pre-filter for fast rejection + precise polygon test
+ *
+ * Depends on:
+ *   - turf.js (already loaded)
+ *   - pointInFeature() (already exists)
+ *   - builtInLayersState.jurisdictionBoundary.geojsonCache (TIGERweb polygon)
+ */
+const SpatialClipService = (() => {
+
+    /**
+     * Get the cached jurisdiction polygon (from TIGERweb)
+     * Must be called AFTER addJurisdictionBoundaryLayer() has completed
+     */
+    function getJurisdictionPolygon(jurisdictionId) {
+        const geojson = builtInLayersState?.jurisdictionBoundary
+            ?.geojsonCache?.[jurisdictionId];
+        if (!geojson?.features?.[0]) return null;
+        return geojson.features[0]; // GeoJSON Feature with Polygon/MultiPolygon geometry
+    }
+
+    /**
+     * Clip point features to jurisdiction boundary
+     * @param {Array} features - Array of GeoJSON/ArcGIS features with point geometry
+     * @param {string} jurisdictionId - Jurisdiction ID for polygon lookup
+     * @returns {Array} Features inside the jurisdiction polygon only
+     */
+    function clipPoints(features, jurisdictionId) {
+        const polygon = getJurisdictionPolygon(jurisdictionId);
+        if (!polygon) {
+            console.warn('[SpatialClip] No polygon cached — returning unclipped results');
+            return features; // Graceful fallback: return all if no polygon
+        }
+
+        return features.filter(f => {
+            const geom = f.geometry || {};
+            let lng, lat;
+
+            // Handle ArcGIS format (x/y)
+            if (geom.x !== undefined && geom.y !== undefined) {
+                lng = geom.x; lat = geom.y;
+            }
+            // Handle GeoJSON format (coordinates)
+            else if (geom.coordinates) {
+                [lng, lat] = geom.coordinates;
+            }
+            // Handle flat attributes
+            else {
+                const attrs = f.attributes || f.properties || f;
+                lng = parseFloat(attrs.longitude || attrs.lng || attrs.LON || attrs.x);
+                lat = parseFloat(attrs.latitude || attrs.lat || attrs.LAT || attrs.y);
+            }
+
+            if (isNaN(lng) || isNaN(lat)) return false;
+            return pointInFeature(lng, lat, polygon);
+        });
+    }
+
+    /**
+     * Clip line features to jurisdiction boundary
+     * @param {Array} features - Array of GeoJSON features with LineString geometry
+     * @param {string} jurisdictionId - Jurisdiction ID for polygon lookup
+     * @returns {Array} Features that intersect the jurisdiction polygon
+     */
+    function clipLines(features, jurisdictionId) {
+        const polygon = getJurisdictionPolygon(jurisdictionId);
+        if (!polygon) return features;
+
+        const polyTurf = turf.feature(polygon.geometry);
+        return features.filter(f => {
+            try {
+                return turf.booleanIntersects(turf.feature(f.geometry), polyTurf);
+            } catch (e) {
+                return true; // Keep feature if test fails
+            }
+        });
+    }
+
+    /**
+     * Clip polygon features to jurisdiction boundary (geometric intersection)
+     * @param {Array} features - Array of GeoJSON features with Polygon geometry
+     * @param {string} jurisdictionId - Jurisdiction ID for polygon lookup
+     * @returns {Array} Features clipped to jurisdiction boundary
+     */
+    function clipPolygons(features, jurisdictionId) {
+        const polygon = getJurisdictionPolygon(jurisdictionId);
+        if (!polygon) return features;
+
+        const polyTurf = turf.feature(polygon.geometry);
+        return features.map(f => {
+            try {
+                const intersection = turf.intersect(
+                    turf.featureCollection([turf.feature(f.geometry), polyTurf])
+                );
+                if (!intersection) return null;
+                return { ...f, geometry: intersection.geometry };
+            } catch (e) {
+                return f; // Keep original if intersection fails
+            }
+        }).filter(Boolean);
+    }
+
+    return { clipPoints, clipLines, clipPolygons, getJurisdictionPolygon };
+})();
+```
+
+### Integration Points
+
+Where to add `SpatialClipService` calls in existing code:
+
+| Function | File Location | Change |
+|----------|--------------|--------|
+| `transitTryStatewideData()` | After bbox fetch returns | `SpatialClipService.clipPoints(data.features, jurisdictionId)` |
+| `transitValidateLocation()` | Replace bbox+distance heuristic | Use `pointInFeature()` with cached polygon |
+| Overpass road network fetch | After OSM response parsed | `SpatialClipService.clipLines(ways, jurisdictionId)` |
+| Overpass signal/crossing fetch | After OSM response parsed | `SpatialClipService.clipPoints(nodes, jurisdictionId)` |
+| Mapillary graph API fetch | After features received | `SpatialClipService.clipPoints(features, jurisdictionId)` |
+| Road Inventory `roadInv_fetchChunked()` | After chunks merged | `SpatialClipService.clipLines(allWays, jurisdictionId)` |
+
+### Loading Sequence Dependency
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  ON JURISDICTION SELECT:                                       │
+│                                                                │
+│  1. Fetch TIGERweb county polygon ──► Cache in geojsonCache   │
+│     (addJurisdictionBoundaryLayer)     [MUST complete first]   │
+│                                                                │
+│  2. Fetch data via bbox APIs ──────► Raw results (with noise)  │
+│     (transit, OSM, Mapillary)         [Can run in parallel]    │
+│                                                                │
+│  3. Clip results to polygon ───────► Clean, accurate results   │
+│     (SpatialClipService)              [After BOTH 1 & 2 done]  │
+│                                                                │
+│  4. Display on map / in tables ────► Precise jurisdiction data │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Critical dependency:** The TIGERweb polygon fetch (step 1) must complete before clipping (step 3) can run. However, steps 1 and 2 can run **in parallel** — fetch the polygon and the data simultaneously, then clip when both are ready.
+
+### Graceful Fallback
+
+If the TIGERweb polygon is not available (API down, cache miss, timeout):
+- **Fallback to current bbox behavior** — show all bbox results without clipping
+- Display a UI indicator: "Approximate area shown — boundary data unavailable"
+- This ensures the tool never breaks; it just loses precision temporarily
+
+---
+
+## 17. Database & Storage Strategy
 
 ### Design Rationale
 
@@ -2150,7 +2481,7 @@ Phase 4 (Only if needed) → Tier 4: Edge SQLite for auth/multi-state at scale (
 
 ---
 
-## 17. Data Pipeline & Query Architecture (Zero-Backend)
+## 18. Data Pipeline & Query Architecture (Zero-Backend)
 
 ### Design Philosophy: Compute at Build Time, Not at Runtime
 
@@ -2385,7 +2716,7 @@ At that point, use **Cloudflare D1** or **Turso** (edge SQLite) — not PostgreS
 
 ---
 
-## 18. Phased Implementation Roadmap
+## 19. Phased Implementation Roadmap
 
 ### Phase 1: Foundation (Weeks 1-4)
 
@@ -2522,7 +2853,7 @@ At that point, use **Cloudflare D1** or **Turso** (edge SQLite) — not PostgreS
 
 ---
 
-## 19. Risk Assessment & Mitigations
+## 20. Risk Assessment & Mitigations
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
