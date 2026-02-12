@@ -25,12 +25,13 @@
 13. [MPO/Regional Aggregation Engine](#13-mporegional-aggregation-engine)
 14. [Statewide View (CDOT HQ)](#14-statewide-view-cdot-hq)
 15. [Multi-State Scaling Strategy](#15-multi-state-scaling-strategy)
-16. [Database & Storage Strategy](#16-database--storage-strategy)
-17. [Data Pipeline & Query Architecture (Zero-Backend)](#17-data-pipeline--query-architecture-zero-backend)
-18. [Phased Implementation Roadmap](#18-phased-implementation-roadmap)
-19. [Risk Assessment & Mitigations](#19-risk-assessment--mitigations)
-20. [Appendix A: Complete Colorado County-to-Region Mapping](#appendix-a-complete-colorado-county-to-region-mapping)
-21. [Appendix B: Configuration Schema Reference](#appendix-b-configuration-schema-reference)
+16. [Spatial Accuracy: Bbox-Fetch + Polygon-Clip Strategy](#16-spatial-accuracy-bbox-fetch--polygon-clip-strategy)
+17. [Database & Storage Strategy](#17-database--storage-strategy)
+18. [Data Pipeline & Query Architecture (Zero-Backend)](#18-data-pipeline--query-architecture-zero-backend)
+19. [Phased Implementation Roadmap](#19-phased-implementation-roadmap)
+20. [Risk Assessment & Mitigations](#20-risk-assessment--mitigations)
+21. [Appendix A: Complete Colorado County-to-Region Mapping](#appendix-a-complete-colorado-county-to-region-mapping)
+22. [Appendix B: Configuration Schema Reference](#appendix-b-configuration-schema-reference)
 
 ---
 
@@ -181,6 +182,72 @@ Colorado is divided into **15 Transportation Planning Regions (TPRs)**: 5 MPOs (
 | 13 | Southeast | SE | Baca, Bent, Crowley, Kiowa, Otero, Prowers | SE CO Enterprise Development |
 | 14 | Southwest | SW | Archuleta, Dolores, La Plata, Montezuma, San Juan | SW CO COG (SWCCOG) |
 | 15 | Upper Front Range | UFR | Morgan (+ parts of Larimer, Weld) | CDOT Planning Liaison |
+
+### Federal MPO Boundary Data Source (BTS/NTAD)
+
+The Bureau of Transportation Statistics provides **official MPO boundary polygons** via a national ArcGIS Feature Service. This dataset should be the primary source for dynamically loading MPO boundaries rather than maintaining static GeoJSON files.
+
+**API Endpoint:**
+```
+https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0/query
+```
+
+| Property | Value |
+|----------|-------|
+| **Source** | BTS National Transportation Atlas Database (NTAD) |
+| **Compiled** | November 10, 2025 (from FHWA data) |
+| **Scope** | National — all US MPOs (~400+) |
+| **Geometry** | `esriGeometryPolygon` — full MPO boundary polygons |
+| **Update Frequency** | Quarterly (as part of NTAD updates) |
+| **NGDA Status** | Recognized as National Geospatial Data Asset by FGDC |
+| **Cost** | Free, no authentication required |
+
+**Key Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `MPO_ID` | String | Unique MPO identifier |
+| `MPO_NAME` | String | Full MPO name (e.g., "Denver Regional Council of Governments") |
+| `ACRONYM` | String | MPO abbreviation (e.g., "DRCOG") |
+| `MPO_URL` | String | Official MPO website |
+| `STATE` | String | Primary state (e.g., "CO") |
+| `STATE_2` | String | Secondary state (for cross-state MPOs) |
+| `STATE_3` | String | Tertiary state (for tri-state MPOs) |
+| `POP` | Integer | Population served by the MPO |
+| `DESIGNATION_DATE` | Date | Date of MPO designation |
+
+**Query Example — Get All Colorado MPOs:**
+```
+?where=STATE='CO' OR STATE_2='CO' OR STATE_3='CO'
+&outFields=MPO_ID,MPO_NAME,ACRONYM,STATE,POP,DESIGNATION_DATE
+&outSR=4326
+&f=geojson
+```
+
+**Why This Matters for Jurisdiction Expansion:**
+
+1. **Dynamic boundary loading** — Instead of maintaining static `tprs.geojson` files per state, query the BTS API to get official MPO polygons on demand
+2. **Multi-state support** — Works for any US state, eliminating the need to manually source MPO boundaries when onboarding new states
+3. **Always current** — Quarterly NTAD updates ensure boundary changes (MPO expansions, mergers, redesignations) are automatically reflected
+4. **Cross-state MPOs** — The `STATE_2`/`STATE_3` fields correctly capture MPOs that span state boundaries (e.g., Portland Metro spans OR/WA)
+5. **Population data** — `POP` field enables population-weighted analysis without separate Census lookups
+6. **Point-in-polygon ready** — The polygon geometry enables precise crash-to-MPO assignment, solving the partial-county problem (Section 13) more accurately than county-level approximations
+
+**Integration with Existing Architecture:**
+
+These endpoints should be added to `API_AVAILABILITY` in `index.html`:
+```javascript
+// Add to existing API_AVAILABILITY object:
+btsMPOBoundaries:     { scope: 'national', label: 'MPO Boundaries (BTS NTAD)' },
+tigerwebPlaces:       { scope: 'national', label: 'City/Place Boundaries (TIGERweb)' },
+tigerwebTracts:       { scope: 'national', label: 'Census Tracts (TIGERweb)' },
+tigerwebUrbanAreas:   { scope: 'national', label: 'Urban Areas (TIGERweb)' },
+tigerwebSchoolDist:   { scope: 'national', label: 'School District Boundaries (TIGERweb)' },
+tigerwebStates:       { scope: 'national', label: 'State Boundaries (TIGERweb)' }
+// Note: tigerwebCounties and tigerwebCouSub already implicitly used via existing tigerweb config
+```
+
+And to the `config.json` boundary configuration for runtime use (see Section 8 for full layer catalog).
 
 ### Key Insight: Overlapping Hierarchies
 
@@ -506,7 +573,128 @@ const AggregationEngine = (() => {
 
 ## 8. State-Level Configuration System
 
-### Proposed Directory Structure
+### TIGERweb API — Complete Boundary Layer Catalog
+
+The tool already uses TIGERweb for county boundaries (layer 82) and county subdivisions (magisterial districts). TIGERweb provides **many more boundary layers** that are critical for the jurisdiction expansion — all free, national, and queryable via the same ArcGIS REST pattern we already use.
+
+**Base URLs (already in `config.json`):**
+```
+Census 2020:  https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer
+Current 2025: https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer
+Places:       https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer
+```
+
+**Important:** TIGERweb does **NOT** have MPO boundary polygons. MPOs are federal DOT planning designations, not Census geographies. Use BTS NTAD for MPO boundaries (see Section 4).
+
+#### HIGH VALUE — Required for Jurisdiction Expansion
+
+| Layer Name | ID (Current) | ID (Census2020) | Geometry | Use Case in Expansion Plan |
+|------------|-------------|-----------------|----------|---------------------------|
+| **States** | 80 | 80 | Polygon | State outline for statewide view choropleth. Replaces static `state_outline.geojson` |
+| **Counties** | 82 | 82 | Polygon | Already using. Core boundary for every county view |
+| **County Subdivisions** | 22 | 20 | Polygon | Already using (`countySubdivisionsUrl`). VA magisterial districts, CO precincts |
+| **Incorporated Places** | 28 | 26 | Polygon | **City/town boundaries — unlocks City/Place level in hierarchy model.** Castle Rock, Lone Tree, Parker boundaries for Douglas Co. |
+| **Census Designated Places** | 30 | 28 | Polygon | Unincorporated community boundaries (e.g., Highlands Ranch, Roxborough Park). Complements Incorporated Places |
+| **Census Tracts** | 8 | 6 | Polygon | Equity analysis (EJScreen, CDC SVI, Justice40). Crash rate per capita at sub-county level. Required for MPO-specific feature "Equity analysis" (Section 13) |
+| **Urban Areas (2020 Corrected)** | 88 | 88 | Polygon | Official Census urban/rural classification. Required for urban vs. rural crash pattern comparisons at state level, transit safety relevance filtering, ped/bike analysis |
+
+#### MEDIUM VALUE — Useful for Future Features
+
+| Layer Name | ID (Current) | ID (Census2020) | Geometry | Use Case |
+|------------|-------------|-----------------|----------|----------|
+| **Metropolitan Statistical Areas** | 93 | 76 | Polygon | MSA boundaries (Census-defined metro areas, NOT the same as MPOs). Useful for federal statistical comparisons |
+| **Combined Statistical Areas** | 97 | 72 | Polygon | Larger metro groupings (e.g., Denver-Aurora CSA). Corridor-level analysis spanning MSAs |
+| **119th Congressional Districts** | 54 | 52 (116th) | Polygon | Legislative advocacy — "crashes in your district, Representative Smith" |
+| **2024 State Legislative Districts (Upper)** | 56 | 54 (2018) | Polygon | State-level legislative advocacy |
+| **2024 State Legislative Districts (Lower)** | 58 | 56 (2018) | Polygon | State-level legislative advocacy |
+| **ZIP Code Tabulation Areas** | 2 | 84 | Polygon | Crash analysis by ZIP code (common user request) |
+| **School Districts (Unified)** | 14 | 12 | Polygon | School district boundary overlay for school safety analysis. Complements LEA ID school location data |
+| **School Districts (Secondary)** | 16 | 14 | Polygon | Secondary school district boundaries |
+| **School Districts (Elementary)** | 18 | 16 | Polygon | Elementary school district boundaries |
+| **Census Block Groups** | 10 | 8 | Polygon | Fine-grained equity analysis (EJScreen uses block groups) |
+
+#### Query Pattern (Same as Existing County Boundary Query)
+
+All layers use the same ArcGIS REST query pattern already implemented in `addJurisdictionBoundaryLayer()`:
+
+```javascript
+// Example: Get all Incorporated Places in Douglas County, CO
+const apiUrl = `${tigerwebConfig.baseUrl}/28/query?` +
+    `where=${encodeURIComponent("STATE='08' AND COUNTY='035'")}` +
+    `&outFields=NAME,PLACEFP,LSAD,FUNCSTAT` +
+    `&returnGeometry=true&outSR=4326&f=geojson`;
+
+// Example: Get Colorado state outline
+const apiUrl = `${tigerwebConfig.baseUrl}/80/query?` +
+    `where=${encodeURIComponent("STATE='08'")}` +
+    `&outFields=NAME,STATE,GEOID` +
+    `&returnGeometry=true&outSR=4326&f=geojson`;
+
+// Example: Get Census Tracts in Douglas County for equity analysis
+const apiUrl = `${tigerwebConfig.baseUrl}/8/query?` +
+    `where=${encodeURIComponent("STATE='08' AND COUNTY='035'")}` +
+    `&outFields=NAME,TRACT,GEOID` +
+    `&returnGeometry=true&outSR=4326&f=geojson`;
+
+// Example: Get 2020 Urban Areas intersecting Colorado
+const apiUrl = `${tigerwebConfig.baseUrl}/88/query?` +
+    `where=1=1` +
+    `&geometry=${encodeURIComponent(JSON.stringify(coloradoBbox))}` +
+    `&geometryType=esriGeometryEnvelope` +
+    `&spatialRel=esriSpatialRelIntersects` +
+    `&outFields=NAME10,UATYP10,GEOID10` +
+    `&returnGeometry=true&outSR=4326&f=geojson`;
+```
+
+#### Proposed `config.json` Layer Configuration (Enhanced)
+
+```json
+{
+  "apis": {
+    "tigerweb": {
+      "enabled": true,
+      "baseUrl": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer",
+      "census2020Url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer",
+      "placesUrl": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer",
+      "stateFips": "08",
+      "layers": {
+        "states": 80,
+        "counties": 82,
+        "countySubdivisions": 22,
+        "incorporatedPlaces": 28,
+        "censusDesignatedPlaces": 30,
+        "censusTracts": 8,
+        "censusBlockGroups": 10,
+        "urbanAreas": 88,
+        "metroStatisticalAreas": 93,
+        "combinedStatisticalAreas": 97,
+        "congressionalDistricts": 54,
+        "stateLegislativeUpper": 56,
+        "stateLegislativeLower": 58,
+        "schoolDistrictsUnified": 14,
+        "schoolDistrictsSecondary": 16,
+        "schoolDistrictsElementary": 18,
+        "zipCodeTabAreas": 2
+      }
+    }
+  }
+}
+```
+
+#### Which Layers Replace Static GeoJSON Files
+
+| Static File | TIGERweb Replacement | Query |
+|-------------|---------------------|-------|
+| `state_outline.geojson` | Layer 80 (States) | `STATE='08'` |
+| `counties.geojson` | Layer 82 (Counties) | `STATE='08'` → returns all 64 |
+| `counties_full/{fips}.geojson` | Layer 82 (Counties) | `STATE='08' AND COUNTY='{fips}'` |
+| `tpr_boundaries.geojson` | **BTS NTAD MPO API** (not TIGERweb) | `STATE='CO'` |
+| `regions.geojson` | **No TIGERweb equivalent** — CDOT regions are custom | Must remain static |
+| City/Place boundaries (new) | Layer 28 + 30 (Places + CDPs) | `STATE='08' AND COUNTY='{fips}'` |
+
+> **Note:** TIGERweb replaces the need for most static GeoJSON files in the boundary directory. Only CDOT Region boundaries and corridor geometries must remain as static files since they are DOT-specific administrative boundaries that Census does not define.
+
+### Proposed Directory Structure (Updated)
 
 ```
 states/
@@ -519,15 +707,15 @@ states/
 ├── 08/                           # Colorado (by FIPS code)
 │   ├── config.json               # State config (move from data/CDOT/config.json)
 │   ├── hierarchy.json            # NEW: Region/MPO/county mappings
-│   ├── regions.geojson           # NEW: CDOT region boundaries
-│   ├── counties.geojson          # NEW: County boundaries (from Census)
-│   ├── tpr_boundaries.geojson    # NEW: TPR/MPO boundaries
+│   ├── regions.geojson           # CDOT region boundaries (static — no Census equivalent)
 │   └── corridors.json            # NEW: Major corridor definitions
+│   # NOTE: County, state, place, tract boundaries all fetched live from TIGERweb API
+│   # NOTE: MPO/TPR boundaries fetched live from BTS NTAD MPO API (see Section 4)
 │
 ├── 51/                           # Virginia (by FIPS code)
 │   ├── config.json               # Existing (moved from states/virginia/)
 │   ├── hierarchy.json            # NEW: VDOT district/MPO mappings
-│   ├── regions.geojson           # VDOT district boundaries
+│   ├── regions.geojson           # VDOT district boundaries (static — no Census equivalent)
 │   └── corridors.json            # Major corridor definitions
 │
 └── template/                     # NEW: Template for new states
@@ -927,10 +1115,14 @@ data/
 │   │       ├── douglas.json
 │   │       └── ...
 │   │
-│   └── boundaries/                # GeoJSON boundaries (NEW)
-│       ├── counties.geojson
-│       ├── regions.geojson
-│       └── tprs.geojson
+│   └── boundaries/                # Static GeoJSON boundaries (reduced — most come from TIGERweb API)
+│       ├── regions.geojson        # CDOT region boundaries (static — no Census/TIGERweb equivalent)
+│       └── corridors/             # Major route geometries (static — from CDOT/OSM)
+│           ├── I-25.geojson
+│           └── I-70.geojson
+│       # County, state, place, tract, urban area boundaries → fetched live from TIGERweb API
+│       # MPO/TPR boundaries → fetched live from BTS NTAD MPO API (see Section 4)
+│       # All cached in IndexedDB after first fetch
 │
 ├── VA/                            # Virginia state data (restructured)
 │   ├── counties/
@@ -940,6 +1132,7 @@ data/
 │   │   └── .../
 │   ├── aggregates/
 │   └── boundaries/
+│       └── regions.geojson        # VDOT district boundaries (static)
 │
 └── README.md                      # Data directory documentation
 ```
@@ -1348,18 +1541,39 @@ Each CDOT region gets a dedicated configuration section that defines:
 - Growth area safety projections
 - Equity analysis (crashes in disadvantaged communities)
 
+### MPO Boundary Data Source for Aggregation
+
+The BTS NTAD MPO Boundary API (documented in Section 4) is the recommended data source for the aggregation engine's boundary needs:
+
+```
+https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0/query
+```
+
+**How the Aggregation Engine Uses MPO Boundaries:**
+
+1. **Crash-to-MPO assignment** — Use `turf.booleanPointInPolygon()` with the official BTS polygon to determine which MPO a crash belongs to. This is more accurate than county-level approximation for split counties like Weld.
+2. **Boundary rendering** — Display the official MPO polygon on the map when in MPO view mode, replacing the need for manually-created `tprs.geojson`.
+3. **Population normalization** — Use the `POP` field from the API to calculate crash rates per capita at the MPO level without a separate Census lookup.
+4. **Auto-discovery** — When onboarding a new state, query `?where=STATE='XX'&outFields=*&f=geojson` to automatically discover all MPOs in that state along with their boundaries, names, and designations.
+
+**Caching Strategy:**
+- Query once per state and cache in IndexedDB (MPO boundaries rarely change)
+- Invalidate cache quarterly (aligned with BTS NTAD update schedule)
+- Fallback to static `tprs.geojson` if API is unavailable
+
 ### Partial County Handling
 
-Some TPRs include only PART of a county (e.g., "Southwest Weld County" is in DRCOG, while most of Weld is in NFRMPO). This requires:
+Some TPRs include only PART of a county (e.g., "Southwest Weld County" is in DRCOG, while most of Weld is in NFRMPO). The BTS MPO boundary polygons solve this more accurately than county-level approximation:
 
 ```javascript
-// For partial counties, filter by geography not just county name
-function filterPartialCounty(countyFips, tprBoundaryGeojson, crashRows) {
+// For partial counties, use BTS MPO polygon for precise assignment
+async function filterPartialCounty(countyFips, mpoBoundaryPolygon, crashRows) {
+    // mpoBoundaryPolygon sourced from BTS NTAD MPO Feature Service
     // Use turf.js point-in-polygon to determine which crashes
     // within Weld County fall inside the DRCOG boundary
     return crashRows.filter(row => {
         const point = turf.point([parseFloat(row.x), parseFloat(row.y)]);
-        return turf.booleanPointInPolygon(point, tprBoundaryGeojson);
+        return turf.booleanPointInPolygon(point, mpoBoundaryPolygon);
     });
 }
 ```
@@ -1507,6 +1721,8 @@ The architecture described above is **state-agnostic**. Here's how to add a new 
 └─────────────────────────────────────────────────────────────┘
 ```
 
+> **Note:** MPO boundaries for any new state are automatically available from the BTS NTAD MPO API (see Section 4). Query `?where=STATE='TX'&f=geojson` to get all Texas MPOs with official boundary polygons, names, populations, and designation dates. No manual GeoJSON creation required for the MPO/TPR layer.
+
 ### Generic State Hierarchy Template
 
 Every state DOT has a similar organizational pattern, but with different names:
@@ -1538,6 +1754,198 @@ The `hierarchy.json` schema handles all of these:
 }
 ```
 
+### Zero-Code Dynamic Boundary System
+
+When a user (or admin) switches to a new state, the tool should **automatically discover and load ALL boundaries** from federal APIs — no coding, no manual GeoJSON creation, no state-specific boundary logic.
+
+**The only input needed:** A 2-digit state FIPS code (e.g., `"48"` for Texas).
+
+Everything else is derived dynamically from TIGERweb + BTS NTAD:
+
+```
+User selects new state: Texas (FIPS: 48)
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────┐
+│  AUTOMATIC BOUNDARY DISCOVERY ENGINE                     │
+│                                                           │
+│  Step 1: State Outline                                   │
+│  TIGERweb layer 80 → STATE='48'                          │
+│  → Returns Texas state polygon                           │
+│                                                           │
+│  Step 2: All Counties                                    │
+│  TIGERweb layer 82 → STATE='48'                          │
+│  → Returns all 254 Texas county polygons with            │
+│    NAME, COUNTY (FIPS), GEOID                            │
+│  → Auto-populates county dropdown                        │
+│                                                           │
+│  Step 3: All MPOs                                        │
+│  BTS NTAD MPO API → STATE='TX' OR STATE_2='TX'           │
+│  → Returns all 25 Texas MPO polygons with                │
+│    MPO_NAME, ACRONYM, POP, DESIGNATION_DATE              │
+│  → Auto-populates MPO/TPR dropdown                       │
+│                                                           │
+│  Step 4: Places (per county, on demand)                  │
+│  TIGERweb layer 28+30 → STATE='48' AND COUNTY='{fips}'  │
+│  → Returns all cities/CDPs within selected county        │
+│  → Auto-populates city/place dropdown                    │
+│                                                           │
+│  Step 5: Urban Areas (on demand)                         │
+│  TIGERweb layer 88 → spatial query within state bbox     │
+│  → Returns all urban area polygons intersecting state    │
+│                                                           │
+│  Step 6: Census Tracts (per county, on demand)           │
+│  TIGERweb layer 8 → STATE='48' AND COUNTY='{fips}'      │
+│  → Returns all tracts for equity analysis overlay        │
+│                                                           │
+│  Step 7: School Districts (on demand)                    │
+│  TIGERweb layer 14 → STATE='48'                          │
+│  → Returns all school district boundaries in state       │
+│                                                           │
+│  All results cached in IndexedDB for instant repeat use  │
+└─────────────────────────────────────────────────────────┘
+```
+
+**What CANNOT be auto-discovered (requires `hierarchy.json`):**
+
+| Item | Why Manual | Effort |
+|------|----------|--------|
+| State DOT region/district boundaries | Custom administrative boundaries — no federal API | One static GeoJSON file per state |
+| Region-to-county mapping | DOT-specific organizational grouping | Part of `hierarchy.json` config |
+| Corridor definitions | Route groupings are state-specific | Part of `hierarchy.json` config |
+| Crash data column mapping | Each state's CSV has different column names | Part of `state_adapter.js` (already exists) |
+
+**What IS fully automatic (zero config):**
+
+| Boundary | Source | Auto-Discovery Query |
+|----------|--------|---------------------|
+| State outline | TIGERweb layer 80 | `STATE='{fips}'` |
+| All counties (with names, FIPS) | TIGERweb layer 82 | `STATE='{fips}'` |
+| All MPOs (with names, populations, boundaries) | BTS NTAD MPO API | `STATE='{abbrev}'` |
+| Cities/Places per county | TIGERweb layer 28 + 30 | `STATE='{fips}' AND COUNTY='{countyFips}'` |
+| Census Tracts per county | TIGERweb layer 8 | `STATE='{fips}' AND COUNTY='{countyFips}'` |
+| Urban Areas | TIGERweb layer 88 | Spatial query within state bbox |
+| School Districts | TIGERweb layer 14/16/18 | `STATE='{fips}'` |
+| Transit Stops | BTS NTAD Transit Stops API | Spatial query within county/region bbox |
+
+**Implementation: `BoundaryService` Module**
+
+```javascript
+// Proposed: boundary_service.js
+const BoundaryService = (() => {
+    'use strict';
+
+    const TIGERWEB_BASE = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer';
+    const BTS_MPO_BASE = 'https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0';
+    const BTS_TRANSIT_BASE = 'https://services.arcgis.com/xOi1kZaI0eWDREZv/ArcGIS/rest/services/NTAD_National_Transit_Map_Stops/FeatureServer/0';
+
+    const LAYERS = {
+        states: 80, counties: 82, countySubdivisions: 22,
+        incorporatedPlaces: 28, censusDesignatedPlaces: 30,
+        censusTracts: 8, censusBlockGroups: 10, urbanAreas: 88,
+        schoolDistrictsUnified: 14, schoolDistrictsSecondary: 16,
+        schoolDistrictsElementary: 18, congressionalDistricts: 54,
+        stateLegislativeUpper: 56, stateLegislativeLower: 58,
+        metroStatisticalAreas: 93, zipCodeTabAreas: 2
+    };
+
+    const cache = {}; // IndexedDB-backed cache
+
+    async function queryTigerWeb(layerId, where, outFields = '*') {
+        const cacheKey = `tw_${layerId}_${where}`;
+        if (cache[cacheKey]) return cache[cacheKey];
+
+        const url = `${TIGERWEB_BASE}/${layerId}/query?` +
+            `where=${encodeURIComponent(where)}` +
+            `&outFields=${outFields}&returnGeometry=true&outSR=4326&f=geojson`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        cache[cacheKey] = data;
+        // Also persist to IndexedDB for offline/repeat use
+        return data;
+    }
+
+    async function queryBtsMpo(where) {
+        const cacheKey = `mpo_${where}`;
+        if (cache[cacheKey]) return cache[cacheKey];
+
+        const url = `${BTS_MPO_BASE}/query?` +
+            `where=${encodeURIComponent(where)}` +
+            `&outFields=*&outSR=4326&f=geojson`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        cache[cacheKey] = data;
+        return data;
+    }
+
+    return {
+        /**
+         * Auto-discover all boundaries for a state. Called once on state selection.
+         * @param {string} stateFips - 2-digit FIPS (e.g., '48')
+         * @param {string} stateAbbrev - 2-letter abbreviation (e.g., 'TX')
+         * @returns {Object} { stateOutline, counties, mpos }
+         */
+        async discoverState(stateFips, stateAbbrev) {
+            const [stateOutline, counties, mpos] = await Promise.all([
+                queryTigerWeb(LAYERS.states, `STATE='${stateFips}'`, 'NAME,STATE,GEOID'),
+                queryTigerWeb(LAYERS.counties, `STATE='${stateFips}'`, 'NAME,COUNTY,STATE,GEOID'),
+                queryBtsMpo(`STATE='${stateAbbrev}' OR STATE_2='${stateAbbrev}' OR STATE_3='${stateAbbrev}'`)
+            ]);
+            return { stateOutline, counties, mpos };
+        },
+
+        /**
+         * Load places (cities + CDPs) for a specific county. Called on county drill-down.
+         */
+        async getPlaces(stateFips, countyFips) {
+            const [places, cdps] = await Promise.all([
+                queryTigerWeb(LAYERS.incorporatedPlaces, `STATE='${stateFips}' AND COUNTY='${countyFips}'`, 'NAME,PLACEFP,LSAD'),
+                queryTigerWeb(LAYERS.censusDesignatedPlaces, `STATE='${stateFips}' AND COUNTY='${countyFips}'`, 'NAME,PLACEFP,LSAD')
+            ]);
+            return { places, cdps };
+        },
+
+        /**
+         * Load census tracts for equity analysis overlay.
+         */
+        async getCensusTracts(stateFips, countyFips) {
+            return queryTigerWeb(LAYERS.censusTracts, `STATE='${stateFips}' AND COUNTY='${countyFips}'`, 'NAME,TRACT,GEOID');
+        },
+
+        /**
+         * Load urban area boundaries for urban/rural classification.
+         */
+        async getUrbanAreas(stateFips) {
+            return queryTigerWeb(LAYERS.urbanAreas, `STATE='${stateFips}'`, 'NAME10,UATYP10,GEOID10');
+        },
+
+        /**
+         * Load school district boundaries.
+         */
+        async getSchoolDistricts(stateFips) {
+            return queryTigerWeb(LAYERS.schoolDistrictsUnified, `STATE='${stateFips}'`, 'NAME,SDLEA,GEOID');
+        },
+
+        /** Expose layer IDs for custom queries */
+        LAYERS
+    };
+})();
+```
+
+**Key Design Principle:** The `BoundaryService` is completely state-agnostic. It takes a FIPS code and returns boundaries. No Colorado-specific or Virginia-specific logic. When someone wants to add Texas, they:
+
+1. Set `stateFips: '48'` in the state config
+2. `BoundaryService.discoverState('48', 'TX')` auto-fetches state outline, all 254 counties, and all 25 MPOs
+3. Selecting any county auto-fetches its cities/places via `getPlaces('48', countyFips)`
+4. Transit stops auto-load from BTS API using county bounding box (existing `transitLoadStops()` is already state-agnostic)
+
+**The only manual work per new state:**
+- Create `hierarchy.json` with DOT region→county mapping (this IS state-specific)
+- Create `regions.geojson` with DOT region boundaries (no federal API for these)
+- Add column mapping to `state_adapter.js` (crash CSV format varies by state)
+
+Everything else — county names, county boundaries, city boundaries, MPO boundaries, census tracts, urban areas, school districts, transit stops — comes from federal APIs automatically.
+
 ### Cross-State Comparison Mode (Future)
 
 For FHWA or multi-state organizations:
@@ -1564,7 +1972,337 @@ For FHWA or multi-state organizations:
 
 ---
 
-## 16. Database & Storage Strategy
+## 16. Spatial Accuracy: Bbox-Fetch + Polygon-Clip Strategy
+
+### The Problem
+
+All external spatial API queries in CRASH LENS use **bounding box (bbox) envelopes** — rectangular queries that fetch data within a geographic rectangle. However, actual jurisdiction boundaries are **irregular polygons** (counties have winding borders along rivers, mountain ridges, historical survey lines). The bbox rectangle always includes area **outside** the actual jurisdiction, meaning API results contain data from neighboring jurisdictions.
+
+**Impact of bbox overshoot by jurisdiction shape:**
+
+| Jurisdiction Shape | Bbox Overshoot | Example |
+|---|---|---|
+| Compact/square county | ~15-25% | Arapahoe County, CO |
+| Elongated county | ~40-60% | Augusta County, VA; Grand County, CO |
+| Independent city (irregular) | ~50-70% | Richmond City, VA; Denver City/County, CO |
+| Coastal/river boundary | ~30-50% | Any county bounded by rivers |
+
+A county with 40% bbox overshoot shows **40% false data** — transit stops, traffic signals, road segments, and Mapillary features from neighboring jurisdictions that do not belong to the selected jurisdiction.
+
+### Current API Calls Using Bbox
+
+**14 distinct bbox-based API call patterns** across 3 API families:
+
+#### ArcGIS Feature Services (`esriGeometryEnvelope`)
+
+| API | Purpose | Current Code |
+|-----|---------|--------------|
+| BTS National Transit Map | Transit stops | `transitTryStatewideData()` — `esriGeometryEnvelope` spatial query |
+| BTS Transit fallback | Transit stops (spatial) | Fallback spatial query — `esriGeometryEnvelope` |
+
+#### Overpass/OSM API (`bbox` parameter)
+
+| API | Purpose | Current Code |
+|-----|---------|--------------|
+| Road network | Road centerlines | Overpass `way["highway"]({bbox})` |
+| Traffic signals | Signal locations | Overpass `node["highway"="traffic_signals"]({bbox})` |
+| Speed limits | Speed data | Overpass `way["maxspeed"]({bbox})` |
+| Bike/ped facilities | Multimodal infrastructure | Overpass `way["cycleway"]({bbox})` etc. |
+| Road Inventory | Full road inventory | Overpass with chunked bbox |
+| Segment Analysis | Road segments for analysis | Overpass bbox query |
+
+#### Mapillary Graph API (`bbox` parameter)
+
+| API | Purpose | Current Code |
+|-----|---------|--------------|
+| Traffic signs | Sign detection | `mapillary/map_features?bbox=` |
+| Map features | Road features | `mapillary/map_features?bbox=` |
+| Location assets | Intersection assets | `mapillary/map_features?bbox=` |
+| Custom selection assets | User-selected area | `mapillary/map_features?bbox=` |
+| Street signs | Street signs | `mapillary/map_features?bbox=` |
+
+#### Config-based bbox matching
+
+| API | Purpose | Current Code |
+|-----|---------|--------------|
+| Jurisdiction crash counting | Multi-jurisdiction counts | `config.bbox` rectangle matching |
+
+### The Solution: Two-Step Bbox-Fetch + Polygon-Clip
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SPATIAL ACCURACY PIPELINE                      │
+│                                                                   │
+│  STEP 1: Bbox Fetch (Server-Side — FAST)                         │
+│  ┌─────────────────────────────────────────────────────────┐     │
+│  │  API Request: esriGeometryEnvelope / OSM bbox / Mapillary│     │
+│  │  Returns: All features in RECTANGULAR area               │     │
+│  │  Speed: Hits server's spatial index — milliseconds        │     │
+│  │  Result: 100% recall, but ~15-60% false positives         │     │
+│  └─────────────────────────────────────────────────────────┘     │
+│                          │                                        │
+│                          ▼                                        │
+│  STEP 2: Polygon Clip (Client-Side — PRECISE)                    │
+│  ┌─────────────────────────────────────────────────────────┐     │
+│  │  Jurisdiction polygon: TIGERweb county boundary (cached)  │     │
+│  │  Filter: pointInFeature(lng, lat, jurisdictionPolygon)    │     │
+│  │  For lines: turf.booleanIntersects(line, polygon)         │     │
+│  │  For areas: turf.intersect(area, polygon)                 │     │
+│  │  Result: 100% recall, 100% precision                      │     │
+│  └─────────────────────────────────────────────────────────┘     │
+│                          │                                        │
+│                          ▼                                        │
+│  DISPLAY: Only features within actual jurisdiction boundary       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Existing Infrastructure (Already Built)
+
+The codebase already has **all components needed** for this pipeline:
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| **turf.js library** | Line 52: `<script src="turf.min.js">` | Already loaded |
+| **`pointInFeature(lng, lat, feature)`** | Line 113584 | Already works for Polygon + MultiPolygon |
+| **`pointInPolygon(point, ring)`** | Line 113505 | Ray-casting algorithm, proven |
+| **`computeFeatureBoundingBox(feature)`** | Line 113541 | Pre-computes bbox for fast rejection |
+| **`pointInBoundingBox(lng, lat, bbox)`** | Line 113574 | Fast rectangular pre-filter |
+| **TIGERweb polygon cache** | `builtInLayersState.jurisdictionBoundary.geojsonCache[id]` | Cached after first fetch |
+| **District crash assignment** | Line 113617: `computeDistrictCrashStatistics()` | Already uses this exact pipeline on 100K+ rows |
+
+### Three-Tier Clipping Strategy
+
+Different geometry types require different clipping methods:
+
+#### Tier 1: Point Data (transit stops, signals, crossings, Mapillary features)
+
+```javascript
+// After bbox API fetch returns pointFeatures[]
+const jurisdictionPolygon = builtInLayersState.jurisdictionBoundary
+    .geojsonCache[currentJurisdictionId]?.features?.[0];
+
+const clippedPoints = pointFeatures.filter(f => {
+    const [lng, lat] = f.geometry.coordinates || [f.geometry.x, f.geometry.y];
+    return pointInFeature(lng, lat, jurisdictionPolygon);
+});
+// clippedPoints contains ONLY points inside the actual jurisdiction boundary
+```
+
+**Performance:** Sub-millisecond for typical datasets (<5,000 points). The bbox pre-filter inside `pointInFeature()` rejects 30-50% of candidates before the expensive ray-casting test.
+
+#### Tier 2: Line Data (road segments, speed limit ways, bike/ped facilities)
+
+```javascript
+// After bbox API fetch returns lineFeatures[]
+const jurisdictionTurf = turf.feature(jurisdictionPolygon.geometry);
+
+const clippedLines = lineFeatures.filter(f => {
+    return turf.booleanIntersects(turf.feature(f.geometry), jurisdictionTurf);
+});
+// For partial overlap, optionally clip to boundary:
+// const clippedLine = turf.lineSplit(lineFeature, jurisdictionTurf);
+```
+
+**Performance:** 10-50ms for typical road networks (1,000-5,000 segments). `booleanIntersects` is fast; `lineSplit` is slower but only needed for display precision.
+
+#### Tier 3: Polygon Data (urban areas, school districts, census tracts)
+
+```javascript
+// After bbox API fetch returns polygonFeatures[]
+const jurisdictionTurf = turf.feature(jurisdictionPolygon.geometry);
+
+const clippedPolygons = polygonFeatures.map(f => {
+    const intersection = turf.intersect(
+        turf.featureCollection([turf.feature(f.geometry), jurisdictionTurf])
+    );
+    return intersection ? { ...f, geometry: intersection.geometry } : null;
+}).filter(Boolean);
+// clippedPolygons shows ONLY the portions within the jurisdiction boundary
+```
+
+**Performance:** 50-200ms for typical polygon datasets (10-50 features). `turf.intersect` is the most expensive operation but polygon datasets are small.
+
+### Why NOT Server-Side Polygon Query
+
+ArcGIS REST API supports `esriGeometryPolygon` as an alternative to `esriGeometryEnvelope`, which would let the server do the clipping. However:
+
+| Factor | Server-Side Polygon | Client-Side Bbox+Clip |
+|--------|---------------------|----------------------|
+| **Request size** | 5,000-20,000 coordinate pairs per county polygon | 4 numbers (bbox) |
+| **Server processing** | Slower — complex polygon intersection | Fast — spatial index envelope lookup |
+| **Network payload** | Large POST body | Small GET URL |
+| **Caching** | Cannot cache (unique polygon per request) | Bbox queries are highly cacheable |
+| **OSM/Mapillary support** | NOT supported (bbox only) | Works for ALL APIs |
+| **Recommendation** | Not recommended | **Recommended** |
+
+The client-side approach works **universally** across all three API families (ArcGIS, Overpass, Mapillary), while server-side polygon queries only work for ArcGIS.
+
+### Implementation Priority
+
+| Priority | API Target | Data Type | Clip Method | Impact |
+|----------|-----------|-----------|-------------|--------|
+| **P0 (Critical)** | BTS Transit Stops | Points | `pointInFeature()` | Transit tab shows wrong jurisdiction stops |
+| **P0 (Critical)** | Road Inventory (OSM) | Lines | `turf.booleanIntersects()` | Road stats include neighbor roads |
+| **P1 (High)** | Traffic Signals (OSM) | Points | `pointInFeature()` | Signal counts inflated |
+| **P1 (High)** | Mapillary Traffic Signs | Points | `pointInFeature()` | Sign inventory includes neighbors |
+| **P2 (Medium)** | Bike/Ped Facilities (OSM) | Lines | `turf.booleanIntersects()` | Facility counts inflated |
+| **P2 (Medium)** | Speed Limit Ways (OSM) | Lines | `turf.booleanIntersects()` | Speed data includes neighbor roads |
+| **P3 (Enhancement)** | Jurisdiction Crash Counting | Points | `pointInFeature()` | Multi-jurisdiction selector accuracy |
+
+### Proposed `SpatialClipService` Module
+
+```javascript
+/**
+ * SpatialClipService — Clips API results to actual jurisdiction polygon
+ * Uses bbox pre-filter for fast rejection + precise polygon test
+ *
+ * Depends on:
+ *   - turf.js (already loaded)
+ *   - pointInFeature() (already exists)
+ *   - builtInLayersState.jurisdictionBoundary.geojsonCache (TIGERweb polygon)
+ */
+const SpatialClipService = (() => {
+
+    /**
+     * Get the cached jurisdiction polygon (from TIGERweb)
+     * Must be called AFTER addJurisdictionBoundaryLayer() has completed
+     */
+    function getJurisdictionPolygon(jurisdictionId) {
+        const geojson = builtInLayersState?.jurisdictionBoundary
+            ?.geojsonCache?.[jurisdictionId];
+        if (!geojson?.features?.[0]) return null;
+        return geojson.features[0]; // GeoJSON Feature with Polygon/MultiPolygon geometry
+    }
+
+    /**
+     * Clip point features to jurisdiction boundary
+     * @param {Array} features - Array of GeoJSON/ArcGIS features with point geometry
+     * @param {string} jurisdictionId - Jurisdiction ID for polygon lookup
+     * @returns {Array} Features inside the jurisdiction polygon only
+     */
+    function clipPoints(features, jurisdictionId) {
+        const polygon = getJurisdictionPolygon(jurisdictionId);
+        if (!polygon) {
+            console.warn('[SpatialClip] No polygon cached — returning unclipped results');
+            return features; // Graceful fallback: return all if no polygon
+        }
+
+        return features.filter(f => {
+            const geom = f.geometry || {};
+            let lng, lat;
+
+            // Handle ArcGIS format (x/y)
+            if (geom.x !== undefined && geom.y !== undefined) {
+                lng = geom.x; lat = geom.y;
+            }
+            // Handle GeoJSON format (coordinates)
+            else if (geom.coordinates) {
+                [lng, lat] = geom.coordinates;
+            }
+            // Handle flat attributes
+            else {
+                const attrs = f.attributes || f.properties || f;
+                lng = parseFloat(attrs.longitude || attrs.lng || attrs.LON || attrs.x);
+                lat = parseFloat(attrs.latitude || attrs.lat || attrs.LAT || attrs.y);
+            }
+
+            if (isNaN(lng) || isNaN(lat)) return false;
+            return pointInFeature(lng, lat, polygon);
+        });
+    }
+
+    /**
+     * Clip line features to jurisdiction boundary
+     * @param {Array} features - Array of GeoJSON features with LineString geometry
+     * @param {string} jurisdictionId - Jurisdiction ID for polygon lookup
+     * @returns {Array} Features that intersect the jurisdiction polygon
+     */
+    function clipLines(features, jurisdictionId) {
+        const polygon = getJurisdictionPolygon(jurisdictionId);
+        if (!polygon) return features;
+
+        const polyTurf = turf.feature(polygon.geometry);
+        return features.filter(f => {
+            try {
+                return turf.booleanIntersects(turf.feature(f.geometry), polyTurf);
+            } catch (e) {
+                return true; // Keep feature if test fails
+            }
+        });
+    }
+
+    /**
+     * Clip polygon features to jurisdiction boundary (geometric intersection)
+     * @param {Array} features - Array of GeoJSON features with Polygon geometry
+     * @param {string} jurisdictionId - Jurisdiction ID for polygon lookup
+     * @returns {Array} Features clipped to jurisdiction boundary
+     */
+    function clipPolygons(features, jurisdictionId) {
+        const polygon = getJurisdictionPolygon(jurisdictionId);
+        if (!polygon) return features;
+
+        const polyTurf = turf.feature(polygon.geometry);
+        return features.map(f => {
+            try {
+                const intersection = turf.intersect(
+                    turf.featureCollection([turf.feature(f.geometry), polyTurf])
+                );
+                if (!intersection) return null;
+                return { ...f, geometry: intersection.geometry };
+            } catch (e) {
+                return f; // Keep original if intersection fails
+            }
+        }).filter(Boolean);
+    }
+
+    return { clipPoints, clipLines, clipPolygons, getJurisdictionPolygon };
+})();
+```
+
+### Integration Points
+
+Where to add `SpatialClipService` calls in existing code:
+
+| Function | File Location | Change |
+|----------|--------------|--------|
+| `transitTryStatewideData()` | After bbox fetch returns | `SpatialClipService.clipPoints(data.features, jurisdictionId)` |
+| `transitValidateLocation()` | Replace bbox+distance heuristic | Use `pointInFeature()` with cached polygon |
+| Overpass road network fetch | After OSM response parsed | `SpatialClipService.clipLines(ways, jurisdictionId)` |
+| Overpass signal/crossing fetch | After OSM response parsed | `SpatialClipService.clipPoints(nodes, jurisdictionId)` |
+| Mapillary graph API fetch | After features received | `SpatialClipService.clipPoints(features, jurisdictionId)` |
+| Road Inventory `roadInv_fetchChunked()` | After chunks merged | `SpatialClipService.clipLines(allWays, jurisdictionId)` |
+
+### Loading Sequence Dependency
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  ON JURISDICTION SELECT:                                       │
+│                                                                │
+│  1. Fetch TIGERweb county polygon ──► Cache in geojsonCache   │
+│     (addJurisdictionBoundaryLayer)     [MUST complete first]   │
+│                                                                │
+│  2. Fetch data via bbox APIs ──────► Raw results (with noise)  │
+│     (transit, OSM, Mapillary)         [Can run in parallel]    │
+│                                                                │
+│  3. Clip results to polygon ───────► Clean, accurate results   │
+│     (SpatialClipService)              [After BOTH 1 & 2 done]  │
+│                                                                │
+│  4. Display on map / in tables ────► Precise jurisdiction data │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Critical dependency:** The TIGERweb polygon fetch (step 1) must complete before clipping (step 3) can run. However, steps 1 and 2 can run **in parallel** — fetch the polygon and the data simultaneously, then clip when both are ready.
+
+### Graceful Fallback
+
+If the TIGERweb polygon is not available (API down, cache miss, timeout):
+- **Fallback to current bbox behavior** — show all bbox results without clipping
+- Display a UI indicator: "Approximate area shown — boundary data unavailable"
+- This ensures the tool never breaks; it just loses precision temporarily
+
+---
+
+## 17. Database & Storage Strategy
 
 ### Design Rationale
 
@@ -1743,7 +2481,7 @@ Phase 4 (Only if needed) → Tier 4: Edge SQLite for auth/multi-state at scale (
 
 ---
 
-## 17. Data Pipeline & Query Architecture (Zero-Backend)
+## 18. Data Pipeline & Query Architecture (Zero-Backend)
 
 ### Design Philosophy: Compute at Build Time, Not at Runtime
 
@@ -1978,7 +2716,7 @@ At that point, use **Cloudflare D1** or **Turso** (edge SQLite) — not PostgreS
 
 ---
 
-## 18. Phased Implementation Roadmap
+## 19. Phased Implementation Roadmap
 
 ### Phase 1: Foundation (Weeks 1-4)
 
@@ -2115,7 +2853,7 @@ At that point, use **Cloudflare D1** or **Turso** (edge SQLite) — not PostgreS
 
 ---
 
-## 19. Risk Assessment & Mitigations
+## 20. Risk Assessment & Mitigations
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
@@ -2337,9 +3075,25 @@ At that point, use **Cloudflare D1** or **Turso** (edge SQLite) — not PostgreS
     "enabled": true,
     "hierarchyFile": "states/08/hierarchy.json",
     "boundaryFiles": {
-      "counties": "states/08/counties.geojson",
-      "regions": "states/08/regions.geojson",
-      "tprs": "states/08/tprs.geojson"
+      "regions": "states/08/regions.geojson"  // Only static file — CDOT-specific
+      // All other boundaries fetched from TIGERweb/BTS APIs:
+      // Counties, state outline, places, tracts → TIGERweb API (see Section 8)
+      // MPO/TPR boundaries → BTS NTAD MPO API (see Section 4)
+    },
+    "boundaryApis": {
+      "tigerweb": {
+        "stateOutline": { "layer": 80, "where": "STATE='{stateFips}'" },
+        "counties": { "layer": 82, "where": "STATE='{stateFips}'" },
+        "places": { "layer": 28, "where": "STATE='{stateFips}' AND COUNTY='{countyFips}'" },
+        "cdps": { "layer": 30, "where": "STATE='{stateFips}' AND COUNTY='{countyFips}'" },
+        "censusTracts": { "layer": 8, "where": "STATE='{stateFips}' AND COUNTY='{countyFips}'" },
+        "urbanAreas": { "layer": 88, "spatialQuery": true },
+        "schoolDistricts": { "layer": 14, "where": "STATE='{stateFips}'" }
+      },
+      "btsMPO": {
+        "endpoint": "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0/query",
+        "where": "STATE='{stateAbbrev}' OR STATE_2='{stateAbbrev}' OR STATE_3='{stateAbbrev}'"
+      }
     },
     "aggregateDir": "data/CDOT/aggregates",
     "countyDataDir": "data/CDOT/counties",
@@ -2379,3 +3133,10 @@ At that point, use **Cloudflare D1** or **Turso** (edge SQLite) — not PostgreS
 - [TPR at a Glance (Jan 2026)](https://www.codot.gov/programs/planning/assets/planning-partners/january2026tpr)
 - [DRCOG Member Governments](https://www.drcog.org/about-drcog/member-governments)
 - [NFRMPO Partners](https://nfrmpo.org/partners/)
+- [BTS NTAD Metropolitan Planning Organizations (Boundary Polygons)](https://geodata.bts.gov/datasets/usdot::metropolitan-planning-organizations/about)
+- [BTS NTAD MPO ArcGIS Feature Service](https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0)
+- [BTS National Transportation Atlas Database](https://www.bts.gov/ntad)
+- [TIGERweb Census 2020 MapServer (Layer Catalog)](https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer)
+- [TIGERweb Current (2025) MapServer (Layer Catalog)](https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer)
+- [TIGERweb REST Services](https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html)
+- [TIGER/Line Shapefiles Documentation](https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html)
