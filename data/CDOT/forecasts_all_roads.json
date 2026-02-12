@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-12T01:51:23",
+  "generated": "2026-02-12T18:00:06",
   "model": "synthetic-demo",
   "horizon": 12,
   "quantileLevels": [
@@ -10571,6 +10571,179 @@
     }
   },
   "derivedMetrics": {
+    "crashPatternMatrix": {
+      "historicalMatrix": {
+        "K": {
+          "angle": {
+            "count": 21,
+            "pct": 26.2
+          },
+          "animal": {
+            "count": 3,
+            "pct": 3.8
+          },
+          "fixed_object": {
+            "count": 32,
+            "pct": 40.0
+          },
+          "head_on": {
+            "count": 14,
+            "pct": 17.5
+          },
+          "rear_end": {
+            "count": 7,
+            "pct": 8.8
+          },
+          "sideswipe_same": {
+            "count": 3,
+            "pct": 3.8
+          }
+        },
+        "A": {
+          "angle": {
+            "count": 181,
+            "pct": 39.2
+          },
+          "animal": {
+            "count": 9,
+            "pct": 1.9
+          },
+          "fixed_object": {
+            "count": 119,
+            "pct": 25.8
+          },
+          "head_on": {
+            "count": 27,
+            "pct": 5.8
+          },
+          "rear_end": {
+            "count": 97,
+            "pct": 21.0
+          },
+          "sideswipe_same": {
+            "count": 29,
+            "pct": 6.3
+          }
+        },
+        "B": {
+          "angle": {
+            "count": 577,
+            "pct": 36.6
+          },
+          "animal": {
+            "count": 55,
+            "pct": 3.5
+          },
+          "fixed_object": {
+            "count": 334,
+            "pct": 21.2
+          },
+          "head_on": {
+            "count": 19,
+            "pct": 1.2
+          },
+          "rear_end": {
+            "count": 477,
+            "pct": 30.2
+          },
+          "sideswipe_same": {
+            "count": 116,
+            "pct": 7.4
+          }
+        },
+        "C": {
+          "angle": {
+            "count": 648,
+            "pct": 22.1
+          },
+          "animal": {
+            "count": 47,
+            "pct": 1.6
+          },
+          "fixed_object": {
+            "count": 365,
+            "pct": 12.4
+          },
+          "head_on": {
+            "count": 17,
+            "pct": 0.6
+          },
+          "rear_end": {
+            "count": 1591,
+            "pct": 54.2
+          },
+          "sideswipe_same": {
+            "count": 269,
+            "pct": 9.2
+          }
+        },
+        "O": {
+          "angle": {
+            "count": 3637,
+            "pct": 21.1
+          },
+          "animal": {
+            "count": 1093,
+            "pct": 6.4
+          },
+          "fixed_object": {
+            "count": 2821,
+            "pct": 16.4
+          },
+          "head_on": {
+            "count": 80,
+            "pct": 0.5
+          },
+          "rear_end": {
+            "count": 6506,
+            "pct": 37.8
+          },
+          "sideswipe_same": {
+            "count": 3060,
+            "pct": 17.8
+          }
+        }
+      },
+      "severityTotals": {
+        "K": 80,
+        "A": 462,
+        "B": 1578,
+        "C": 2937,
+        "O": 17197
+      },
+      "typeTotals": {
+        "angle": 5064,
+        "animal": 1207,
+        "fixed_object": 3671,
+        "head_on": 157,
+        "rear_end": 8678,
+        "sideswipe_same": 3477
+      },
+      "crashTypes": [
+        "angle",
+        "animal",
+        "fixed_object",
+        "head_on",
+        "rear_end",
+        "sideswipe_same"
+      ],
+      "epdoByType": {
+        "angle": 34725,
+        "animal": 3932,
+        "fixed_object": 30816,
+        "head_on": 8535,
+        "rear_end": 29433,
+        "sideswipe_same": 8981
+      },
+      "kaRateByType": {
+        "angle": 4.0,
+        "animal": 1.0,
+        "fixed_object": 4.1,
+        "head_on": 26.1,
+        "rear_end": 1.2,
+        "sideswipe_same": 0.9
+      }
+    },
     "confidenceWidth": {
       "monthlyWidths": [
         110.6,

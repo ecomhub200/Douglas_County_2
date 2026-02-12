@@ -541,7 +541,83 @@ def build_summary_stats(df, matrices):
     }
 
 
-def build_derived_metrics(matrices, summary, horizon):
+def build_crash_pattern_matrix(df):
+    """Build historical severity x crash type cross-tabulation.
+
+    Computes the proportion of each crash type within each severity level,
+    enabling safety engineers to understand what crash patterns drive
+    fatal and serious injury outcomes.
+
+    Returns:
+        dict with 'historicalMatrix', 'severityTotals', 'typeTotals',
+        and 'epdoByType' for the crash pattern heatmap.
+    """
+    print("\n[Derived] Building crash pattern matrix (Severity x Crash Type)...")
+
+    if "Collision Type" not in df.columns or "severity" not in df.columns:
+        print("  WARNING: Missing Collision Type or severity column. Skipping.")
+        return None
+
+    df_typed = df.copy()
+    df_typed["crash_type"] = df_typed["Collision Type"].map(CRASH_TYPE_MAP)
+    df_typed = df_typed.dropna(subset=["crash_type"])
+
+    severities = ["K", "A", "B", "C", "O"]
+    crash_types = sorted(df_typed["crash_type"].unique())
+
+    # Build the cross-tabulation: count of crashes per (severity, type)
+    cross_tab = df_typed.groupby(["severity", "crash_type"]).size().reset_index(name="count")
+    ct_dict = {}
+    for _, row in cross_tab.iterrows():
+        sev = row["severity"]
+        ct = row["crash_type"]
+        ct_dict[(sev, ct)] = int(row["count"])
+
+    # Build matrix with counts and percentages
+    matrix = {}
+    severity_totals = {}
+    type_totals = {ct: 0 for ct in crash_types}
+
+    for sev in severities:
+        sev_total = sum(ct_dict.get((sev, ct), 0) for ct in crash_types)
+        severity_totals[sev] = sev_total
+        row = {}
+        for ct in crash_types:
+            count = ct_dict.get((sev, ct), 0)
+            type_totals[ct] += count
+            pct = round(count / max(sev_total, 1) * 100, 1)
+            row[ct] = {"count": count, "pct": pct}
+        matrix[sev] = row
+
+    # EPDO-weighted crash counts by type (which types cause highest severity cost)
+    epdo_by_type = {}
+    for ct in crash_types:
+        epdo = sum(ct_dict.get((sev, ct), 0) * EPDO_WEIGHTS.get(sev, 1) for sev in severities)
+        epdo_by_type[ct] = epdo
+
+    # KA rate by type (% of each type that is K or A)
+    ka_rate_by_type = {}
+    for ct in crash_types:
+        ct_total = type_totals[ct]
+        ka_count = ct_dict.get(("K", ct), 0) + ct_dict.get(("A", ct), 0)
+        ka_rate_by_type[ct] = round(ka_count / max(ct_total, 1) * 100, 1)
+
+    print(f"  Matrix: {len(severities)} severities x {len(crash_types)} types")
+    print(f"  Total typed crashes: {sum(type_totals.values()):,}")
+    for ct in sorted(ka_rate_by_type, key=ka_rate_by_type.get, reverse=True):
+        print(f"    {ct}: KA rate = {ka_rate_by_type[ct]}%, EPDO = {epdo_by_type[ct]:,}")
+
+    return {
+        "historicalMatrix": matrix,
+        "severityTotals": severity_totals,
+        "typeTotals": type_totals,
+        "crashTypes": crash_types,
+        "epdoByType": epdo_by_type,
+        "kaRateByType": ka_rate_by_type,
+    }
+
+
+def build_derived_metrics(matrices, summary, horizon, crash_pattern=None):
     """Build derived analytics from the 6 prediction matrices.
 
     These metrics provide deeper insights beyond raw forecasts:
@@ -552,8 +628,13 @@ def build_derived_metrics(matrices, summary, horizon):
     - Crash type momentum (which types are growing fastest)
     - Seasonal risk calendar
     - Composite risk scoring
+    - Crash pattern matrix (severity x crash type)
     """
     derived = {}
+
+    # ---- 0. Crash Pattern Matrix (severity x crash type) ----
+    if crash_pattern:
+        derived["crashPatternMatrix"] = crash_pattern
 
     # ---- 1. Prediction Confidence Width (from M01) ----
     m01 = matrices.get("m01", {})
@@ -942,9 +1023,12 @@ def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_
     # Build summary
     summary = build_summary_stats(df, matrices)
 
+    # Build crash pattern matrix from raw data (severity x crash type)
+    crash_pattern = build_crash_pattern_matrix(df)
+
     # Build derived analytics from the matrices
     print("\n[Derived] Building derived prediction metrics...")
-    derived = build_derived_metrics(matrices, summary, horizon)
+    derived = build_derived_metrics(matrices, summary, horizon, crash_pattern=crash_pattern)
     print(f"  Derived metrics: {list(derived.keys())}")
 
     # Assemble final output
