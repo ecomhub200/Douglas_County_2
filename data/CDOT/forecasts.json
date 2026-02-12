@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-11T02:43:30",
+  "generated": "2026-02-12T01:51:33",
   "model": "synthetic-demo",
   "horizon": 12,
   "quantileLevels": [
@@ -16,6 +16,7 @@
     "C": 5,
     "O": 1
   },
+  "roadType": "all_roads",
   "summary": {
     "totalCrashes": 24702,
     "years": [
@@ -10567,6 +10568,544 @@
           "total": 811
         }
       }
+    }
+  },
+  "derivedMetrics": {
+    "confidenceWidth": {
+      "monthlyWidths": [
+        110.6,
+        102.8,
+        111.2,
+        100.1,
+        107.3,
+        112.3,
+        106.3,
+        111.7,
+        110.8,
+        108.2,
+        108.9,
+        104.3
+      ],
+      "months": [
+        "2025-12",
+        "2026-01",
+        "2026-02",
+        "2026-03",
+        "2026-04",
+        "2026-05",
+        "2026-06",
+        "2026-07",
+        "2026-08",
+        "2026-09",
+        "2026-10",
+        "2026-11"
+      ],
+      "avgWidth": 107.9,
+      "coefficientOfVariation": 30.6,
+      "interpretation": "moderate"
+    },
+    "epdoForecast": {
+      "months": [
+        "2025-12",
+        "2026-01",
+        "2026-02",
+        "2026-03",
+        "2026-04",
+        "2026-05",
+        "2026-06",
+        "2026-07",
+        "2026-08",
+        "2026-09",
+        "2026-10",
+        "2026-11"
+      ],
+      "p50": [
+        1762,
+        1620,
+        1427,
+        1883,
+        2055,
+        1967,
+        2325,
+        2184,
+        2734,
+        2205,
+        1980,
+        1123
+      ],
+      "p10": [
+        1271,
+        1031,
+        871,
+        1110,
+        1246,
+        1272,
+        1612,
+        1418,
+        1962,
+        1478,
+        1214,
+        890
+      ],
+      "p90": [
+        2502,
+        2339,
+        2215,
+        2648,
+        2886,
+        2733,
+        3047,
+        2914,
+        3552,
+        2985,
+        2671,
+        1902
+      ],
+      "predicted6moTotal": 10714,
+      "historical6moTotal": 0,
+      "changePct": 0
+    },
+    "kaForecast": {
+      "months": [
+        "2025-12",
+        "2026-01",
+        "2026-02",
+        "2026-03",
+        "2026-04",
+        "2026-05",
+        "2026-06",
+        "2026-07",
+        "2026-08",
+        "2026-09",
+        "2026-10",
+        "2026-11"
+      ],
+      "predicted": [
+        9.0,
+        8.2,
+        6.4,
+        8.4,
+        9.8,
+        8.8,
+        10.7,
+        8.8,
+        10.6,
+        8.8,
+        8.5,
+        4.0
+      ],
+      "kaRatePct": [
+        2.1,
+        2.2,
+        1.9,
+        2.4,
+        2.9,
+        2.3,
+        3.2,
+        2.7,
+        2.9,
+        2.4,
+        2.6,
+        1.3
+      ],
+      "predicted6mo": 50.6,
+      "historical6mo": 64,
+      "trend": "improving"
+    },
+    "severityShift": {
+      "historicalKAShare": 3.02,
+      "predictedKAShare": 2.27,
+      "shiftPct": -0.75,
+      "interpretation": "improving",
+      "predictedDistribution": {
+        "K": 5,
+        "A": 45,
+        "B": 205,
+        "C": 273,
+        "O": 1670
+      }
+    },
+    "corridorRankMovement": {
+      "rankings": [
+        {
+          "name": "I-25",
+          "historical6moAvg": 68.8,
+          "predicted6moAvg": 54.1,
+          "changePct": -21.5,
+          "epdo": 32180,
+          "confidenceWidth": 32.0,
+          "direction": "falling",
+          "predictedRank": 1,
+          "historicalRank": 1,
+          "rankChange": 0
+        },
+        {
+          "name": "C-470",
+          "historical6moAvg": 20.3,
+          "predicted6moAvg": 18.6,
+          "changePct": -8.4,
+          "epdo": 7118,
+          "confidenceWidth": 11.2,
+          "direction": "falling",
+          "predictedRank": 2,
+          "historicalRank": 2,
+          "rankChange": 0
+        },
+        {
+          "name": "LINCOLN AVE",
+          "historical6moAvg": 14.5,
+          "predicted6moAvg": 15.8,
+          "changePct": 9.3,
+          "epdo": 4655,
+          "confidenceWidth": 6.5,
+          "direction": "rising",
+          "predictedRank": 3,
+          "historicalRank": 4,
+          "rankChange": 1
+        },
+        {
+          "name": "S PARKER RD",
+          "historical6moAvg": 18.8,
+          "predicted6moAvg": 12.7,
+          "changePct": -32.7,
+          "epdo": 5667,
+          "confidenceWidth": 13.6,
+          "direction": "falling",
+          "predictedRank": 4,
+          "historicalRank": 3,
+          "rankChange": -1
+        },
+        {
+          "name": "FOUNDERS PKWY",
+          "historical6moAvg": 5.8,
+          "predicted6moAvg": 6.5,
+          "changePct": 10.9,
+          "epdo": 2373,
+          "confidenceWidth": 4.5,
+          "direction": "rising",
+          "predictedRank": 5,
+          "historicalRank": 6,
+          "rankChange": 1
+        },
+        {
+          "name": "HWY 85",
+          "historical6moAvg": 7.3,
+          "predicted6moAvg": 5.3,
+          "changePct": -27.3,
+          "epdo": 6944,
+          "confidenceWidth": 7.8,
+          "direction": "falling",
+          "predictedRank": 6,
+          "historicalRank": 5,
+          "rankChange": -1
+        },
+        {
+          "name": "HWY 86",
+          "historical6moAvg": 5.0,
+          "predicted6moAvg": 5.3,
+          "changePct": 6.0,
+          "epdo": 2098,
+          "confidenceWidth": 3.8,
+          "direction": "rising",
+          "predictedRank": 7,
+          "historicalRank": 7,
+          "rankChange": 0
+        },
+        {
+          "name": "HWY 83",
+          "historical6moAvg": 5.0,
+          "predicted6moAvg": 2.8,
+          "changePct": -44.3,
+          "epdo": 6260,
+          "confidenceWidth": 4.2,
+          "direction": "falling",
+          "predictedRank": 8,
+          "historicalRank": 8,
+          "rankChange": 0
+        },
+        {
+          "name": "RIDGEGATE PKWY",
+          "historical6moAvg": 3.0,
+          "predicted6moAvg": 2.6,
+          "changePct": -11.7,
+          "epdo": 1079,
+          "confidenceWidth": 2.7,
+          "direction": "falling",
+          "predictedRank": 9,
+          "historicalRank": 9,
+          "rankChange": 0
+        }
+      ],
+      "emergingRisk": [
+        "FOUNDERS PKWY",
+        "LINCOLN AVE",
+        "HWY 86"
+      ],
+      "improvingMost": [
+        {
+          "name": "HWY 83",
+          "historical6moAvg": 5.0,
+          "predicted6moAvg": 2.8,
+          "changePct": -44.3,
+          "epdo": 6260,
+          "confidenceWidth": 4.2,
+          "direction": "falling",
+          "predictedRank": 8,
+          "historicalRank": 8,
+          "rankChange": 0
+        },
+        {
+          "name": "S PARKER RD",
+          "historical6moAvg": 18.8,
+          "predicted6moAvg": 12.7,
+          "changePct": -32.7,
+          "epdo": 5667,
+          "confidenceWidth": 13.6,
+          "direction": "falling",
+          "predictedRank": 4,
+          "historicalRank": 3,
+          "rankChange": -1
+        },
+        {
+          "name": "HWY 85",
+          "historical6moAvg": 7.3,
+          "predicted6moAvg": 5.3,
+          "changePct": -27.3,
+          "epdo": 6944,
+          "confidenceWidth": 7.8,
+          "direction": "falling",
+          "predictedRank": 6,
+          "historicalRank": 5,
+          "rankChange": -1
+        }
+      ]
+    },
+    "crashTypeMomentum": {
+      "types": [
+        {
+          "type": "head_on",
+          "historical6mo": 14,
+          "predicted6mo": 16,
+          "changePct": 17.9,
+          "trendSlope": 0.03,
+          "total": 157,
+          "momentum": "accelerating"
+        },
+        {
+          "type": "rear_end",
+          "historical6mo": 855,
+          "predicted6mo": 849,
+          "changePct": -0.7,
+          "trendSlope": 3.35,
+          "total": 8678,
+          "momentum": "steady"
+        },
+        {
+          "type": "animal",
+          "historical6mo": 192,
+          "predicted6mo": 183,
+          "changePct": -4.7,
+          "trendSlope": 5.34,
+          "total": 1207,
+          "momentum": "steady"
+        },
+        {
+          "type": "angle",
+          "historical6mo": 454,
+          "predicted6mo": 430,
+          "changePct": -5.3,
+          "trendSlope": -1.75,
+          "total": 5064,
+          "momentum": "steady"
+        },
+        {
+          "type": "sideswipe_same",
+          "historical6mo": 323,
+          "predicted6mo": 290,
+          "changePct": -10.2,
+          "trendSlope": -1.76,
+          "total": 3477,
+          "momentum": "decelerating"
+        },
+        {
+          "type": "fixed_object",
+          "historical6mo": 241,
+          "predicted6mo": 181,
+          "changePct": -25.1,
+          "trendSlope": -4.73,
+          "total": 3671,
+          "momentum": "decelerating"
+        }
+      ],
+      "fastestGrowing": "head_on",
+      "fastestDeclining": "fixed_object"
+    },
+    "factorTrends": {
+      "factors": [
+        {
+          "factor": "pedestrian",
+          "historical6mo": 16,
+          "predicted6mo": 15,
+          "changePct": -3.7,
+          "involvementRatePct": 0.7,
+          "total": 166
+        },
+        {
+          "factor": "alcohol",
+          "historical6mo": 42,
+          "predicted6mo": 38,
+          "changePct": -10.2,
+          "involvementRatePct": 1.7,
+          "total": 445
+        },
+        {
+          "factor": "night",
+          "historical6mo": 442,
+          "predicted6mo": 365,
+          "changePct": -17.5,
+          "involvementRatePct": 16.6,
+          "total": 5810
+        },
+        {
+          "factor": "bicycle",
+          "historical6mo": 23,
+          "predicted6mo": 16,
+          "changePct": -29.1,
+          "involvementRatePct": 0.7,
+          "total": 180
+        },
+        {
+          "factor": "speed",
+          "historical6mo": 63,
+          "predicted6mo": 27,
+          "changePct": -56.7,
+          "involvementRatePct": 1.2,
+          "total": 1796
+        }
+      ],
+      "steepestRising": null
+    },
+    "seasonalRiskCalendar": {
+      "months": [
+        {
+          "month": "2025-12",
+          "monthNum": 12,
+          "totalPredicted": 433.9,
+          "kaPredicted": 9.0,
+          "epdoPredicted": 1762,
+          "riskRank": 9
+        },
+        {
+          "month": "2026-01",
+          "monthNum": 1,
+          "totalPredicted": 375.8,
+          "kaPredicted": 8.2,
+          "epdoPredicted": 1620,
+          "riskRank": 10
+        },
+        {
+          "month": "2026-02",
+          "monthNum": 2,
+          "totalPredicted": 332.3,
+          "kaPredicted": 6.4,
+          "epdoPredicted": 1427,
+          "riskRank": 11
+        },
+        {
+          "month": "2026-03",
+          "monthNum": 3,
+          "totalPredicted": 345.3,
+          "kaPredicted": 8.4,
+          "epdoPredicted": 1883,
+          "riskRank": 8
+        },
+        {
+          "month": "2026-04",
+          "monthNum": 4,
+          "totalPredicted": 335.8,
+          "kaPredicted": 9.8,
+          "epdoPredicted": 2055,
+          "riskRank": 5
+        },
+        {
+          "month": "2026-05",
+          "monthNum": 5,
+          "totalPredicted": 378.2,
+          "kaPredicted": 8.8,
+          "epdoPredicted": 1967,
+          "riskRank": 7
+        },
+        {
+          "month": "2026-06",
+          "monthNum": 6,
+          "totalPredicted": 333.0,
+          "kaPredicted": 10.7,
+          "epdoPredicted": 2325,
+          "riskRank": 2
+        },
+        {
+          "month": "2026-07",
+          "monthNum": 7,
+          "totalPredicted": 325.3,
+          "kaPredicted": 8.8,
+          "epdoPredicted": 2184,
+          "riskRank": 4
+        },
+        {
+          "month": "2026-08",
+          "monthNum": 8,
+          "totalPredicted": 359.9,
+          "kaPredicted": 10.6,
+          "epdoPredicted": 2734,
+          "riskRank": 1
+        },
+        {
+          "month": "2026-09",
+          "monthNum": 9,
+          "totalPredicted": 362.6,
+          "kaPredicted": 8.8,
+          "epdoPredicted": 2205,
+          "riskRank": 3
+        },
+        {
+          "month": "2026-10",
+          "monthNum": 10,
+          "totalPredicted": 328.3,
+          "kaPredicted": 8.5,
+          "epdoPredicted": 1980,
+          "riskRank": 6
+        },
+        {
+          "month": "2026-11",
+          "monthNum": 11,
+          "totalPredicted": 318.5,
+          "kaPredicted": 4.0,
+          "epdoPredicted": 1123,
+          "riskRank": 12
+        }
+      ],
+      "highestRiskMonth": "2026-08",
+      "lowestRiskMonth": "2026-11"
+    },
+    "compositeRiskScore": {
+      "score": -3.6,
+      "level": "moderate",
+      "components": {
+        "totalTrend": -6.9,
+        "severityShift": -0.75,
+        "epdoChange": 0
+      },
+      "weights": {
+        "epdoChange": 0.5,
+        "totalTrend": 0.3,
+        "severityShift": 0.2
+      }
+    },
+    "locationTypeSplit": {
+      "intersectionPredicted6mo": 957,
+      "segmentPredicted6mo": 1238,
+      "intersectionSharePct": 43.6,
+      "segmentSharePct": 56.4
     }
   }
 }
