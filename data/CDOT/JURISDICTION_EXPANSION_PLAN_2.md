@@ -984,9 +984,42 @@ data/CDOT/boundaries/
 | Selects corridor I-25 | `corridors/I-25.geojson` | ~50 KB additional |
 | Selects TPR view | `tprs.geojson` (if not already loaded) | ~200 KB |
 
+### Live API Alternative: BTS NTAD MPO Boundary Service
+
+Instead of maintaining static `tprs.geojson` files per state, MPO/TPR boundaries can be loaded dynamically from the BTS National Transportation Atlas Database:
+
+**API Endpoint:**
+```
+https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0/query
+```
+
+| Property | Value |
+|----------|-------|
+| **Scope** | National — all US MPOs |
+| **Geometry** | `esriGeometryPolygon` — official MPO boundary polygons |
+| **Key Fields** | `MPO_ID`, `MPO_NAME`, `ACRONYM`, `STATE`, `POP`, `DESIGNATION_DATE` |
+| **Update Frequency** | Quarterly (BTS NTAD schedule) |
+| **Cost** | Free, no authentication |
+
+**Loading Strategy for MPO Boundaries:**
+
+| User Action | Data Source | Fallback |
+|------------|------------|----------|
+| Opens state view | Static `regions.geojson` (CDOT regions) | Always available |
+| Selects TPR/MPO view | **BTS MPO API** → query `?where=STATE='CO'&f=geojson` | Static `tprs.geojson` |
+| Selects specific MPO (e.g., DRCOG) | **BTS MPO API** → query `?where=ACRONYM='DRCOG'&f=geojson` | Cached from previous query |
+| Onboards new state | **BTS MPO API** → auto-discover all MPOs for that state | Manual GeoJSON creation |
+
+**Advantages Over Static GeoJSON:**
+- No manual boundary maintenance when MPOs change (expansions, mergers, redesignations)
+- Automatically works for any US state during jurisdiction onboarding
+- Includes metadata (population, designation date, website) alongside geometry
+- Solves the partial-county problem with precise polygon boundaries (see Part 1, Section 13)
+
 ### Caching Strategy
 
 - All GeoJSON files cached in IndexedDB after first load
+- **BTS MPO boundaries:** Cache in IndexedDB with quarterly expiration (aligned with NTAD updates)
 - Cache invalidation: check ETag monthly (boundaries rarely change)
 - Simplified boundaries for state view are ALWAYS loaded (fast)
 - Full-detail boundaries loaded on demand and cached

@@ -182,6 +182,65 @@ Colorado is divided into **15 Transportation Planning Regions (TPRs)**: 5 MPOs (
 | 14 | Southwest | SW | Archuleta, Dolores, La Plata, Montezuma, San Juan | SW CO COG (SWCCOG) |
 | 15 | Upper Front Range | UFR | Morgan (+ parts of Larimer, Weld) | CDOT Planning Liaison |
 
+### Federal MPO Boundary Data Source (BTS/NTAD)
+
+The Bureau of Transportation Statistics provides **official MPO boundary polygons** via a national ArcGIS Feature Service. This dataset should be the primary source for dynamically loading MPO boundaries rather than maintaining static GeoJSON files.
+
+**API Endpoint:**
+```
+https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0/query
+```
+
+| Property | Value |
+|----------|-------|
+| **Source** | BTS National Transportation Atlas Database (NTAD) |
+| **Compiled** | November 10, 2025 (from FHWA data) |
+| **Scope** | National — all US MPOs (~400+) |
+| **Geometry** | `esriGeometryPolygon` — full MPO boundary polygons |
+| **Update Frequency** | Quarterly (as part of NTAD updates) |
+| **NGDA Status** | Recognized as National Geospatial Data Asset by FGDC |
+| **Cost** | Free, no authentication required |
+
+**Key Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `MPO_ID` | String | Unique MPO identifier |
+| `MPO_NAME` | String | Full MPO name (e.g., "Denver Regional Council of Governments") |
+| `ACRONYM` | String | MPO abbreviation (e.g., "DRCOG") |
+| `MPO_URL` | String | Official MPO website |
+| `STATE` | String | Primary state (e.g., "CO") |
+| `STATE_2` | String | Secondary state (for cross-state MPOs) |
+| `STATE_3` | String | Tertiary state (for tri-state MPOs) |
+| `POP` | Integer | Population served by the MPO |
+| `DESIGNATION_DATE` | Date | Date of MPO designation |
+
+**Query Example — Get All Colorado MPOs:**
+```
+?where=STATE='CO' OR STATE_2='CO' OR STATE_3='CO'
+&outFields=MPO_ID,MPO_NAME,ACRONYM,STATE,POP,DESIGNATION_DATE
+&outSR=4326
+&f=geojson
+```
+
+**Why This Matters for Jurisdiction Expansion:**
+
+1. **Dynamic boundary loading** — Instead of maintaining static `tprs.geojson` files per state, query the BTS API to get official MPO polygons on demand
+2. **Multi-state support** — Works for any US state, eliminating the need to manually source MPO boundaries when onboarding new states
+3. **Always current** — Quarterly NTAD updates ensure boundary changes (MPO expansions, mergers, redesignations) are automatically reflected
+4. **Cross-state MPOs** — The `STATE_2`/`STATE_3` fields correctly capture MPOs that span state boundaries (e.g., Portland Metro spans OR/WA)
+5. **Population data** — `POP` field enables population-weighted analysis without separate Census lookups
+6. **Point-in-polygon ready** — The polygon geometry enables precise crash-to-MPO assignment, solving the partial-county problem (Section 13) more accurately than county-level approximations
+
+**Integration with Existing Architecture:**
+
+This endpoint should be added to `API_AVAILABILITY` in `index.html`:
+```javascript
+btsMPOBoundaries: { scope: 'national', label: 'MPO Boundaries (BTS NTAD)' }
+```
+
+And to the `config.json` transit/boundary configuration for runtime use.
+
 ### Key Insight: Overlapping Hierarchies
 
 **CDOT Regions and TPRs/MPOs are NOT the same hierarchy.** They overlap:
@@ -930,7 +989,7 @@ data/
 │   └── boundaries/                # GeoJSON boundaries (NEW)
 │       ├── counties.geojson
 │       ├── regions.geojson
-│       └── tprs.geojson
+│       └── tprs.geojson           # Fallback; prefer BTS NTAD MPO API (see Section 4)
 │
 ├── VA/                            # Virginia state data (restructured)
 │   ├── counties/
@@ -1348,18 +1407,39 @@ Each CDOT region gets a dedicated configuration section that defines:
 - Growth area safety projections
 - Equity analysis (crashes in disadvantaged communities)
 
+### MPO Boundary Data Source for Aggregation
+
+The BTS NTAD MPO Boundary API (documented in Section 4) is the recommended data source for the aggregation engine's boundary needs:
+
+```
+https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0/query
+```
+
+**How the Aggregation Engine Uses MPO Boundaries:**
+
+1. **Crash-to-MPO assignment** — Use `turf.booleanPointInPolygon()` with the official BTS polygon to determine which MPO a crash belongs to. This is more accurate than county-level approximation for split counties like Weld.
+2. **Boundary rendering** — Display the official MPO polygon on the map when in MPO view mode, replacing the need for manually-created `tprs.geojson`.
+3. **Population normalization** — Use the `POP` field from the API to calculate crash rates per capita at the MPO level without a separate Census lookup.
+4. **Auto-discovery** — When onboarding a new state, query `?where=STATE='XX'&outFields=*&f=geojson` to automatically discover all MPOs in that state along with their boundaries, names, and designations.
+
+**Caching Strategy:**
+- Query once per state and cache in IndexedDB (MPO boundaries rarely change)
+- Invalidate cache quarterly (aligned with BTS NTAD update schedule)
+- Fallback to static `tprs.geojson` if API is unavailable
+
 ### Partial County Handling
 
-Some TPRs include only PART of a county (e.g., "Southwest Weld County" is in DRCOG, while most of Weld is in NFRMPO). This requires:
+Some TPRs include only PART of a county (e.g., "Southwest Weld County" is in DRCOG, while most of Weld is in NFRMPO). The BTS MPO boundary polygons solve this more accurately than county-level approximation:
 
 ```javascript
-// For partial counties, filter by geography not just county name
-function filterPartialCounty(countyFips, tprBoundaryGeojson, crashRows) {
+// For partial counties, use BTS MPO polygon for precise assignment
+async function filterPartialCounty(countyFips, mpoBoundaryPolygon, crashRows) {
+    // mpoBoundaryPolygon sourced from BTS NTAD MPO Feature Service
     // Use turf.js point-in-polygon to determine which crashes
     // within Weld County fall inside the DRCOG boundary
     return crashRows.filter(row => {
         const point = turf.point([parseFloat(row.x), parseFloat(row.y)]);
-        return turf.booleanPointInPolygon(point, tprBoundaryGeojson);
+        return turf.booleanPointInPolygon(point, mpoBoundaryPolygon);
     });
 }
 ```
@@ -1506,6 +1586,8 @@ The architecture described above is **state-agnostic**. Here's how to add a new 
 │  The Hierarchy Registry and Aggregation Engine handle it.    │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+> **Note:** MPO boundaries for any new state are automatically available from the BTS NTAD MPO API (see Section 4). Query `?where=STATE='TX'&f=geojson` to get all Texas MPOs with official boundary polygons, names, populations, and designation dates. No manual GeoJSON creation required for the MPO/TPR layer.
 
 ### Generic State Hierarchy Template
 
@@ -2379,3 +2461,6 @@ At that point, use **Cloudflare D1** or **Turso** (edge SQLite) — not PostgreS
 - [TPR at a Glance (Jan 2026)](https://www.codot.gov/programs/planning/assets/planning-partners/january2026tpr)
 - [DRCOG Member Governments](https://www.drcog.org/about-drcog/member-governments)
 - [NFRMPO Partners](https://nfrmpo.org/partners/)
+- [BTS NTAD Metropolitan Planning Organizations (Boundary Polygons)](https://geodata.bts.gov/datasets/usdot::metropolitan-planning-organizations/about)
+- [BTS NTAD MPO ArcGIS Feature Service](https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0)
+- [BTS National Transportation Atlas Database](https://www.bts.gov/ntad)
