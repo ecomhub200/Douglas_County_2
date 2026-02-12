@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-12T20:38:51",
+  "generated": "2026-02-12T20:50:00",
   "model": "synthetic-demo",
   "horizon": 12,
   "quantileLevels": [
@@ -10572,6 +10572,179 @@
     }
   },
   "derivedMetrics": {
+    "crashPatternMatrix": {
+      "historicalMatrix": {
+        "K": {
+          "angle": {
+            "count": 19,
+            "pct": 29.2
+          },
+          "animal": {
+            "count": 3,
+            "pct": 4.6
+          },
+          "fixed_object": {
+            "count": 25,
+            "pct": 38.5
+          },
+          "head_on": {
+            "count": 14,
+            "pct": 21.5
+          },
+          "rear_end": {
+            "count": 3,
+            "pct": 4.6
+          },
+          "sideswipe_same": {
+            "count": 1,
+            "pct": 1.5
+          }
+        },
+        "A": {
+          "angle": {
+            "count": 178,
+            "pct": 50.7
+          },
+          "animal": {
+            "count": 8,
+            "pct": 2.3
+          },
+          "fixed_object": {
+            "count": 82,
+            "pct": 23.4
+          },
+          "head_on": {
+            "count": 26,
+            "pct": 7.4
+          },
+          "rear_end": {
+            "count": 48,
+            "pct": 13.7
+          },
+          "sideswipe_same": {
+            "count": 9,
+            "pct": 2.6
+          }
+        },
+        "B": {
+          "angle": {
+            "count": 566,
+            "pct": 46.4
+          },
+          "animal": {
+            "count": 48,
+            "pct": 3.9
+          },
+          "fixed_object": {
+            "count": 236,
+            "pct": 19.3
+          },
+          "head_on": {
+            "count": 19,
+            "pct": 1.6
+          },
+          "rear_end": {
+            "count": 304,
+            "pct": 24.9
+          },
+          "sideswipe_same": {
+            "count": 47,
+            "pct": 3.9
+          }
+        },
+        "C": {
+          "angle": {
+            "count": 631,
+            "pct": 33.4
+          },
+          "animal": {
+            "count": 39,
+            "pct": 2.1
+          },
+          "fixed_object": {
+            "count": 198,
+            "pct": 10.5
+          },
+          "head_on": {
+            "count": 16,
+            "pct": 0.8
+          },
+          "rear_end": {
+            "count": 899,
+            "pct": 47.6
+          },
+          "sideswipe_same": {
+            "count": 106,
+            "pct": 5.6
+          }
+        },
+        "O": {
+          "angle": {
+            "count": 3413,
+            "pct": 24.7
+          },
+          "animal": {
+            "count": 992,
+            "pct": 7.2
+          },
+          "fixed_object": {
+            "count": 2057,
+            "pct": 14.9
+          },
+          "head_on": {
+            "count": 78,
+            "pct": 0.6
+          },
+          "rear_end": {
+            "count": 5145,
+            "pct": 37.3
+          },
+          "sideswipe_same": {
+            "count": 2111,
+            "pct": 15.3
+          }
+        }
+      },
+      "severityTotals": {
+        "K": 65,
+        "A": 351,
+        "B": 1220,
+        "C": 1889,
+        "O": 13796
+      },
+      "typeTotals": {
+        "angle": 4807,
+        "animal": 1090,
+        "fixed_object": 2598,
+        "head_on": 153,
+        "rear_end": 6399,
+        "sideswipe_same": 2274
+      },
+      "crashTypes": [
+        "angle",
+        "animal",
+        "fixed_object",
+        "head_on",
+        "rear_end",
+        "sideswipe_same"
+      ],
+      "epdoByType": {
+        "angle": 33174,
+        "animal": 3645,
+        "fixed_object": 22513,
+        "head_on": 8466,
+        "rear_end": 17650,
+        "sideswipe_same": 4225
+      },
+      "kaRateByType": {
+        "angle": 4.1,
+        "animal": 1.0,
+        "fixed_object": 4.1,
+        "head_on": 26.1,
+        "rear_end": 0.8,
+        "sideswipe_same": 0.4
+      }
+    },
     "confidenceWidth": {
       "monthlyWidths": [
         86.7,
