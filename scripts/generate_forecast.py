@@ -8,7 +8,23 @@ data/CDOT/forecasts*.json for the Crash Prediction tab in CRASH LENS.
 
 Each DOT's prediction data is stored alongside its source data (e.g., data/CDOT/).
 
-Implements all 6 prediction matrices:
+Temporal Embedding Layer
+~~~~~~~~~~~~~~~~~~~~~~~~
+Before inference, a temporal embedding layer transforms each series to
+improve Chronos-2 prediction accuracy:
+
+  - **Seasonal decomposition** (additive) for high-count series (≥ 10/month)
+    with 2+ years of history.  Removes the 12-month cyclical pattern so
+    Chronos-2 can focus on trend and irregular components.
+  - **Log1p variance stabilization** for low-count series (< 10/month, e.g.
+    K and A severity crashes).  Compresses the range of sparse counts so the
+    model treats small differences proportionally.
+
+Both transforms are automatically reversed after prediction; the output JSON
+structure is unchanged.
+
+Prediction Matrices
+~~~~~~~~~~~~~~~~~~~
   M01: Total Crash Frequency (county-wide)
   M02: Severity-Level Multivariate (K/A/B/C/O)
   M03: Corridor Cross-Learning (top 10 routes)
@@ -272,6 +288,168 @@ def generate_synthetic_forecast(series_dict, horizon):
         forecasts[sid] = forecast
 
     return forecasts
+
+
+# ============================================================
+# Temporal Embedding Layer
+# ============================================================
+# Pre-model transformation layer to improve Chronos-2 forecast accuracy.
+#
+# Two transforms are applied based on series characteristics:
+#   1. Seasonal decomposition (additive) for high-count series with 2+ years
+#      of history.  Removes known 12-month cyclical patterns so Chronos-2
+#      can focus on trend and irregular components.
+#   2. Log1p variance stabilization for low-count series (mean < 10/month).
+#      Compresses the range of sparse counts (e.g., fatal crashes: 0,3,0,1)
+#      so the model treats small differences proportionally.
+#
+# Both transforms are automatically reversed after prediction, producing
+# forecasts in the original count scale.  The output JSON is unchanged.
+
+LOG_TRANSFORM_THRESHOLD = 10   # series with mean below this get log1p
+MIN_MONTHS_FOR_SEASONAL = 24   # need 2+ full years for seasonal estimation
+
+
+def estimate_seasonal_pattern(month_strings, values):
+    """Estimate additive seasonal factors by calendar month.
+
+    For each calendar month (Jan=1 … Dec=12), computes the average
+    deviation from the overall series mean.
+
+    Args:
+        month_strings: list of "YYYY-MM" strings
+        values: list of numeric values (same length)
+
+    Returns:
+        dict {int: float} mapping calendar month (1-12) to seasonal
+        deviation, or None if insufficient data or zero-mean series.
+    """
+    if len(values) < MIN_MONTHS_FOR_SEASONAL:
+        return None
+
+    overall_mean = sum(values) / len(values)
+    if overall_mean == 0:
+        return None
+
+    monthly_sums = defaultdict(float)
+    monthly_counts = defaultdict(int)
+    for month_str, value in zip(month_strings, values):
+        cal_month = int(month_str.split("-")[1])
+        monthly_sums[cal_month] += value
+        monthly_counts[cal_month] += 1
+
+    seasonal = {}
+    for m in range(1, 13):
+        if monthly_counts[m] > 0:
+            seasonal[m] = monthly_sums[m] / monthly_counts[m] - overall_mean
+        else:
+            seasonal[m] = 0.0
+
+    return seasonal
+
+
+def apply_temporal_embedding(series_dict):
+    """Apply temporal transforms to series before Chronos-2 inference.
+
+    Low-count series (mean < LOG_TRANSFORM_THRESHOLD) receive a log1p
+    transform.  Higher-count series with enough history receive additive
+    seasonal decomposition.  Series that qualify for neither are passed
+    through unchanged.
+
+    Args:
+        series_dict: {series_id: [(month_str, count), ...]}
+
+    Returns:
+        (transformed_dict, metadata_dict)
+        - transformed_dict: same structure with transformed values
+        - metadata_dict: per-series info needed for inverse_temporal_embedding
+    """
+    transformed = {}
+    metadata = {}
+    log_ids = []
+    seasonal_ids = []
+
+    for sid, series in series_dict.items():
+        values = [pt[1] for pt in series]
+        months = [pt[0] for pt in series]
+        n = len(values)
+        mean_val = sum(values) / n if n > 0 else 0
+        meta = {"transform": "none"}
+
+        if 0 < mean_val < LOG_TRANSFORM_THRESHOLD:
+            # Low-count series: log1p variance stabilization
+            tv = [round(math.log1p(v), 6) for v in values]
+            transformed[sid] = list(zip(months, tv))
+            meta["transform"] = "log1p"
+            log_ids.append(sid)
+
+        elif n >= MIN_MONTHS_FOR_SEASONAL and mean_val >= LOG_TRANSFORM_THRESHOLD:
+            seasonal = estimate_seasonal_pattern(months, values)
+            if seasonal is not None:
+                dv = []
+                for month_str, v in zip(months, values):
+                    cal = int(month_str.split("-")[1])
+                    dv.append(max(0.0, round(v - seasonal.get(cal, 0.0), 6)))
+                transformed[sid] = list(zip(months, dv))
+                meta["transform"] = "seasonal"
+                meta["seasonal"] = seasonal
+                seasonal_ids.append(sid)
+            else:
+                transformed[sid] = series
+        else:
+            transformed[sid] = series
+
+        metadata[sid] = meta
+
+    if log_ids:
+        print(f"    Temporal embedding: log1p → {log_ids}")
+    if seasonal_ids:
+        print(f"    Temporal embedding: seasonal decomposition → {seasonal_ids}")
+
+    return transformed, metadata
+
+
+def inverse_temporal_embedding(forecasts, metadata):
+    """Reverse temporal transforms on Chronos-2 output.
+
+    Args:
+        forecasts: {series_id: {"months": [...], "p10": [...], ...}}
+        metadata:  per-series transform info from apply_temporal_embedding
+
+    Returns:
+        dict with same structure, values restored to original count scale.
+    """
+    result = {}
+
+    for sid, fc in forecasts.items():
+        meta = metadata.get(sid, {"transform": "none"})
+        transform = meta["transform"]
+
+        if transform == "none":
+            result[sid] = fc
+            continue
+
+        inv = {}
+        for key, vals in fc.items():
+            if key == "months" or not isinstance(vals, list):
+                inv[key] = vals
+                continue
+
+            if transform == "log1p":
+                inv[key] = [round(max(0.0, math.expm1(v)), 1) for v in vals]
+
+            elif transform == "seasonal":
+                seasonal = meta["seasonal"]
+                fc_months = fc.get("months", [])
+                adjusted = []
+                for i, v in enumerate(vals):
+                    cal = int(fc_months[i].split("-")[1]) if i < len(fc_months) else 1
+                    adjusted.append(round(max(0.0, v + seasonal.get(cal, 0.0)), 1))
+                inv[key] = adjusted
+
+        result[sid] = inv
+
+    return result
 
 
 def build_matrix_01(df, horizon, call_endpoint):
@@ -897,9 +1075,9 @@ def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_
     """Generate forecast for a single crash data file."""
     df = load_crash_data(csv_path)
 
-    # Set up endpoint caller or synthetic generator
+    # Set up raw endpoint caller or synthetic generator
     if dry_run:
-        call_endpoint = lambda series, h: generate_synthetic_forecast(series, h)
+        raw_endpoint = lambda series, h: generate_synthetic_forecast(series, h)
     else:
         try:
             import boto3
@@ -912,7 +1090,14 @@ def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_
             aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
             region_name=os.environ.get("AWS_REGION", "us-east-1"),
         )
-        call_endpoint = lambda series, h: invoke_endpoint(session, series, h)
+        raw_endpoint = lambda series, h: invoke_endpoint(session, series, h)
+
+    # Wrap with temporal embedding layer: seasonal decomposition for
+    # high-count series, log1p for low-count series (K, A severity).
+    def call_endpoint(series, h):
+        transformed, meta = apply_temporal_embedding(series)
+        forecasts = raw_endpoint(transformed, h)
+        return inverse_temporal_embedding(forecasts, meta)
 
     # Build all 6 matrices
     matrices = {}
@@ -955,6 +1140,15 @@ def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_
         "quantileLevels": QUANTILE_LEVELS,
         "epdoWeights": EPDO_WEIGHTS,
         "roadType": road_type_label or "all_roads",
+        "temporalEmbedding": {
+            "enabled": True,
+            "transforms": [
+                "seasonal_decomposition",
+                "log1p_variance_stabilization",
+            ],
+            "logTransformThreshold": LOG_TRANSFORM_THRESHOLD,
+            "minMonthsForSeasonal": MIN_MONTHS_FOR_SEASONAL,
+        },
         "summary": summary,
         "matrices": matrices,
         "derivedMetrics": derived,
