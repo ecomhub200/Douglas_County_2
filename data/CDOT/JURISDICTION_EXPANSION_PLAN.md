@@ -1753,6 +1753,198 @@ The `hierarchy.json` schema handles all of these:
 }
 ```
 
+### Zero-Code Dynamic Boundary System
+
+When a user (or admin) switches to a new state, the tool should **automatically discover and load ALL boundaries** from federal APIs — no coding, no manual GeoJSON creation, no state-specific boundary logic.
+
+**The only input needed:** A 2-digit state FIPS code (e.g., `"48"` for Texas).
+
+Everything else is derived dynamically from TIGERweb + BTS NTAD:
+
+```
+User selects new state: Texas (FIPS: 48)
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────┐
+│  AUTOMATIC BOUNDARY DISCOVERY ENGINE                     │
+│                                                           │
+│  Step 1: State Outline                                   │
+│  TIGERweb layer 80 → STATE='48'                          │
+│  → Returns Texas state polygon                           │
+│                                                           │
+│  Step 2: All Counties                                    │
+│  TIGERweb layer 82 → STATE='48'                          │
+│  → Returns all 254 Texas county polygons with            │
+│    NAME, COUNTY (FIPS), GEOID                            │
+│  → Auto-populates county dropdown                        │
+│                                                           │
+│  Step 3: All MPOs                                        │
+│  BTS NTAD MPO API → STATE='TX' OR STATE_2='TX'           │
+│  → Returns all 25 Texas MPO polygons with                │
+│    MPO_NAME, ACRONYM, POP, DESIGNATION_DATE              │
+│  → Auto-populates MPO/TPR dropdown                       │
+│                                                           │
+│  Step 4: Places (per county, on demand)                  │
+│  TIGERweb layer 28+30 → STATE='48' AND COUNTY='{fips}'  │
+│  → Returns all cities/CDPs within selected county        │
+│  → Auto-populates city/place dropdown                    │
+│                                                           │
+│  Step 5: Urban Areas (on demand)                         │
+│  TIGERweb layer 88 → spatial query within state bbox     │
+│  → Returns all urban area polygons intersecting state    │
+│                                                           │
+│  Step 6: Census Tracts (per county, on demand)           │
+│  TIGERweb layer 8 → STATE='48' AND COUNTY='{fips}'      │
+│  → Returns all tracts for equity analysis overlay        │
+│                                                           │
+│  Step 7: School Districts (on demand)                    │
+│  TIGERweb layer 14 → STATE='48'                          │
+│  → Returns all school district boundaries in state       │
+│                                                           │
+│  All results cached in IndexedDB for instant repeat use  │
+└─────────────────────────────────────────────────────────┘
+```
+
+**What CANNOT be auto-discovered (requires `hierarchy.json`):**
+
+| Item | Why Manual | Effort |
+|------|----------|--------|
+| State DOT region/district boundaries | Custom administrative boundaries — no federal API | One static GeoJSON file per state |
+| Region-to-county mapping | DOT-specific organizational grouping | Part of `hierarchy.json` config |
+| Corridor definitions | Route groupings are state-specific | Part of `hierarchy.json` config |
+| Crash data column mapping | Each state's CSV has different column names | Part of `state_adapter.js` (already exists) |
+
+**What IS fully automatic (zero config):**
+
+| Boundary | Source | Auto-Discovery Query |
+|----------|--------|---------------------|
+| State outline | TIGERweb layer 80 | `STATE='{fips}'` |
+| All counties (with names, FIPS) | TIGERweb layer 82 | `STATE='{fips}'` |
+| All MPOs (with names, populations, boundaries) | BTS NTAD MPO API | `STATE='{abbrev}'` |
+| Cities/Places per county | TIGERweb layer 28 + 30 | `STATE='{fips}' AND COUNTY='{countyFips}'` |
+| Census Tracts per county | TIGERweb layer 8 | `STATE='{fips}' AND COUNTY='{countyFips}'` |
+| Urban Areas | TIGERweb layer 88 | Spatial query within state bbox |
+| School Districts | TIGERweb layer 14/16/18 | `STATE='{fips}'` |
+| Transit Stops | BTS NTAD Transit Stops API | Spatial query within county/region bbox |
+
+**Implementation: `BoundaryService` Module**
+
+```javascript
+// Proposed: boundary_service.js
+const BoundaryService = (() => {
+    'use strict';
+
+    const TIGERWEB_BASE = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer';
+    const BTS_MPO_BASE = 'https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Metropolitan_Planning_Organizations/FeatureServer/0';
+    const BTS_TRANSIT_BASE = 'https://services.arcgis.com/xOi1kZaI0eWDREZv/ArcGIS/rest/services/NTAD_National_Transit_Map_Stops/FeatureServer/0';
+
+    const LAYERS = {
+        states: 80, counties: 82, countySubdivisions: 22,
+        incorporatedPlaces: 28, censusDesignatedPlaces: 30,
+        censusTracts: 8, censusBlockGroups: 10, urbanAreas: 88,
+        schoolDistrictsUnified: 14, schoolDistrictsSecondary: 16,
+        schoolDistrictsElementary: 18, congressionalDistricts: 54,
+        stateLegislativeUpper: 56, stateLegislativeLower: 58,
+        metroStatisticalAreas: 93, zipCodeTabAreas: 2
+    };
+
+    const cache = {}; // IndexedDB-backed cache
+
+    async function queryTigerWeb(layerId, where, outFields = '*') {
+        const cacheKey = `tw_${layerId}_${where}`;
+        if (cache[cacheKey]) return cache[cacheKey];
+
+        const url = `${TIGERWEB_BASE}/${layerId}/query?` +
+            `where=${encodeURIComponent(where)}` +
+            `&outFields=${outFields}&returnGeometry=true&outSR=4326&f=geojson`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        cache[cacheKey] = data;
+        // Also persist to IndexedDB for offline/repeat use
+        return data;
+    }
+
+    async function queryBtsMpo(where) {
+        const cacheKey = `mpo_${where}`;
+        if (cache[cacheKey]) return cache[cacheKey];
+
+        const url = `${BTS_MPO_BASE}/query?` +
+            `where=${encodeURIComponent(where)}` +
+            `&outFields=*&outSR=4326&f=geojson`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        cache[cacheKey] = data;
+        return data;
+    }
+
+    return {
+        /**
+         * Auto-discover all boundaries for a state. Called once on state selection.
+         * @param {string} stateFips - 2-digit FIPS (e.g., '48')
+         * @param {string} stateAbbrev - 2-letter abbreviation (e.g., 'TX')
+         * @returns {Object} { stateOutline, counties, mpos }
+         */
+        async discoverState(stateFips, stateAbbrev) {
+            const [stateOutline, counties, mpos] = await Promise.all([
+                queryTigerWeb(LAYERS.states, `STATE='${stateFips}'`, 'NAME,STATE,GEOID'),
+                queryTigerWeb(LAYERS.counties, `STATE='${stateFips}'`, 'NAME,COUNTY,STATE,GEOID'),
+                queryBtsMpo(`STATE='${stateAbbrev}' OR STATE_2='${stateAbbrev}' OR STATE_3='${stateAbbrev}'`)
+            ]);
+            return { stateOutline, counties, mpos };
+        },
+
+        /**
+         * Load places (cities + CDPs) for a specific county. Called on county drill-down.
+         */
+        async getPlaces(stateFips, countyFips) {
+            const [places, cdps] = await Promise.all([
+                queryTigerWeb(LAYERS.incorporatedPlaces, `STATE='${stateFips}' AND COUNTY='${countyFips}'`, 'NAME,PLACEFP,LSAD'),
+                queryTigerWeb(LAYERS.censusDesignatedPlaces, `STATE='${stateFips}' AND COUNTY='${countyFips}'`, 'NAME,PLACEFP,LSAD')
+            ]);
+            return { places, cdps };
+        },
+
+        /**
+         * Load census tracts for equity analysis overlay.
+         */
+        async getCensusTracts(stateFips, countyFips) {
+            return queryTigerWeb(LAYERS.censusTracts, `STATE='${stateFips}' AND COUNTY='${countyFips}'`, 'NAME,TRACT,GEOID');
+        },
+
+        /**
+         * Load urban area boundaries for urban/rural classification.
+         */
+        async getUrbanAreas(stateFips) {
+            return queryTigerWeb(LAYERS.urbanAreas, `STATE='${stateFips}'`, 'NAME10,UATYP10,GEOID10');
+        },
+
+        /**
+         * Load school district boundaries.
+         */
+        async getSchoolDistricts(stateFips) {
+            return queryTigerWeb(LAYERS.schoolDistrictsUnified, `STATE='${stateFips}'`, 'NAME,SDLEA,GEOID');
+        },
+
+        /** Expose layer IDs for custom queries */
+        LAYERS
+    };
+})();
+```
+
+**Key Design Principle:** The `BoundaryService` is completely state-agnostic. It takes a FIPS code and returns boundaries. No Colorado-specific or Virginia-specific logic. When someone wants to add Texas, they:
+
+1. Set `stateFips: '48'` in the state config
+2. `BoundaryService.discoverState('48', 'TX')` auto-fetches state outline, all 254 counties, and all 25 MPOs
+3. Selecting any county auto-fetches its cities/places via `getPlaces('48', countyFips)`
+4. Transit stops auto-load from BTS API using county bounding box (existing `transitLoadStops()` is already state-agnostic)
+
+**The only manual work per new state:**
+- Create `hierarchy.json` with DOT region→county mapping (this IS state-specific)
+- Create `regions.geojson` with DOT region boundaries (no federal API for these)
+- Add column mapping to `state_adapter.js` (crash CSV format varies by state)
+
+Everything else — county names, county boundaries, city boundaries, MPO boundaries, census tracts, urban areas, school districts, transit stops — comes from federal APIs automatically.
+
 ### Cross-State Comparison Mode (Future)
 
 For FHWA or multi-state organizations:
