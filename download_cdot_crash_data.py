@@ -91,6 +91,40 @@ def create_session_with_retries():
     return session
 
 
+def bootstrap_session(session):
+    """
+    Visit the OnBase DocPop landing page to establish session cookies.
+    Many document management systems require a valid session before serving
+    individual documents. Without this step, direct document requests
+    return 403 Forbidden.
+    """
+    landing_url = ONBASE_BASE_URL
+    logger.info("Bootstrapping OnBase session (visiting DocPop landing page)...")
+    try:
+        resp = session.get(landing_url, timeout=60, allow_redirects=True)
+        # Accept any 2xx/3xx — we just need the cookies, not the content
+        logger.info(f"  Session bootstrap: HTTP {resp.status_code}, "
+                     f"cookies={list(session.cookies.keys())}")
+        # Follow any meta-refresh or JS redirects embedded in the HTML
+        if resp.status_code == 200:
+            html = resp.text[:4000].lower()
+            meta_match = re.search(
+                r'<meta[^>]+http-equiv=["\']refresh["\'][^>]+content=["\'][\d;]*\s*url=([^"\'>\s]+)',
+                html
+            )
+            if meta_match:
+                redirect_url = meta_match.group(1)
+                if not redirect_url.startswith('http'):
+                    from urllib.parse import urljoin
+                    redirect_url = urljoin(landing_url, redirect_url)
+                logger.info(f"  Following meta-refresh to {redirect_url[:80]}...")
+                session.get(redirect_url, timeout=60, allow_redirects=True)
+        return True
+    except Exception as e:
+        logger.warning(f"  Session bootstrap failed (non-fatal): {e}")
+        return False
+
+
 def make_request_with_retry(session, url, params=None, timeout=120, max_manual_retries=4,
                             stream=False):
     """
@@ -243,6 +277,16 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
         context = browser.new_context(accept_downloads=True)
         page = context.new_page()
 
+        # Visit the DocPop landing page first to establish session cookies,
+        # then navigate to the document. This mirrors how a real user would
+        # access the portal.
+        try:
+            logger.info(f"  Playwright: visiting DocPop landing page for session...")
+            page.goto(ONBASE_BASE_URL, wait_until='networkidle', timeout=30000)
+            logger.info(f"  Playwright: session established, page title: {page.title()}")
+        except Exception as e:
+            logger.warning(f"  Playwright: landing page visit failed (continuing): {e}")
+
         downloaded_path = None
 
         try:
@@ -345,6 +389,7 @@ def download_onbase_document(session, docid, label='document'):
     """
     Download a document from Hyland OnBase. Tries multiple strategies:
       1. Direct requests with redirect following
+      1b. Re-bootstrap session and retry (if strategy 1 got 403)
       2. Parse HTML response for real download URL
       3. clienttype=activex parameter
       4. Playwright headless browser (fallback for JS-rendered pages)
@@ -355,6 +400,9 @@ def download_onbase_document(session, docid, label='document'):
     params = {'clienttype': 'html', 'docid': str(docid)}
 
     logger.info(f"Downloading {label} (docid={docid})...")
+
+    html_content = None  # Saved for strategy 2 if strategy 1 returns HTML
+    response_url = None
 
     # --- Strategy 1: direct request with redirects ---
     try:
@@ -370,44 +418,78 @@ def download_onbase_document(session, docid, label='document'):
             logger.info(f"  Downloaded {len(content):,} bytes")
             return content, ext
 
-        # --- Strategy 2: parse HTML for download URL ---
-        logger.info("  Got HTML response. Parsing for download link...")
-        download_url = extract_download_url_from_html(content, response.url)
+        # Not a valid file — save HTML for strategy 2
+        html_content = content
+        response_url = response.url
 
-        if download_url:
-            logger.info(f"  Found download link: {download_url[:100]}...")
-            response = make_request_with_retry(session, download_url, timeout=180)
-            content = response.content
-            content_type = response.headers.get('Content-Type', '')
-            content_disposition = response.headers.get('Content-Disposition', '')
+    except requests.exceptions.HTTPError as e:
+        status = e.response.status_code if e.response is not None else 'unknown'
+        logger.warning(f"  Strategy 1 failed: HTTP {status}")
 
-            is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
-            logger.info(f"  Strategy 2 (HTML parse): {reason}")
+        # --- Strategy 1b: re-bootstrap session and retry on 403 ---
+        if e.response is not None and e.response.status_code == 403:
+            logger.info("  Got 403 — re-bootstrapping session and retrying...")
+            bootstrap_session(session)
+            try:
+                response = make_request_with_retry(session, url, params=params, timeout=180)
+                content = response.content
+                content_type = response.headers.get('Content-Type', '')
+                content_disposition = response.headers.get('Content-Disposition', '')
 
-            if is_valid:
-                logger.info(f"  Downloaded {len(content):,} bytes")
-                return content, ext
+                is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
+                logger.info(f"  Strategy 1b (post-bootstrap): {reason}")
 
-        # --- Strategy 3: clienttype=activex ---
-        logger.info("  Trying clienttype=activex...")
-        params_activex = {'clienttype': 'activex', 'docid': str(docid)}
-        try:
-            response = make_request_with_retry(session, url, params=params_activex, timeout=180)
-            content = response.content
-            content_type = response.headers.get('Content-Type', '')
-            content_disposition = response.headers.get('Content-Disposition', '')
+                if is_valid:
+                    logger.info(f"  Downloaded {len(content):,} bytes")
+                    return content, ext
 
-            is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
-            logger.info(f"  Strategy 3 (activex): {reason}")
-
-            if is_valid:
-                logger.info(f"  Downloaded {len(content):,} bytes")
-                return content, ext
-        except Exception as e:
-            logger.debug(f"  activex attempt failed: {e}")
-
+                html_content = content
+                response_url = response.url
+            except Exception as e2:
+                logger.warning(f"  Strategy 1b also failed: {e2}")
     except Exception as e:
-        logger.warning(f"  All requests-based strategies failed: {e}")
+        logger.warning(f"  Strategy 1 failed: {e}")
+
+    # --- Strategy 2: parse HTML for download URL ---
+    if html_content is not None:
+        logger.info("  Got HTML response. Parsing for download link...")
+        try:
+            download_url = extract_download_url_from_html(html_content, response_url or url)
+            if download_url:
+                logger.info(f"  Found download link: {download_url[:100]}...")
+                response = make_request_with_retry(session, download_url, timeout=180)
+                content = response.content
+                content_type = response.headers.get('Content-Type', '')
+                content_disposition = response.headers.get('Content-Disposition', '')
+
+                is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
+                logger.info(f"  Strategy 2 (HTML parse): {reason}")
+
+                if is_valid:
+                    logger.info(f"  Downloaded {len(content):,} bytes")
+                    return content, ext
+            else:
+                logger.info("  Strategy 2: no download link found in HTML")
+        except Exception as e:
+            logger.warning(f"  Strategy 2 failed: {e}")
+
+    # --- Strategy 3: clienttype=activex ---
+    logger.info("  Trying clienttype=activex...")
+    params_activex = {'clienttype': 'activex', 'docid': str(docid)}
+    try:
+        response = make_request_with_retry(session, url, params=params_activex, timeout=180)
+        content = response.content
+        content_type = response.headers.get('Content-Type', '')
+        content_disposition = response.headers.get('Content-Disposition', '')
+
+        is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
+        logger.info(f"  Strategy 3 (activex): {reason}")
+
+        if is_valid:
+            logger.info(f"  Downloaded {len(content):,} bytes")
+            return content, ext
+    except Exception as e:
+        logger.warning(f"  Strategy 3 (activex) failed: {e}")
 
     # --- Strategy 4: Playwright headless browser ---
     if _playwright_available():
@@ -849,6 +931,10 @@ def main():
 
     # Create session (reuse across all downloads for connection pooling)
     session = create_session_with_retries()
+
+    # Bootstrap session — visit the DocPop landing page to establish cookies.
+    # OnBase returns 403 for direct document requests without a valid session.
+    bootstrap_session(session)
 
     # Download data dictionaries first (unless skipped)
     if not args.no_dict:
