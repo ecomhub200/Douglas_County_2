@@ -1040,13 +1040,10 @@ def main():
             all_files.get(str(y), {}).get('status') == 'preliminary'
             for y, _ in failures
         )
-        # Also check if we have existing data files for any year
-        existing_csvs = list(data_dir.glob(f'*{jurisdiction_key}*.csv')) if data_dir else []
-        has_existing_data = len(existing_csvs) > 0
 
-        if all_preliminary and has_existing_data:
+        if all_preliminary:
             logger.warning("All failed downloads were preliminary data — treating as non-fatal.")
-            logger.warning("Existing finalized data is still available. Will retry next month.")
+            logger.warning("Finalized data is served from R2. Will retry next scheduled run.")
             return 0
         return 1
     return 0
