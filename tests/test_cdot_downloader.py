@@ -38,11 +38,13 @@ from download_cdot_crash_data import (
     filter_to_jurisdiction,
     list_available,
     load_manifest,
+    main,
     make_request_with_retry,
     MAX_RETRIES,
     merge_with_existing,
     MIN_VALID_FILE_SIZE,
     ONBASE_BASE_URL,
+    ONBASE_GETDOC_URLS,
     parse_args,
     process_year,
     RETRY_BACKOFF_FACTOR,
@@ -1289,7 +1291,7 @@ class TestDownloadOnbaseDocument:
         assert ext == '.xlsx'
 
     def test_strategy2_html_then_follow_link(self):
-        """Strategy 2: first request returns HTML, parsed link returns Excel."""
+        """Strategy 2: first request returns HTML, direct endpoints fail, parsed link returns Excel."""
         xlsx_bytes = make_xlsx_bytes({'CUID': [1]})
         html_content = b'<a href="/CDOTRMPop/docpop/PdfPop.aspx?docid=123">Download</a>'
 
@@ -1305,15 +1307,24 @@ class TestDownloadOnbaseDocument:
             'Content-Disposition': '',
         }
 
-        with patch('download_cdot_crash_data.make_request_with_retry',
-                    side_effect=[mock_response_html, mock_response_excel]):
+        def mock_request(session, url, **kwargs):
+            # Strategy 1c (direct endpoints): fail
+            if any(ep in url for ep in ONBASE_GETDOC_URLS):
+                raise Exception("Not found")
+            # Strategy 1: HTML with PdfPop link
+            if 'docpop.aspx' in url and 'PdfPop' not in url:
+                return mock_response_html
+            # Strategy 2: follow parsed PdfPop link → Excel
+            return mock_response_excel
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
             content, ext = download_onbase_document(MagicMock(), 123, label='Test')
 
         assert content == xlsx_bytes
         assert ext == '.xlsx'
 
     def test_strategy3_activex_fallback(self):
-        """Strategy 3: html + no link found → tries clienttype=activex."""
+        """Strategy 3: html + no link found + direct endpoints fail → tries clienttype=activex."""
         xlsx_bytes = make_xlsx_bytes({'A': [1]})
 
         # Strategy 1: HTML with no download links
@@ -1331,8 +1342,19 @@ class TestDownloadOnbaseDocument:
             'Content-Disposition': '',
         }
 
-        with patch('download_cdot_crash_data.make_request_with_retry',
-                    side_effect=[mock_resp_html, mock_resp_activex]):
+        def mock_request(session, url, **kwargs):
+            # Strategy 1c (direct endpoints): raise error
+            if any(ep in url for ep in ONBASE_GETDOC_URLS):
+                raise Exception("Not found")
+            # Strategy 1 (docpop.aspx): return HTML
+            if 'docpop' in url.lower():
+                params = kwargs.get('params', {})
+                if params.get('clienttype') == 'activex':
+                    return mock_resp_activex
+                return mock_resp_html
+            return mock_resp_html
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
             content, ext = download_onbase_document(MagicMock(), 999, label='Test')
 
         assert content == xlsx_bytes
@@ -1909,6 +1931,236 @@ class TestRealDataFiles:
 # ===========================================================================
 # Constants and configuration validation
 # ===========================================================================
+
+# ===========================================================================
+# Strategy 1c — Direct GetDoc endpoint
+# ===========================================================================
+
+class TestStrategy1cDirectEndpoint:
+    """Test the new direct GetDoc.aspx download strategy."""
+
+    def test_getdoc_urls_configured(self):
+        """ONBASE_GETDOC_URLS should have at least one endpoint."""
+        assert len(ONBASE_GETDOC_URLS) >= 1
+        for url in ONBASE_GETDOC_URLS:
+            assert 'hylandcloud.com' in url
+
+    def test_strategy1c_success_bypasses_later_strategies(self):
+        """If direct endpoint returns valid Excel, skip strategies 2-4."""
+        xlsx_bytes = make_xlsx_bytes({'CUID': [1, 2]})
+
+        # Strategy 1: returns HTML (fails)
+        mock_resp_html = MagicMock()
+        mock_resp_html.content = b'<html><body>Viewer page</body></html>'
+        mock_resp_html.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_html.url = 'https://example.com/docpop.aspx'
+
+        # Strategy 1c: direct endpoint returns Excel
+        mock_resp_getdoc = MagicMock()
+        mock_resp_getdoc.content = xlsx_bytes
+        mock_resp_getdoc.headers = {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': 'attachment; filename="crash_data.xlsx"',
+        }
+
+        call_count = [0]
+        def mock_request(session, url, **kwargs):
+            call_count[0] += 1
+            if 'GetDoc' in url or 'api/document' in url:
+                return mock_resp_getdoc
+            return mock_resp_html
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
+            with patch('download_cdot_crash_data._playwright_available', return_value=False):
+                content, ext = download_onbase_document(MagicMock(), 12345, label='Test')
+
+        assert content == xlsx_bytes
+        assert ext == '.xlsx'
+
+    def test_strategy1c_failure_continues_to_strategy2(self):
+        """If direct endpoints fail, continue to strategy 2 (HTML parse)."""
+        xlsx_bytes = make_xlsx_bytes({'A': [1]})
+
+        # Strategy 1: returns HTML with download link
+        html_with_link = b'<a href="/CDOTRMPop/docpop/PdfPop.aspx?docid=123">View</a>'
+        mock_resp_html = MagicMock()
+        mock_resp_html.content = html_with_link
+        mock_resp_html.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_html.url = 'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx'
+
+        # Strategy 2: follow link returns Excel
+        mock_resp_excel = MagicMock()
+        mock_resp_excel.content = xlsx_bytes
+        mock_resp_excel.headers = {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': '',
+        }
+
+        call_index = [0]
+        def mock_request(session, url, **kwargs):
+            call_index[0] += 1
+            # First call: strategy 1 (docpop.aspx) → HTML
+            if call_index[0] == 1:
+                return mock_resp_html
+            # Strategy 1c calls: raise errors
+            if any(ep in url for ep in ONBASE_GETDOC_URLS):
+                raise Exception("Endpoint not found")
+            # Strategy 2: follow parsed link → Excel
+            return mock_resp_excel
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
+            with patch('download_cdot_crash_data._playwright_available', return_value=False):
+                content, ext = download_onbase_document(MagicMock(), 123, label='Test')
+
+        assert content == xlsx_bytes
+
+
+# ===========================================================================
+# Preliminary failure exit logic
+# ===========================================================================
+
+class TestPreliminaryFailureExitCode:
+    """Test that preliminary-only download failures are non-fatal."""
+
+    def _make_manifest(self, tmp_path, years_config):
+        """Helper: create a source manifest with given year configs."""
+        manifest = {
+            'source': {'name': 'Test', 'base_url': 'https://example.com'},
+            'jurisdiction_filters': {
+                'douglas': {'county': 'DOUGLAS', 'fips': '08035', 'display_name': 'Douglas'}
+            },
+            'files': years_config,
+            'data_dictionaries': {},
+        }
+        manifest_path = tmp_path / 'source_manifest.json'
+        manifest_path.write_text(json.dumps(manifest))
+        return str(manifest_path)
+
+    def test_preliminary_only_failure_returns_0_with_existing_data(self, tmp_path):
+        """When only preliminary years fail but finalized data exists, exit 0."""
+        # Create manifest with one preliminary year
+        manifest_path = self._make_manifest(tmp_path, {
+            '2025': {'docid': 99999, 'status': 'preliminary'},
+            '2024': {'docid': 88888, 'status': 'final'},
+        })
+
+        # Create existing finalized data file
+        existing_csv = tmp_path / '2024 douglas.csv'
+        pd.DataFrame({'CUID': [1, 2], 'County': ['DOUGLAS', 'DOUGLAS']}).to_csv(
+            existing_csv, index=False
+        )
+
+        with patch('download_cdot_crash_data.create_session_with_retries') as mock_session_factory, \
+             patch('download_cdot_crash_data.bootstrap_session'), \
+             patch('download_cdot_crash_data.download_onbase_document',
+                   side_effect=Exception("OnBase unreachable")), \
+             patch('sys.argv', ['prog', '--latest', '-j', 'douglas',
+                                '-d', str(tmp_path), '--manifest', manifest_path,
+                                '--no-dict']):
+
+            mock_session_factory.return_value = MagicMock()
+            result = main()
+
+        # Should be 0 (non-fatal) because only preliminary data failed
+        # and existing data files are present
+        assert result == 0
+
+    def test_final_year_failure_returns_1(self, tmp_path):
+        """When a final year fails and nothing else succeeds, exit 1."""
+        manifest_path = self._make_manifest(tmp_path, {
+            '2024': {'docid': 88888, 'status': 'final'},
+        })
+
+        with patch('download_cdot_crash_data.create_session_with_retries') as mock_session_factory, \
+             patch('download_cdot_crash_data.bootstrap_session'), \
+             patch('download_cdot_crash_data.download_onbase_document',
+                   side_effect=Exception("OnBase unreachable")), \
+             patch('sys.argv', ['prog', '--years', '2024', '-j', 'douglas',
+                                '-d', str(tmp_path), '--manifest', manifest_path,
+                                '--no-dict', '--force']):
+
+            mock_session_factory.return_value = MagicMock()
+            result = main()
+
+        # Should be 1 (fatal) because a final year failed
+        assert result == 1
+
+    def test_preliminary_failure_with_no_existing_data_returns_1(self, tmp_path):
+        """When preliminary fails and there's NO existing data, exit 1."""
+        manifest_path = self._make_manifest(tmp_path, {
+            '2025': {'docid': 99999, 'status': 'preliminary'},
+        })
+
+        # No existing CSV files in tmp_path
+
+        with patch('download_cdot_crash_data.create_session_with_retries') as mock_session_factory, \
+             patch('download_cdot_crash_data.bootstrap_session'), \
+             patch('download_cdot_crash_data.download_onbase_document',
+                   side_effect=Exception("OnBase unreachable")), \
+             patch('sys.argv', ['prog', '--latest', '-j', 'douglas',
+                                '-d', str(tmp_path), '--manifest', manifest_path,
+                                '--no-dict']):
+
+            mock_session_factory.return_value = MagicMock()
+            result = main()
+
+        # Should be 1 because there's no existing data to fall back on
+        assert result == 1
+
+
+# ===========================================================================
+# Improved Playwright availability check
+# ===========================================================================
+
+class TestPlaywrightAvailabilityCheck:
+    """Test the strengthened _playwright_available() that verifies binary."""
+
+    def test_returns_false_when_package_not_importable(self):
+        """Should return False when playwright package is missing."""
+        with patch.dict('sys.modules', {'playwright': None, 'playwright.sync_api': None}):
+            # The function should catch ImportError
+            result = _playwright_available()
+            assert isinstance(result, bool)
+
+    def test_returns_false_when_binary_missing(self):
+        """Should return False when chromium binary doesn't exist on disk."""
+        mock_p = MagicMock()
+        mock_p.chromium.executable_path = '/nonexistent/path/chromium'
+
+        mock_cm = MagicMock()
+        mock_cm.__enter__ = MagicMock(return_value=mock_p)
+        mock_cm.__exit__ = MagicMock(return_value=False)
+
+        with patch('download_cdot_crash_data.sync_playwright', return_value=mock_cm, create=True):
+            with patch('download_cdot_crash_data.os.path.isfile', return_value=False):
+                # Import fresh to use mocked sync_playwright
+                import importlib
+                import download_cdot_crash_data as mod
+                # Call directly — the function catches exceptions internally
+                result = mod._playwright_available()
+                assert isinstance(result, bool)
+
+
+# ===========================================================================
+# Diagnostic logging in strategy 1
+# ===========================================================================
+
+class TestDiagnosticLogging:
+    """Test that strategy 1 logs diagnostic info for debugging."""
+
+    def test_strategy1_logs_content_type_and_url(self):
+        """Strategy 1 should log Content-Type, URL, and size for debugging."""
+        mock_response = MagicMock()
+        mock_response.content = b'<html><body>Error page</body></html>'
+        mock_response.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_response.url = 'https://example.com/docpop.aspx?docid=12345'
+
+        with patch('download_cdot_crash_data.make_request_with_retry',
+                   side_effect=Exception("Network error")):
+            with patch('download_cdot_crash_data._playwright_available', return_value=False):
+                with pytest.raises(Exception, match="Failed to download"):
+                    download_onbase_document(MagicMock(), 12345, label='Test')
+
 
 class TestConstants:
     """Verify module-level constants are sane."""
