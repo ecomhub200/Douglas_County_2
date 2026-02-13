@@ -57,6 +57,12 @@ RETRY_BACKOFF_FACTOR = 2  # 2s, 4s, 8s, 16s
 # OnBase base URL
 ONBASE_BASE_URL = 'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx'
 
+# OnBase direct retrieval endpoints (bypass HTML viewer)
+ONBASE_GETDOC_URLS = [
+    'https://oitco.hylandcloud.com/CDOTRMPop/docpop/GetDoc.aspx',
+    'https://oitco.hylandcloud.com/CDOTRMPop/api/document',
+]
+
 # Realistic browser headers to avoid being blocked
 BROWSER_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -253,9 +259,18 @@ def extract_download_url_from_html(html_content, base_url):
 def _playwright_available():
     """Check if Playwright is installed and has browsers."""
     try:
-        from playwright.sync_api import sync_playwright  # noqa: F401
-        return True
+        from playwright.sync_api import sync_playwright
+        # Verify chromium binary is actually installed (not just the Python package)
+        with sync_playwright() as p:
+            browser_path = p.chromium.executable_path
+            if browser_path and os.path.isfile(browser_path):
+                return True
+            logger.warning(f"  Playwright package installed but chromium binary not found at: {browser_path}")
+            return False
     except ImportError:
+        return False
+    except Exception as e:
+        logger.warning(f"  Playwright availability check failed: {e}")
         return False
 
 
@@ -297,15 +312,23 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
             # Strategy A: intercept automatic download triggered by OnBase
             # Some OnBase pages auto-start a download on page load
             try:
-                with page.expect_download(timeout=15000) as download_info:
+                with page.expect_download(timeout=20000) as download_info:
                     # Click any visible download/open link on the page
                     for selector in [
                         'a[href*="GetDoc"]',
+                        'a[href*="getdoc"]',
                         'a[href*="Download"]',
+                        'a[href*="download"]',
                         'a[href*="PdfPop"]',
                         'a[href*=".xlsx"]',
                         'a[href*=".xls"]',
+                        '[id*="lnkRetrieve"]',
+                        '[id*="btnDownload"]',
+                        '[id*="btnRetrieve"]',
+                        'input[type="button"][value*="Download"]',
+                        'input[type="button"][value*="Retrieve"]',
                         'text=Download',
+                        'text=Retrieve',
                         'text=Open',
                         'text=Save',
                     ]:
@@ -413,6 +436,10 @@ def download_onbase_document(session, docid, label='document'):
 
         is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
         logger.info(f"  Strategy 1 (requests): {reason}")
+        logger.info(f"    Content-Type: {content_type}")
+        logger.info(f"    Content-Disposition: {content_disposition}")
+        logger.info(f"    Response URL: {response.url[:120]}")
+        logger.info(f"    Response size: {len(content):,} bytes")
 
         if is_valid:
             logger.info(f"  Downloaded {len(content):,} bytes")
@@ -421,6 +448,9 @@ def download_onbase_document(session, docid, label='document'):
         # Not a valid file — save HTML for strategy 2
         html_content = content
         response_url = response.url
+        # Log first 500 chars of HTML for debugging
+        if content[:500].strip().lower().startswith((b'<!doctype', b'<html', b'<?xml')):
+            logger.debug(f"  HTML preview: {content[:500].decode('utf-8', errors='replace')}")
 
     except requests.exceptions.HTTPError as e:
         status = e.response.status_code if e.response is not None else 'unknown'
@@ -449,6 +479,26 @@ def download_onbase_document(session, docid, label='document'):
                 logger.warning(f"  Strategy 1b also failed: {e2}")
     except Exception as e:
         logger.warning(f"  Strategy 1 failed: {e}")
+
+    # --- Strategy 1c: try direct document retrieval endpoints ---
+    for i, getdoc_url in enumerate(ONBASE_GETDOC_URLS):
+        try:
+            logger.info(f"  Strategy 1c-{i+1}: trying direct endpoint {getdoc_url}...")
+            getdoc_params = {'docid': str(docid)}
+            response = make_request_with_retry(session, getdoc_url, params=getdoc_params,
+                                                timeout=180, max_manual_retries=2)
+            content = response.content
+            content_type = response.headers.get('Content-Type', '')
+            content_disposition = response.headers.get('Content-Disposition', '')
+
+            is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
+            logger.info(f"  Strategy 1c-{i+1}: {reason}")
+
+            if is_valid:
+                logger.info(f"  Downloaded {len(content):,} bytes via direct endpoint")
+                return content, ext
+        except Exception as e:
+            logger.info(f"  Strategy 1c-{i+1}: {e}")
 
     # --- Strategy 2: parse HTML for download URL ---
     if html_content is not None:
@@ -492,20 +542,28 @@ def download_onbase_document(session, docid, label='document'):
         logger.warning(f"  Strategy 3 (activex) failed: {e}")
 
     # --- Strategy 4: Playwright headless browser ---
+    playwright_status = 'not_installed'
     if _playwright_available():
+        playwright_status = 'available'
         logger.info("  Falling back to Playwright headless browser...")
         try:
             return download_with_playwright(docid, label=label)
         except Exception as e:
+            playwright_status = f'failed: {e}'
             logger.error(f"  Playwright fallback failed: {e}")
     else:
-        logger.info("  Playwright not installed. To enable browser fallback:")
-        logger.info("    pip install playwright && playwright install chromium")
+        logger.warning("  Playwright not installed. To enable browser fallback:")
+        logger.warning("    pip install playwright && playwright install chromium")
+
+    strategies_tried = "requests + direct-endpoint + HTML-parse + activex"
+    if playwright_status == 'not_installed':
+        strategies_tried += " (Playwright NOT available — install it for headless browser fallback)"
+    else:
+        strategies_tried += f" + Playwright ({playwright_status})"
 
     raise Exception(
         f"Failed to download {label} (docid={docid}). "
-        f"All strategies (requests + HTML parse + activex + Playwright) failed. "
-        f"Try: pip install playwright && playwright install chromium"
+        f"All strategies failed: {strategies_tried}"
     )
 
 
@@ -973,7 +1031,25 @@ def main():
 
     logger.info("=" * 60)
 
-    return 1 if failures and not successes else 0
+    if failures and not successes:
+        # Check if all failures are preliminary years — treat as non-fatal warning
+        # so scheduled --latest runs don't fail the entire pipeline when OnBase
+        # is temporarily unreachable or the preliminary data isn't ready yet.
+        all_files = manifest.get('files', {})
+        all_preliminary = all(
+            all_files.get(str(y), {}).get('status') == 'preliminary'
+            for y, _ in failures
+        )
+        # Also check if we have existing data files for any year
+        existing_csvs = list(data_dir.glob(f'*{jurisdiction_key}*.csv')) if data_dir else []
+        has_existing_data = len(existing_csvs) > 0
+
+        if all_preliminary and has_existing_data:
+            logger.warning("All failed downloads were preliminary data — treating as non-fatal.")
+            logger.warning("Existing finalized data is still available. Will retry next month.")
+            return 0
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

@@ -59,8 +59,19 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install playwright
           playwright install chromium --with-deps
+          # Verify Playwright + Chromium are working
+          python -c "
+          from playwright.sync_api import sync_playwright
+          import os
+          with sync_playwright() as p:
+              path = p.chromium.executable_path
+              exists = os.path.isfile(path) if path else False
+              print(f'Chromium binary: {path}')
+              print(f'Binary exists: {exists}')
+              if not exists:
+                  print('WARNING: Chromium binary not found!')
+          " || echo "WARNING: Playwright verification failed (non-fatal)"
 
       - name: Build download arguments
         id: build-args
