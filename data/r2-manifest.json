@@ -1,7 +1,33 @@
 {
   "version": 1,
-  "r2BaseUrl": "",
-  "updated": "",
-  "files": {},
-  "localPathMapping": {}
+  "r2BaseUrl": "https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev",
+  "updated": "2026-02-13T03:03:27.622388+00:00",
+  "files": {
+    "colorado/douglas/standardized.csv": {
+      "size": 18447410,
+      "md5": "908abfa0d4fcb690a28a25b38b8e625b",
+      "uploaded": "2026-02-13T03:03:30.207872+00:00"
+    },
+    "colorado/douglas/all_roads.csv": {
+      "size": 18355770,
+      "md5": "f75adf787799794567329cb5f321680e",
+      "uploaded": "2026-02-13T03:03:32.230052+00:00"
+    },
+    "colorado/douglas/county_roads.csv": {
+      "size": 9500748,
+      "md5": "1bd08eebb2789666adf54872dbc3f9c8",
+      "uploaded": "2026-02-13T03:03:34.198284+00:00"
+    },
+    "colorado/douglas/no_interstate.csv": {
+      "size": 14401256,
+      "md5": "ee39cf08e260fb9c953446b5c185d139",
+      "uploaded": "2026-02-13T03:03:36.043269+00:00"
+    }
+  },
+  "localPathMapping": {
+    "data/CDOT/douglas_standardized.csv": "colorado/douglas/standardized.csv",
+    "data/CDOT/douglas_all_roads.csv": "colorado/douglas/all_roads.csv",
+    "data/CDOT/douglas_county_roads.csv": "colorado/douglas/county_roads.csv",
+    "data/CDOT/douglas_no_interstate.csv": "colorado/douglas/no_interstate.csv"
+  }
 }
