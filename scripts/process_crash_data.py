@@ -951,11 +951,6 @@ def stage_split(validated_path: str, config: PipelineConfig, stats: PipelineStat
     created_files.append(no_int_path)
     stats.files_created.append(no_int_path)
 
-    # --- Also copy county_roads to crashes.csv as default fallback ---
-    crashes_fallback = str(config.output_dir / 'crashes.csv')
-    shutil.copy(county_path, crashes_fallback)
-    logger.info("  Updated fallback: %s", crashes_fallback)
-
     stats.stages_completed.append('split')
     return created_files
 

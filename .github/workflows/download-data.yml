@@ -247,10 +247,6 @@ jobs:
           echo ">>> Downloading All Roads (Including Interstate)..."
           python download_crash_data.py --jurisdiction "$JURISDICTION" --filter allRoads --output "data/${JURISDICTION}_all_roads.csv"
 
-          # Also create crashes.csv as the default (county roads only)
-          echo ">>> Creating default crashes.csv..."
-          cp "data/${JURISDICTION}_county_roads.csv" "data/CDOT/crashes.csv"
-
           echo "=========================================="
           echo "Download complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
@@ -331,13 +327,6 @@ jobs:
             fi
             echo "Error rate ($ERROR_RATE%) is within acceptable limits."
           fi
-
-      - name: Update crashes.csv with validated data
-        run: |
-          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
-          # Copy validated county roads to crashes.csv inside DOT folder
-          cp "data/${JURISDICTION}_county_roads.csv" "data/CDOT/crashes.csv"
-          echo "Updated data/CDOT/crashes.csv with validated data"
 
       - name: Upload crash CSVs to R2
         uses: ./.github/actions/upload-r2

@@ -64,8 +64,8 @@ jobs:
           ls -lh "$DATA_DIR"/20*.csv 2>/dev/null || echo "  None found"
           echo ""
 
-          echo "Other CSV files:"
-          ls -lh "$DATA_DIR"/crashes.csv 2>/dev/null || echo "  None found"
+          echo "Forecast JSON files:"
+          ls -lh "$DATA_DIR"/forecasts_*.json 2>/dev/null || echo "  None found"
 
       - name: Build upload file list
         id: files
@@ -99,12 +99,15 @@ jobs:
             fi
           done
 
-          # crashes.csv
-          if [ -f "${DATA_DIR}/crashes.csv" ]; then
-            if [ "$FIRST" = true ]; then FIRST=false; else FILES="$FILES,"; fi
-            FILES="$FILES{\"local_path\":\"${DATA_DIR}/crashes.csv\",\"r2_key\":\"${R2_PREFIX}/crashes.csv\"}"
-            echo "  Found: ${DATA_DIR}/crashes.csv -> ${R2_PREFIX}/crashes.csv"
-          fi
+          # Forecast JSON files
+          for rt in county_roads no_interstate all_roads; do
+            FFILE="${DATA_DIR}/forecasts_${rt}.json"
+            if [ -f "$FFILE" ]; then
+              if [ "$FIRST" = true ]; then FIRST=false; else FILES="$FILES,"; fi
+              FILES="$FILES{\"local_path\":\"$FFILE\",\"r2_key\":\"${R2_PREFIX}/forecasts_${rt}.json\"}"
+              echo "  Found: $FFILE -> ${R2_PREFIX}/forecasts_${rt}.json"
+            fi
+          done
 
           FILES="$FILES]"
 
