@@ -27,9 +27,10 @@
 19. [Colorado (CDOT) Complete Example](#19-colorado-cdot-complete-example)
 20. [CDOT Auto-Downloader & Merge Strategy](#20-cdot-auto-downloader--merge-strategy)
 21. [Stage 5: Prediction Forecasting](#21-stage-5-prediction-forecasting)
-22. [Appendix A: Standardized Output Columns](#appendix-a-standardized-output-columns)
-23. [Appendix B: VDOT Value Reference Tables](#appendix-b-vdot-value-reference-tables)
-24. [Appendix C: Command-Line Reference](#appendix-c-command-line-reference)
+22. [R2 Cloud Storage Layer](#22-r2-cloud-storage-layer)
+23. [Appendix A: Standardized Output Columns](#appendix-a-standardized-output-columns)
+24. [Appendix B: VDOT Value Reference Tables](#appendix-b-vdot-value-reference-tables)
+25. [Appendix C: Command-Line Reference](#appendix-c-command-line-reference)
 
 ---
 
@@ -46,11 +47,28 @@ Raw CSV(s) from State DOT
 |   MERGE        |--->|   CONVERT      |--->|   VALIDATE     |--->|   GEOCODE      |--->|   SPLIT        |--->|   PREDICT      |
 |   (optional)   |    |   (normalize)  |    |   (QA/QC)      |    |   (fill GPS)   |    |   (road type)  |    |   (forecast)   |
 +----------------+    +----------------+    +----------------+    +----------------+    +----------------+    +----------------+
-                                                                                                                     |
-                                                                                                                     v
-                                                                                                           3 output CSV files
-                                                                                                           + pipeline_report.json
-                                                                                                           + 3 forecast JSON files
+                                                                                              |                       |
+                                                                                              v                       v
+                                                                                    3 output CSV files        3 forecast JSON files
+                                                                                    + pipeline_report.json
+                                                                                              |
+                                                                                              v
+                                                                                    +------------------+
+                                                                                    |   R2 UPLOAD      |
+                                                                                    |   (cloud CDN)    |
+                                                                                    +------------------+
+                                                                                              |
+                                                                                              v
+                                                                                    +------------------+
+                                                                                    |   r2-manifest    |
+                                                                                    |   .json (Git)    |
+                                                                                    +------------------+
+                                                                                              |
+                                                                                              v
+                                                                                    +------------------+
+                                                                                    |   BROWSER APP    |
+                                                                                    |   (index.html)   |
+                                                                                    +------------------+
 ```
 
 ### Core Design Principle
@@ -80,7 +98,11 @@ project_root/
 |   +-- download-cdot-crash-data.yml  # CDOT auto-downloader (monthly + manual)
 |   +-- download-data.yml             # Scheduled Virginia data downloads
 |   +-- validate-data.yml             # Scheduled data validation
+|   +-- generate-forecast.yml         # Stage 5: forecast generation
 |   +-- send-notifications.yml        # Email notifications
+|
++-- .github/actions/
+|   +-- upload-r2/action.yml          # Composite action: upload CSVs to Cloudflare R2
 |
 +-- download_cdot_crash_data.py       # CDOT OnBase downloader + county filter + merge
 +-- requirements.txt                  # Python deps (requests, pandas, openpyxl)
@@ -92,6 +114,7 @@ project_root/
 |   +-- generate_forecast.py          # Stage 5: Prediction forecast generator
 |   +-- deploy_chronos_endpoint.py    # SageMaker Chronos-2 endpoint lifecycle
 |   +-- pipeline_server.py            # HTTP server for browser uploads
+|   +-- upload-to-r2.py              # Manual R2 upload tool (seed bucket from local files)
 |   +-- fix_douglas_conversion.py     # One-time correction script (reference only)
 |
 +-- states/                           # Per-state configuration
@@ -106,6 +129,7 @@ project_root/
 |   +-- test_cdot_downloader.py       # 152 tests for downloader + merge logic
 |
 +-- data/
+|   +-- r2-manifest.json              # R2 URL mapping (local path -> R2 key)
 |   +-- {DOT_NAME}/                   # State data folder (e.g., CDOT, TxDOT)
 |   |   +-- source_manifest.json      # CDOT OnBase doc ID registry (64 counties)
 |   |   +-- *.csv                     # Raw input + processed output
@@ -1833,6 +1857,217 @@ After generating forecasts for any state:
 - [ ] Forecast months extend `horizon` months beyond the last history month
 - [ ] Corridor names in M03 exist in the source CSV's `RTE Name` column
 - [ ] `county_roads` forecast total < `all_roads` forecast total (subset relationship)
+
+---
+
+## 22. R2 Cloud Storage Layer
+
+Large CSV data files are stored in **Cloudflare R2** (S3-compatible object storage) instead of Git. This keeps the Git repo lightweight while providing fast, CDN-cached data delivery to the browser app.
+
+### Why R2?
+
+| Concern | Before (Git) | After (R2) |
+|---------|-------------|------------|
+| Repo size | 50+ MB of CSVs inflating every clone | ~5 MB (config, code, manifest only) |
+| Data delivery | GitHub Pages / raw Git | R2 CDN with edge caching |
+| Cost | Free (GitHub limits apply) | R2 free tier: 10 GB storage, 10M reads/mo |
+| Access control | Public repo = public data | Public r2.dev URL for reads, token-gated writes |
+| Multi-state scaling | Repo grows linearly per state | R2 scales independently |
+
+### Architecture
+
+```
+GitHub Actions (Workflows)          Cloudflare R2                    Browser App
+┌─────────────────────┐            ┌─────────────────────┐         ┌──────────────────┐
+│ download-cdot-data  │            │  crash-lens-data/   │         │                  │
+│ process-cdot-data   │──upload──►│    colorado/         │         │  index.html      │
+│ download-data       │            │      douglas/       │◄─fetch──│                  │
+│                     │            │        all_roads.csv│         │  1. loadManifest │
+│  upload-r2 action   │            │        county_...csv│         │  2. resolveUrl() │
+│  (composite)        │            │        raw/2021.csv │         │  3. fetch(r2Url) │
+└────────┬────────────┘            │    virginia/        │         │  4. PapaParse    │
+         │                         │      henrico/       │         └──────────────────┘
+         │ commit                  │        all_roads.csv│
+         ▼                         └─────────────────────┘
+┌─────────────────────┐
+│  data/r2-manifest   │
+│  .json (in Git)     │
+│                     │
+│  Maps local paths   │
+│  to R2 keys         │
+└─────────────────────┘
+```
+
+### R2 Bucket Structure
+
+```
+crash-lens-data/                    # Bucket name
+  colorado/
+    douglas/
+      standardized.csv              # Stage 1 output (full normalized data)
+      all_roads.csv                 # Stage 4: all road types
+      county_roads.csv              # Stage 4: county roads only
+      no_interstate.csv             # Stage 4: excludes interstates
+      crashes.csv                   # Default (copy of county_roads)
+      raw/
+        2021.csv                    # Raw annual download
+        2022.csv
+        2023.csv
+        2024.csv
+        2025.csv
+  virginia/
+    henrico/
+      all_roads.csv
+      county_roads.csv
+      no_interstate.csv
+  {state}/                          # Future states follow same pattern
+    {jurisdiction}/
+      all_roads.csv
+      county_roads.csv
+      no_interstate.csv
+```
+
+### Manifest File (`data/r2-manifest.json`)
+
+The manifest is the **only file committed to Git** that connects the app to R2 data. It maps local file paths to R2 keys:
+
+```json
+{
+  "version": 1,
+  "r2BaseUrl": "https://pub-XXXXX.r2.dev",
+  "updated": "2026-02-13T12:00:00+00:00",
+  "files": {
+    "colorado/douglas/all_roads.csv": {
+      "size": 18355770,
+      "md5": "abc123...",
+      "uploaded": "2026-02-13T12:00:00+00:00"
+    }
+  },
+  "localPathMapping": {
+    "data/CDOT/douglas_all_roads.csv": "colorado/douglas/all_roads.csv"
+  }
+}
+```
+
+### Browser-Side Data Loading
+
+The app resolves data URLs at runtime:
+
+```
+1. App starts → loadR2Manifest() fetches data/r2-manifest.json
+2. User loads data → getDataFilePath() returns "../data/CDOT/douglas_all_roads.csv"
+3. resolveDataUrl() looks up localPathMapping:
+   "../data/CDOT/douglas_all_roads.csv" → "colorado/douglas/all_roads.csv"
+4. Constructs full URL: "https://pub-XXXXX.r2.dev/colorado/douglas/all_roads.csv"
+5. fetch() from R2 CDN → PapaParse CSV → crashState.sampleRows
+6. Fallback: if manifest empty or fetch fails → load from local relative path
+```
+
+### Upload Mechanisms
+
+#### 1. Composite Action (`.github/actions/upload-r2/action.yml`)
+
+Used by all GitHub Actions workflows. Accepts a JSON array of `{local_path, r2_key}` pairs:
+
+```yaml
+- uses: ./.github/actions/upload-r2
+  with:
+    files_json: |
+      [
+        {"local_path": "data/CDOT/douglas_all_roads.csv", "r2_key": "colorado/douglas/all_roads.csv"}
+      ]
+    cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+    r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+    r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+    r2_public_url: ${{ vars.R2_PUBLIC_URL }}
+```
+
+Features:
+- Configures AWS CLI for R2 endpoint
+- Uploads each file with 3 retries
+- Computes file size and MD5 hash
+- Updates `data/r2-manifest.json` with mapping
+- Skips files that don't exist (non-fatal)
+
+#### 2. Local Upload Script (`scripts/upload-to-r2.py`)
+
+For manual uploads from a developer machine (e.g., initial seeding, OnBase blocked from CI):
+
+```bash
+# Dry run (see what would be uploaded):
+python scripts/upload-to-r2.py --dry-run
+
+# Upload with credentials via environment:
+CF_ACCOUNT_ID=xxx CF_R2_ACCESS_KEY_ID=xxx CF_R2_SECRET_ACCESS_KEY=xxx \
+  R2_PUBLIC_URL=https://pub-xxx.r2.dev \
+  python scripts/upload-to-r2.py
+
+# Upload processed files only (skip raw annual CSVs):
+python scripts/upload-to-r2.py --processed-only
+
+# Upload for a different state/jurisdiction:
+python scripts/upload-to-r2.py --state virginia --jurisdiction henrico
+```
+
+### Required Secrets & Variables (GitHub)
+
+| Name | Type | Purpose |
+|------|------|---------|
+| `CF_ACCOUNT_ID` | Secret | Cloudflare Account ID |
+| `CF_R2_ACCESS_KEY_ID` | Secret | R2 API token access key |
+| `CF_R2_SECRET_ACCESS_KEY` | Secret | R2 API token secret key |
+| `R2_PUBLIC_URL` | Variable | Public r2.dev URL (e.g., `https://pub-xxx.r2.dev`) |
+
+### What Stays in Git vs R2
+
+| In Git | In R2 |
+|--------|-------|
+| `data/r2-manifest.json` | `colorado/douglas/*.csv` (processed) |
+| `data/CDOT/config.json` | `colorado/douglas/raw/*.csv` (annual) |
+| `data/CDOT/source_manifest.json` | `virginia/henrico/*.csv` (processed) |
+| `data/CDOT/jurisdictions.json` | Future state data |
+| `data/CDOT/.geocode_cache.json` | |
+| `data/CDOT/forecasts_*.json` | |
+| `data/CDOT/.validation/*` | |
+| `data/grants.csv` (3.4 KB) | |
+| `data/cmf_processed.json` (245 KB) | |
+
+### Adding a New State to R2
+
+When onboarding a new state (e.g., Texas):
+
+1. Process data through the pipeline (Stages 0-4) to produce output CSVs
+2. Add R2 upload step to the state's workflow:
+   ```yaml
+   - uses: ./.github/actions/upload-r2
+     with:
+       files_json: |
+         [
+           {"local_path": "data/TxDOT/harris_all_roads.csv", "r2_key": "texas/harris/all_roads.csv"},
+           {"local_path": "data/TxDOT/harris_county_roads.csv", "r2_key": "texas/harris/county_roads.csv"},
+           {"local_path": "data/TxDOT/harris_no_interstate.csv", "r2_key": "texas/harris/no_interstate.csv"}
+         ]
+   ```
+3. The manifest auto-updates with the new state's path mappings
+4. The browser app resolves the new state's URLs via the same `resolveDataUrl()` function
+
+### Future: Parquet Format (Tier 3)
+
+The current pipeline stores CSV. A future enhancement will add **Parquet** conversion for ~90% size reduction and in-browser SQL via DuckDB-WASM:
+
+```
+CSV (current) ─── Tier 1 ─── PapaParse in browser
+                                   │
+Parquet (future) ── Tier 3 ─── DuckDB-WASM in browser
+                                   │
+                              Ad-hoc SQL queries on
+                              multi-state datasets
+```
+
+When implemented:
+- Pipeline will output both `.csv` and `.parquet` to R2
+- Browser app will prefer Parquet when DuckDB-WASM is loaded
+- Fallback to CSV for compatibility
 
 ---
 
