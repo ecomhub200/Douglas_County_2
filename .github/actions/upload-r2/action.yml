@@ -1,0 +1,133 @@
+name: 'Upload to Cloudflare R2'
+description: 'Upload files to Cloudflare R2 and update the data manifest'
+
+inputs:
+  files_json:
+    description: 'JSON array of {local_path, r2_key} pairs'
+    required: true
+  cf_account_id:
+    description: 'Cloudflare Account ID'
+    required: true
+  r2_access_key_id:
+    description: 'R2 API Access Key ID'
+    required: true
+  r2_secret_access_key:
+    description: 'R2 API Secret Access Key'
+    required: true
+  r2_public_url:
+    description: 'R2 public URL (e.g. https://pub-XXX.r2.dev)'
+    required: true
+  bucket:
+    description: 'R2 bucket name'
+    required: false
+    default: 'crash-lens-data'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure AWS CLI for R2
+      shell: bash
+      env:
+        AWS_ACCESS_KEY_ID: ${{ inputs.r2_access_key_id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.r2_secret_access_key }}
+      run: |
+        aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+        aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+        aws configure set default.region auto
+
+    - name: Upload files to R2 and update manifest
+      shell: bash
+      env:
+        R2_ENDPOINT: "https://${{ inputs.cf_account_id }}.r2.cloudflarestorage.com"
+        R2_BUCKET: ${{ inputs.bucket }}
+        R2_PUBLIC_URL: ${{ inputs.r2_public_url }}
+        FILES_JSON: ${{ inputs.files_json }}
+      run: |
+        echo "=========================================="
+        echo "Uploading files to Cloudflare R2"
+        echo "Endpoint: $R2_ENDPOINT"
+        echo "Bucket: $R2_BUCKET"
+        echo "=========================================="
+
+        python3 -c "
+        import json, sys, subprocess, os, hashlib
+        from datetime import datetime, timezone
+
+        files = json.loads(os.environ['FILES_JSON'])
+        endpoint = os.environ['R2_ENDPOINT']
+        bucket = os.environ['R2_BUCKET']
+        public_url = os.environ['R2_PUBLIC_URL'].rstrip('/')
+        manifest_path = 'data/r2-manifest.json'
+
+        # Load existing manifest or create new one
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            manifest = {
+                'version': 1,
+                'r2BaseUrl': '',
+                'updated': '',
+                'files': {},
+                'localPathMapping': {}
+            }
+
+        manifest['r2BaseUrl'] = public_url
+        manifest['updated'] = datetime.now(timezone.utc).isoformat()
+
+        uploaded = 0
+        for entry in files:
+            local_path = entry['local_path']
+            r2_key = entry['r2_key']
+
+            if not os.path.isfile(local_path):
+                print(f'  SKIP (not found): {local_path}')
+                continue
+
+            # Determine content type
+            content_type = 'text/csv' if local_path.endswith('.csv') else 'application/octet-stream'
+
+            # Upload via AWS CLI with retry
+            s3_uri = f's3://{bucket}/{r2_key}'
+            cmd = [
+                'aws', 's3', 'cp', local_path, s3_uri,
+                '--endpoint-url', endpoint,
+                '--content-type', content_type
+            ]
+
+            success = False
+            for attempt in range(3):
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode == 0:
+                    success = True
+                    break
+                print(f'  Retry {attempt + 1}/3 for {local_path}: {result.stderr.strip()}')
+
+            if not success:
+                print(f'  ERROR uploading {local_path}: {result.stderr.strip()}')
+                continue
+
+            # Compute file metadata
+            size = os.path.getsize(local_path)
+            with open(local_path, 'rb') as fh:
+                md5 = hashlib.md5(fh.read()).hexdigest()
+
+            # Update manifest
+            manifest['files'][r2_key] = {
+                'size': size,
+                'md5': md5,
+                'uploaded': datetime.now(timezone.utc).isoformat()
+            }
+            manifest['localPathMapping'][local_path] = r2_key
+
+            uploaded += 1
+            print(f'  OK: {local_path} -> {r2_key} ({size:,} bytes)')
+
+        # Write updated manifest
+        with open(manifest_path, 'w') as f:
+            json.dump(manifest, f, indent=2)
+
+        print(f'')
+        print(f'Uploaded {uploaded}/{len(files)} files')
+        print(f'Manifest updated: {manifest_path}')
+        "

@@ -130,22 +130,61 @@ jobs:
           echo "untracked=$UNTRACKED" >> $GITHUB_OUTPUT
           echo "=========================================="
 
-      - name: Commit and push if changed
+      - name: Upload CDOT CSVs to R2
+        uses: ./.github/actions/upload-r2
+        with:
+          files_json: |
+            [
+              {"local_path": "data/CDOT/${{ steps.build-args.outputs.jurisdiction }}_standardized.csv", "r2_key": "colorado/${{ steps.build-args.outputs.jurisdiction }}/standardized.csv"},
+              {"local_path": "data/CDOT/${{ steps.build-args.outputs.jurisdiction }}_all_roads.csv", "r2_key": "colorado/${{ steps.build-args.outputs.jurisdiction }}/all_roads.csv"},
+              {"local_path": "data/CDOT/${{ steps.build-args.outputs.jurisdiction }}_county_roads.csv", "r2_key": "colorado/${{ steps.build-args.outputs.jurisdiction }}/county_roads.csv"},
+              {"local_path": "data/CDOT/${{ steps.build-args.outputs.jurisdiction }}_no_interstate.csv", "r2_key": "colorado/${{ steps.build-args.outputs.jurisdiction }}/no_interstate.csv"},
+              {"local_path": "data/CDOT/crashes.csv", "r2_key": "colorado/${{ steps.build-args.outputs.jurisdiction }}/crashes.csv"}
+            ]
+          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          r2_public_url: ${{ vars.R2_PUBLIC_URL }}
+
+      - name: Upload raw annual CSVs to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        run: |
+          JURISDICTION="${{ steps.build-args.outputs.jurisdiction }}"
+          # Upload raw annual CSVs (filenames may have spaces)
+          for f in data/CDOT/20*.csv; do
+            [ -f "$f" ] || continue
+            BASENAME=$(basename "$f")
+            YEAR=$(echo "$BASENAME" | grep -oP '^\d{4}')
+            if [ -n "$YEAR" ]; then
+              aws s3 cp "$f" "s3://crash-lens-data/colorado/${JURISDICTION}/raw/${YEAR}.csv" \
+                --endpoint-url "$R2_ENDPOINT" \
+                --content-type "text/csv" || echo "  Warning: failed to upload $f"
+              echo "  Uploaded: $f -> colorado/${JURISDICTION}/raw/${YEAR}.csv"
+            fi
+          done
+
+      - name: Commit manifest and metadata
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add data/CDOT/
 
-          # Check if there are changes to commit
+          # Stage only metadata and manifest (NOT the large CSVs)
+          git add data/r2-manifest.json
+          git add data/CDOT/.validation/ 2>/dev/null || true
+          git add data/CDOT/config.json data/CDOT/source_manifest.json data/CDOT/jurisdictions.json 2>/dev/null || true
+          git add data/CDOT/.geocode_cache.json 2>/dev/null || true
+
           if git diff --staged --quiet; then
-            echo "No changes to commit — data is already up to date"
+            echo "No changes to commit"
             exit 0
           fi
 
           JURISDICTION="${{ steps.build-args.outputs.jurisdiction }}"
-          git commit -m "chore: update CDOT crash data ($JURISDICTION) [$(date +'%Y-%m-%d')]"
+          git commit -m "chore: update CDOT crash data ($JURISDICTION) -> R2 [$(date +'%Y-%m-%d')]"
 
-          # Push with retry logic
           MAX_RETRIES=4
           for i in $(seq 1 $MAX_RETRIES); do
             if git push; then
@@ -156,7 +195,6 @@ jobs:
             sleep $((2 ** i))
             git fetch origin main
             git rebase origin/main || {
-              echo "Rebase failed, trying merge..."
               git rebase --abort 2>/dev/null || true
               git pull --no-edit origin main
             }

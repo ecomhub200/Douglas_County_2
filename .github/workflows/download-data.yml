@@ -339,21 +339,33 @@ jobs:
           cp "data/${JURISDICTION}_county_roads.csv" "data/CDOT/crashes.csv"
           echo "Updated data/CDOT/crashes.csv with validated data"
 
-      - name: Commit and push crash data changes
+      - name: Upload crash CSVs to R2
+        uses: ./.github/actions/upload-r2
+        with:
+          files_json: |
+            [
+              {"local_path": "data/${{ steps.get-jurisdiction.outputs.jurisdiction }}_county_roads.csv", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/county_roads.csv"},
+              {"local_path": "data/${{ steps.get-jurisdiction.outputs.jurisdiction }}_no_interstate.csv", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/no_interstate.csv"},
+              {"local_path": "data/${{ steps.get-jurisdiction.outputs.jurisdiction }}_all_roads.csv", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/all_roads.csv"}
+            ]
+          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          r2_public_url: ${{ vars.R2_PUBLIC_URL }}
+
+      - name: Commit manifest and validation data
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add data/
+          git add data/r2-manifest.json data/.validation/
 
-          # Check if there are changes to commit
           if git diff --staged --quiet; then
             echo "No changes to commit"
             exit 0
           fi
 
-          # Create commit message with validation summary
           JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
-          COMMIT_MSG="Auto-update: Crash data ($JURISDICTION) - $(date +'%Y-%m-%d')"
+          COMMIT_MSG="Auto-update: Crash data ($JURISDICTION) -> R2 - $(date +'%Y-%m-%d')"
 
           if [ -f "data/.validation/latest_report.json" ]; then
             SUMMARY=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['summary'])")
@@ -361,13 +373,13 @@ jobs:
           $COMMIT_MSG
 
           Validation: $SUMMARY
+          Data uploaded to Cloudflare R2
           EOFMSG
           )"
           else
             git commit -m "$COMMIT_MSG"
           fi
 
-          # Push with retry logic to handle race conditions with grants job
           MAX_RETRIES=4
           for i in $(seq 1 $MAX_RETRIES); do
             if git push; then
@@ -375,7 +387,7 @@ jobs:
               exit 0
             fi
             echo "Push failed (attempt $i/$MAX_RETRIES), pulling latest changes..."
-            sleep $((2 ** i))  # Exponential backoff: 2, 4, 8, 16 seconds
+            sleep $((2 ** i))
             git fetch origin main
             git rebase origin/main || {
               echo "Rebase failed, trying merge..."

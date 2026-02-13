@@ -49,6 +49,35 @@ jobs:
         run: |
           pip install pandas boto3
 
+      - name: Download crash data from R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        run: |
+          DATA_FILE="${{ github.event.inputs.data_file || 'data/CDOT/douglas_all_roads.csv' }}"
+
+          # Skip if file already exists locally
+          if [ -f "$DATA_FILE" ]; then
+            echo "Data file already exists locally: $DATA_FILE"
+            exit 0
+          fi
+
+          # Extract jurisdiction and file type from the path
+          # data/CDOT/douglas_all_roads.csv -> colorado/douglas/all_roads.csv
+          BASENAME=$(basename "$DATA_FILE" .csv)
+          JURISDICTION=$(echo "$BASENAME" | sed 's/_all_roads$//' | sed 's/_county_roads$//' | sed 's/_no_interstate$//' | sed 's/_standardized$//')
+          SUFFIX=$(echo "$BASENAME" | sed "s/^${JURISDICTION}_//")
+          R2_KEY="colorado/${JURISDICTION}/${SUFFIX}.csv"
+
+          echo "Downloading $R2_KEY from R2 to $DATA_FILE..."
+          mkdir -p "$(dirname "$DATA_FILE")"
+          aws s3 cp "s3://crash-lens-data/${R2_KEY}" "$DATA_FILE" \
+            --endpoint-url "$R2_ENDPOINT" || {
+            echo "WARNING: R2 download failed. Forecast may fail if data file is not available."
+          }
+          ls -lh "$DATA_FILE" 2>/dev/null || echo "WARNING: Data file not found!"
+
       - name: Generate forecasts
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
