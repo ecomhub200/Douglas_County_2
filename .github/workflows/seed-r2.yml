@@ -1,0 +1,196 @@
+name: Seed R2 Bucket (One-Time)
+
+# One-time workflow to upload existing CSV files to R2.
+# Use this when the OnBase download can't run from GitHub Actions
+# (e.g., IP blocking) and you need to seed the bucket from files in the repo.
+#
+# After R2 is seeded, the CSVs should be removed from Git and re-gitignored.
+
+on:
+  workflow_dispatch:
+    inputs:
+      jurisdiction:
+        description: 'County to upload (must match file prefix)'
+        required: false
+        default: 'douglas'
+        type: string
+      state:
+        description: 'State (colorado or virginia)'
+        required: false
+        default: 'colorado'
+        type: string
+      upload_raw:
+        description: 'Also upload raw annual CSVs (20XX files)'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  seed-r2:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: List available CSV files
+        run: |
+          echo "=========================================="
+          echo "Available CSV files"
+          echo "=========================================="
+
+          JURISDICTION="${{ github.event.inputs.jurisdiction || 'douglas' }}"
+          STATE="${{ github.event.inputs.state || 'colorado' }}"
+
+          if [ "$STATE" = "colorado" ]; then
+            DATA_DIR="data/CDOT"
+          elif [ "$STATE" = "virginia" ]; then
+            DATA_DIR="data"
+          else
+            DATA_DIR="data/$STATE"
+          fi
+
+          echo "Data directory: $DATA_DIR"
+          echo "Jurisdiction: $JURISDICTION"
+          echo ""
+
+          echo "Processed files:"
+          ls -lh "$DATA_DIR/${JURISDICTION}_"*.csv 2>/dev/null || echo "  None found"
+          echo ""
+
+          echo "Raw annual files:"
+          ls -lh "$DATA_DIR"/20*.csv 2>/dev/null || echo "  None found"
+          echo ""
+
+          echo "Other CSV files:"
+          ls -lh "$DATA_DIR"/crashes.csv 2>/dev/null || echo "  None found"
+
+      - name: Build upload file list
+        id: files
+        run: |
+          JURISDICTION="${{ github.event.inputs.jurisdiction || 'douglas' }}"
+          STATE="${{ github.event.inputs.state || 'colorado' }}"
+          UPLOAD_RAW="${{ github.event.inputs.upload_raw || 'true' }}"
+
+          if [ "$STATE" = "colorado" ]; then
+            DATA_DIR="data/CDOT"
+            R2_PREFIX="colorado/${JURISDICTION}"
+          elif [ "$STATE" = "virginia" ]; then
+            DATA_DIR="data"
+            R2_PREFIX="virginia/${JURISDICTION}"
+          else
+            DATA_DIR="data/$STATE"
+            R2_PREFIX="${STATE}/${JURISDICTION}"
+          fi
+
+          # Build JSON array of files to upload
+          FILES="["
+          FIRST=true
+
+          # Processed pipeline outputs
+          for suffix in standardized all_roads county_roads no_interstate; do
+            FILE="${DATA_DIR}/${JURISDICTION}_${suffix}.csv"
+            if [ -f "$FILE" ]; then
+              if [ "$FIRST" = true ]; then FIRST=false; else FILES="$FILES,"; fi
+              FILES="$FILES{\"local_path\":\"$FILE\",\"r2_key\":\"${R2_PREFIX}/${suffix}.csv\"}"
+              echo "  Found: $FILE -> ${R2_PREFIX}/${suffix}.csv"
+            fi
+          done
+
+          # crashes.csv
+          if [ -f "${DATA_DIR}/crashes.csv" ]; then
+            if [ "$FIRST" = true ]; then FIRST=false; else FILES="$FILES,"; fi
+            FILES="$FILES{\"local_path\":\"${DATA_DIR}/crashes.csv\",\"r2_key\":\"${R2_PREFIX}/crashes.csv\"}"
+            echo "  Found: ${DATA_DIR}/crashes.csv -> ${R2_PREFIX}/crashes.csv"
+          fi
+
+          FILES="$FILES]"
+
+          echo "files_json<<EOFFILES" >> $GITHUB_OUTPUT
+          echo "$FILES" >> $GITHUB_OUTPUT
+          echo "EOFFILES" >> $GITHUB_OUTPUT
+
+          # Raw annual CSVs (handled separately with aws cli for flexible naming)
+          echo "upload_raw=$UPLOAD_RAW" >> $GITHUB_OUTPUT
+          echo "data_dir=$DATA_DIR" >> $GITHUB_OUTPUT
+          echo "r2_prefix=$R2_PREFIX" >> $GITHUB_OUTPUT
+          echo "jurisdiction=$JURISDICTION" >> $GITHUB_OUTPUT
+
+      - name: Upload processed CSVs to R2
+        uses: ./.github/actions/upload-r2
+        with:
+          files_json: ${{ steps.files.outputs.files_json }}
+          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          r2_public_url: ${{ vars.R2_PUBLIC_URL }}
+
+      - name: Upload raw annual CSVs to R2
+        if: steps.files.outputs.upload_raw == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        run: |
+          DATA_DIR="${{ steps.files.outputs.data_dir }}"
+          R2_PREFIX="${{ steps.files.outputs.r2_prefix }}"
+
+          echo "Uploading raw annual CSVs..."
+          UPLOADED=0
+          for f in "${DATA_DIR}"/20*.csv; do
+            [ -f "$f" ] || continue
+            BASENAME=$(basename "$f")
+            YEAR=$(echo "$BASENAME" | grep -oP '^\d{4}')
+            if [ -n "$YEAR" ]; then
+              R2_KEY="${R2_PREFIX}/raw/${YEAR}.csv"
+              if aws s3 cp "$f" "s3://crash-lens-data/${R2_KEY}" \
+                --endpoint-url "$R2_ENDPOINT" \
+                --content-type "text/csv"; then
+                echo "  OK: $f -> $R2_KEY"
+                UPLOADED=$((UPLOADED + 1))
+              else
+                echo "  FAIL: $f"
+              fi
+            fi
+          done
+          echo "Uploaded $UPLOADED raw annual CSVs"
+
+      - name: Commit updated manifest
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          git add data/r2-manifest.json
+
+          if git diff --staged --quiet; then
+            echo "No manifest changes to commit"
+            exit 0
+          fi
+
+          JURISDICTION="${{ steps.files.outputs.jurisdiction }}"
+          git commit -m "chore: seed R2 bucket with ${JURISDICTION} data [$(date +'%Y-%m-%d')]"
+
+          for i in 1 2 3 4; do
+            if git push; then
+              echo "Push successful"
+              exit 0
+            fi
+            echo "Push failed (attempt $i/4), retrying..."
+            sleep $((2 ** i))
+            git pull --rebase origin ${{ github.ref_name }} || git pull --no-edit origin ${{ github.ref_name }}
+          done
+          echo "ERROR: Push failed after 4 attempts"
+          exit 1
+
+      - name: Verify R2 contents
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        run: |
+          echo "=========================================="
+          echo "R2 Bucket Contents"
+          echo "=========================================="
+          aws s3 ls "s3://crash-lens-data/" --endpoint-url "$R2_ENDPOINT" --recursive --human-readable || echo "Could not list bucket"
