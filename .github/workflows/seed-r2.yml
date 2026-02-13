@@ -132,12 +132,14 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
           R2_ENDPOINT: "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
         run: |
           DATA_DIR="${{ steps.files.outputs.data_dir }}"
           R2_PREFIX="${{ steps.files.outputs.r2_prefix }}"
 
           echo "Uploading raw annual CSVs..."
+          echo "Endpoint: $R2_ENDPOINT"
           UPLOADED=0
           for f in "${DATA_DIR}"/20*.csv; do
             [ -f "$f" ] || continue
@@ -145,9 +147,13 @@ jobs:
             YEAR=$(echo "$BASENAME" | grep -oP '^\d{4}')
             if [ -n "$YEAR" ]; then
               R2_KEY="${R2_PREFIX}/raw/${YEAR}.csv"
-              if aws s3 cp "$f" "s3://crash-lens-data/${R2_KEY}" \
+              echo "  Uploading: $f -> s3://crash-lens-data/${R2_KEY}"
+              OUTPUT=$(aws s3 cp "$f" "s3://crash-lens-data/${R2_KEY}" \
                 --endpoint-url "$R2_ENDPOINT" \
-                --content-type "text/csv"; then
+                --content-type "text/csv" 2>&1)
+              EXIT_CODE=$?
+              echo "    exit_code=$EXIT_CODE output=$OUTPUT"
+              if [ $EXIT_CODE -eq 0 ]; then
                 echo "  OK: $f -> $R2_KEY"
                 UPLOADED=$((UPLOADED + 1))
               else
