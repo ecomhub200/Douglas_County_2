@@ -41,6 +41,11 @@ on:
 permissions:
   contents: write
 
+env:
+  # R2 state prefix - parameterized for multi-state support
+  R2_STATE_PREFIX: colorado
+  STATE_DISPLAY: Colorado
+
 jobs:
   download-cdot-data:
     runs-on: ubuntu-latest
@@ -156,10 +161,10 @@ jobs:
             BASENAME=$(basename "$f")
             YEAR=$(echo "$BASENAME" | grep -oP '^\d{4}')
             if [ -n "$YEAR" ]; then
-              if aws s3 cp "$f" "s3://crash-lens-data/colorado/${JURISDICTION}/raw/${YEAR}.csv" \
+              if aws s3 cp "$f" "s3://crash-lens-data/${R2_STATE_PREFIX}/${JURISDICTION}/raw/${YEAR}.csv" \
                 --endpoint-url "$R2_ENDPOINT" \
                 --content-type "text/csv"; then
-                echo "  Uploaded: $f -> colorado/${JURISDICTION}/raw/${YEAR}.csv"
+                echo "  Uploaded: $f -> ${R2_STATE_PREFIX}/${JURISDICTION}/raw/${YEAR}.csv"
                 UPLOADED=$((UPLOADED + 1))
               else
                 echo "  Warning: failed to upload $f"
@@ -179,9 +184,9 @@ jobs:
         run: |
           JURISDICTION="${{ steps.build-args.outputs.jurisdiction }}"
           echo "=========================================="
-          echo "R2 Storage State: colorado/${JURISDICTION}/raw/"
+          echo "R2 Storage State: ${R2_STATE_PREFIX}/${JURISDICTION}/raw/"
           echo "=========================================="
-          aws s3 ls "s3://crash-lens-data/colorado/${JURISDICTION}/raw/" \
+          aws s3 ls "s3://crash-lens-data/${R2_STATE_PREFIX}/${JURISDICTION}/raw/" \
             --endpoint-url "$R2_ENDPOINT" 2>/dev/null || echo "  Could not list R2 bucket (check credentials)"
           echo "=========================================="
 
@@ -202,7 +207,7 @@ jobs:
           fi
 
           JURISDICTION="${{ steps.build-args.outputs.jurisdiction }}"
-          git commit -m "chore: update CDOT crash data ($JURISDICTION) -> R2 [$(date +'%Y-%m-%d')]"
+          git commit -m "chore: update $STATE_DISPLAY crash data ($JURISDICTION) -> R2 [$(date +'%Y-%m-%d')]"
 
           MAX_RETRIES=4
           for i in $(seq 1 $MAX_RETRIES); do

@@ -130,6 +130,20 @@
       }
     },
 
+    "splitConfig": {
+      "_description": "Config-driven split logic for stage_split in process_crash_data.py",
+      "countyRoads": {
+        "method": "system_column",
+        "column": "SYSTEM",
+        "includeValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT"]
+      },
+      "interstateExclusion": {
+        "method": "system_column",
+        "column": "SYSTEM",
+        "excludeValues": ["Interstate"]
+      }
+    },
+
     "filterProfiles": {
       "countyOnly": {
         "name": "County/City Roads Only",

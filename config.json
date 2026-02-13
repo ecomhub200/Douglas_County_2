@@ -1,6 +1,6 @@
 {
   "appName": "CRASH LENS",
-  "appSubtitle": "Virginia Crash Analysis Tool",
+  "appSubtitle": "Crash Analysis Tool",
   "version": "2.0.0",
   "apis": {
     "mapbox": {
@@ -33,7 +33,8 @@
       "enabled": true,
       "baseUrl": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer",
       "countySubdivisionsUrl": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer",
-      "stateFips": "51",
+      "stateFips": null,
+      "_comment": "stateFips is resolved at runtime from the active state config. Set to null to force dynamic resolution.",
       "layers": {
         "counties": 82,
         "tracts": 14,
@@ -3284,21 +3285,55 @@
       ]
     }
   },
-  "defaults": {
-    "jurisdiction": "henrico",
-    "filterProfile": "countyOnly"
+  "states": {
+    "_comment": "Registry of supported states. Each key maps to a states/{key}/config.json with column mappings, jurisdictions, and road system definitions.",
+    "virginia": {
+      "fips": "51",
+      "name": "Virginia",
+      "abbreviation": "VA",
+      "dotName": "VDOT",
+      "defaultJurisdiction": "henrico",
+      "dataDir": null,
+      "r2Prefix": "virginia",
+      "appSubtitle": "Virginia Crash Analysis Tool"
+    },
+    "colorado": {
+      "fips": "08",
+      "name": "Colorado",
+      "abbreviation": "CO",
+      "dotName": "CDOT",
+      "defaultJurisdiction": "douglas",
+      "dataDir": "CDOT",
+      "r2Prefix": "colorado",
+      "appSubtitle": "Colorado Crash Analysis Tool"
+    }
   },
-  "dataSource": {
-    "name": "Virginia Roads",
-    "url": "https://www.virginiaroads.org",
-    "apiUrl": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_Basic_Updated/FeatureServer/0/query",
-    "apiUrlAlternatives": [
-      "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/Crash_Data_Updated/FeatureServer/0/query",
-      "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData/FeatureServer/0/query",
-      "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_test/FeatureServer/0/query"
-    ],
-    "fallbackUrl": "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0",
-    "datasetId": "1a96a2f31b4f4d77991471b6cabb38ba"
+  "defaultState": "virginia",
+  "defaults": {
+    "jurisdiction": null,
+    "filterProfile": "countyOnly",
+    "_comment": "jurisdiction is resolved from the active state's defaultJurisdiction at runtime"
+  },
+  "dataSources": {
+    "_comment": "State-specific data source configurations. Keyed by state key.",
+    "virginia": {
+      "name": "Virginia Roads",
+      "url": "https://www.virginiaroads.org",
+      "apiUrl": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_Basic_Updated/FeatureServer/0/query",
+      "apiUrlAlternatives": [
+        "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/Crash_Data_Updated/FeatureServer/0/query",
+        "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData/FeatureServer/0/query",
+        "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_test/FeatureServer/0/query"
+      ],
+      "fallbackUrl": "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0",
+      "datasetId": "1a96a2f31b4f4d77991471b6cabb38ba"
+    },
+    "colorado": {
+      "name": "CDOT OnBase Portal",
+      "url": "https://www.codot.gov/safety/traffic-safety/crash-data",
+      "downloadMethod": "playwright",
+      "description": "Colorado DOT crash data via OnBase web portal"
+    }
   },
   "transitStops": {
     "enabled": true,

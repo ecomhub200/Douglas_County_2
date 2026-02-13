@@ -179,7 +179,8 @@ jobs:
           fi
 
           JURISDICTION="${{ steps.files.outputs.jurisdiction }}"
-          git commit -m "chore: seed R2 bucket with ${JURISDICTION} data [$(date +'%Y-%m-%d')]"
+          STATE="${{ github.event.inputs.state || 'colorado' }}"
+          git commit -m "chore: seed R2 bucket with ${STATE} ${JURISDICTION} data [$(date +'%Y-%m-%d')]"
 
           for i in 1 2 3 4; do
             if git push; then

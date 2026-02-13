@@ -514,11 +514,21 @@ def stage_validate(standardized_path: str, config: PipelineConfig, stats: Pipeli
     return validated_path
 
 
-# State config directory mapping
-STATE_SIGNATURES_DIRS = {
-    'colorado': 'colorado',
-    'virginia': 'virginia',
-}
+# State config directory mapping - auto-discovered from states/ directory
+# Any subdirectory of states/ with a config.json is a valid state
+def _discover_state_dirs():
+    """Auto-discover state config directories from the states/ folder."""
+    mapping = {}
+    if STATES_DIR.exists():
+        for child in STATES_DIR.iterdir():
+            if child.is_dir() and (child / 'config.json').exists():
+                mapping[child.name] = child.name
+    # Fallback to known states if directory scanning fails
+    if not mapping:
+        mapping = {'colorado': 'colorado', 'virginia': 'virginia'}
+    return mapping
+
+STATE_SIGNATURES_DIRS = _discover_state_dirs()
 
 
 # ============================================================
@@ -920,15 +930,32 @@ def stage_split(validated_path: str, config: PipelineConfig, stats: PipelineStat
     stats.files_created.append(all_roads_path)
 
     # --- File 2: County/City Roads Only ---
-    # Determine filter based on state
-    if state_key == 'colorado':
-        # Colorado: use original Agency Id from preserved column
+    # Config-driven split logic: reads splitConfig from state config
+    split_config = state_cfg.get('roadSystems', {}).get('splitConfig', {}) if state_config_path.exists() else {}
+    county_config = split_config.get('countyRoads', {})
+
+    if county_config.get('method') == 'agency_id':
+        # Agency-based filtering (e.g., Colorado): match agency column against jurisdiction-specific IDs
+        agency_col = county_config.get('column', '_co_agency_id')
+        agency_map = county_config.get('agencyMap', {})
+        allowed_agencies = set(agency_map.get(jurisdiction, []))
+        if not allowed_agencies:
+            logger.warning("  No agency IDs configured for jurisdiction '%s' in splitConfig.countyRoads.agencyMap", jurisdiction)
         county_rows = [r for r in all_rows
-                       if r.get('_co_agency_id', '').strip() in _get_county_agencies(config, state_key)]
+                       if r.get(agency_col, '').strip() in allowed_agencies]
+    elif county_config.get('method') == 'system_column':
+        # System column filtering (e.g., Virginia): match SYSTEM column against include values
+        sys_col = county_config.get('column', 'SYSTEM')
+        include_values = set(county_config.get('includeValues', []))
+        county_rows = [r for r in all_rows if r.get(sys_col, '').strip() in include_values]
     else:
-        # Virginia: use SYSTEM column - NonVDOT types are county/city roads
-        county_systems = {'NonVDOT secondary', 'NONVDOT', 'Non-VDOT'}
-        county_rows = [r for r in all_rows if r.get('SYSTEM', '').strip() in county_systems]
+        # Fallback: legacy hardcoded logic for backward compatibility
+        if state_key == 'colorado':
+            county_rows = [r for r in all_rows
+                           if r.get('_co_agency_id', '').strip() in _get_county_agencies(config, state_key)]
+        else:
+            county_systems = {'NonVDOT secondary', 'NONVDOT', 'Non-VDOT'}
+            county_rows = [r for r in all_rows if r.get('SYSTEM', '').strip() in county_systems]
 
     county_path = str(config.output_dir / f"{jurisdiction}_county_roads.csv")
     _write_split_csv(county_path, headers, county_rows,
@@ -937,13 +964,20 @@ def stage_split(validated_path: str, config: PipelineConfig, stats: PipelineStat
     stats.files_created.append(county_path)
 
     # --- File 3: No Interstate ---
-    if state_key == 'colorado':
-        # Colorado: exclude Interstate Highway from original system code
-        no_interstate = [r for r in all_rows
-                         if r.get('_co_system_code', '').strip() != 'Interstate Highway']
+    interstate_config = split_config.get('interstateExclusion', {})
+
+    if interstate_config.get('method') in ('column_value', 'system_column'):
+        # Config-driven interstate exclusion
+        int_col = interstate_config.get('column', 'SYSTEM')
+        exclude_values = set(interstate_config.get('excludeValues', []))
+        no_interstate = [r for r in all_rows if r.get(int_col, '').strip() not in exclude_values]
     else:
-        # Virginia: exclude SYSTEM = Interstate
-        no_interstate = [r for r in all_rows if r.get('SYSTEM', '').strip() != 'Interstate']
+        # Fallback: legacy hardcoded logic for backward compatibility
+        if state_key == 'colorado':
+            no_interstate = [r for r in all_rows
+                             if r.get('_co_system_code', '').strip() != 'Interstate Highway']
+        else:
+            no_interstate = [r for r in all_rows if r.get('SYSTEM', '').strip() != 'Interstate']
 
     no_int_path = str(config.output_dir / f"{jurisdiction}_no_interstate.csv")
     _write_split_csv(no_int_path, headers, no_interstate,
@@ -1016,14 +1050,14 @@ Examples:
   # Dry run (preview):
   python process_crash_data.py -i data/CDOT/Douglas_County.csv -j douglas --dry-run
 
-Supported states: colorado (CDOT), virginia (TREDS)
+Supported states: auto-discovered from states/ directory (currently colorado, virginia)
         """
     )
 
     parser.add_argument('-i', '--input', nargs='+', required=True,
                         help='Input CSV file(s) or glob pattern(s)')
     parser.add_argument('-s', '--state', type=str, default=None,
-                        help='State key (auto-detected if omitted). Options: colorado, virginia')
+                        help='State key (auto-detected if omitted). Auto-discovered from states/ directory.')
     parser.add_argument('-j', '--jurisdiction', type=str, required=True,
                         help='Jurisdiction name (e.g., douglas, henrico)')
     parser.add_argument('-o', '--output-dir', type=str, default=None,
