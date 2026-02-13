@@ -225,19 +225,18 @@ data/*_all_roads.csv
 data/crashes.csv
 
 # Colorado CDOT crash data
-# TEMPORARILY UN-GITIGNORED for R2 seeding — restore after seed workflow succeeds
-# data/CDOT/*_standardized.csv
-# data/CDOT/*_all_roads.csv
-# data/CDOT/*_county_roads.csv
-# data/CDOT/*_no_interstate.csv
-# data/CDOT/crashes.csv
-# data/CDOT/*_merged_raw.csv
+data/CDOT/*_standardized.csv
+data/CDOT/*_all_roads.csv
+data/CDOT/*_county_roads.csv
+data/CDOT/*_no_interstate.csv
+data/CDOT/crashes.csv
+data/CDOT/*_merged_raw.csv
 
 # Raw annual CSVs (CDOT source files)
-# data/CDOT/20*.csv
-# data/CDOT/*crash*.csv
-# data/CDOT/*Crash*.csv
-# data/CDOT/*export*.csv
+data/CDOT/20*.csv
+data/CDOT/*crash*.csv
+data/CDOT/*Crash*.csv
+data/CDOT/*export*.csv
 
 # CMF raw download (large, can be re-downloaded)
 data/cmfclearinghouse.csv
