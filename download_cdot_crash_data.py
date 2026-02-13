@@ -281,6 +281,12 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
     Playwright handles JavaScript rendering, session cookies, and redirects
     that requests cannot follow.
 
+    OnBase uses an ASP.NET frameset where the DocSelectPage iframe starts at
+    blank.aspx and gets populated asynchronously by JavaScript.  We must:
+      1. Intercept network responses carrying Excel/binary content
+      2. Wait for the iframe to navigate away from blank.aspx
+      3. Look for download triggers inside the iframe (not just the main page)
+
     Returns (content_bytes, extension) or raises on failure.
     """
     from playwright.sync_api import sync_playwright
@@ -293,9 +299,43 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
         context = browser.new_context(accept_downloads=True)
         page = context.new_page()
 
+        # --- Network response interceptor ---
+        # OnBase may serve the Excel file as a sub-request while the
+        # DocSelectPage iframe loads.  Capture it before it disappears.
+        captured_excel = {}
+
+        def _on_response(response):
+            if captured_excel:
+                return  # already captured
+            try:
+                ct = (response.headers.get('content-type') or '').lower()
+                cd = response.headers.get('content-disposition') or ''
+                resp_url = response.url.lower()
+
+                is_binary = ('octet-stream' in ct or 'spreadsheet' in ct or
+                             'excel' in ct or 'ms-excel' in ct)
+                has_file_url = any(k in resp_url for k in [
+                    '.xlsx', '.xls', 'getdoc', 'retrievedoc',
+                    'fetchdocument', 'renderpage',
+                ])
+                has_file_disp = '.xls' in cd.lower()
+
+                if is_binary or has_file_url or has_file_disp:
+                    body = response.body()
+                    if len(body) > 1000:  # skip tiny responses
+                        is_valid, ext, reason = detect_file_type(body, ct, cd)
+                        if is_valid:
+                            captured_excel['data'] = body
+                            captured_excel['ext'] = ext
+                            captured_excel['reason'] = f'network intercept: {reason}'
+                            logger.info(f"  [Intercept] Captured Excel from {response.url[:100]}")
+            except Exception:
+                pass
+
+        page.on('response', _on_response)
+
         # Visit the DocPop landing page first to establish session cookies,
-        # then navigate to the document. This mirrors how a real user would
-        # access the portal.
+        # then navigate to the document.
         try:
             logger.info(f"  Playwright: visiting DocPop landing page for session...")
             page.goto(ONBASE_BASE_URL, wait_until='networkidle', timeout=30000)
@@ -310,52 +350,152 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
             page.goto(url, wait_until='networkidle', timeout=timeout_ms)
             logger.info(f"  Page loaded: {page.title()}")
 
-            # Strategy A: intercept automatic download triggered by OnBase
-            # Some OnBase pages auto-start a download on page load
-            try:
-                with page.expect_download(timeout=20000) as download_info:
-                    # Click any visible download/open link on the page
-                    for selector in [
-                        'a[href*="GetDoc"]',
-                        'a[href*="getdoc"]',
-                        'a[href*="Download"]',
-                        'a[href*="download"]',
-                        'a[href*="PdfPop"]',
-                        'a[href*=".xlsx"]',
-                        'a[href*=".xls"]',
-                        '[id*="lnkRetrieve"]',
-                        '[id*="btnDownload"]',
-                        '[id*="btnRetrieve"]',
-                        'input[type="button"][value*="Download"]',
-                        'input[type="button"][value*="Retrieve"]',
-                        'text=Download',
-                        'text=Retrieve',
-                        'text=Open',
-                        'text=Save',
-                    ]:
-                        link = page.query_selector(selector)
-                        if link and link.is_visible():
-                            logger.info(f"  Clicking download link: {selector}")
-                            link.click()
-                            break
+            # Check if network interceptor already captured the file
+            if captured_excel:
+                browser.close()
+                logger.info(f"  Playwright success ({captured_excel['reason']})")
+                return captured_excel['data'], captured_excel['ext']
 
-                download = download_info.value
-                downloaded_path = download.path()
-                logger.info(f"  Browser download captured: {download.suggested_filename}")
-            except Exception:
-                # Strategy B: no auto-download, try to find a direct link
-                logger.info("  No automatic download triggered. Checking page content...")
+            # --- Wait for DocSelectPage iframe to navigate ---
+            # The iframe starts at blank.aspx and JS populates it.
+            logger.info("  Waiting for OnBase DocSelectPage iframe to load...")
+            doc_frame = None
+            for _ in range(40):  # up to ~40 seconds
+                for frame in page.frames:
+                    furl = frame.url.lower()
+                    if (frame != page.main_frame
+                            and 'blank.aspx' not in furl
+                            and 'unloadhandler' not in furl
+                            and furl not in ('', 'about:blank')):
+                        doc_frame = frame
+                        break
+                if doc_frame or captured_excel:
+                    break
+                page.wait_for_timeout(1000)
 
-            # Strategy B: if no download was captured, try fetching page content
-            # The OnBase viewer may embed the document or provide a link
+            if captured_excel:
+                browser.close()
+                logger.info(f"  Playwright success ({captured_excel['reason']})")
+                return captured_excel['data'], captured_excel['ext']
+
+            # --- Prepare list of frames to search for download triggers ---
+            all_frames = [page] + ([doc_frame] if doc_frame else [])
+            if doc_frame:
+                logger.info(f"  DocSelectPage iframe navigated to: {doc_frame.url[:150]}")
+                try:
+                    doc_frame.wait_for_load_state('networkidle', timeout=15000)
+                except Exception:
+                    pass
+                if captured_excel:
+                    browser.close()
+                    logger.info(f"  Playwright success ({captured_excel['reason']})")
+                    return captured_excel['data'], captured_excel['ext']
+            else:
+                logger.info("  DocSelectPage iframe did not navigate away from blank.aspx")
+
+            # --- Click download triggers in all frames ---
+            download_selectors = [
+                'a[href*="GetDoc"]', 'a[href*="getdoc"]',
+                'a[href*="Download"]', 'a[href*="download"]',
+                'a[href*="Retrieve"]', 'a[href*="retrieve"]',
+                'a[href*="PdfPop"]', 'a[href*="pdfpop"]',
+                'a[href*=".xlsx"]', 'a[href*=".xls"]',
+                '[id*="lnkRetrieve"]', '[id*="btnDownload"]',
+                '[id*="btnRetrieve"]', '[id*="SendTo"]', '[id*="sendTo"]',
+                'input[type="button"][value*="Download"]',
+                'input[type="button"][value*="Retrieve"]',
+                'input[type="submit"][value*="Download"]',
+                'input[type="submit"][value*="Retrieve"]',
+                '[title*="Send to"]', '[title*="Retrieve"]',
+                '[title*="Download"]', '[title*="Save"]',
+                'text=Download', 'text=Retrieve',
+                'text=Open', 'text=Save',
+                'text=Send to', 'text=Send To',
+            ]
+
+            for target_frame in all_frames:
+                frame_label = 'main' if target_frame == page else 'iframe'
+                for selector in download_selectors:
+                    try:
+                        el = target_frame.query_selector(selector)
+                        if el and el.is_visible():
+                            logger.info(f"  Clicking [{frame_label}]: {selector}")
+                            try:
+                                with page.expect_download(timeout=15000) as dl_info:
+                                    el.click()
+                                download = dl_info.value
+                                downloaded_path = download.path()
+                                logger.info(f"  Download captured: {download.suggested_filename}")
+                                break
+                            except Exception:
+                                if captured_excel:
+                                    browser.close()
+                                    logger.info(f"  Playwright success ({captured_excel['reason']})")
+                                    return captured_excel['data'], captured_excel['ext']
+                    except Exception:
+                        continue
+                if downloaded_path:
+                    break
+
+            # --- Try fetching iframe URL directly (it may serve the file) ---
+            if downloaded_path is None and doc_frame and doc_frame.url:
+                frame_url = doc_frame.url
+                if 'blank.aspx' not in frame_url.lower():
+                    logger.info(f"  Trying direct fetch of iframe URL: {frame_url[:120]}")
+                    try:
+                        resp = page.request.get(frame_url)
+                        body = resp.body()
+                        is_valid, ext, reason = detect_file_type(body)
+                        if is_valid:
+                            browser.close()
+                            logger.info(f"  Playwright success via iframe URL: {reason}")
+                            return body, ext
+                    except Exception as e:
+                        logger.info(f"  Direct iframe URL fetch failed: {e}")
+
+            # --- JavaScript-based download trigger across all frames ---
             if downloaded_path is None:
-                # --- Diagnostic dump: log what the page actually contains ---
+                for target_frame in all_frames:
+                    try:
+                        with page.expect_download(timeout=10000) as dl_info:
+                            target_frame.evaluate("""() => {
+                                const links = document.querySelectorAll('a');
+                                for (const a of links) {
+                                    const href = (a.href || '').toLowerCase();
+                                    if (href.includes('getdoc') || href.includes('download') ||
+                                        href.includes('.xls') || href.includes('pdfpop') ||
+                                        href.includes('retrieve')) {
+                                        a.click();
+                                        return true;
+                                    }
+                                }
+                                const btn = document.querySelector(
+                                    '[id*="download"], [id*="Download"], ' +
+                                    '[id*="Retrieve"], [id*="retrieve"]'
+                                );
+                                if (btn) { btn.click(); return true; }
+                                return false;
+                            }""")
+                        download = dl_info.value
+                        downloaded_path = download.path()
+                        logger.info(f"  JS-triggered download: {download.suggested_filename}")
+                        break
+                    except Exception:
+                        continue
+
+            # --- Final check on network interceptor ---
+            if captured_excel:
+                browser.close()
+                logger.info(f"  Playwright success ({captured_excel['reason']})")
+                return captured_excel['data'], captured_excel['ext']
+
+            # --- Diagnostic dump (only on failure) ---
+            if downloaded_path is None:
                 try:
                     page_html = page.content()
                     logger.info(f"  [Playwright diag] Page URL: {page.url}")
                     logger.info(f"  [Playwright diag] Page title: {page.title()}")
                     logger.info(f"  [Playwright diag] HTML length: {len(page_html):,} chars")
-                    # Log all links on the page
                     all_links = page.evaluate("""() => {
                         return Array.from(document.querySelectorAll('a')).slice(0, 20).map(a => ({
                             text: (a.textContent || '').trim().substring(0, 60),
@@ -364,9 +504,8 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                         }));
                     }""")
                     logger.info(f"  [Playwright diag] Links found: {len(all_links)}")
-                    for link in all_links:
-                        logger.info(f"    <a href='{link['href']}' visible={link['visible']}>{link['text']}</a>")
-                    # Log all iframes
+                    for lnk in all_links:
+                        logger.info(f"    <a href='{lnk['href']}' visible={lnk['visible']}>{lnk['text']}</a>")
                     all_iframes = page.evaluate("""() => {
                         return Array.from(document.querySelectorAll('iframe')).map(f => ({
                             src: (f.src || '').substring(0, 150),
@@ -375,50 +514,19 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                         }));
                     }""")
                     logger.info(f"  [Playwright diag] Iframes: {len(all_iframes)}")
-                    for iframe in all_iframes:
-                        logger.info(f"    <iframe src='{iframe['src']}' id='{iframe['id']}' name='{iframe['name']}'/>")
-                    # Log first 1500 chars of HTML
-                    logger.info(f"  [Playwright diag] HTML preview:\n{page_html[:1500]}")
+                    for ifr in all_iframes:
+                        logger.info(f"    <iframe src='{ifr['src']}' id='{ifr['id']}' name='{ifr['name']}'/>")
+                    # Dump iframe content too
+                    for frame in page.frames:
+                        if frame != page.main_frame:
+                            try:
+                                fc = frame.content()
+                                logger.info(f"  [Playwright diag] Frame {frame.url[:80]} HTML ({len(fc)} chars):\n{fc[:1000]}")
+                            except Exception:
+                                pass
+                    logger.info(f"  [Playwright diag] Main HTML preview:\n{page_html[:1500]}")
                 except Exception as diag_err:
                     logger.warning(f"  [Playwright diag] Failed to dump page: {diag_err}")
-
-                # Look for iframe or embedded content with the actual document
-                for frame in page.frames:
-                    frame_url = frame.url
-                    if any(ext in frame_url.lower() for ext in ['.xlsx', '.xls', 'getdoc', 'pdfpop']):
-                        logger.info(f"  Found document frame: {frame_url[:100]}")
-                        # Fetch the frame URL directly
-                        resp = page.request.get(frame_url)
-                        content = resp.body()
-                        is_valid, ext, reason = detect_file_type(content)
-                        if is_valid:
-                            browser.close()
-                            logger.info(f"  Playwright success via frame: {reason}")
-                            return content, ext
-
-                # Strategy C: try triggering download via JavaScript
-                try:
-                    with page.expect_download(timeout=10000) as download_info:
-                        page.evaluate("""() => {
-                            // Try clicking the document link in OnBase viewer
-                            const links = document.querySelectorAll('a');
-                            for (const a of links) {
-                                const href = (a.href || '').toLowerCase();
-                                if (href.includes('getdoc') || href.includes('download') ||
-                                    href.includes('.xls') || href.includes('pdfpop')) {
-                                    a.click();
-                                    return;
-                                }
-                            }
-                            // Try the OnBase-specific download button
-                            const btn = document.querySelector('[id*="download"], [id*="Download"]');
-                            if (btn) btn.click();
-                        }""")
-                    download = download_info.value
-                    downloaded_path = download.path()
-                    logger.info(f"  JS-triggered download: {download.suggested_filename}")
-                except Exception:
-                    pass
 
             # Read the downloaded file
             if downloaded_path:
