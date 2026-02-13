@@ -224,6 +224,9 @@ data/*_no_interstate.csv
 data/*_all_roads.csv
 data/crashes.csv
 
+# Virginia jurisdiction subdirectory crash data (generated/downloaded)
+data/virginia/**/*.csv
+
 # Colorado CDOT crash data
 data/CDOT/*_standardized.csv
 data/CDOT/*_all_roads.csv

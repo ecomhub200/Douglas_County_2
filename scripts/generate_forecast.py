@@ -68,14 +68,58 @@ DEFAULT_HORIZON = 12  # months
 # EPDO weights (must match index.html)
 EPDO_WEIGHTS = {"K": 462, "A": 62, "B": 12, "C": 5, "O": 1}
 
-# Top corridors by crash volume (from Douglas County data)
-TOP_CORRIDORS = [
+# Default top corridors (Douglas County, Colorado — used as fallback)
+DEFAULT_CORRIDORS = [
     "I-25", "C-470", "S PARKER RD", "HWY 85", "LINCOLN AVE",
     "FOUNDERS PKWY", "HWY 83", "E LINCOLN AVE", "HWY 86", "RIDGEGATE PKWY",
 ]
 
-# Crash type mapping
+# Will be populated dynamically from data via auto_detect_top_corridors()
+TOP_CORRIDORS = []
+
+
+def auto_detect_top_corridors(df, top_n=10):
+    """Auto-detect top corridors by crash volume from the data.
+
+    Finds the top N routes by crash count, filtering out empty/unknown values.
+    Works for any jurisdiction/state — no hardcoded route names required.
+
+    Args:
+        df: DataFrame with crash records
+        top_n: Number of top corridors to return (default: 10)
+
+    Returns:
+        list of route name strings, sorted by crash volume descending
+    """
+    if "RTE Name" in df.columns:
+        route_col = "RTE Name"
+    elif "RTE_NAME" in df.columns:
+        route_col = "RTE_NAME"
+    else:
+        print("  [AutoDetect] No route column found. Using default corridors.")
+        return DEFAULT_CORRIDORS[:top_n]
+
+    # Count crashes per route, filter out empty/unknown
+    route_counts = df[route_col].value_counts()
+    route_counts = route_counts[
+        ~route_counts.index.isin(["", "Unknown", "UNKNOWN", "N/A", "NA", "None"])
+    ]
+    route_counts = route_counts[route_counts.index.notna()]
+
+    if route_counts.empty:
+        print("  [AutoDetect] No valid routes found. Using default corridors.")
+        return DEFAULT_CORRIDORS[:top_n]
+
+    top_routes = route_counts.head(top_n).index.tolist()
+    print(f"  [AutoDetect] Top {len(top_routes)} corridors by crash volume:")
+    for i, route in enumerate(top_routes, 1):
+        print(f"    {i:2d}. {route} ({route_counts[route]:,} crashes)")
+
+    return top_routes
+
+# Crash type mapping — supports both Colorado-numbered and Virginia label formats
 CRASH_TYPE_MAP = {
+    # Colorado (numbered prefix) formats
     "1. Rear End": "rear_end",
     "2. Broadside": "angle",
     "2. Angle": "angle",
@@ -85,14 +129,37 @@ CRASH_TYPE_MAP = {
     "4. Sideswipe Same": "sideswipe_same",
     "10. Deer/Animal": "animal",
     "3. Head On": "head_on",
+    # Virginia (plain label) formats — from TREDS Collision Type field
+    "Rear End": "rear_end",
+    "Angle": "angle",
+    "Fixed Object - Off Road": "fixed_object",
+    "Fixed Object in Road": "fixed_object",
+    "Sideswipe - Same Direction": "sideswipe_same",
+    "Sideswipe - Opposite Direction": "sideswipe_opposite",
+    "Head On": "head_on",
+    "Pedestrian": "pedestrian",
+    "Bicyclist": "bicycle",
+    "Other Animal": "animal",
+    "Deer": "animal",
+    "Non-Collision": "non_collision",
+    "Backed Into": "backed_into",
+    "Other": "other",
 }
 
-# Intersection type mapping
+# Intersection type mapping — supports both Colorado-numbered and Virginia label formats
 INTERSECTION_TYPE_MAP = {
+    # Colorado (numbered prefix) formats
     "1. Not at Intersection": "segment",
     "4. Four Approaches": "four_leg",
     "2. Two Approaches": "three_leg",
     "5. Roundabout": "roundabout",
+    # Virginia (plain label) formats — from TREDS Intersection Type / Roadway Description
+    "Non-Intersection": "segment",
+    "Intersection": "four_leg",
+    "Driveway": "segment",
+    "Ramp": "segment",
+    "Roundabout": "roundabout",
+    "Railroad Crossing": "segment",
 }
 
 
@@ -527,11 +594,14 @@ def build_matrix_03(df, horizon, call_endpoint):
         print("  WARNING: No route column found. Skipping corridor forecast.")
         return None
 
+    # Auto-detect top corridors from data if not already populated
+    corridors_to_use = TOP_CORRIDORS if TOP_CORRIDORS else auto_detect_top_corridors(df)
+
     # Match top corridors (case-insensitive partial match)
     corridor_map = {}
     for _, row in df_corr.iterrows():
         rte = str(row.get(route_col, "")).strip().upper()
-        for corr in TOP_CORRIDORS:
+        for corr in corridors_to_use:
             if corr.upper() in rte or rte in corr.upper():
                 corridor_map[row.name] = corr
                 break
@@ -1154,7 +1224,11 @@ def build_derived_metrics(matrices, summary, horizon, crash_pattern=None):
 
 def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_label=None):
     """Generate forecast for a single crash data file."""
+    global TOP_CORRIDORS
     df = load_crash_data(csv_path)
+
+    # Auto-detect top corridors from this jurisdiction's data
+    TOP_CORRIDORS = auto_detect_top_corridors(df)
 
     # Set up raw endpoint caller or synthetic generator
     if dry_run:
@@ -1293,7 +1367,8 @@ def main():
     if args.all_road_types:
         # Generate forecasts for all 3 road type datasets
         data_dir = os.path.join(project_root, args.data_dir) if not os.path.isabs(args.data_dir) else args.data_dir
-        output_dir = os.path.join(project_root, "data", "CDOT")
+        # Output forecast JSONs to the same directory as the input data (not hardcoded to CDOT)
+        output_dir = data_dir
         generated = 0
 
         for road_type, config in ROAD_TYPE_CONFIGS.items():
