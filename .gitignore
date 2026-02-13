@@ -218,11 +218,11 @@ tmp/
 # These files are uploaded to R2 by GitHub Actions workflows.
 # The app loads them via r2-manifest.json at runtime.
 
-# Virginia crash data — TEMPORARILY UN-GITIGNORED for R2 seeding
-# data/*_county_roads.csv
-# data/*_no_interstate.csv
-# data/*_all_roads.csv
-# data/crashes.csv
+# Virginia crash data
+data/*_county_roads.csv
+data/*_no_interstate.csv
+data/*_all_roads.csv
+data/crashes.csv
 
 # Colorado CDOT crash data
 data/CDOT/*_standardized.csv
