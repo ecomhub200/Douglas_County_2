@@ -35,6 +35,7 @@ from download_cdot_crash_data import (
     download_onbase_document,
     excel_to_dataframe,
     extract_download_url_from_html,
+    extract_obtoken_url,
     filter_to_jurisdiction,
     list_available,
     load_manifest,
@@ -309,6 +310,134 @@ class TestExtractDownloadUrl:
         html = b'<a HREF="/path/PDFPOP.ASPX?docid=1">View</a>'
         url = extract_download_url_from_html(html, 'https://host.com/page.aspx')
         assert url is not None
+
+    def test_retrieve_native_document_link(self):
+        html = b'<a href="/docpop/RetrieveNativeDocument.aspx?id=1">Save</a>'
+        url = extract_download_url_from_html(html, 'https://host.com/docpop/page.aspx')
+        assert url is not None
+        assert 'RetrieveNativeDocument' in url
+
+    def test_get_native_doc_link(self):
+        html = b'<a href="GetNativeDoc.ashx?docid=55">Download</a>'
+        url = extract_download_url_from_html(html, 'https://host.com/docpop/viewer.aspx')
+        assert url is not None
+        assert 'GetNativeDoc' in url
+
+    def test_send_to_application_link(self):
+        html = b'<a href="SendToApplication.aspx?action=download">Send</a>'
+        url = extract_download_url_from_html(html, 'https://host.com/page.aspx')
+        assert url is not None
+        assert 'SendToApplication' in url
+
+    def test_string_input_accepted(self):
+        """extract_download_url_from_html should accept str in addition to bytes."""
+        html = '<a href="/docpop/GetDoc.aspx?id=1">DL</a>'
+        url = extract_download_url_from_html(html, 'https://host.com/page.aspx')
+        assert url is not None
+        assert 'GetDoc' in url
+
+
+# ===========================================================================
+# extract_obtoken_url
+# ===========================================================================
+
+class TestExtractObtokenUrl:
+    """Test OBToken extraction from OnBase DocPop HTML framesets."""
+
+    BASE_URL = 'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx'
+
+    def test_frame_src_with_obtoken(self):
+        """Classic OnBase frameset with ViewDocumentEx in a <frame> tag."""
+        html = b'''<html><head><title>DocPop</title></head>
+        <frameset rows="0,*">
+          <frame src="UnloadHandler.aspx" name="unloadHandler" />
+          <frame src="ViewDocumentEx.aspx?OBToken=e1c20842-ad67-4e79-9343-2edff43b5868"
+                 name="DocSelectPage" />
+        </frameset></html>'''
+        url = extract_obtoken_url(html, self.BASE_URL)
+        assert url is not None
+        assert 'ViewDocumentEx.aspx' in url
+        assert 'OBToken=e1c20842-ad67-4e79-9343-2edff43b5868' in url
+        assert url.startswith('https://')
+
+    def test_iframe_src_with_obtoken(self):
+        """Modern OnBase with <iframe> instead of <frame>."""
+        html = b'''<html><body>
+        <iframe src="ViewDocumentEx.aspx?OBToken=aabbccdd-1122-3344-5566-778899001122"
+                id="DocSelectPage"></iframe>
+        </body></html>'''
+        url = extract_obtoken_url(html, self.BASE_URL)
+        assert url is not None
+        assert 'OBToken=aabbccdd-1122-3344-5566-778899001122' in url
+
+    def test_javascript_src_assignment(self):
+        """OBToken embedded in JavaScript .src assignment."""
+        html = b'''<html><body>
+        <iframe id="DocSelectPage" src="blank.aspx"></iframe>
+        <script>
+          document.getElementById('DocSelectPage').src =
+            'ViewDocumentEx.aspx?OBToken=12345678-abcd-ef01-2345-678901234567';
+        </script></body></html>'''
+        url = extract_obtoken_url(html, self.BASE_URL)
+        assert url is not None
+        assert 'OBToken=12345678-abcd-ef01-2345-678901234567' in url
+
+    def test_window_location_obtoken(self):
+        """OBToken in window.location redirect."""
+        html = b'''<script>
+        location = 'ViewDocumentEx.aspx?OBToken=aaaabbbb-cccc-dddd-eeee-ffffffffffff';
+        </script>'''
+        url = extract_obtoken_url(html, self.BASE_URL)
+        assert url is not None
+        assert 'OBToken=aaaabbbb-cccc-dddd-eeee-ffffffffffff' in url
+
+    def test_bare_obtoken_guid(self):
+        """Only OBToken GUID visible (not in a complete URL) — should build URL."""
+        html = b'<input type="hidden" name="token" value="OBToken=aabb1122-3344-5566-7788-99aabbccddee" />'
+        url = extract_obtoken_url(html, self.BASE_URL)
+        assert url is not None
+        assert 'ViewDocumentEx.aspx' in url
+        assert 'OBToken=aabb1122-3344-5566-7788-99aabbccddee' in url
+
+    def test_absolute_url_preserved(self):
+        """If the OBToken URL is already absolute, don't mangle it."""
+        abs_url = 'https://other.server.com/docpop/ViewDocumentEx.aspx?OBToken=11111111-2222-3333-4444-555555555555'
+        html = f'<iframe src="{abs_url}"></iframe>'.encode()
+        url = extract_obtoken_url(html, self.BASE_URL)
+        assert url == abs_url
+
+    def test_relative_url_resolved(self):
+        """Relative OBToken URL resolved against base URL."""
+        html = b'<frame src="ViewDocumentEx.aspx?OBToken=12345678-1234-1234-1234-123456789abc" />'
+        url = extract_obtoken_url(html, self.BASE_URL)
+        assert url.startswith('https://oitco.hylandcloud.com/')
+        assert 'ViewDocumentEx.aspx' in url
+
+    def test_no_obtoken_returns_none(self):
+        """HTML without OBToken returns None."""
+        html = b'<html><body>No frames or tokens here</body></html>'
+        url = extract_obtoken_url(html, self.BASE_URL)
+        assert url is None
+
+    def test_empty_html_returns_none(self):
+        url = extract_obtoken_url(b'', self.BASE_URL)
+        assert url is None
+
+    def test_string_input_accepted(self):
+        """Should handle str input, not just bytes."""
+        html = '<frame src="ViewDocumentEx.aspx?OBToken=abcdef01-2345-6789-abcd-ef0123456789" />'
+        url = extract_obtoken_url(html, self.BASE_URL)
+        assert url is not None
+        assert 'OBToken=abcdef01-2345-6789-abcd-ef0123456789' in url
+
+    def test_quoted_js_variable(self):
+        """OBToken in a JS string variable (not in src/href attribute)."""
+        html = b'''<script>
+        var docUrl = "ViewDocumentEx.aspx?OBToken=deadbeef-1234-5678-9abc-def012345678";
+        </script>'''
+        url = extract_obtoken_url(html, self.BASE_URL)
+        assert url is not None
+        assert 'OBToken=deadbeef-1234-5678-9abc-def012345678' in url
 
 
 # ===========================================================================
@@ -1289,6 +1418,120 @@ class TestDownloadOnbaseDocument:
 
         assert content == xlsx_bytes
         assert ext == '.xlsx'
+
+    def test_strategy1_5_obtoken_returns_excel(self):
+        """Strategy 1.5: HTML frameset contains OBToken → ViewDocumentEx returns Excel."""
+        xlsx_bytes = make_xlsx_bytes({'CUID': [1, 2], 'County': ['DOUGLAS', 'DOUGLAS']})
+
+        # Strategy 1: returns HTML frameset with OBToken
+        frameset_html = (
+            b'<html><frameset rows="0,*">'
+            b'<frame src="UnloadHandler.aspx" name="unloadHandler" />'
+            b'<frame src="ViewDocumentEx.aspx?OBToken=aabb1122-3344-5566-7788-99aabbccddee"'
+            b' name="DocSelectPage" />'
+            b'</frameset></html>'
+        )
+
+        mock_resp_html = MagicMock()
+        mock_resp_html.content = frameset_html
+        mock_resp_html.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_html.url = 'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx?clienttype=html&docid=123'
+
+        mock_resp_excel = MagicMock()
+        mock_resp_excel.content = xlsx_bytes
+        mock_resp_excel.headers = {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': '',
+        }
+        mock_resp_excel.url = 'https://oitco.hylandcloud.com/CDOTRMPop/docpop/ViewDocumentEx.aspx?OBToken=aabb1122-3344-5566-7788-99aabbccddee'
+
+        def mock_request(session, url, **kwargs):
+            if 'ViewDocumentEx' in url or 'OBToken' in url:
+                return mock_resp_excel
+            return mock_resp_html
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
+            content, ext = download_onbase_document(MagicMock(), 123, label='Test')
+
+        assert content == xlsx_bytes
+        assert ext == '.xlsx'
+
+    def test_strategy1_5_obtoken_viewer_then_native_link(self):
+        """Strategy 1.5: ViewDocumentEx returns HTML viewer → follow native download link."""
+        xlsx_bytes = make_xlsx_bytes({'A': [1]})
+
+        # Strategy 1: frameset with OBToken
+        frameset_html = (
+            b'<html><iframe src="ViewDocumentEx.aspx?OBToken=11112222-3333-4444-5555-666677778888"'
+            b' id="DocSelectPage"></iframe></html>'
+        )
+
+        # ViewDocumentEx returns HTML viewer with a GetDoc link
+        viewer_html = (
+            b'<html><body><a href="/CDOTRMPop/docpop/GetDoc.aspx?docid=123">Download</a>'
+            b'</body></html>'
+        )
+
+        mock_resp_frameset = MagicMock()
+        mock_resp_frameset.content = frameset_html
+        mock_resp_frameset.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_frameset.url = 'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx'
+
+        mock_resp_viewer = MagicMock()
+        mock_resp_viewer.content = viewer_html
+        mock_resp_viewer.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_viewer.url = 'https://oitco.hylandcloud.com/CDOTRMPop/docpop/ViewDocumentEx.aspx'
+
+        mock_resp_excel = MagicMock()
+        mock_resp_excel.content = xlsx_bytes
+        mock_resp_excel.headers = {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': 'attachment; filename="crash.xlsx"',
+        }
+
+        def mock_request(session, url, **kwargs):
+            if 'GetDoc' in url:
+                return mock_resp_excel
+            if 'ViewDocumentEx' in url or 'OBToken' in url:
+                return mock_resp_viewer
+            return mock_resp_frameset
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
+            content, ext = download_onbase_document(MagicMock(), 123, label='Test')
+
+        assert content == xlsx_bytes
+
+    def test_strategy1_5_no_obtoken_falls_through(self):
+        """Strategy 1.5: no OBToken in HTML → falls through to later strategies."""
+        xlsx_bytes = make_xlsx_bytes({'A': [1]})
+
+        # Strategy 1: HTML without OBToken
+        html_no_token = b'<html><body>No OBToken here</body></html>'
+        mock_resp_html = MagicMock()
+        mock_resp_html.content = html_no_token
+        mock_resp_html.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_html.url = 'https://example.com/docpop.aspx'
+
+        # Strategy 3 (activex): returns Excel
+        mock_resp_excel = MagicMock()
+        mock_resp_excel.content = xlsx_bytes
+        mock_resp_excel.headers = {
+            'Content-Type': 'application/vnd.ms-excel',
+            'Content-Disposition': '',
+        }
+
+        def mock_request(session, url, **kwargs):
+            if any(ep in url for ep in ONBASE_GETDOC_URLS):
+                raise Exception("Not found")
+            params = kwargs.get('params', {})
+            if params.get('clienttype') == 'activex':
+                return mock_resp_excel
+            return mock_resp_html
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
+            content, ext = download_onbase_document(MagicMock(), 999, label='Test')
+
+        assert content == xlsx_bytes
 
     def test_strategy2_html_then_follow_link(self):
         """Strategy 2: first request returns HTML, direct endpoints fail, parsed link returns Excel."""

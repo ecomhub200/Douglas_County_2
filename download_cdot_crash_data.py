@@ -229,7 +229,8 @@ def extract_download_url_from_html(html_content, base_url):
     If OnBase returns an HTML viewer page instead of the file directly,
     parse it to find the actual document download URL.
     """
-    html_str = html_content.decode('utf-8', errors='ignore')
+    html_str = (html_content.decode('utf-8', errors='ignore')
+                if isinstance(html_content, bytes) else html_content)
 
     # Look for common OnBase download URL patterns
     patterns = [
@@ -239,6 +240,12 @@ def extract_download_url_from_html(html_content, base_url):
         r'src=["\']([^"\']*\.xlsx?[^"\']*)["\']',
         r'window\.location\s*=\s*["\']([^"\']+)["\']',
         r'window\.open\(["\']([^"\']+)["\']',
+        # OnBase native-document retrieval patterns (viewer pages)
+        r'href=["\']([^"\']*RetrieveNativeDocument[^"\']*)["\']',
+        r'href=["\']([^"\']*GetNativeDoc[^"\']*)["\']',
+        r'href=["\']([^"\']*SendToApplication[^"\']*)["\']',
+        r'href=["\']([^"\']*RenderDocument[^"\']*)["\']',
+        r'href=["\']([^"\']*docid=\d+[^"\']*\.(?:xlsx?|csv)[^"\']*)["\']',
     ]
 
     for pattern in patterns:
@@ -252,6 +259,55 @@ def extract_download_url_from_html(html_content, base_url):
                 url = f"{parsed.scheme}://{parsed.netloc}{url}"
             elif not url.startswith('http'):
                 url = base_url.rsplit('/', 1)[0] + '/' + url
+            return url
+
+    return None
+
+
+def extract_obtoken_url(html_content, base_url):
+    """
+    Extract the ViewDocumentEx.aspx?OBToken=... URL from an OnBase DocPop HTML
+    response.
+
+    When docpop.aspx processes a document request the server generates a
+    session-scoped OBToken GUID and embeds it in the frameset, iframe src, or
+    inline JavaScript.  ViewDocumentEx.aspx requires this token (along with the
+    matching ASP.NET_SessionId cookie) to serve the actual file content.
+
+    Returns the absolute URL string, or None if no OBToken was found.
+    """
+    html_str = (html_content.decode('utf-8', errors='ignore')
+                if isinstance(html_content, bytes) else html_content)
+
+    from urllib.parse import urljoin
+
+    # Patterns ordered from most specific (frame/iframe src) to broadest
+    # (standalone GUID).  We stop at the first match.
+    patterns = [
+        # <frame src="ViewDocumentEx.aspx?OBToken=..."> or <iframe src="...">
+        r'(?:frame|iframe)[^>]+src=["\']([^"\']*ViewDocumentEx[^"\']*OBToken=[^"\']+)["\']',
+        # Any src= or href= containing OBToken
+        r'(?:src|href)\s*=\s*["\']([^"\']*OBToken=[^"\']+)["\']',
+        # JS: .src = "...OBToken=..."  or  location = "...OBToken=..."
+        r'(?:\.src|location)\s*=\s*["\']([^"\']*OBToken=[^"\']+)["\']',
+        # JS: window.open("...OBToken=...")
+        r'window\.open\(\s*["\']([^"\']*OBToken=[^"\']+)["\']',
+        # Quoted string with full ViewDocumentEx URL (catches JS variable assignments)
+        r'["\']([^"\']*ViewDocumentEx\.aspx\?[^"\']*OBToken=[^"\']+)["\']',
+        # Bare OBToken GUID anywhere in the page — we'll construct the URL
+        r'OBToken=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, html_str, re.IGNORECASE)
+        if match:
+            url = match.group(1)
+            # Last pattern captures only the bare GUID — build the URL
+            if re.fullmatch(r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}', url):
+                url = f'ViewDocumentEx.aspx?OBToken={url}'
+            # Resolve relative URLs against the base (docpop.aspx response URL)
+            if not url.startswith('http'):
+                url = urljoin(base_url, url)
             return url
 
     return None
@@ -553,11 +609,13 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
 def download_onbase_document(session, docid, label='document'):
     """
     Download a document from Hyland OnBase. Tries multiple strategies:
-      1. Direct requests with redirect following
+      1.  Direct requests with redirect following
       1b. Re-bootstrap session and retry (if strategy 1 got 403)
-      2. Parse HTML response for real download URL
-      3. clienttype=activex parameter
-      4. Playwright headless browser (fallback for JS-rendered pages)
+      1.5 Extract OBToken from HTML frameset → fetch ViewDocumentEx directly
+      1c. Direct document retrieval endpoints (GetDoc, PdfPop, /api)
+      2.  Parse HTML response for real download URL
+      3.  clienttype=activex parameter
+      4.  Playwright headless browser (fallback for JS-rendered pages)
 
     Returns (content_bytes, extension) or raises on failure.
     """
@@ -621,6 +679,63 @@ def download_onbase_document(session, docid, label='document'):
                 logger.warning(f"  Strategy 1b also failed: {e2}")
     except Exception as e:
         logger.warning(f"  Strategy 1 failed: {e}")
+
+    # --- Strategy 1.5: extract OBToken from HTML and fetch ViewDocumentEx ---
+    # OnBase embeds a session-scoped OBToken in the DocPop frameset/iframe.
+    # ViewDocumentEx.aspx?OBToken=<GUID> serves the actual file when called
+    # with the same session cookies (ASP.NET_SessionId).
+    if html_content is not None:
+        obtoken_url = extract_obtoken_url(html_content, response_url or url)
+        if obtoken_url:
+            logger.info(f"  Strategy 1.5: found OBToken URL: {obtoken_url[:150]}")
+            try:
+                response = make_request_with_retry(session, obtoken_url, timeout=180,
+                                                    max_manual_retries=2)
+                content = response.content
+                content_type = response.headers.get('Content-Type', '')
+                content_disposition = response.headers.get('Content-Disposition', '')
+
+                is_valid, ext, reason = detect_file_type(content, content_type,
+                                                          content_disposition)
+                logger.info(f"  Strategy 1.5 (OBToken): {reason}")
+                logger.info(f"    Content-Type: {content_type}")
+                logger.info(f"    Response URL: {response.url[:150]}")
+                logger.info(f"    Response size: {len(content):,} bytes")
+
+                if is_valid:
+                    logger.info(f"  Downloaded {len(content):,} bytes via OBToken")
+                    return content, ext
+
+                # ViewDocumentEx returned HTML (viewer page) — search for the
+                # native-document download link inside the viewer.
+                viewer_download_url = extract_download_url_from_html(
+                    content, response.url)
+                if viewer_download_url:
+                    logger.info(f"  OBToken viewer returned HTML. "
+                                f"Following download link: {viewer_download_url[:120]}")
+                    try:
+                        resp2 = make_request_with_retry(
+                            session, viewer_download_url, timeout=180,
+                            max_manual_retries=2)
+                        content2 = resp2.content
+                        ct2 = resp2.headers.get('Content-Type', '')
+                        cd2 = resp2.headers.get('Content-Disposition', '')
+
+                        is_valid2, ext2, reason2 = detect_file_type(content2, ct2, cd2)
+                        logger.info(f"  Strategy 1.5 viewer follow-up: {reason2}")
+
+                        if is_valid2:
+                            logger.info(f"  Downloaded {len(content2):,} bytes via "
+                                        f"OBToken viewer link")
+                            return content2, ext2
+                    except Exception as e2:
+                        logger.info(f"  OBToken viewer follow-up failed: {e2}")
+                else:
+                    logger.info("  No native download link found in OBToken viewer HTML")
+            except Exception as e:
+                logger.warning(f"  Strategy 1.5 (OBToken) failed: {e}")
+        else:
+            logger.info("  Strategy 1.5: no OBToken found in HTML response")
 
     # --- Strategy 1c: try direct document retrieval endpoints ---
     for i, getdoc_url in enumerate(ONBASE_GETDOC_URLS):
