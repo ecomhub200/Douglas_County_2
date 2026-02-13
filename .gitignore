@@ -217,12 +217,6 @@ tmp/
 # ============================================================
 # These files are uploaded to R2 by GitHub Actions workflows.
 # The app loads them via r2-manifest.json at runtime.
-#
-# >>> TEMPORARILY UN-IGNORED FOR R2 SEEDING <<<
-# After running the "Seed R2 Bucket" workflow, restore these rules
-# and remove the CSVs from Git with:
-#   git rm --cached data/CDOT/*.csv data/CDOT/Douglas_County*.csv
-#   Then uncomment the rules below and commit.
 
 # Virginia crash data
 data/*_county_roads.csv
@@ -230,19 +224,19 @@ data/*_no_interstate.csv
 data/*_all_roads.csv
 data/crashes.csv
 
-# Colorado CDOT crash data -- TEMPORARILY COMMENTED OUT FOR R2 SEEDING
-# data/CDOT/*_standardized.csv
-# data/CDOT/*_all_roads.csv
-# data/CDOT/*_county_roads.csv
-# data/CDOT/*_no_interstate.csv
-# data/CDOT/crashes.csv
-# data/CDOT/*_merged_raw.csv
+# Colorado CDOT crash data
+data/CDOT/*_standardized.csv
+data/CDOT/*_all_roads.csv
+data/CDOT/*_county_roads.csv
+data/CDOT/*_no_interstate.csv
+data/CDOT/crashes.csv
+data/CDOT/*_merged_raw.csv
 
-# Raw annual CSVs -- TEMPORARILY COMMENTED OUT FOR R2 SEEDING
-# data/CDOT/20*.csv
-# data/CDOT/*crash*.csv
-# data/CDOT/*Crash*.csv
-# data/CDOT/*export*.csv
+# Raw annual CSVs (CDOT source files)
+data/CDOT/20*.csv
+data/CDOT/*crash*.csv
+data/CDOT/*Crash*.csv
+data/CDOT/*export*.csv
 
 # CMF raw download (large, can be re-downloaded)
 data/cmfclearinghouse.csv
