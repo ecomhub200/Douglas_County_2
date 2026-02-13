@@ -57,9 +57,20 @@ RETRY_BACKOFF_FACTOR = 2  # 2s, 4s, 8s, 16s
 # OnBase base URL
 ONBASE_BASE_URL = 'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx'
 
-# Realistic browser headers to avoid being blocked
+# Minimum file size to consider a download valid (100 KB)
+MIN_VALID_FILE_SIZE = 100 * 1024
+
+# Excel file magic bytes
+XLSX_MAGIC = b'PK'  # ZIP-based format (xlsx)
+XLS_MAGIC = b'\xd0\xcf'  # OLE2 format (xls)
+
+# Session management
+SESSION_REFRESH_INTERVAL = 3  # Re-bootstrap session every N downloads
+INTER_DOWNLOAD_DELAY = 2      # Seconds to wait between downloads
+
+# Updated browser headers (Chrome 131, current as of 2026)
 BROWSER_HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.5',
     'Accept-Encoding': 'gzip, deflate, br',
@@ -67,12 +78,189 @@ BROWSER_HEADERS = {
     'Upgrade-Insecure-Requests': '1',
 }
 
-# Minimum file size to consider a download valid (100 KB)
-MIN_VALID_FILE_SIZE = 100 * 1024
+# ──────────────────────────────────────────────────────────────────────
+# STANDARDIZATION MAPPINGS
+# Maps raw CDOT values to CRASH LENS universal numbered categories.
+# ──────────────────────────────────────────────────────────────────────
 
-# Excel file magic bytes
-XLSX_MAGIC = b'PK'  # ZIP-based format (xlsx)
-XLS_MAGIC = b'\xd0\xcf'  # OLE2 format (xls)
+SYSTEM_MAP = {
+    'Interstate Highway': 'Interstate',
+    'State Highway':      'Primary',
+    'County Road':        'NonVDOT secondary',
+    'City Street':        'NonVDOT secondary',
+    'Frontage Road':      'Secondary',
+    'Non Crash':          'NonVDOT secondary',  # Edge case: miscoded records
+}
+
+ROADWAY_DESC_MAP = {
+    'Interstate':        '3. Two-Way, Divided, Positive Median Barrier',
+    'Primary':           '2. Two-Way, Divided, Unprotected Median',
+    'NonVDOT secondary': '1. Two-Way, Not Divided',
+    'Secondary':         '2. Two-Way, Divided, Unprotected Median',
+}
+
+OWNERSHIP_MAP = {
+    'Interstate Highway': '1. State Hwy Agency',
+    'State Highway':      '1. State Hwy Agency',
+    'Frontage Road':      '1. State Hwy Agency',
+    'County Road':        '2. County Hwy Agency',
+    'City Street':        '3. City or Town Hwy Agency',
+    'Non Crash':          '',
+}
+
+COLLISION_TYPE_MAP = {
+    'Rear-End':              '1. Rear End',
+    'Broadside':             '2. Angle',
+    'Head-On':               '3. Head On',
+    'Sideswipe Same Direction':     '4. Sideswipe - Same Direction',
+    'Sideswipe Opposite Direction': '5. Sideswipe - Opposite Direction',
+    'Approach Turn':         '2. Angle',
+    'Overtaking Turn':       '2. Angle',
+    'Overturning/Rollover':  '8. Non-Collision',
+    'Pedestrian':            '12. Ped',
+    'Bicycle/Motorized Bicycle': '13. Bicycle',
+    'Wild Animal':           '10. Deer/Animal',
+    # Fixed objects
+    'Light Pole/Utility Pole':   '9. Fixed Object - Off Road',
+    'Concrete Highway Barrier':  '9. Fixed Object - Off Road',
+    'Guardrail Face':            '9. Fixed Object - Off Road',
+    'Guardrail End':             '9. Fixed Object - Off Road',
+    'Cable Rail':                '9. Fixed Object - Off Road',
+    'Tree':                      '9. Fixed Object - Off Road',
+    'Fence':                     '9. Fixed Object - Off Road',
+    'Sign':                      '9. Fixed Object - Off Road',
+    'Curb':                      '9. Fixed Object - Off Road',
+    'Embankment':                '9. Fixed Object - Off Road',
+    'Ditch':                     '9. Fixed Object - Off Road',
+    'Large Rocks or Boulder':    '9. Fixed Object - Off Road',
+    'Electrical/Utility Box':    '9. Fixed Object - Off Road',
+    'Other Fixed Object (Describe in Narrative)': '9. Fixed Object - Off Road',
+    'Vehicle Debris or Cargo':   '11. Fixed Object in Road',
+    'Parked Motor Vehicle':      '16. Other',
+    'Other Non-Fixed Object Describe in Narrative)': '16. Other',
+    'Other Non-Collision':       '8. Non-Collision',
+}
+
+WEATHER_MAP = {
+    'Clear':     '1. No Adverse Condition (Clear/Cloudy)',
+    'Cloudy':    '1. No Adverse Condition (Clear/Cloudy)',
+    'Fog':       '3. Fog/Smog/Smoke',
+    'Snow':      '4. Snow',
+    'Rain':      '5. Rain',
+    'Sleet or Hail':                    '6. Sleet/Hail/Freezing',
+    'Freezing Rain or Freezing Drizzle':'6. Sleet/Hail/Freezing',
+    'Blowing Snow':  '4. Snow',
+    'Wind':          '8. Severe Crosswinds',
+    'Dust':          '7. Blowing Sand/Dust',
+}
+
+LIGHT_MAP = {
+    'Daylight':           '2. Daylight',
+    'Dark – Lighted':     '4. Darkness - Road Lighted',
+    'Dark – Unlighted':   '5. Darkness - Road Not Lighted',
+    'Dark - Lighted':     '4. Darkness - Road Lighted',
+    'Dark - Unlighted':   '5. Darkness - Road Not Lighted',
+    'Dark-lighted':       '4. Darkness - Road Lighted',
+    'Dark-unlighted':     '5. Darkness - Road Not Lighted',
+    # Dawn or Dusk split by time of day in standardize_dataframe()
+}
+
+SURFACE_MAP = {
+    'Dry':       '1. Dry',
+    'Wet':       '2. Wet',
+    'Snowy':     '3. Snow',
+    'Snow':      '3. Snow',
+    'Slushy':    '4. Slush',
+    'Slush':     '4. Slush',
+    'Icy':       '5. Ice',
+    'Ice':       '5. Ice',
+    'Sand/Gravel': '6. Sand/Mud/Dirt/Oil/Gravel',
+    'Muddy':       '6. Sand/Mud/Dirt/Oil/Gravel',
+    'Dry W/Visible Icy Road Treatment':    '1. Dry',
+    'Snowy W/Visible Icy Road Treatment':  '3. Snow',
+    'Icy W/Visible Icy Road Treatment':    '5. Ice',
+    'Wet W/Visible Icy Road Treatment':    '2. Wet',
+    'Slushy W/Visible Icy Road Treatment': '4. Slush',
+    'Roto-Milled':      '16. Other',
+    'Foreign Material':  '16. Other',
+}
+
+RELATION_MAP = {
+    'Non-Intersection':          '8. Non-Intersection',
+    'At Intersection':           '9. Within Intersection',
+    'Intersection Related':      '10. Intersection Related - Within 150 Feet',
+    'Driveway Access Related':   '10. Intersection Related - Within 150 Feet',
+    'Ramp':                      '2. Acceleration/Deceleration Lanes',
+    'Ramp-related':              '2. Acceleration/Deceleration Lanes',
+    'Roundabout':                '9. Within Intersection',
+    'Express/Managed/HOV Lane':  '1. Main-Line Roadway',
+    'Crossover-Related ':        '10. Intersection Related - Within 150 Feet',
+    'Mid-Block Crosswalk':       '9. Within Intersection',
+    'Auxiliary Lane':            '2. Acceleration/Deceleration Lanes',
+    'Alley Related':             '9. Within Intersection',
+    'Railroad Crossing Related': '9. Within Intersection',
+}
+
+INTERSECTION_TYPE_MAP = {
+    'Non-Intersection':          '1. Not at Intersection',
+    'At Intersection':           '4. Four Approaches',
+    'Intersection Related':      '4. Four Approaches',
+    'Driveway Access Related':   '2. Two Approaches',
+    'Roundabout':                '5. Roundabout',
+    'Ramp':                      '1. Not at Intersection',
+    'Ramp-related':              '1. Not at Intersection',
+    'Express/Managed/HOV Lane':  '1. Not at Intersection',
+    'Crossover-Related ':        '4. Four Approaches',
+    'Mid-Block Crosswalk':       '2. Two Approaches',
+    'Auxiliary Lane':            '1. Not at Intersection',
+    'Alley Related':             '2. Two Approaches',
+    'Railroad Crossing Related': '2. Two Approaches',
+}
+
+FIRST_HE_MAP = {
+    'Front to Rear':         '20. Motor Vehicle In Transport',
+    'Front to Side':         '20. Motor Vehicle In Transport',
+    'Side to Side-Same Direction': '20. Motor Vehicle In Transport',
+    'Side to Side-Opposite Direction': '20. Motor Vehicle In Transport',
+    'Front to Front':        '20. Motor Vehicle In Transport',
+    'Wild Animal':           '21. Animal',
+    'Parked Motor Vehicle':  '6. Parked Vehicle',
+    'Concrete Highway Barrier': '15. Concrete Traffic Barrier',
+    'Overturning/Rollover':  '30. Overturn (Rollover)',
+    'Sign':                  '4. Traffic Sign Support',
+    'Fence':                 '8. Fence',
+    'Light Pole/Utility Pole': '3. Utility Pole',
+    'Curb':                  '27. Curb',
+    'Tree':                  '2. Trees',
+    'Vehicle Debris or Cargo': '37. Other Object (Not Fixed)',
+    'Guardrail Face':        '5. Guard Rail',
+    'Guardrail End':         '5. Guard Rail',
+    'Cable Rail':            '5. Guard Rail',
+    'Ditch':                 '14. Ditch',
+    'Embankment':            '13. Embankment',
+    'Large Rocks or Boulder': '24. Other Fixed Object',
+    'Electrical/Utility Box': '24. Other Fixed Object',
+    'Pedestrian':            '19. Ped',
+    'Bicycle/Motorized Bicycle': '22. Bicycle',
+    'Other Fixed Object (Describe in Narrative)': '24. Other Fixed Object',
+    'Other Non-Fixed Object Describe in Narrative)': '37. Other Object (Not Fixed)',
+    'Other Non-Collision':   '38. Other Non-Collision',
+    'Impact Attenuator/Crash Cushion': '16. Impact Attenuator/Crash Cushion',
+}
+
+FIRST_HE_LOC_MAP = {
+    'On Roadway':         '1. On Roadway',
+    'On-roadway':         '1. On Roadway',
+    'Ran off right side': '4. Roadside',
+    'Ran off left side':  '4. Roadside',
+    'Ran off "T" intersection': '4. Roadside',
+    'Center median/ Island':    '3. Median',
+    'Center Median/Island':     '3. Median',
+    'Vehicle crossed center median into opposing lanes': '3. Median',
+    'On Private Property':      '9. Outside Right-of-Way',
+    'Shared-Use Path or Trail': '4. Roadside',
+    'Parking Lot':              '9. Outside Right-of-Way',
+}
 
 
 def create_session_with_retries():
@@ -671,6 +859,445 @@ def merge_with_existing(new_df, existing_path):
     return merged_df, stats
 
 
+def _safe_get(row, col):
+    """Safely get a column value from a DataFrame row, returning '' for missing/NaN."""
+    val = row.get(col, '')
+    if val is None or (isinstance(val, float) and str(val) == 'nan'):
+        return ''
+    return str(val).strip()
+
+
+def _safe_int(val, default=0):
+    """Convert a value to int, returning default for non-numeric."""
+    try:
+        return int(float(val))
+    except (ValueError, TypeError):
+        return default
+
+
+def _check_any_match(row, columns, match_values):
+    """Check if any of the given columns contain any of the match values."""
+    for col in columns:
+        val = _safe_get(row, col)
+        if val and any(m.lower() in val.lower() for m in match_values):
+            return True
+    return False
+
+
+def _check_positive_flags(row, columns, positive_values):
+    """Check if any column has a positive value (exact match, case-insensitive)."""
+    for col in columns:
+        val = _safe_get(row, col)
+        if val and val.lower() in [pv.lower() for pv in positive_values]:
+            return True
+    return False
+
+
+def _check_age_range(row, columns, min_age, max_age):
+    """Check if any driver age falls within the given range."""
+    for col in columns:
+        age = _safe_int(_safe_get(row, col), -1)
+        if min_age <= age <= max_age:
+            return True
+    return False
+
+
+def derive_severity(row):
+    """Derive KABCO severity from injury count columns."""
+    if _safe_int(_safe_get(row, 'Injury 04')) > 0:
+        return 'K'
+    if _safe_int(_safe_get(row, 'Injury 03')) > 0:
+        return 'A'
+    if _safe_int(_safe_get(row, 'Injury 02')) > 0:
+        return 'B'
+    if _safe_int(_safe_get(row, 'Injury 01')) > 0:
+        return 'C'
+    return 'O'
+
+
+def derive_light_condition(row):
+    """Map lighting condition, splitting Dawn/Dusk by time of day."""
+    raw = _safe_get(row, 'Lighting Conditions')
+    if raw in LIGHT_MAP:
+        return LIGHT_MAP[raw]
+
+    # Handle Dawn or Dusk — split by crash time
+    if 'dawn' in raw.lower() or 'dusk' in raw.lower():
+        time_str = _safe_get(row, 'Crash Time')
+        try:
+            # Parse HH:MM:SS or HHMM
+            hour = int(time_str.replace(':', '')[:2])
+            return '1. Dawn' if hour < 12 else '3. Dusk'
+        except (ValueError, IndexError):
+            return '3. Dusk'
+
+    return raw  # Pass through unknown values
+
+
+def derive_alignment(row):
+    """Build roadway alignment from curves + grade."""
+    curves = _safe_get(row, 'Road Contour Curves')
+    grade = _safe_get(row, 'Road Contour Grade')
+    is_curve = bool(curves and 'Curve' in curves)
+    is_grade = bool(grade and grade.lower() not in ('', 'level'))
+    if is_curve and is_grade:
+        return '4. Grade - Curve'
+    elif is_grade:
+        return '3. Grade - Straight'
+    elif is_curve:
+        return '2. Curve - Level'
+    return '1. Straight - Level'
+
+
+def build_route_name(row):
+    """Build a route name from System Code + Rd_Number + Location 1."""
+    system = _safe_get(row, 'System Code')
+    location1 = _safe_get(row, 'Location 1')
+
+    # For interstates/state highways, use Location 1 (e.g., "I-25", "CO-83")
+    if system in ('Interstate Highway', 'State Highway', 'Frontage Road') and location1:
+        return location1
+
+    # For local roads, use Location 1 (street name)
+    if location1:
+        return location1
+
+    # Fallback to road number
+    rd_num = _safe_get(row, 'Rd_Number')
+    return rd_num if rd_num else ''
+
+
+def build_node_id(row):
+    """Build intersection node ID from Location 1 + Location 2."""
+    loc1 = _safe_get(row, 'Location 1')
+    loc2 = _safe_get(row, 'Location 2')
+
+    # Only build a node for intersection-type records
+    road_desc = _safe_get(row, 'Road Description')
+    if road_desc in ('Non-Intersection',) or not loc2:
+        return ''
+
+    # Skip milepost-style Location 2 values (e.g., "MM 190")
+    if loc2.startswith('MM ') or loc2.endswith('ME') or loc2.endswith('MW'):
+        return ''
+
+    return f'{loc2} & {loc1}' if loc2 and loc1 else ''
+
+
+def format_military_time(time_str):
+    """Convert 'HH:MM:SS' or 'H:MM:SS' to 4-digit military time 'HHMM'."""
+    if not time_str:
+        return ''
+    cleaned = time_str.replace(':', '')
+    # Take first 4 digits
+    digits = ''.join(c for c in cleaned if c.isdigit())
+    return digits[:4].zfill(4) if digits else ''
+
+
+def standardize_dataframe(df, source_file=''):
+    """
+    Transform a raw CDOT DataFrame into the CRASH LENS standardized format.
+    Applies column mapping, derives computed fields, and preserves raw values
+    as _co_* columns for reference.
+    """
+    import pandas as pd
+
+    logger.info(f"  Standardizing {len(df):,} rows...")
+
+    # Clean column names (strip BOM, whitespace)
+    df.columns = [col.lstrip('\ufeff').strip() for col in df.columns]
+
+    rows = []
+    for _, raw_row in df.iterrows():
+        system_code = _safe_get(raw_row, 'System Code')
+        system = SYSTEM_MAP.get(system_code, system_code)
+        crash_type = _safe_get(raw_row, 'Crash Type')
+        mhe = _safe_get(raw_row, 'MHE')
+        road_desc = _safe_get(raw_row, 'Road Description')
+        first_he = _safe_get(raw_row, 'First HE')
+        location = _safe_get(raw_row, 'Location')
+
+        # Derive severity from injury counts
+        severity = derive_severity(raw_row)
+
+        # Boolean flag derivations
+        ped = 'Yes' if _check_any_match(raw_row,
+            ['TU-1 NM Type', 'TU-2 NM Type'], ['Pedestrian']) else 'No'
+        bike = 'Yes' if _check_any_match(raw_row,
+            ['TU-1 NM Type', 'TU-2 NM Type'], ['Bicycle']) else 'No'
+        alcohol = 'Yes' if _check_positive_flags(raw_row,
+            ['TU-1 Alcohol Suspected', 'TU-2 Alcohol Suspected'],
+            ['Yes - SFST', 'Yes - BAC', 'Yes - Both', 'Yes - Observation',
+             'Yes - Preliminary Breath Test', 'Yes - Blood Test',
+             'Yes SFST', 'Yes BAC', 'Yes Both', 'Yes Observation']) else 'No'
+        speed = 'Yes' if _check_any_match(raw_row,
+            ['TU-1 Driver Action', 'TU-2 Driver Action'],
+            ['Too Fast for Conditions', 'Exceeded Speed Limit']) else 'No'
+        hitrun = 'Yes' if _check_positive_flags(raw_row,
+            ['TU-1 Hit And Run', 'TU-2 Hit And Run'],
+            ['TRUE', 'True', 'true']) else 'No'
+        motorcycle = 'Yes' if _check_any_match(raw_row,
+            ['TU-1 Type', 'TU-2 Type'], ['Motorcycle']) else 'No'
+        night = 'Yes' if _safe_get(raw_row, 'Lighting Conditions').lower().startswith('dark') else 'No'
+        distracted = 'Yes' if _check_any_match(raw_row,
+            ['TU-1 Driver Action', 'TU-2 Driver Action',
+             'TU-1 Human Contributing Factor', 'TU-2 Human Contributing Factor'],
+            ['Distracted', 'Cell Phone', 'Inattention', 'Inattentive']) else 'No'
+        drowsy = 'Yes' if _check_any_match(raw_row,
+            ['TU-1 Human Contributing Factor', 'TU-2 Human Contributing Factor'],
+            ['Asleep', 'Fatigued', 'Drowsy']) else 'No'
+        drug = 'Yes' if _check_positive_flags(raw_row,
+            ['TU-1  Marijuana Suspected', 'TU-2 Marijuana Suspected',
+             'TU-1 Other Drugs Suspected ', 'TU-2 Other Drugs Suspected '],
+            ['Yes - Observation', 'Yes - SFST', 'Yes - Both', 'Yes - Test Results',
+             'Marijuana Suspected', 'Yes Observation']) else 'No'
+        young = 'Yes' if _check_age_range(raw_row, ['TU-1 Age', 'TU-2 Age'], 16, 20) else 'No'
+        senior = 'Yes' if _check_age_range(raw_row, ['TU-1 Age', 'TU-2 Age'], 65, 999) else 'No'
+        unrestrained = 'Yes' if _check_any_match(raw_row,
+            ['TU-1 Safety restraint Use', 'TU-2 Safety restraint Use'],
+            ['Not Used', 'Improperly Used']) else 'No'
+
+        # Map collision type: try Crash Type first, then MHE
+        collision = COLLISION_TYPE_MAP.get(crash_type,
+                    COLLISION_TYPE_MAP.get(mhe, '16. Other'))
+
+        row = {
+            'Document Nbr':            _safe_get(raw_row, 'CUID'),
+            'Crash Date':              _safe_get(raw_row, 'Crash Date'),
+            'Crash Year':              _safe_get(raw_row, 'Crash Date').split('/')[-1] if '/' in _safe_get(raw_row, 'Crash Date') else '',
+            'Crash Military Time':     format_military_time(_safe_get(raw_row, 'Crash Time')),
+            'Crash Severity':          severity,
+            'K_People':                _safe_int(_safe_get(raw_row, 'Injury 04')),
+            'A_People':                _safe_int(_safe_get(raw_row, 'Injury 03')),
+            'B_People':                _safe_int(_safe_get(raw_row, 'Injury 02')),
+            'C_People':                _safe_int(_safe_get(raw_row, 'Injury 01')),
+            'Collision Type':          collision,
+            'Weather Condition':       WEATHER_MAP.get(_safe_get(raw_row, 'Weather Condition'), _safe_get(raw_row, 'Weather Condition')),
+            'Light Condition':         derive_light_condition(raw_row),
+            'Roadway Surface Condition': SURFACE_MAP.get(_safe_get(raw_row, 'Road Condition'), _safe_get(raw_row, 'Road Condition')),
+            'Roadway Alignment':       derive_alignment(raw_row),
+            'Roadway Description':     ROADWAY_DESC_MAP.get(system, ''),
+            'Intersection Type':       INTERSECTION_TYPE_MAP.get(road_desc, road_desc),
+            'Relation To Roadway':     RELATION_MAP.get(road_desc, road_desc),
+            'RTE Name':                build_route_name(raw_row),
+            'SYSTEM':                  system,
+            'Node':                    build_node_id(raw_row),
+            'RNS MP':                  _safe_get(raw_row, 'Link') if _safe_get(raw_row, 'Link') not in ('AT', '') else _safe_get(raw_row, 'Rd_Section'),
+            'x':                       _safe_get(raw_row, 'Longitude'),
+            'y':                       _safe_get(raw_row, 'Latitude'),
+            'Physical Juris Name':     _safe_get(raw_row, 'County'),
+            'Pedestrian?':             ped,
+            'Bike?':                   bike,
+            'Alcohol?':                alcohol,
+            'Speed?':                  speed,
+            'Hitrun?':                 hitrun,
+            'Motorcycle?':             motorcycle,
+            'Night?':                  night,
+            'Distracted?':             distracted,
+            'Drowsy?':                 drowsy,
+            'Drug Related?':           drug,
+            'Young?':                  young,
+            'Senior?':                 senior,
+            'Unrestrained?':           unrestrained,
+            'School Zone':             _safe_get(raw_row, 'School Zone'),
+            'Work Zone Related':       _safe_get(raw_row, 'Construction Zone'),
+            'Traffic Control Type':    '',
+            'Traffic Control Status':  '',
+            'Functional Class':        '',
+            'Area Type':               '',
+            'Facility Type':           '',
+            'Ownership':               OWNERSHIP_MAP.get(system_code, ''),
+            'First Harmful Event':     FIRST_HE_MAP.get(first_he, FIRST_HE_MAP.get(mhe, first_he)),
+            'First Harmful Event Loc': FIRST_HE_LOC_MAP.get(location, location),
+            'Vehicle Count':           _safe_int(_safe_get(raw_row, 'Total Vehicles')),
+            'Persons Injured':         _safe_int(_safe_get(raw_row, 'Number Injured')),
+            'Pedestrians Killed':      0,
+            'Pedestrians Injured':     0,
+            # Source metadata
+            '_source_state':           'colorado',
+            # Preserved Colorado-specific raw values
+            '_co_system_code':         system_code,
+            '_co_agency_id':           _safe_get(raw_row, 'Agency Id'),
+            '_co_rd_number':           _safe_get(raw_row, 'Rd_Number'),
+            '_co_location1':           _safe_get(raw_row, 'Location 1'),
+            '_co_location2':           _safe_get(raw_row, 'Location 2'),
+            '_co_city':                _safe_get(raw_row, 'City'),
+            '_co_total_vehicles':      _safe_int(_safe_get(raw_row, 'Total Vehicles')),
+            '_co_mhe':                 mhe,
+            '_co_crash_type':          crash_type,
+            '_co_link':                _safe_get(raw_row, 'Link'),
+            '_co_second_he':           _safe_get(raw_row, 'Second HE'),
+            '_co_third_he':            _safe_get(raw_row, 'Third HE'),
+            '_co_wild_animal':         _safe_get(raw_row, 'Wild Animal'),
+            '_co_secondary_crash':     _safe_get(raw_row, 'Secondary Crash'),
+            '_co_weather2':            _safe_get(raw_row, 'Weather Condition 2'),
+            '_co_lane_position':       _safe_get(raw_row, 'Lane Position'),
+            '_co_injury00_uninjured':  _safe_int(_safe_get(raw_row, 'Injury 00')),
+            '_co_tu1_direction':       _safe_get(raw_row, 'TU-1 Direction'),
+            '_co_tu1_movement':        _safe_get(raw_row, 'TU-1 Movement'),
+            '_co_tu1_vehicle_type':    _safe_get(raw_row, 'TU-1 Type'),
+            '_co_tu1_speed_limit':     _safe_get(raw_row, 'TU-1 Speed Limit'),
+            '_co_tu1_estimated_speed': _safe_get(raw_row, 'TU-1 Estimated Speed'),
+            '_co_tu1_stated_speed':    _safe_get(raw_row, 'TU-1 Speed'),
+            '_co_tu1_driver_action':   _safe_get(raw_row, 'TU-1 Driver Action'),
+            '_co_tu1_human_factor':    _safe_get(raw_row, 'TU-1 Human Contributing Factor'),
+            '_co_tu1_age':             _safe_get(raw_row, 'TU-1 Age'),
+            '_co_tu1_sex':             _safe_get(raw_row, 'TU-1 Sex '),
+            '_co_tu2_direction':       _safe_get(raw_row, 'TU-2 Direction'),
+            '_co_tu2_movement':        _safe_get(raw_row, 'TU-2 Movement'),
+            '_co_tu2_vehicle_type':    _safe_get(raw_row, 'TU-2 Type'),
+            '_co_tu2_speed_limit':     _safe_get(raw_row, 'TU-2 Speed Limit'),
+            '_co_tu2_estimated_speed': _safe_get(raw_row, 'TU-2 Estimated Speed'),
+            '_co_tu2_stated_speed':    _safe_get(raw_row, 'TU-2 Speed'),
+            '_co_tu2_driver_action':   _safe_get(raw_row, 'TU-2 Driver Action'),
+            '_co_tu2_human_factor':    _safe_get(raw_row, 'TU-2 Human Contributing Factor'),
+            '_co_tu2_age':             _safe_get(raw_row, 'TU-2 Age'),
+            '_co_tu2_sex':             _safe_get(raw_row, 'TU-2 Sex'),
+            '_co_nm1_type':            _safe_get(raw_row, 'TU-1 NM Type'),
+            '_co_nm1_age':             _safe_get(raw_row, 'TU-1 NM Age '),
+            '_co_nm1_sex':             _safe_get(raw_row, 'TU-1 NM Sex '),
+            '_co_nm1_action':          _safe_get(raw_row, 'TU-1 NM Action '),
+            '_co_nm1_movement':        _safe_get(raw_row, 'TU-1 NM Movement'),
+            '_co_nm1_location':        _safe_get(raw_row, 'TU-1 NM Location '),
+            '_co_nm1_facility':        _safe_get(raw_row, 'TU-1 NM Facility Available'),
+            '_co_nm1_contributing_factor': _safe_get(raw_row, 'TU-1 NM Human Contributing Factor '),
+            '_co_nm2_type':            _safe_get(raw_row, 'TU-2 NM Type'),
+            '_co_nm2_age':             _safe_get(raw_row, 'TU-2 NM Age '),
+            '_co_nm2_sex':             _safe_get(raw_row, 'TU-2 NM Sex '),
+            '_co_nm2_action':          _safe_get(raw_row, 'TU-2 NM Action '),
+            '_co_nm2_movement':        _safe_get(raw_row, 'TU-2 NM Movement'),
+            '_co_nm2_location':        _safe_get(raw_row, 'TU-2 NM Location '),
+            '_co_nm2_facility':        _safe_get(raw_row, 'TU-2 NM Facility Available'),
+            '_co_nm2_contributing_factor': _safe_get(raw_row, 'TU-2 NM Human Contributing Factor '),
+            '_source_file':            source_file,
+        }
+        rows.append(row)
+
+    result = pd.DataFrame(rows)
+    logger.info(f"  Standardized: {len(result):,} rows, {len(result.columns)} columns")
+    return result
+
+
+def generate_road_variants(standardized_df, data_dir, jurisdiction_key):
+    """
+    Generate road-type filtered CSV variants from the standardized DataFrame.
+    Produces: all_roads, county_roads, no_interstate, and crashes.csv.
+    """
+    import pandas as pd
+    import shutil
+
+    # Save standardized (all data including interstate)
+    std_path = data_dir / f'{jurisdiction_key}_standardized.csv'
+    standardized_df.to_csv(std_path, index=False)
+    logger.info(f"  Saved: {std_path.name} ({len(standardized_df):,} rows)")
+
+    # All roads = same as standardized (excludes nothing)
+    all_roads_path = data_dir / f'{jurisdiction_key}_all_roads.csv'
+    standardized_df.to_csv(all_roads_path, index=False)
+    logger.info(f"  Saved: {all_roads_path.name} ({len(standardized_df):,} rows)")
+
+    # County roads only (NonVDOT secondary)
+    county_mask = standardized_df['SYSTEM'] == 'NonVDOT secondary'
+    county_df = standardized_df[county_mask]
+    county_path = data_dir / f'{jurisdiction_key}_county_roads.csv'
+    county_df.to_csv(county_path, index=False)
+    logger.info(f"  Saved: {county_path.name} ({len(county_df):,} rows)")
+
+    # No interstate (everything except Interstate)
+    no_int_mask = standardized_df['SYSTEM'] != 'Interstate'
+    no_int_df = standardized_df[no_int_mask]
+    no_int_path = data_dir / f'{jurisdiction_key}_no_interstate.csv'
+    no_int_df.to_csv(no_int_path, index=False)
+    logger.info(f"  Saved: {no_int_path.name} ({len(no_int_df):,} rows)")
+
+    # crashes.csv (copy of standardized for compatibility)
+    crashes_path = data_dir / 'crashes.csv'
+    standardized_df.to_csv(crashes_path, index=False)
+    logger.info(f"  Saved: crashes.csv ({len(standardized_df):,} rows)")
+
+    return {
+        'standardized': str(std_path),
+        'all_roads': str(all_roads_path),
+        'county_roads': str(county_path),
+        'no_interstate': str(no_int_path),
+        'crashes': str(crashes_path),
+    }
+
+
+def post_process(data_dir, jurisdiction_key, manifest):
+    """
+    Post-processing pipeline: combine all annual CSVs, standardize columns,
+    and generate road-filtered variants for R2 upload.
+    """
+    import pandas as pd
+
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("POST-PROCESSING: Standardization Pipeline")
+    logger.info("=" * 60)
+
+    # Find all raw annual CSVs
+    annual_csvs = sorted(data_dir.glob('20*.csv'))
+    # Filter to only raw annual files (not processed outputs)
+    annual_csvs = [f for f in annual_csvs
+                   if not any(suffix in f.name for suffix in
+                              ['standardized', 'all_roads', 'county_roads',
+                               'no_interstate', 'merged_raw', 'crash export'])]
+
+    if not annual_csvs:
+        logger.warning("  No raw annual CSVs found in data directory. Skipping standardization.")
+        return None
+
+    logger.info(f"  Found {len(annual_csvs)} annual CSV files:")
+    for f in annual_csvs:
+        logger.info(f"    {f.name}")
+
+    # Combine all annual CSVs
+    frames = []
+    for csv_path in annual_csvs:
+        try:
+            df = pd.read_csv(csv_path)
+            # Clean BOM from first column
+            df.columns = [col.lstrip('\ufeff').strip() for col in df.columns]
+            logger.info(f"  Read {csv_path.name}: {len(df):,} rows")
+            frames.append((csv_path.name, df))
+        except Exception as e:
+            logger.warning(f"  Failed to read {csv_path.name}: {e}")
+
+    if not frames:
+        logger.error("  No annual CSVs could be read. Aborting standardization.")
+        return None
+
+    # Standardize each year's data and combine
+    std_frames = []
+    for source_file, df in frames:
+        std_df = standardize_dataframe(df, source_file=source_file)
+        std_frames.append(std_df)
+
+    # Combine and deduplicate by Document Nbr (CUID)
+    combined = pd.concat(std_frames, ignore_index=True)
+    original_count = len(combined)
+
+    if 'Document Nbr' in combined.columns:
+        combined = combined.drop_duplicates(subset='Document Nbr', keep='last')
+        if len(combined) < original_count:
+            logger.info(f"  Deduplicated: {original_count:,} → {len(combined):,} rows "
+                        f"({original_count - len(combined):,} duplicates removed)")
+
+    # Sort by date descending
+    combined = combined.sort_values(['Crash Year', 'Crash Date'], ascending=[False, False])
+    combined = combined.reset_index(drop=True)
+
+    logger.info(f"  Combined standardized data: {len(combined):,} rows")
+
+    # Generate road-filtered variants
+    logger.info("  Generating road-filtered variants...")
+    paths = generate_road_variants(combined, data_dir, jurisdiction_key)
+
+    logger.info("  Standardization pipeline complete!")
+    return paths
+
+
 def process_year(session, year, year_info, manifest, data_dir, jurisdiction_key,
                  force=False):
     """
@@ -759,6 +1386,26 @@ def download_data_dictionary(session, dict_info, data_dir):
         return True
     except Exception as e:
         logger.warning(f"  Failed to download data dictionary: {e}")
+        return False
+
+
+def preflight_check(session):
+    """
+    Verify OnBase is accessible before starting batch downloads.
+    Returns True if reachable, False otherwise.
+    """
+    logger.info("Preflight check: verifying OnBase is accessible...")
+    try:
+        resp = session.get(ONBASE_BASE_URL, timeout=30, allow_redirects=True)
+        if resp.status_code == 200:
+            logger.info(f"  OnBase is reachable (HTTP 200, {len(resp.content):,} bytes)")
+            return True
+        else:
+            logger.warning(f"  OnBase returned HTTP {resp.status_code}")
+            return True  # Non-200 but reachable; let the download logic handle it
+    except Exception as e:
+        logger.error(f"  OnBase is not reachable: {e}")
+        logger.error("  Downloads will likely fail. Check network connectivity.")
         return False
 
 
@@ -869,6 +1516,18 @@ Examples:
         help='Force re-download even for finalized years that already exist locally'
     )
 
+    parser.add_argument(
+        '--standardize-only',
+        action='store_true',
+        help='Skip downloads; only run standardization on existing raw CSVs'
+    )
+
+    parser.add_argument(
+        '--no-standardize',
+        action='store_true',
+        help='Skip the post-download standardization step'
+    )
+
     return parser.parse_args()
 
 
@@ -929,12 +1588,27 @@ def main():
     logger.info(f"Output: {data_dir}")
     logger.info("=" * 60)
 
+    # Handle --standardize-only (skip downloads, just re-process existing CSVs)
+    if args.standardize_only:
+        logger.info("--- Standardize-only mode: skipping downloads ---")
+        post_result = post_process(data_dir, jurisdiction_key, manifest)
+        if post_result:
+            logger.info("Standardization complete!")
+            return 0
+        else:
+            logger.error("Standardization failed.")
+            return 1
+
     # Create session (reuse across all downloads for connection pooling)
     session = create_session_with_retries()
 
     # Bootstrap session — visit the DocPop landing page to establish cookies.
     # OnBase returns 403 for direct document requests without a valid session.
     bootstrap_session(session)
+
+    # Preflight health check
+    if not preflight_check(session):
+        logger.warning("OnBase may be unreachable. Proceeding anyway...")
 
     # Download data dictionaries first (unless skipped)
     if not args.no_dict:
@@ -944,15 +1618,28 @@ def main():
 
     # Download and process each year
     results = []
+    download_count = 0
     logger.info(f"--- Downloading {len(years_to_download)} year(s) ---")
 
     for year in sorted(years_to_download.keys(), reverse=True):
         year_info = years_to_download[year]
+
+        # Re-bootstrap session periodically to prevent stale cookies
+        if download_count > 0 and download_count % SESSION_REFRESH_INTERVAL == 0:
+            logger.info("  Refreshing OnBase session...")
+            bootstrap_session(session)
+
+        # Inter-download delay to avoid rate limiting
+        if download_count > 0:
+            logger.info(f"  Waiting {INTER_DOWNLOAD_DELAY}s between downloads...")
+            time.sleep(INTER_DOWNLOAD_DELAY)
+
         year_result = process_year(session, year, year_info, manifest, data_dir, jurisdiction_key,
                                    force=args.force)
         results.append(year_result)
+        download_count += 1
 
-    # Print summary
+    # Print download summary
     successes = [(y, p) for y, ok, p in results if ok]
     failures = [(y, e) for y, ok, e in results if not ok]
 
@@ -972,6 +1659,12 @@ def main():
             logger.warning(f"  {year}: {error}")
 
     logger.info("=" * 60)
+
+    # Run standardization pipeline (unless skipped or all downloads failed)
+    if not args.no_standardize and successes:
+        post_result = post_process(data_dir, jurisdiction_key, manifest)
+        if not post_result:
+            logger.warning("Standardization had issues but downloads succeeded.")
 
     return 1 if failures and not successes else 0
 

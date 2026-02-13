@@ -98,7 +98,7 @@ jobs:
           echo "jurisdiction=$JURISDICTION" >> $GITHUB_OUTPUT
           echo "Download arguments: $ARGS"
 
-      - name: Download CDOT crash data
+      - name: Download and standardize CDOT crash data
         id: download
         run: |
           echo "=========================================="
@@ -107,7 +107,7 @@ jobs:
           echo "=========================================="
           python download_cdot_crash_data.py ${{ steps.build-args.outputs.args }}
           echo "=========================================="
-          echo "Download complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Download and standardization complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
 
       - name: Generate download statistics
