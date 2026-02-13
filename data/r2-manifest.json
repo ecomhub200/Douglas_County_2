@@ -34,6 +34,18 @@
     "virginia/Henrico/henrico_all_roads.csv": {
       "size": 34478899,
       "uploaded": "2026-02-13T04:00:00.000000+00:00"
+    },
+    "virginia/henrico/forecasts_county_roads.json": {
+      "size": 358029,
+      "uploaded": "2026-02-13T16:24:32.000000+00:00"
+    },
+    "virginia/henrico/forecasts_no_interstate.json": {
+      "size": 368589,
+      "uploaded": "2026-02-13T16:24:32.000000+00:00"
+    },
+    "virginia/henrico/forecasts_all_roads.json": {
+      "size": 359000,
+      "uploaded": "2026-02-13T16:24:32.000000+00:00"
     }
   },
   "localPathMapping": {

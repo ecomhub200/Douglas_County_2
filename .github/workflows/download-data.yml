@@ -414,8 +414,8 @@ jobs:
           echo "Stage 5: PREDICT — Generating forecasts"
           echo "=========================================="
 
-          # Generate forecasts for all 3 road types
-          CMD="python scripts/generate_forecast.py --all-road-types --jurisdiction $JURISDICTION --data data/${JURISDICTION}_all_roads.csv"
+          # Generate forecasts for all 3 road types (data-dir is root data/ for Virginia)
+          CMD="python scripts/generate_forecast.py --all-road-types --jurisdiction $JURISDICTION --data-dir data"
 
           # If no AWS credentials, fall back to dry-run (synthetic forecasts)
           if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
@@ -428,7 +428,7 @@ jobs:
             echo "WARNING: Forecast generation failed (non-fatal). Pipeline CSVs are still valid."
             echo "Falling back to dry-run mode..."
             python scripts/generate_forecast.py --all-road-types --jurisdiction $JURISDICTION \
-              --data "data/${JURISDICTION}_all_roads.csv" --dry-run || true
+              --data-dir data --dry-run || true
           }
 
           # Verify forecast outputs
