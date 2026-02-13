@@ -169,6 +169,10 @@ permissions:
 
 env:
   NOTIFICATION_EMAIL: ecomhub200@gmail.com
+  # R2 state prefix - parameterized for multi-state support
+  # Change this to support different states (e.g., 'colorado', 'texas')
+  R2_STATE_PREFIX: virginia
+  STATE_DISPLAY: Virginia
 
 jobs:
   download-crash-data:
@@ -393,9 +397,9 @@ jobs:
         with:
           files_json: |
             [
-              {"local_path": "data/${{ steps.get-jurisdiction.outputs.jurisdiction }}_county_roads.csv", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/county_roads.csv"},
-              {"local_path": "data/${{ steps.get-jurisdiction.outputs.jurisdiction }}_no_interstate.csv", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/no_interstate.csv"},
-              {"local_path": "data/${{ steps.get-jurisdiction.outputs.jurisdiction }}_all_roads.csv", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/all_roads.csv"}
+              {"local_path": "data/${{ steps.get-jurisdiction.outputs.jurisdiction }}_county_roads.csv", "r2_key": "${{ env.R2_STATE_PREFIX || 'virginia' }}/${{ steps.get-jurisdiction.outputs.jurisdiction }}/county_roads.csv"},
+              {"local_path": "data/${{ steps.get-jurisdiction.outputs.jurisdiction }}_no_interstate.csv", "r2_key": "${{ env.R2_STATE_PREFIX || 'virginia' }}/${{ steps.get-jurisdiction.outputs.jurisdiction }}/no_interstate.csv"},
+              {"local_path": "data/${{ steps.get-jurisdiction.outputs.jurisdiction }}_all_roads.csv", "r2_key": "${{ env.R2_STATE_PREFIX || 'virginia' }}/${{ steps.get-jurisdiction.outputs.jurisdiction }}/all_roads.csv"}
             ]
           cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
           r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
@@ -447,9 +451,9 @@ jobs:
         with:
           files_json: |
             [
-              {"local_path": "data/forecasts_county_roads.json", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/forecasts_county_roads.json"},
-              {"local_path": "data/forecasts_no_interstate.json", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/forecasts_no_interstate.json"},
-              {"local_path": "data/forecasts_all_roads.json", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/forecasts_all_roads.json"}
+              {"local_path": "data/forecasts_county_roads.json", "r2_key": "${{ env.R2_STATE_PREFIX || 'virginia' }}/${{ steps.get-jurisdiction.outputs.jurisdiction }}/forecasts_county_roads.json"},
+              {"local_path": "data/forecasts_no_interstate.json", "r2_key": "${{ env.R2_STATE_PREFIX || 'virginia' }}/${{ steps.get-jurisdiction.outputs.jurisdiction }}/forecasts_no_interstate.json"},
+              {"local_path": "data/forecasts_all_roads.json", "r2_key": "${{ env.R2_STATE_PREFIX || 'virginia' }}/${{ steps.get-jurisdiction.outputs.jurisdiction }}/forecasts_all_roads.json"}
             ]
           cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
           r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
@@ -470,7 +474,7 @@ jobs:
           fi
 
           JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
-          COMMIT_MSG="Auto-update: Virginia $JURISDICTION pipeline + forecasts -> R2 - $(date +'%Y-%m-%d')"
+          COMMIT_MSG="Auto-update: $STATE_DISPLAY $JURISDICTION pipeline + forecasts -> R2 - $(date +'%Y-%m-%d')"
 
           if [ -f "data/.validation/latest_report.json" ]; then
             SUMMARY=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['summary'])")

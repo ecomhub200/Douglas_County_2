@@ -599,11 +599,14 @@ const StateAdapter = (() => {
         /**
          * Check if a non-default state has been selected (either detected or manual).
          * Used by applyStateAdapterConfig to decide whether to apply overrides.
+         * Reads default state from appConfig.defaultState instead of hardcoding.
          * @returns {boolean}
          */
         hasStateOverride() {
-            return (manualStateFips !== null && manualStateFips !== '51') ||
-                   (detectedState !== null && detectedState !== 'virginia');
+            const defaultState = (typeof appConfig !== 'undefined' && appConfig?.defaultState) || 'virginia';
+            const defaultFips = (typeof appConfig !== 'undefined' && appConfig?.states?.[defaultState]?.fips) || '51';
+            return (manualStateFips !== null && manualStateFips !== defaultFips) ||
+                   (detectedState !== null && detectedState !== defaultState);
         },
 
         /**
@@ -611,23 +614,28 @@ const StateAdapter = (() => {
          * @returns {Object} Filter profiles
          */
         getFilterProfiles() {
+            // Try to load filter profiles from state config (loaded at detection time)
+            if (stateConfig?.roadSystems?.filterProfiles) {
+                return stateConfig.roadSystems.filterProfiles;
+            }
+            // Fallback: hardcoded profiles for states without config loaded
             if (detectedState === 'colorado') {
                 return {
                     countyOnly: {
                         name: "County/City Roads Only",
-                        systemValues: ["NonVDOT secondary"]  // mapped from City Street + County Road
+                        systemValues: ["NonVDOT secondary"]
                     },
                     countyPlusVDOT: {
                         name: "All Roads (No Interstate)",
-                        systemValues: ["NonVDOT secondary", "Primary", "Secondary"]  // mapped
+                        systemValues: ["NonVDOT secondary", "Primary", "Secondary"]
                     },
                     allRoads: {
                         name: "All Roads (Including Interstate)",
-                        systemValues: ["NonVDOT secondary", "Primary", "Secondary", "Interstate"]  // mapped
+                        systemValues: ["NonVDOT secondary", "Primary", "Secondary", "Interstate"]
                     }
                 };
             }
-            // Default Virginia profiles
+            // Default: return null (app uses config.json filterProfiles)
             return null;
         },
 
@@ -648,7 +656,14 @@ const StateAdapter = (() => {
             if (typeof FIPSDatabase !== 'undefined') {
                 return FIPSDatabase.getAllStates();
             }
-            // Fallback: return just the states with signatures
+            // Fallback: build from appConfig.states registry if available, else signatures
+            if (typeof appConfig !== 'undefined' && appConfig?.states) {
+                return Object.entries(appConfig.states).map(([key, st]) => ({
+                    fips: st.fips || '',
+                    name: st.name || key,
+                    abbr: st.abbreviation || ''
+                }));
+            }
             return Object.entries(STATE_SIGNATURES).map(([key, sig]) => ({
                 fips: key === 'colorado' ? '08' : key === 'virginia' ? '51' : '',
                 name: sig.displayName,
@@ -691,8 +706,14 @@ const StateAdapter = (() => {
                 return null;
             }
 
-            // Check if this maps to a known normalizer state
-            const fipsToKey = { '08': 'colorado', '51': 'virginia' };
+            // Check if this maps to a known normalizer state (config-driven)
+            let fipsToKey = { '08': 'colorado', '51': 'virginia' }; // fallback
+            if (typeof appConfig !== 'undefined' && appConfig?.states) {
+                fipsToKey = {};
+                for (const [key, st] of Object.entries(appConfig.states)) {
+                    if (st.fips) fipsToKey[st.fips] = key;
+                }
+            }
             if (fipsToKey[padded]) {
                 detectedState = fipsToKey[padded];
             }
@@ -700,15 +721,16 @@ const StateAdapter = (() => {
             manualStateFips = padded;
             console.log(`[StateAdapter] State set by FIPS: ${stateInfo.name} (${padded})`);
 
-            // For Virginia: use the cached config.json jurisdictions (rich data with bbox, education, jurisCode)
-            // These are cached at startup in window._virginiaConfigJurisdictions to survive state switching
-            if (padded === '51') {
-                const vaJurisdictions = (typeof window !== 'undefined' && window._virginiaConfigJurisdictions)
-                    ? window._virginiaConfigJurisdictions
+            // For the default state: use the cached config.json jurisdictions (rich data with bbox, education, jurisCode)
+            // These are cached at startup in window._defaultStateConfigJurisdictions to survive state switching
+            const defaultStateFips = (typeof appConfig !== 'undefined' && appConfig?.states?.[appConfig?.defaultState]?.fips) || '51';
+            if (padded === defaultStateFips) {
+                const cachedJurisdictions = (typeof window !== 'undefined' && (window._defaultStateConfigJurisdictions || window._virginiaConfigJurisdictions))
+                    ? (window._defaultStateConfigJurisdictions || window._virginiaConfigJurisdictions)
                     : null;
-                if (vaJurisdictions && Object.keys(vaJurisdictions).length > 0) {
-                    console.log(`[StateAdapter] Using cached config.json jurisdictions for Virginia (${Object.keys(vaJurisdictions).length} entries)`);
-                    dynamicGeoConfig = FIPSDatabase.buildGeoConfig(padded, vaJurisdictions);
+                if (cachedJurisdictions && Object.keys(cachedJurisdictions).length > 0) {
+                    console.log(`[StateAdapter] Using cached config.json jurisdictions for ${stateInfo.name} (${Object.keys(cachedJurisdictions).length} entries)`);
+                    dynamicGeoConfig = FIPSDatabase.buildGeoConfig(padded, cachedJurisdictions);
                     try { localStorage.setItem('selectedStateFips', padded); } catch(e) {}
                     return dynamicGeoConfig;
                 }
@@ -859,10 +881,20 @@ const StateAdapter = (() => {
          * @returns {string|null} Subdirectory name or null for root
          */
         getDataDir() {
-            const STATE_DATA_DIRS = {
-                'colorado': 'CDOT'
-            };
-            // Check detected state first, then manual FIPS selection
+            // Try appConfig.states registry first (config-driven)
+            if (typeof appConfig !== 'undefined' && appConfig?.states) {
+                if (detectedState && appConfig.states[detectedState]?.dataDir) {
+                    return appConfig.states[detectedState].dataDir;
+                }
+                // Check manual FIPS against states registry
+                if (manualStateFips) {
+                    for (const [key, st] of Object.entries(appConfig.states)) {
+                        if (st.fips === manualStateFips && st.dataDir) return st.dataDir;
+                    }
+                }
+            }
+            // Fallback to hardcoded mapping for backward compatibility
+            const STATE_DATA_DIRS = { 'colorado': 'CDOT' };
             if (detectedState && STATE_DATA_DIRS[detectedState]) {
                 return STATE_DATA_DIRS[detectedState];
             }
