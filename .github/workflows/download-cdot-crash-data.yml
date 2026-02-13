@@ -142,24 +142,48 @@ jobs:
           echo "=========================================="
 
       - name: Upload raw annual CSVs to R2
+        id: r2-upload
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
         run: |
           JURISDICTION="${{ steps.build-args.outputs.jurisdiction }}"
+          UPLOADED=0
           # Upload raw annual CSVs (filenames may have spaces)
           for f in data/CDOT/20*.csv; do
             [ -f "$f" ] || continue
             BASENAME=$(basename "$f")
             YEAR=$(echo "$BASENAME" | grep -oP '^\d{4}')
             if [ -n "$YEAR" ]; then
-              aws s3 cp "$f" "s3://crash-lens-data/colorado/${JURISDICTION}/raw/${YEAR}.csv" \
+              if aws s3 cp "$f" "s3://crash-lens-data/colorado/${JURISDICTION}/raw/${YEAR}.csv" \
                 --endpoint-url "$R2_ENDPOINT" \
-                --content-type "text/csv" || echo "  Warning: failed to upload $f"
-              echo "  Uploaded: $f -> colorado/${JURISDICTION}/raw/${YEAR}.csv"
+                --content-type "text/csv"; then
+                echo "  Uploaded: $f -> colorado/${JURISDICTION}/raw/${YEAR}.csv"
+                UPLOADED=$((UPLOADED + 1))
+              else
+                echo "  Warning: failed to upload $f"
+              fi
             fi
           done
+          echo "uploaded=$UPLOADED" >> $GITHUB_OUTPUT
+          if [ "$UPLOADED" -eq 0 ]; then
+            echo "::warning::No CSV files were uploaded to R2 — download may have failed"
+          fi
+
+      - name: Verify R2 state
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        run: |
+          JURISDICTION="${{ steps.build-args.outputs.jurisdiction }}"
+          echo "=========================================="
+          echo "R2 Storage State: colorado/${JURISDICTION}/raw/"
+          echo "=========================================="
+          aws s3 ls "s3://crash-lens-data/colorado/${JURISDICTION}/raw/" \
+            --endpoint-url "$R2_ENDPOINT" 2>/dev/null || echo "  Could not list R2 bucket (check credentials)"
+          echo "=========================================="
 
       - name: Commit manifest and metadata
         run: |
@@ -197,3 +221,25 @@ jobs:
 
           echo "ERROR: Push failed after $MAX_RETRIES attempts"
           exit 1
+
+      - name: Job summary
+        if: always()
+        run: |
+          JURISDICTION="${{ steps.build-args.outputs.jurisdiction }}"
+          UPLOADED="${{ steps.r2-upload.outputs.uploaded || '0' }}"
+          CHANGED="${{ steps.stats.outputs.changed || '0' }}"
+          UNTRACKED="${{ steps.stats.outputs.untracked || '0' }}"
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          ## CDOT Crash Data Download — ${JURISDICTION}
+
+          | Metric | Value |
+          |--------|-------|
+          | Jurisdiction | ${JURISDICTION} |
+          | Args | \`${{ steps.build-args.outputs.args }}\` |
+          | CSVs downloaded | ${CHANGED} changed, ${UNTRACKED} new |
+          | CSVs uploaded to R2 | ${UPLOADED} |
+          | Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
+
+          > Check the **Download CDOT crash data** step logs for detailed strategy output.
+          > Check the **Verify R2 state** step to confirm data in R2.
+          EOF
