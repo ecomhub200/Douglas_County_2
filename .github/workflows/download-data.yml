@@ -328,6 +328,66 @@ jobs:
             echo "Error rate ($ERROR_RATE%) is within acceptable limits."
           fi
 
+      # Stage 3: GEOCODE — Fill missing GPS coordinates
+      - name: Geocode crash data (Stage 3)
+        run: |
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+          echo "=========================================="
+          echo "Stage 3: GEOCODE — Filling missing GPS coordinates"
+          echo "=========================================="
+
+          # Run geocoding on all_roads (largest file, superset of others)
+          # process_crash_data.py can geocode Virginia data directly
+          python scripts/process_crash_data.py \
+            -i "data/${JURISDICTION}_all_roads.csv" \
+            -s virginia -j "$JURISDICTION" \
+            -o data \
+            --skip-split --skip-validation --convert-only=false \
+            -f -v 2>&1 || {
+            echo "WARNING: Full pipeline geocode failed, trying standalone geocode..."
+            # Fallback: run just geocoding via Python
+            python -c "
+          import sys
+          sys.path.insert(0, 'scripts')
+          from process_crash_data import stage_geocode, PipelineConfig, PipelineStats
+          from pathlib import Path
+          config = PipelineConfig()
+          config.output_dir = Path('data')
+          config.jurisdiction = '$JURISDICTION'
+          config.state = 'virginia'
+          config.dry_run = False
+          stats = PipelineStats()
+          for suffix in ['all_roads', 'county_roads', 'no_interstate']:
+              fpath = f'data/${JURISDICTION}_{suffix}.csv'
+              try:
+                  stage_geocode(fpath, config, stats)
+                  print(f'  Geocoded: {fpath}')
+              except Exception as e:
+                  print(f'  WARNING: Geocode failed for {fpath}: {e}')
+          " || echo "WARNING: Geocoding failed (non-fatal). CSVs still valid."
+          }
+
+          # Report GPS coverage
+          for suffix in all_roads county_roads no_interstate; do
+            FILE="data/${JURISDICTION}_${suffix}.csv"
+            if [ -f "$FILE" ]; then
+              TOTAL=$(wc -l < "$FILE")
+              GPS=$(python -c "
+          import csv
+          with open('$FILE') as f:
+              r = csv.DictReader(f)
+              total = gps = 0
+              for row in r:
+                  total += 1
+                  x, y = row.get('x',''), row.get('y','')
+                  if x and y and x != '0' and y != '0':
+                      gps += 1
+          print(f'{gps}/{total} ({gps/total*100:.1f}%)' if total else '0/0')
+          ")
+              echo "  $FILE: GPS coverage = $GPS"
+            fi
+          done
+
       - name: Upload crash CSVs to R2
         uses: ./.github/actions/upload-r2
         with:
@@ -342,11 +402,67 @@ jobs:
           r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
           r2_public_url: ${{ vars.R2_PUBLIC_URL }}
 
-      - name: Commit manifest and validation data
+      # Stage 5: PREDICT — Generate forecasts
+      - name: Generate crash forecasts (Stage 5)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
+          echo "=========================================="
+          echo "Stage 5: PREDICT — Generating forecasts"
+          echo "=========================================="
+
+          # Generate forecasts for all 3 road types
+          CMD="python scripts/generate_forecast.py --all-road-types --jurisdiction $JURISDICTION --data data/${JURISDICTION}_all_roads.csv"
+
+          # If no AWS credentials, fall back to dry-run (synthetic forecasts)
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "No AWS credentials — using dry-run mode (synthetic forecasts)"
+            CMD="$CMD --dry-run"
+          fi
+
+          echo "Running: $CMD"
+          $CMD || {
+            echo "WARNING: Forecast generation failed (non-fatal). Pipeline CSVs are still valid."
+            echo "Falling back to dry-run mode..."
+            python scripts/generate_forecast.py --all-road-types --jurisdiction $JURISDICTION \
+              --data "data/${JURISDICTION}_all_roads.csv" --dry-run || true
+          }
+
+          # Verify forecast outputs
+          for rt in county_roads no_interstate all_roads; do
+            FFILE="data/forecasts_${rt}.json"
+            if [ -f "$FFILE" ]; then
+              SIZE=$(ls -lh "$FFILE" | awk '{print $5}')
+              echo "  $FFILE: $SIZE"
+            else
+              echo "  $FFILE: NOT GENERATED"
+            fi
+          done
+
+      - name: Upload forecast JSONs to R2
+        uses: ./.github/actions/upload-r2
+        with:
+          files_json: |
+            [
+              {"local_path": "data/forecasts_county_roads.json", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/forecasts_county_roads.json"},
+              {"local_path": "data/forecasts_no_interstate.json", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/forecasts_no_interstate.json"},
+              {"local_path": "data/forecasts_all_roads.json", "r2_key": "virginia/${{ steps.get-jurisdiction.outputs.jurisdiction }}/forecasts_all_roads.json"}
+            ]
+          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          r2_public_url: ${{ vars.R2_PUBLIC_URL }}
+
+      - name: Commit manifest, geocode cache, and validation data
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add data/r2-manifest.json data/.validation/
+          git add data/r2-manifest.json
+          git add data/.validation/ 2>/dev/null || true
+          git add data/.geocode_cache.json 2>/dev/null || true
 
           if git diff --staged --quiet; then
             echo "No changes to commit"
@@ -354,15 +470,15 @@ jobs:
           fi
 
           JURISDICTION="${{ steps.get-jurisdiction.outputs.jurisdiction }}"
-          COMMIT_MSG="Auto-update: Crash data ($JURISDICTION) -> R2 - $(date +'%Y-%m-%d')"
+          COMMIT_MSG="Auto-update: Virginia $JURISDICTION pipeline + forecasts -> R2 - $(date +'%Y-%m-%d')"
 
           if [ -f "data/.validation/latest_report.json" ]; then
             SUMMARY=$(python -c "import json; print(json.load(open('data/.validation/latest_report.json'))['summary'])")
-            git commit -m "$(cat <<EOFMSG
+            git commit -m "$(cat <<'EOFMSG'
           $COMMIT_MSG
 
           Validation: $SUMMARY
-          Data uploaded to Cloudflare R2
+          Data + forecasts uploaded to Cloudflare R2
           EOFMSG
           )"
           else

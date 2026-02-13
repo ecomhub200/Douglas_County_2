@@ -99,7 +99,7 @@ project_root/
 +-- .github/workflows/
 |   +-- process-cdot-data.yml         # Auto-trigger pipeline on new CSV push
 |   +-- download-cdot-crash-data.yml  # CDOT auto-downloader (monthly + manual)
-|   +-- download-data.yml             # Scheduled Virginia data downloads
+|   +-- download-data.yml             # Virginia pipeline: download + validate + geocode + predict + R2
 |   +-- validate-data.yml             # Scheduled data validation
 |   +-- send-notifications.yml        # Email notifications
 |
@@ -977,6 +977,73 @@ Trigger: push
 
 The workflow only triggers on raw CSV changes and explicitly excludes output filenames in the `paths` filter. The commit step only stages output files. Since output filenames (`*_standardized.csv`, `*_all_roads.csv`, etc.) are in the ignore list, the output commit does NOT re-trigger the workflow.
 
+### Virginia Pipeline (`download-data.yml`)
+
+Virginia data is already in the VDOT reference format, so the Virginia pipeline **skips** Stages 0 (Merge), 1 (Convert), and 4 (Split). The ArcGIS API returns pre-split road-type CSVs directly.
+
+**Workflow file:** `.github/workflows/download-data.yml` (crash-data job)
+
+#### Virginia Pipeline Stages
+
+```
+ArcGIS API (Virginia TREDS)
+      |
+      v
++----------------+    +----------------+    +----------------+    +----------------+
+|   DOWNLOAD     |    |   STAGE 2      |    |   STAGE 3      |    |   STAGE 5      |
+|   (ArcGIS)     |--->|   VALIDATE     |--->|   GEOCODE      |--->|   PREDICT      |
+|   3 CSV files  |    |   (QA/QC)      |    |   (fill GPS)   |    |   (forecast)   |
++----------------+    +----------------+    +----------------+    +----------------+
+      |                                           |                       |
+      v                                           v                       v
+3 pre-split CSVs                        data/.geocode_cache.json   3 forecast JSONs
+  {jurisdiction}_all_roads.csv                                     (replaces previous)
+  {jurisdiction}_county_roads.csv                                         |
+  {jurisdiction}_no_interstate.csv                                        v
+      |                                                          +------------------+
+      v                                                          |   R2 UPLOAD      |
++------------------+                                             |   (3 JSONs)      |
+|   R2 UPLOAD      |                                             +------------------+
+|   (3 CSVs)       |                                                      |
++------------------+                                                      |
+      |                                                                   |
+      +----------------------------+--------------------------------------+
+                                   |
+                                   v
+                         +------------------+
+                         |   COMMIT         |
+                         |   r2-manifest    |
+                         |   geocode_cache  |
+                         |   (Git only)     |
+                         +------------------+
+```
+
+#### What Virginia Skips (and Why)
+
+| Stage | Skipped? | Reason |
+|-------|----------|--------|
+| Stage 0 (Merge) | **Yes** | ArcGIS returns a single query result per road type |
+| Stage 1 (Convert) | **Yes** | Data is already in VDOT format (column names + values match) |
+| Stage 2 (Validate) | **No** | QA/QC checks applied after download |
+| Stage 3 (Geocode) | **No** | Fills missing GPS via node lookup + Nominatim |
+| Stage 4 (Split) | **Yes** | ArcGIS query filters by road type at download time |
+| Stage 5 (Predict) | **No** | Generates Chronos-2 forecasts (dry-run fallback if no AWS creds) |
+
+#### Schedule
+
+| Trigger | When | Behavior |
+|---------|------|----------|
+| Scheduled | 1st Monday of each month, 11:00 UTC | Downloads latest crash data from ArcGIS |
+| Manual dispatch | Actions UI | Choose jurisdiction, custom date range, force re-download |
+
+#### Virginia-Specific Notes
+
+- **Geocode cache**: Stored at `data/.geocode_cache.json` (not under `data/CDOT/`)
+- **Forecast output**: Files land in `data/forecasts_*.json` (no state subfolder prefix locally)
+- **R2 paths**: `virginia/{jurisdiction}/all_roads.csv`, `virginia/{jurisdiction}/forecasts_*.json`
+- **Stage 5 fallback**: If no AWS credentials, runs `--dry-run` to produce synthetic forecasts
+- **Non-fatal stages**: Both geocode and forecast failures are non-fatal — the pipeline still commits valid CSVs to R2
+
 ---
 
 
@@ -1441,11 +1508,11 @@ python download_cdot_crash_data.py --statewide              # No filter (all CO)
 
 #### Automatic (Monthly)
 
-Runs on the 1st of every month at 6:00 AM UTC. Uses `--latest` to check only the most recent year for new data.
+Runs on the 1st of every month at 11:00 AM UTC. Uses `--latest` to check only the most recent year for new data.
 
 ```yaml
 schedule:
-  - cron: '0 6 1 * *'
+  - cron: '0 11 1 * *'
 ```
 
 **Why monthly?** CDOT publishes annual data. Monthly checks catch preliminary-year updates without excessive runs.
@@ -1926,6 +1993,9 @@ crash-lens-data/                    # Bucket name
       all_roads.csv
       county_roads.csv
       no_interstate.csv
+      forecasts_county_roads.json
+      forecasts_no_interstate.json
+      forecasts_all_roads.json
   {state}/                          # Future states follow same pattern
     {jurisdiction}/
       all_roads.csv
@@ -2041,6 +2111,7 @@ python scripts/upload-to-r2.py --state virginia --jurisdiction henrico
 | `data/CDOT/config.json` | `colorado/douglas/raw/*.csv` (annual) |
 | `data/CDOT/source_manifest.json` | `colorado/douglas/forecasts_*.json` (predictions) |
 | `data/CDOT/jurisdictions.json` | `virginia/henrico/*.csv` (processed) |
+| `data/.geocode_cache.json` | `virginia/henrico/forecasts_*.json` (predictions) |
 | `data/CDOT/.geocode_cache.json` | Future state data + forecasts |
 | `data/CDOT/.validation/*` | |
 | `data/grants.csv` (3.4 KB) | |

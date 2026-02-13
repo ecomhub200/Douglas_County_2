@@ -46,6 +46,9 @@
     "data/CDOT/forecasts_all_roads.json": "colorado/douglas/forecasts_all_roads.json",
     "data/henrico_county_roads.csv": "virginia/henrico/county_roads.csv",
     "data/henrico_no_interstate.csv": "virginia/henrico/no_interstate.csv",
-    "data/henrico_all_roads.csv": "virginia/henrico/all_roads.csv"
+    "data/henrico_all_roads.csv": "virginia/henrico/all_roads.csv",
+    "data/forecasts_county_roads.json": "virginia/henrico/forecasts_county_roads.json",
+    "data/forecasts_no_interstate.json": "virginia/henrico/forecasts_no_interstate.json",
+    "data/forecasts_all_roads.json": "virginia/henrico/forecasts_all_roads.json"
   }
 }
