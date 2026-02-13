@@ -60,6 +60,7 @@ ONBASE_BASE_URL = 'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx'
 # OnBase direct retrieval endpoints (bypass HTML viewer)
 ONBASE_GETDOC_URLS = [
     'https://oitco.hylandcloud.com/CDOTRMPop/docpop/GetDoc.aspx',
+    'https://oitco.hylandcloud.com/CDOTRMPop/docpop/PdfPop.aspx',
     'https://oitco.hylandcloud.com/CDOTRMPop/api/document',
 ]
 
@@ -348,6 +349,39 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
             # Strategy B: if no download was captured, try fetching page content
             # The OnBase viewer may embed the document or provide a link
             if downloaded_path is None:
+                # --- Diagnostic dump: log what the page actually contains ---
+                try:
+                    page_html = page.content()
+                    logger.info(f"  [Playwright diag] Page URL: {page.url}")
+                    logger.info(f"  [Playwright diag] Page title: {page.title()}")
+                    logger.info(f"  [Playwright diag] HTML length: {len(page_html):,} chars")
+                    # Log all links on the page
+                    all_links = page.evaluate("""() => {
+                        return Array.from(document.querySelectorAll('a')).slice(0, 20).map(a => ({
+                            text: (a.textContent || '').trim().substring(0, 60),
+                            href: (a.href || '').substring(0, 120),
+                            visible: a.offsetParent !== null
+                        }));
+                    }""")
+                    logger.info(f"  [Playwright diag] Links found: {len(all_links)}")
+                    for link in all_links:
+                        logger.info(f"    <a href='{link['href']}' visible={link['visible']}>{link['text']}</a>")
+                    # Log all iframes
+                    all_iframes = page.evaluate("""() => {
+                        return Array.from(document.querySelectorAll('iframe')).map(f => ({
+                            src: (f.src || '').substring(0, 150),
+                            id: f.id || '',
+                            name: f.name || ''
+                        }));
+                    }""")
+                    logger.info(f"  [Playwright diag] Iframes: {len(all_iframes)}")
+                    for iframe in all_iframes:
+                        logger.info(f"    <iframe src='{iframe['src']}' id='{iframe['id']}' name='{iframe['name']}'/>")
+                    # Log first 1500 chars of HTML
+                    logger.info(f"  [Playwright diag] HTML preview:\n{page_html[:1500]}")
+                except Exception as diag_err:
+                    logger.warning(f"  [Playwright diag] Failed to dump page: {diag_err}")
+
                 # Look for iframe or embedded content with the actual document
                 for frame in page.frames:
                     frame_url = frame.url
@@ -523,23 +557,25 @@ def download_onbase_document(session, docid, label='document'):
         except Exception as e:
             logger.warning(f"  Strategy 2 failed: {e}")
 
-    # --- Strategy 3: clienttype=activex ---
-    logger.info("  Trying clienttype=activex...")
-    params_activex = {'clienttype': 'activex', 'docid': str(docid)}
-    try:
-        response = make_request_with_retry(session, url, params=params_activex, timeout=180)
-        content = response.content
-        content_type = response.headers.get('Content-Type', '')
-        content_disposition = response.headers.get('Content-Disposition', '')
+    # --- Strategy 3: alternative client types ---
+    for ctype in ['activex', 'browser']:
+        logger.info(f"  Trying clienttype={ctype}...")
+        params_alt = {'clienttype': ctype, 'docid': str(docid)}
+        try:
+            response = make_request_with_retry(session, url, params=params_alt, timeout=180,
+                                               max_manual_retries=2)
+            content = response.content
+            content_type = response.headers.get('Content-Type', '')
+            content_disposition = response.headers.get('Content-Disposition', '')
 
-        is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
-        logger.info(f"  Strategy 3 (activex): {reason}")
+            is_valid, ext, reason = detect_file_type(content, content_type, content_disposition)
+            logger.info(f"  Strategy 3 ({ctype}): {reason}")
 
-        if is_valid:
-            logger.info(f"  Downloaded {len(content):,} bytes")
-            return content, ext
-    except Exception as e:
-        logger.warning(f"  Strategy 3 (activex) failed: {e}")
+            if is_valid:
+                logger.info(f"  Downloaded {len(content):,} bytes")
+                return content, ext
+        except Exception as e:
+            logger.warning(f"  Strategy 3 ({ctype}) failed: {e}")
 
     # --- Strategy 4: Playwright headless browser ---
     playwright_status = 'not_installed'
@@ -555,7 +591,7 @@ def download_onbase_document(session, docid, label='document'):
         logger.warning("  Playwright not installed. To enable browser fallback:")
         logger.warning("    pip install playwright && playwright install chromium")
 
-    strategies_tried = "requests + direct-endpoint + HTML-parse + activex"
+    strategies_tried = "requests + direct-endpoint + HTML-parse + activex + browser"
     if playwright_status == 'not_installed':
         strategies_tried += " (Playwright NOT available — install it for headless browser fallback)"
     else:
