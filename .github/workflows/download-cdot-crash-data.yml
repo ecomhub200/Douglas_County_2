@@ -130,22 +130,6 @@ jobs:
           echo "untracked=$UNTRACKED" >> $GITHUB_OUTPUT
           echo "=========================================="
 
-      - name: Upload CDOT CSVs to R2
-        uses: ./.github/actions/upload-r2
-        with:
-          files_json: |
-            [
-              {"local_path": "data/CDOT/${{ steps.build-args.outputs.jurisdiction }}_standardized.csv", "r2_key": "colorado/${{ steps.build-args.outputs.jurisdiction }}/standardized.csv"},
-              {"local_path": "data/CDOT/${{ steps.build-args.outputs.jurisdiction }}_all_roads.csv", "r2_key": "colorado/${{ steps.build-args.outputs.jurisdiction }}/all_roads.csv"},
-              {"local_path": "data/CDOT/${{ steps.build-args.outputs.jurisdiction }}_county_roads.csv", "r2_key": "colorado/${{ steps.build-args.outputs.jurisdiction }}/county_roads.csv"},
-              {"local_path": "data/CDOT/${{ steps.build-args.outputs.jurisdiction }}_no_interstate.csv", "r2_key": "colorado/${{ steps.build-args.outputs.jurisdiction }}/no_interstate.csv"},
-              {"local_path": "data/CDOT/crashes.csv", "r2_key": "colorado/${{ steps.build-args.outputs.jurisdiction }}/crashes.csv"}
-            ]
-          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
-          r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
-          r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
-          r2_public_url: ${{ vars.R2_PUBLIC_URL }}
-
       - name: Upload raw annual CSVs to R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}

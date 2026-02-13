@@ -49,26 +49,29 @@ Raw CSV(s) from State DOT
 +----------------+    +----------------+    +----------------+    +----------------+    +----------------+    +----------------+
                                                                                               |                       |
                                                                                               v                       v
-                                                                                    3 output CSV files        3 forecast JSON files
-                                                                                    + pipeline_report.json
-                                                                                              |
-                                                                                              v
-                                                                                    +------------------+
-                                                                                    |   R2 UPLOAD      |
-                                                                                    |   (cloud CDN)    |
-                                                                                    +------------------+
-                                                                                              |
-                                                                                              v
-                                                                                    +------------------+
-                                                                                    |   r2-manifest    |
-                                                                                    |   .json (Git)    |
-                                                                                    +------------------+
-                                                                                              |
-                                                                                              v
-                                                                                    +------------------+
-                                                                                    |   BROWSER APP    |
-                                                                                    |   (index.html)   |
-                                                                                    +------------------+
+                                                                                    4 output CSV files        3 forecast JSON files
+                                                                                    + pipeline_report.json    (replaces previous)
+                                                                                              |                       |
+                                                                                              v                       v
+                                                                                    +------------------+    +------------------+
+                                                                                    |   R2 UPLOAD      |    |   R2 UPLOAD      |
+                                                                                    |   (4 CSVs)       |    |   (3 JSONs)      |
+                                                                                    +------------------+    +------------------+
+                                                                                              |                       |
+                                                                                              +-----------+-----------+
+                                                                                                          |
+                                                                                                          v
+                                                                                                +------------------+
+                                                                                                |   COMMIT         |
+                                                                                                |   r2-manifest    |
+                                                                                                |   .json (Git)    |
+                                                                                                +------------------+
+                                                                                                          |
+                                                                                                          v
+                                                                                                +------------------+
+                                                                                                |   BROWSER APP    |
+                                                                                                |   (index.html)   |
+                                                                                                +------------------+
 ```
 
 ### Core Design Principle
@@ -98,7 +101,6 @@ project_root/
 |   +-- download-cdot-crash-data.yml  # CDOT auto-downloader (monthly + manual)
 |   +-- download-data.yml             # Scheduled Virginia data downloads
 |   +-- validate-data.yml             # Scheduled data validation
-|   +-- generate-forecast.yml         # Stage 5: forecast generation
 |   +-- send-notifications.yml        # Email notifications
 |
 +-- .github/actions/
@@ -135,13 +137,12 @@ project_root/
 |   |   +-- *.csv                     # Raw input + processed output
 |   |   +-- {year} {county}.csv       # Per-year county-filtered crash data
 |   |   +-- {jurisdiction}_standardized.csv  # Stage 1 output
-|   |   +-- {jurisdiction}_all_roads.csv     # Stage 4 output
-|   |   +-- {jurisdiction}_county_roads.csv  # Stage 4 output
-|   |   +-- {jurisdiction}_no_interstate.csv # Stage 4 output
-|   |   +-- crashes.csv               # Default fallback (copy of county_roads)
-|   |   +-- forecasts_county_roads.json   # Stage 5: Prediction forecast (county roads)
-|   |   +-- forecasts_no_interstate.json  # Stage 5: Prediction forecast (no interstate)
-|   |   +-- forecasts_all_roads.json      # Stage 5: Prediction forecast (all roads)
+|   |   +-- {jurisdiction}_all_roads.csv     # Stage 4 output (uploaded to R2)
+|   |   +-- {jurisdiction}_county_roads.csv  # Stage 4 output (uploaded to R2)
+|   |   +-- {jurisdiction}_no_interstate.csv # Stage 4 output (uploaded to R2)
+|   |   +-- forecasts_county_roads.json   # Stage 5: Prediction forecast (uploaded to R2)
+|   |   +-- forecasts_no_interstate.json  # Stage 5: Prediction forecast (uploaded to R2)
+|   |   +-- forecasts_all_roads.json      # Stage 5: Prediction forecast (uploaded to R2)
 |   |   +-- .geocode_cache.json      # Persistent geocode cache
 |   |   +-- .validation/
 |   |       +-- pipeline_report.json  # Processing report
@@ -224,15 +225,14 @@ Also see [Section 13](#13-geocoding-strategy) for detailed strategy documentatio
 | `{jurisdiction}_county_roads.csv` | Agency Id matches county agency code |
 | `{jurisdiction}_no_interstate.csv` | System Code != "Interstate Highway" |
 
-Also copies `county_roads.csv` to `data/{DOT}/crashes.csv` as the UI default fallback.
+### Stage 5: PREDICT (Forecast Generation)
 
-### Stage 5: PREDICT (Forecast Generation) — Optional
-
-**Script:** `generate_forecast.py`
-**What it does:** Reads the 3 split CSVs from Stage 4, aggregates crash data into monthly time series, and generates probabilistic forecasts using Amazon SageMaker Chronos-2 (or synthetic fallback). Produces one JSON forecast file per road type.
+**Script:** `scripts/generate_forecast.py`
+**Workflow:** Integrated into `process-cdot-data.yml` (runs after Stage 4 Split)
+**What it does:** Reads the 3 split CSVs from Stage 4, aggregates crash data into monthly time series, and generates probabilistic forecasts using Amazon SageMaker Chronos-2 (or synthetic fallback). Produces one JSON forecast file per road type. Each run **replaces** previous forecast files.
 
 **Inputs:** Stage 4 split CSVs (`{jurisdiction}_county_roads.csv`, `{jurisdiction}_no_interstate.csv`, `{jurisdiction}_all_roads.csv`)
-**Outputs:** `forecasts_county_roads.json`, `forecasts_no_interstate.json`, `forecasts_all_roads.json`
+**Outputs:** `forecasts_county_roads.json`, `forecasts_no_interstate.json`, `forecasts_all_roads.json` (uploaded to R2)
 
 See [Section 21](#21-stage-5-prediction-forecasting) for full details.
 
@@ -960,12 +960,9 @@ Go to **Actions** > **Process CDOT Crash Data** > **Run workflow**:
 
 ### Output Commit
 
-The workflow commits only pipeline output files:
-- `data/{DOT}/{jurisdiction}_standardized.csv`
-- `data/{DOT}/{jurisdiction}_all_roads.csv`
-- `data/{DOT}/{jurisdiction}_county_roads.csv`
-- `data/{DOT}/{jurisdiction}_no_interstate.csv`
-- `data/{DOT}/crashes.csv`
+The workflow commits only metadata (CSVs and forecasts are uploaded to R2, not committed):
+- `data/r2-manifest.json` (updated with new R2 keys)
+- `data/{DOT}/.geocode_cache.json`
 - `data/{DOT}/.validation/pipeline_report.json`
 
 Commit message format:
@@ -1532,11 +1529,18 @@ Stage 3: Geocode (fill missing GPS)
     v
 Stage 4: Split (all_roads, county_roads, no_interstate)
     |
-    v
-data/CDOT/douglas_county_roads.csv → crashes.csv
+    ├──► R2 Upload (4 processed CSVs)
     |
     v
-CRASH LENS browser tool loads crashes.csv
+Stage 5: Predict (Chronos-2 forecasts)
+    |
+    └──► R2 Upload (3 forecast JSONs)
+    |
+    v
+r2-manifest.json committed to Git
+    |
+    v
+CRASH LENS browser tool loads via resolveDataUrl() → R2 CDN
 ```
 
 ### Test Coverage
@@ -1908,7 +1912,9 @@ crash-lens-data/                    # Bucket name
       all_roads.csv                 # Stage 4: all road types
       county_roads.csv              # Stage 4: county roads only
       no_interstate.csv             # Stage 4: excludes interstates
-      crashes.csv                   # Default (copy of county_roads)
+      forecasts_county_roads.json   # Stage 5: county roads forecast
+      forecasts_no_interstate.json  # Stage 5: no-interstate forecast
+      forecasts_all_roads.json      # Stage 5: all roads forecast
       raw/
         2021.csv                    # Raw annual download
         2022.csv
@@ -1925,6 +1931,9 @@ crash-lens-data/                    # Bucket name
       all_roads.csv
       county_roads.csv
       no_interstate.csv
+      forecasts_county_roads.json
+      forecasts_no_interstate.json
+      forecasts_all_roads.json
 ```
 
 ### Manifest File (`data/r2-manifest.json`)
@@ -1941,10 +1950,16 @@ The manifest is the **only file committed to Git** that connects the app to R2 d
       "size": 18355770,
       "md5": "abc123...",
       "uploaded": "2026-02-13T12:00:00+00:00"
+    },
+    "colorado/douglas/forecasts_county_roads.json": {
+      "size": 208000,
+      "md5": "def456...",
+      "uploaded": "2026-02-13T12:00:00+00:00"
     }
   },
   "localPathMapping": {
-    "data/CDOT/douglas_all_roads.csv": "colorado/douglas/all_roads.csv"
+    "data/CDOT/douglas_all_roads.csv": "colorado/douglas/all_roads.csv",
+    "data/CDOT/forecasts_county_roads.json": "colorado/douglas/forecasts_county_roads.json"
   }
 }
 ```
@@ -2024,10 +2039,9 @@ python scripts/upload-to-r2.py --state virginia --jurisdiction henrico
 |--------|-------|
 | `data/r2-manifest.json` | `colorado/douglas/*.csv` (processed) |
 | `data/CDOT/config.json` | `colorado/douglas/raw/*.csv` (annual) |
-| `data/CDOT/source_manifest.json` | `virginia/henrico/*.csv` (processed) |
-| `data/CDOT/jurisdictions.json` | Future state data |
-| `data/CDOT/.geocode_cache.json` | |
-| `data/CDOT/forecasts_*.json` | |
+| `data/CDOT/source_manifest.json` | `colorado/douglas/forecasts_*.json` (predictions) |
+| `data/CDOT/jurisdictions.json` | `virginia/henrico/*.csv` (processed) |
+| `data/CDOT/.geocode_cache.json` | Future state data + forecasts |
 | `data/CDOT/.validation/*` | |
 | `data/grants.csv` (3.4 KB) | |
 | `data/cmf_processed.json` (245 KB) | |
@@ -2036,9 +2050,10 @@ python scripts/upload-to-r2.py --state virginia --jurisdiction henrico
 
 When onboarding a new state (e.g., Texas):
 
-1. Process data through the pipeline (Stages 0-4) to produce output CSVs
-2. Add R2 upload step to the state's workflow:
+1. Process data through the pipeline (Stages 0-5) to produce output CSVs + forecast JSONs
+2. Add R2 upload steps to the state's workflow:
    ```yaml
+   # Upload processed CSVs
    - uses: ./.github/actions/upload-r2
      with:
        files_json: |
@@ -2047,9 +2062,20 @@ When onboarding a new state (e.g., Texas):
            {"local_path": "data/TxDOT/harris_county_roads.csv", "r2_key": "texas/harris/county_roads.csv"},
            {"local_path": "data/TxDOT/harris_no_interstate.csv", "r2_key": "texas/harris/no_interstate.csv"}
          ]
+
+   # Upload forecast JSONs
+   - uses: ./.github/actions/upload-r2
+     with:
+       files_json: |
+         [
+           {"local_path": "data/TxDOT/forecasts_county_roads.json", "r2_key": "texas/harris/forecasts_county_roads.json"},
+           {"local_path": "data/TxDOT/forecasts_no_interstate.json", "r2_key": "texas/harris/forecasts_no_interstate.json"},
+           {"local_path": "data/TxDOT/forecasts_all_roads.json", "r2_key": "texas/harris/forecasts_all_roads.json"}
+         ]
    ```
-3. The manifest auto-updates with the new state's path mappings
+3. The manifest auto-updates with the new state's path mappings (CSVs + forecasts)
 4. The browser app resolves the new state's URLs via the same `resolveDataUrl()` function
+5. Forecast files in R2 are replaced on each pipeline run (not appended)
 
 ### Future: Parquet Format (Tier 3)
 
