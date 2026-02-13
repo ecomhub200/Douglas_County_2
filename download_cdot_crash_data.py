@@ -450,10 +450,35 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                 logger.info("  DocSelectPage iframe did not navigate away from blank.aspx")
 
             # --- Click download triggers in all frames ---
+            # OnBase ViewDocumentEx uses toolbar buttons (img/span elements with
+            # onclick handlers), NOT standard <a> links.  We search for both
+            # traditional links and OnBase-specific toolbar controls.
             download_selectors = [
+                # OnBase toolbar buttons (img with title/alt, span with title)
+                'img[title*="Send to"]', 'img[title*="send to"]',
+                'img[title*="Retrieve"]', 'img[title*="retrieve"]',
+                'img[title*="Download"]', 'img[title*="download"]',
+                'img[title*="Save"]', 'img[title*="save"]',
+                'img[title*="Export"]', 'img[title*="export"]',
+                'img[alt*="Send to"]', 'img[alt*="Retrieve"]',
+                'img[alt*="Download"]', 'img[alt*="Export"]',
+                # OnBase toolbar span/div buttons
+                'span[title*="Send to"]', 'span[title*="Retrieve"]',
+                'span[title*="Download"]', 'span[title*="Export"]',
+                'div[title*="Send to"]', 'div[title*="Retrieve"]',
+                'div[title*="Download"]', 'div[title*="Export"]',
+                # OnBase-specific element IDs
+                '[id*="SendToApp"]', '[id*="sendToApp"]',
+                '[id*="RetrieveNative"]', '[id*="retrieveNative"]',
+                '[id*="NativeDoc"]', '[id*="nativeDoc"]',
+                '[id*="ToolbarSendTo"]', '[id*="toolbarSendTo"]',
+                '[id*="imgSendTo"]', '[id*="imgRetrieve"]',
+                '[id*="imgDownload"]', '[id*="imgExport"]',
+                # Standard link-based selectors
                 'a[href*="GetDoc"]', 'a[href*="getdoc"]',
                 'a[href*="Download"]', 'a[href*="download"]',
                 'a[href*="Retrieve"]', 'a[href*="retrieve"]',
+                'a[href*="RetrieveNativeDocument"]',
                 'a[href*="PdfPop"]', 'a[href*="pdfpop"]',
                 'a[href*=".xlsx"]', 'a[href*=".xls"]',
                 '[id*="lnkRetrieve"]', '[id*="btnDownload"]',
@@ -510,24 +535,74 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                         logger.info(f"  Direct iframe URL fetch failed: {e}")
 
             # --- JavaScript-based download trigger across all frames ---
+            # OnBase viewer uses JS functions for native document retrieval.
+            # Try calling known OnBase client-side APIs and clicking toolbar
+            # elements that may not be standard <a> links.
             if downloaded_path is None:
                 for target_frame in all_frames:
                     try:
                         with page.expect_download(timeout=10000) as dl_info:
                             target_frame.evaluate("""() => {
+                                // 1. Try OnBase JS API functions (if available)
+                                if (typeof SendToApplication === 'function') {
+                                    SendToApplication(); return true;
+                                }
+                                if (typeof RetrieveNativeDocument === 'function') {
+                                    RetrieveNativeDocument(); return true;
+                                }
+                                if (typeof GetNativeDocument === 'function') {
+                                    GetNativeDocument(); return true;
+                                }
+                                if (typeof window.HSViewer !== 'undefined') {
+                                    if (typeof window.HSViewer.sendToApplication === 'function') {
+                                        window.HSViewer.sendToApplication(); return true;
+                                    }
+                                    if (typeof window.HSViewer.retrieveNative === 'function') {
+                                        window.HSViewer.retrieveNative(); return true;
+                                    }
+                                }
+
+                                // 2. Click any toolbar image/button with send/retrieve title
+                                const toolbarBtns = document.querySelectorAll(
+                                    'img[title], span[title], div[title], td[title]'
+                                );
+                                for (const el of toolbarBtns) {
+                                    const t = (el.title || '').toLowerCase();
+                                    if (t.includes('send to') || t.includes('retrieve') ||
+                                        t.includes('download') || t.includes('native') ||
+                                        t.includes('export')) {
+                                        el.click(); return true;
+                                    }
+                                }
+
+                                // 3. Click any element with onclick containing
+                                //    retrieve/sendto/download
+                                const allEls = document.querySelectorAll('[onclick]');
+                                for (const el of allEls) {
+                                    const oc = (el.getAttribute('onclick') || '').toLowerCase();
+                                    if (oc.includes('retrieve') || oc.includes('sendto') ||
+                                        oc.includes('download') || oc.includes('native')) {
+                                        el.click(); return true;
+                                    }
+                                }
+
+                                // 4. Standard link-based fallback
                                 const links = document.querySelectorAll('a');
                                 for (const a of links) {
                                     const href = (a.href || '').toLowerCase();
                                     if (href.includes('getdoc') || href.includes('download') ||
                                         href.includes('.xls') || href.includes('pdfpop') ||
-                                        href.includes('retrieve')) {
+                                        href.includes('retrieve') || href.includes('native')) {
                                         a.click();
                                         return true;
                                     }
                                 }
+
                                 const btn = document.querySelector(
                                     '[id*="download"], [id*="Download"], ' +
-                                    '[id*="Retrieve"], [id*="retrieve"]'
+                                    '[id*="Retrieve"], [id*="retrieve"], ' +
+                                    '[id*="SendTo"], [id*="sendTo"], ' +
+                                    '[id*="Native"], [id*="native"]'
                                 );
                                 if (btn) { btn.click(); return true; }
                                 return false;
@@ -562,6 +637,30 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                     logger.info(f"  [Playwright diag] Links found: {len(all_links)}")
                     for lnk in all_links:
                         logger.info(f"    <a href='{lnk['href']}' visible={lnk['visible']}>{lnk['text']}</a>")
+
+                    # Dump toolbar elements with titles (OnBase uses img/span toolbar)
+                    toolbar_els = page.evaluate("""() => {
+                        const results = [];
+                        for (const frame of [document, ...Array.from(document.querySelectorAll('iframe')).map(f => { try { return f.contentDocument } catch(e) { return null } }).filter(Boolean)]) {
+                            const titled = frame.querySelectorAll('[title], [onclick], img[alt]');
+                            for (const el of Array.from(titled).slice(0, 30)) {
+                                results.push({
+                                    tag: el.tagName,
+                                    id: (el.id || '').substring(0, 60),
+                                    title: (el.title || '').substring(0, 80),
+                                    alt: (el.alt || '').substring(0, 80),
+                                    onclick: (el.getAttribute('onclick') || '').substring(0, 100),
+                                    visible: el.offsetParent !== null
+                                });
+                            }
+                        }
+                        return results;
+                    }""")
+                    logger.info(f"  [Playwright diag] Titled/onclick elements: {len(toolbar_els)}")
+                    for el in toolbar_els:
+                        attrs = ' '.join(f'{k}="{v}"' for k, v in el.items() if v)
+                        logger.info(f"    <{attrs}>")
+
                     all_iframes = page.evaluate("""() => {
                         return Array.from(document.querySelectorAll('iframe')).map(f => ({
                             src: (f.src || '').substring(0, 150),
@@ -572,12 +671,34 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                     logger.info(f"  [Playwright diag] Iframes: {len(all_iframes)}")
                     for ifr in all_iframes:
                         logger.info(f"    <iframe src='{ifr['src']}' id='{ifr['id']}' name='{ifr['name']}'/>")
-                    # Dump iframe content too
+
+                    # Dump iframe content and their toolbar elements
                     for frame in page.frames:
                         if frame != page.main_frame:
                             try:
                                 fc = frame.content()
                                 logger.info(f"  [Playwright diag] Frame {frame.url[:80]} HTML ({len(fc)} chars):\n{fc[:1000]}")
+                                # Also search for toolbar/onclick elements in frames
+                                frame_btns = frame.evaluate("""() => {
+                                    const results = [];
+                                    const els = document.querySelectorAll('[title], [onclick], img[alt], [id*="toolbar"], [class*="toolbar"]');
+                                    for (const el of Array.from(els).slice(0, 20)) {
+                                        results.push({
+                                            tag: el.tagName,
+                                            id: (el.id || '').substring(0, 60),
+                                            title: (el.title || '').substring(0, 80),
+                                            alt: (el.alt || '').substring(0, 80),
+                                            onclick: (el.getAttribute('onclick') || '').substring(0, 120),
+                                            className: (el.className || '').toString().substring(0, 80)
+                                        });
+                                    }
+                                    return results;
+                                }""")
+                                if frame_btns:
+                                    logger.info(f"  [Playwright diag] Frame toolbar elements: {len(frame_btns)}")
+                                    for btn in frame_btns:
+                                        attrs = ' '.join(f'{k}="{v}"' for k, v in btn.items() if v)
+                                        logger.info(f"    <{attrs}>")
                             except Exception:
                                 pass
                     logger.info(f"  [Playwright diag] Main HTML preview:\n{page_html[:1500]}")
@@ -1290,21 +1411,32 @@ def main():
 
     logger.info("=" * 60)
 
-    if failures and not successes:
-        # Check if all failures are preliminary years — treat as non-fatal warning
-        # so scheduled --latest runs don't fail the entire pipeline when OnBase
-        # is temporarily unreachable or the preliminary data isn't ready yet.
+    if failures:
         all_files = manifest.get('files', {})
         all_preliminary = all(
             all_files.get(str(y), {}).get('status') == 'preliminary'
             for y, _ in failures
         )
 
-        if all_preliminary:
-            logger.warning("All failed downloads were preliminary data — treating as non-fatal.")
-            logger.warning("Finalized data is served from R2. Will retry next scheduled run.")
+        if all_preliminary and successes:
+            # Some downloads succeeded + only preliminary data failed → non-fatal
+            logger.warning("Preliminary data downloads failed — treating as non-fatal "
+                           "since other downloads succeeded.")
             return 0
+        elif all_preliminary and not successes:
+            # All downloads failed but they were all preliminary → exit 2
+            # (distinct code so workflows can distinguish "no data available yet"
+            # from hard errors, but still non-zero to surface the failure)
+            logger.error("ALL downloads failed. No crash data was produced.")
+            logger.error("OnBase may be blocking automated access or the data "
+                         "may not be published yet.")
+            logger.error("Check the strategy logs above for details.")
+            return 2
+
+        # Mix of final + preliminary failures, or final-only failures → hard fail
+        logger.error(f"{len(failures)} download(s) failed (including finalized data).")
         return 1
+
     return 0
 
 

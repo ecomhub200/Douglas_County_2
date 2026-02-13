@@ -121,12 +121,52 @@ jobs:
           echo "Downloading CDOT Crash Data"
           echo "Started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
-          python download_cdot_crash_data.py ${{ steps.build-args.outputs.args }}
+
+          EXIT_CODE=0
+          python download_cdot_crash_data.py ${{ steps.build-args.outputs.args }} || EXIT_CODE=$?
+
           echo "=========================================="
-          echo "Download complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Download finished at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Exit code: $EXIT_CODE"
           echo "=========================================="
 
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+          if [ "$EXIT_CODE" -eq 2 ]; then
+            echo "::warning::All downloads failed — OnBase may be blocking automated access. No crash data was produced."
+          elif [ "$EXIT_CODE" -ne 0 ]; then
+            echo "::error::Download script failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+
+      - name: Verify crash data was produced
+        id: verify
+        run: |
+          echo "=========================================="
+          echo "Verifying crash data output"
+          echo "=========================================="
+
+          # Count crash data CSVs (year-prefixed, excluding dictionaries)
+          CRASH_CSVS=$(ls data/CDOT/20*.csv 2>/dev/null | wc -l | tr -d ' ')
+          echo "Crash data CSVs found: $CRASH_CSVS"
+          echo "crash_csv_count=$CRASH_CSVS" >> $GITHUB_OUTPUT
+
+          DOWNLOAD_EXIT="${{ steps.download.outputs.exit_code }}"
+          if [ "$CRASH_CSVS" -eq 0 ] && [ "$DOWNLOAD_EXIT" -ne 0 ]; then
+            echo "::error::No crash data CSVs were produced and download reported failure (exit $DOWNLOAD_EXIT)."
+            echo "::error::OnBase is likely blocking automated downloads. Consider using seed-r2.yml for manual upload."
+            echo "data_available=false" >> $GITHUB_OUTPUT
+            exit 1
+          elif [ "$CRASH_CSVS" -eq 0 ]; then
+            echo "::warning::No crash data CSVs found. Download may have silently failed."
+            echo "data_available=false" >> $GITHUB_OUTPUT
+          else
+            echo "data_available=true" >> $GITHUB_OUTPUT
+            ls -lh data/CDOT/20*.csv
+          fi
+
       - name: Generate download statistics
+        if: steps.verify.outputs.data_available == 'true'
         id: stats
         run: |
           echo "=========================================="
@@ -147,6 +187,7 @@ jobs:
           echo "=========================================="
 
       - name: Upload raw annual CSVs to R2
+        if: steps.verify.outputs.data_available == 'true'
         id: r2-upload
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
@@ -177,6 +218,7 @@ jobs:
           fi
 
       - name: Verify R2 state
+        if: steps.verify.outputs.data_available == 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
@@ -234,17 +276,40 @@ jobs:
           UPLOADED="${{ steps.r2-upload.outputs.uploaded || '0' }}"
           CHANGED="${{ steps.stats.outputs.changed || '0' }}"
           UNTRACKED="${{ steps.stats.outputs.untracked || '0' }}"
+          DOWNLOAD_EXIT="${{ steps.download.outputs.exit_code || 'unknown' }}"
+          DATA_AVAILABLE="${{ steps.verify.outputs.data_available || 'false' }}"
+          CRASH_CSVS="${{ steps.verify.outputs.crash_csv_count || '0' }}"
+
+          if [ "$DATA_AVAILABLE" = "true" ]; then
+            STATUS_EMOJI="SUCCESS"
+            STATUS_NOTE="> Data was downloaded and uploaded to R2 successfully."
+          elif [ "$DOWNLOAD_EXIT" = "2" ]; then
+            STATUS_EMOJI="FAILED — NO DATA DOWNLOADED"
+            STATUS_NOTE="> **OnBase blocked all automated download attempts.** All strategies (requests, OBToken, direct endpoints, HTML parsing, Playwright) failed to extract the Excel file. OnBase serves an HTML document viewer instead of the actual file. Consider using \`seed-r2.yml\` for manual upload, or investigate if CDOT has changed their OnBase portal configuration."
+          elif [ "$DOWNLOAD_EXIT" != "0" ]; then
+            STATUS_EMOJI="FAILED"
+            STATUS_NOTE="> Download script exited with code ${DOWNLOAD_EXIT}. Check logs for details."
+          else
+            STATUS_EMOJI="WARNING — UNKNOWN"
+            STATUS_NOTE="> Script exited successfully but data availability is unclear."
+          fi
+
           cat >> $GITHUB_STEP_SUMMARY <<EOF
           ## CDOT Crash Data Download — ${JURISDICTION}
+
+          ### Status: ${STATUS_EMOJI}
 
           | Metric | Value |
           |--------|-------|
           | Jurisdiction | ${JURISDICTION} |
           | Args | \`${{ steps.build-args.outputs.args }}\` |
-          | CSVs downloaded | ${CHANGED} changed, ${UNTRACKED} new |
+          | Download exit code | ${DOWNLOAD_EXIT} |
+          | Crash CSVs produced | ${CRASH_CSVS} |
+          | CSVs changed/new | ${CHANGED} changed, ${UNTRACKED} new |
           | CSVs uploaded to R2 | ${UPLOADED} |
           | Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
 
+          ${STATUS_NOTE}
+
           > Check the **Download CDOT crash data** step logs for detailed strategy output.
-          > Check the **Verify R2 state** step to confirm data in R2.
           EOF
