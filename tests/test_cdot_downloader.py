@@ -2036,19 +2036,13 @@ class TestPreliminaryFailureExitCode:
         manifest_path.write_text(json.dumps(manifest))
         return str(manifest_path)
 
-    def test_preliminary_only_failure_returns_0_with_existing_data(self, tmp_path):
-        """When only preliminary years fail but finalized data exists, exit 0."""
+    def test_preliminary_only_failure_returns_0(self, tmp_path):
+        """When only preliminary years fail, exit 0 (non-fatal)."""
         # Create manifest with one preliminary year
         manifest_path = self._make_manifest(tmp_path, {
             '2025': {'docid': 99999, 'status': 'preliminary'},
             '2024': {'docid': 88888, 'status': 'final'},
         })
-
-        # Create existing finalized data file
-        existing_csv = tmp_path / '2024 douglas.csv'
-        pd.DataFrame({'CUID': [1, 2], 'County': ['DOUGLAS', 'DOUGLAS']}).to_csv(
-            existing_csv, index=False
-        )
 
         with patch('download_cdot_crash_data.create_session_with_retries') as mock_session_factory, \
              patch('download_cdot_crash_data.bootstrap_session'), \
@@ -2062,7 +2056,7 @@ class TestPreliminaryFailureExitCode:
             result = main()
 
         # Should be 0 (non-fatal) because only preliminary data failed
-        # and existing data files are present
+        # Finalized data is served from R2, not local files
         assert result == 0
 
     def test_final_year_failure_returns_1(self, tmp_path):
@@ -2085,13 +2079,17 @@ class TestPreliminaryFailureExitCode:
         # Should be 1 (fatal) because a final year failed
         assert result == 1
 
-    def test_preliminary_failure_with_no_existing_data_returns_1(self, tmp_path):
-        """When preliminary fails and there's NO existing data, exit 1."""
+    def test_preliminary_failure_with_no_local_data_still_returns_0(self, tmp_path):
+        """When preliminary fails and no local CSVs exist, still exit 0.
+
+        With R2 integration, finalized data is served from Cloudflare R2,
+        not from local files. Preliminary-only failures are always non-fatal.
+        """
         manifest_path = self._make_manifest(tmp_path, {
             '2025': {'docid': 99999, 'status': 'preliminary'},
         })
 
-        # No existing CSV files in tmp_path
+        # No existing CSV files in tmp_path — but that's fine with R2
 
         with patch('download_cdot_crash_data.create_session_with_retries') as mock_session_factory, \
              patch('download_cdot_crash_data.bootstrap_session'), \
@@ -2104,8 +2102,9 @@ class TestPreliminaryFailureExitCode:
             mock_session_factory.return_value = MagicMock()
             result = main()
 
-        # Should be 1 because there's no existing data to fall back on
-        assert result == 1
+        # Should be 0 — preliminary failures are always non-fatal
+        # regardless of local file presence (data is on R2)
+        assert result == 0
 
 
 # ===========================================================================
