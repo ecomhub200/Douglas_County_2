@@ -531,6 +531,86 @@ if (fs.existsSync(pyPath)) {
 }
 
 // ─────────────────────────────────────────────
+// 21. Phase 5 — State View HTML & JS Presence
+// ─────────────────────────────────────────────
+section('21. Phase 5 — State View HTML & JS Functions');
+
+const htmlPath = path.join(ROOT, 'app', 'index.html');
+if (fs.existsSync(htmlPath)) {
+    const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+
+    // HTML overlays exist
+    assert(htmlContent.includes('id="stateDashboardOverlay"'), 'State dashboard overlay HTML exists');
+    assert(htmlContent.includes('id="stateMapOverlay"'), 'State map overlay HTML exists');
+    assert(htmlContent.includes('id="stateHotspotsOverlay"'), 'State hotspots overlay HTML exists');
+
+    // State KPI elements
+    assert(htmlContent.includes('id="stateKpiTotal"'), 'State KPI: total crashes element');
+    assert(htmlContent.includes('id="stateKpiFatal"'), 'State KPI: fatal crashes element');
+    assert(htmlContent.includes('id="stateKpiEPDO"'), 'State KPI: EPDO element');
+    assert(htmlContent.includes('id="stateKpiKA"'), 'State KPI: K+A element');
+    assert(htmlContent.includes('id="stateKpiVRU"'), 'State KPI: VRU element');
+
+    // State county ranking table
+    assert(htmlContent.includes('id="stateCountyTable"'), 'State county ranking table exists');
+    assert(htmlContent.includes('id="stateCountyBody"'), 'State county table body exists');
+    assert(htmlContent.includes('id="stateCountySortBy"'), 'State county sort selector exists');
+
+    // State choropleth map
+    assert(htmlContent.includes('id="stateChoroplethMap"'), 'State choropleth map container exists');
+    assert(htmlContent.includes('id="stateChoroplethMetric"'), 'State choropleth metric selector exists');
+    assert(htmlContent.includes('id="stateChoroplethLegend"'), 'State choropleth legend exists');
+
+    // State hotspots table
+    assert(htmlContent.includes('id="stateHotspotTable"'), 'State hotspot table exists');
+    assert(htmlContent.includes('id="stateHotspotBody"'), 'State hotspot body exists');
+    assert(htmlContent.includes('id="stateHotspotSort"'), 'State hotspot sort selector exists');
+    assert(htmlContent.includes('id="stateHotspotGroup"'), 'State hotspot group-by selector exists');
+
+    // State trend chart
+    assert(htmlContent.includes('id="stateTrendChart"'), 'State yearly trend chart canvas exists');
+    assert(htmlContent.includes('id="stateCollisionChart"'), 'State collision types chart canvas exists');
+
+    // JS functions exist
+    assert(htmlContent.includes('function renderStateDashboard('), 'renderStateDashboard function exists');
+    assert(htmlContent.includes('function renderStateCountyTable('), 'renderStateCountyTable function exists');
+    assert(htmlContent.includes('function renderStateTrendChart('), 'renderStateTrendChart function exists');
+    assert(htmlContent.includes('function renderStateCollisionChart('), 'renderStateCollisionChart function exists');
+    assert(htmlContent.includes('function renderStateChoroplethMap('), 'renderStateChoroplethMap function exists');
+    assert(htmlContent.includes('function updateStateChoropleth('), 'updateStateChoropleth function exists');
+    assert(htmlContent.includes('function renderChoroplethLegend('), 'renderChoroplethLegend function exists');
+    assert(htmlContent.includes('function renderStateHotspots('), 'renderStateHotspots function exists');
+    assert(htmlContent.includes('function toggleStateViewOverlays('), 'toggleStateViewOverlays function exists');
+    assert(htmlContent.includes('function activateStateView('), 'activateStateView function exists');
+    assert(htmlContent.includes('function deactivateStateView('), 'deactivateStateView function exists');
+    assert(htmlContent.includes('function drillDownToCounty('), 'drillDownToCounty function exists');
+    assert(htmlContent.includes('function loadStateChoroplethBoundaries('), 'loadStateChoroplethBoundaries function exists');
+
+    // handleTierChange integration
+    assert(htmlContent.includes('activateStateView()'), 'handleTierChange calls activateStateView');
+    assert(htmlContent.includes('deactivateStateView()'), 'handleTierChange calls deactivateStateView');
+
+    // No duplicate function names from Phase 5
+    const phase5Fns = [
+        'renderStateDashboard', 'renderStateCountyTable', 'renderStateTrendChart',
+        'renderStateCollisionChart', 'renderStateChoroplethMap', 'updateStateChoropleth',
+        'renderChoroplethLegend', 'renderStateHotspots', 'toggleStateViewOverlays',
+        'activateStateView', 'deactivateStateView', 'drillDownToCounty'
+    ];
+    phase5Fns.forEach(fn => {
+        const regex = new RegExp(`function ${fn}\\b`, 'g');
+        const matches = htmlContent.match(regex);
+        assert(matches && matches.length === 1, `No duplicate '${fn}' function (found ${matches ? matches.length : 0})`);
+    });
+
+    // Verify countyMapCard id was added for toggling
+    assert(htmlContent.includes('id="countyMapCard"'), 'countyMapCard id exists for state/county toggle');
+
+} else {
+    skip('index.html not found');
+}
+
+// ─────────────────────────────────────────────
 // RESULTS SUMMARY
 // ─────────────────────────────────────────────
 console.log('\n' + '='.repeat(50));
