@@ -102,7 +102,7 @@ R2 Archive (aggregates only, not raw CSVs):
       2026-02_aggregates.json
 ```
 
-### 2.2 Dataset Size Reduction Strategies
+### 2.2 Dataset Size Reduction Strategy
 
 **Current sizes:**
 | Dataset | Files | Total Size |
@@ -111,92 +111,42 @@ R2 Archive (aggregates only, not raw CSVs):
 | Virginia / Henrico (3 CSVs) | 3 road types | 76.5 MB |
 | **Total** | | **134.4 MB** |
 
-At scale: 133 VA jurisdictions × 3 road types × ~25 MB avg = **~10 GB**. Size reduction is critical.
+At scale: 133 VA jurisdictions × 3 road types × ~25 MB avg = **~10 GB**. Transfer size reduction is critical.
 
-#### Strategy 1: Drop Unused Columns (Savings: ~15%)
+**Decision: Keep all columns. Use Gzip compression on R2 only.**
 
-The Colorado pipeline currently outputs **112 columns**, but the UI (`COL` object in index.html) only references **57**. There are **26 columns** that are written to CSVs but never read by the browser:
+All 112 columns (including the 26 currently unused by the UI) are preserved in the CSV. These columns may be needed by future features (e.g., Deep Dive panels for new states, research exports, AI analysis context). Dropping them saves ~15% on disk but creates fragility — any new feature that needs `_co_tu2_speed_limit` or `_co_nm1_age` would require a full re-download from the source.
 
-| Category | Unused Columns | Count |
-|----------|---------------|-------|
-| Non-motorist 2 (entire block) | `_co_nm2_type`, `_co_nm2_age`, `_co_nm2_sex`, `_co_nm2_action`, `_co_nm2_movement`, `_co_nm2_location`, `_co_nm2_facility`, `_co_nm2_contributing_factor` | 8 |
-| Transport Unit 2 details | `_co_tu2_direction`, `_co_tu2_movement`, `_co_tu2_estimated_speed`, `_co_tu2_speed_limit`, `_co_tu2_stated_speed` | 5 |
-| Redundant/tracking | `_co_crash_type`, `_co_total_vehicles`, `_co_injury00_uninjured`, `_co_link`, `_co_location2`, `_co_rd_number`, `_co_weather2`, `_source_file` | 8 |
-| NM1 partial | `_co_nm1_age`, `_co_nm1_movement`, `_co_nm1_sex` | 3 |
-| TU1 partial | `_co_tu1_direction`, `_co_tu1_movement` | 2 |
+#### Gzip/Brotli Compression on R2 (Savings: ~70-80% transfer)
 
-**Action:** Add `--slim` flag to `state_adapter.py` that drops unused columns from output. Keep a `--full` mode for archival/research use.
+CSV data compresses extremely well due to repetitive categorical values and whitespace. R2 can serve pre-compressed files that the browser decompresses transparently.
 
-#### Strategy 2: Encode Categorical Values (Savings: ~20%)
+**How it works:**
+1. Pipeline uploads `county_roads.csv.gz` to R2 with `Content-Encoding: gzip`
+2. Browser requests the file normally
+3. R2 serves the compressed version; browser decompresses automatically
+4. **No user-side impact** — the browser handles gzip/brotli decompression natively. All modern browsers support it. The user sees no difference except faster load times.
 
-The VDOT-format categorical values are verbose strings. Examples:
+**Action:** Configure R2 upload script to compress CSVs before upload. Set `Content-Encoding: gzip` and `Content-Type: text/csv` headers.
 
-| Column | Current Value (avg 30 chars) | Encoded (avg 2 chars) |
-|--------|------------------------------|----------------------|
-| Weather | `1. No Adverse Condition (Clear/Cloudy)` | `1` |
-| Road Desc | `3. Two-Way, Divided, Positive Median Barrier` | `3` |
-| Relation To Roadway | `10. Intersection Related - Within 150 Feet` | `10` |
-| Light | `5. Darkness - Road Not Lighted` | `5` |
-| Collision Type | `4. Sideswipe - Same Direction` | `4` |
-| Surface | `6. Sand/Mud/Dirt/Oil/Gravel` | `6` |
-| Intersection Type | `1. Not at Intersection` | `1` |
+**User-Side Impact Assessment:**
 
-Across 11 categorical columns × thousands of rows, each row saves ~120 characters.
-
-**Action:** Store only the numeric prefix code in CSVs. Add a lightweight `value_labels.json` (~5 KB) lookup table in R2 that the UI loads once at startup to reconstruct display labels.
-
-```json
-// shared/value_labels.json (loaded once, cached)
-{
-  "Weather Condition": {
-    "1": "No Adverse Condition (Clear/Cloudy)",
-    "2": "Blowing Sand/Snow",
-    "3": "Fog/Smog"
-  },
-  "Collision Type": {
-    "1": "Rear End",
-    "2": "Angle",
-    "3": "Head On"
-  }
-}
-```
-
-#### Strategy 3: Boolean Encoding (Savings: ~4%)
-
-18 boolean columns currently store `"Yes"/"No"`. The UI's `isYes()` function already handles `"1"`, `"Y"`, `"y"`, `"Yes"`.
-
-**Action:** Encode as `"1"/"0"` in pipeline output. No UI changes needed.
-
-#### Strategy 4: Coordinate Rounding (Savings: ~2%)
-
-GPS coordinates like `-104.952300000000` can be truncated to 5 decimal places (`-104.95230`), which is ~1.1 meter accuracy — more than sufficient for crash mapping.
-
-**Action:** Round `x` and `y` to 5 decimal places in `state_adapter.py`.
-
-#### Strategy 5: Gzip/Brotli Compression on R2 (Savings: ~70% transfer)
-
-R2 supports serving pre-compressed files. CSV compresses extremely well.
-
-**Action:** Upload `.csv.gz` alongside `.csv`. Browser decompresses transparently with `Accept-Encoding: gzip`. A 25 MB CSV becomes ~5-7 MB over the wire.
-
-#### Combined Impact Estimate
-
-| Strategy | Per-File Savings | Risk | Priority |
-|----------|-----------------|------|----------|
-| Drop unused columns | ~15% | None (columns not used) | P0 |
-| Encode categoricals | ~20% | Low (add decode table) | P1 |
-| Boolean encoding | ~4% | None (isYes() handles it) | P0 |
-| Coordinate rounding | ~2% | None (1m accuracy sufficient) | P0 |
-| Gzip on R2 | ~70% transfer | None (transparent) | P0 |
-| **Combined** | **~41% file size, ~85% transfer** | | |
+| Concern | Impact | Details |
+|---------|--------|---------|
+| Browser compatibility | None | All modern browsers (Chrome, Firefox, Safari, Edge) handle gzip transparently since ~2005 |
+| JavaScript processing | None | `fetch()` and `XMLHttpRequest` auto-decompress. Papa Parse receives the same uncompressed CSV string |
+| Data accuracy | None | Gzip is lossless compression. Bit-for-bit identical after decompression |
+| Memory usage | None | Same in-memory footprint after decompression |
+| Load time | Improved | ~70-80% less data over the network = significantly faster loads |
+| Offline/cache | No change | Browser caches the decompressed version in its HTTP cache |
 
 **Projected sizes at Virginia scale (133 jurisdictions):**
 
-| Metric | Before | After (slim+encode) | After (+ gzip transfer) |
-|--------|--------|---------------------|------------------------|
-| Per-county CSV | ~25 MB avg | ~15 MB avg | ~4 MB transfer |
-| State total (133 × 3) | ~10 GB | ~6 GB | ~1.6 GB transfer |
-| R2 storage cost | ~$0.15/mo | ~$0.09/mo | Same (storage) |
+| Metric | Raw CSV | Gzipped Transfer | Savings |
+|--------|---------|-------------------|---------|
+| Per-county CSV | ~25 MB avg | ~5-7 MB transfer | ~72% |
+| State total (133 × 3) | ~10 GB storage | ~2.5-3 GB transfer | ~72% |
+| R2 storage (gzipped files) | ~3 GB | — | ~70% vs raw |
 
 ### 2.3 Automated Multi-County Processing
 
@@ -305,12 +255,14 @@ crash-lens-data/
 │   ├── cmf_processed.json                  ← CMF clearinghouse data
 │   ├── cmf_metadata.json
 │   ├── value_labels.json                   ← Categorical value decode table (~5 KB)
-│   ├── boundaries/                         ← GeoJSON boundaries for choropleth maps
+│   ├── boundaries/                         ← GeoJSON boundaries for choropleth + overlay maps
 │   │   ├── us_states.geojson               ← Federal tier map
 │   │   ├── virginia_counties.geojson       ← VA state tier map
 │   │   ├── colorado_counties.geojson       ← CO state tier map
-│   │   ├── virginia_mpos.geojson           ← VA MPO boundaries (from BTS NTAD)
-│   │   └── colorado_mpos.geojson           ← CO MPO boundaries (from BTS NTAD)
+│   │   ├── virginia_mpos.geojson           ← VA MPO boundaries (cached from BTS NTAD)
+│   │   ├── colorado_mpos.geojson           ← CO MPO boundaries (cached from BTS NTAD)
+│   │   ├── virginia_vdot_districts.geojson ← VDOT 9-district boundaries (cached from VDOT ArcGIS)
+│   │   └── colorado_cdot_regions.geojson   ← CDOT 5-region boundaries (cached from CDOT ArcGIS)
 │   └── mutcd/                              ← MUTCD reference data
 │       └── *.json
 │
@@ -471,6 +423,7 @@ The existing Leaflet.js map with:
 | **Base** | Same Leaflet instance, zoomed to state bounds (from config.json state bbox) |
 | **Primary Layer** | County-level choropleth polygons colored by selected metric |
 | **Boundary Source** | `shared/boundaries/{state}_counties.geojson` from R2 (pre-downloaded from Census, ~2-3 MB per state) |
+| **DOT District Overlay** | Optional toggle: DOT district/region boundary outlines (bold dashed, from state DOT ArcGIS — see Section 5.4) |
 | **MPO Overlay** | Optional toggle: MPO boundary outlines (dashed purple, from BTS NTAD MPO FeatureServer — see Section 5) overlaid on county choropleth |
 | **Color Metric** | Selectable dropdown: Total Crashes, K Fatalities, KA Rate, EPDO, Ped/Bike Crashes, Crash Trend |
 | **Interaction** | Hover: tooltip with county name + metrics. Click: drills down to County view |
@@ -492,6 +445,7 @@ The existing Leaflet.js map with:
 | BTS Transit Stops | ❌ Hidden | Too dense at state zoom |
 | BTS Transit Routes | ✅ Available | Major routes visible at state zoom |
 | **NEW: BTS MPO Boundaries** | ✅ Available | Toggle to show all MPO boundaries overlaid (see Section 5) |
+| **NEW: DOT District Boundaries** | ✅ Available | Toggle to show state DOT administrative district/region outlines (see Section 5.4) |
 | User Assets | ✅ Available | If user uploaded state-scope assets |
 
 #### MPO Map — Hybrid Choropleth + Heatmap
@@ -639,11 +593,427 @@ The NTAD provides ~90 datasets. Beyond the 5 already integrated + MPO Boundaries
 
 **Recommendation:** Add MPO Boundaries now (directly supports the MPO tier). Add Urbanized Areas and Freight Network later as optional layers.
 
+### 5.4 State DOT District/Region Boundary Integration
+
+#### The Problem
+
+State DOT users (VDOT HQ, CDOT HQ) organize their operations by **administrative districts/regions**. The State view map needs to show these boundaries as an overlay so users can see which district "owns" which counties. There is **no national dataset** of state DOT district boundaries — each state publishes their own via separate ArcGIS REST APIs.
+
+#### State DOT Boundary APIs
+
+| State | Term | Count | ArcGIS REST API |
+|-------|------|-------|-----------------|
+| **Virginia (VDOT)** | Districts | 9 | `https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOTAdministrativeBoundaries/FeatureServer/2` |
+| **Colorado (CDOT)** | Engineering Regions | 5 | `https://dtdapps.coloradodot.info/arcgis/rest/services/CPLAN/open_data_sde/FeatureServer/3` |
+| **Texas (TxDOT)** | Districts | 25 | `https://maps.dot.state.tx.us/arcgis/rest/services/Boundaries/MapServer` |
+| **Florida (FDOT)** | Districts | 7 | Via `gis-fdot.opendata.arcgis.com` |
+| **California (Caltrans)** | Districts | 12 | Via `gisdata-caltrans.opendata.arcgis.com` |
+| **N. Carolina (NCDOT)** | Highway Divisions | 14 | Via `connect.ncdot.gov` |
+
+All use ArcGIS, so the query pattern is consistent: `/query?where=1=1&outFields=*&f=geojson`. But the URLs, layer IDs, and field names differ per state.
+
+#### Configuration: Per-State `boundaries.json`
+
+**Yes — create a dedicated boundary configuration file for each state DOT.** This file lives in `states/{state}/boundaries.json` and defines all boundary layer endpoints for that state.
+
+```json
+// states/virginia/boundaries.json
+{
+  "state": "virginia",
+  "dotDistricts": {
+    "name": "VDOT Districts",
+    "term": "District",
+    "count": 9,
+    "source": "arcgis_rest",
+    "endpoint": "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOTAdministrativeBoundaries/FeatureServer/2",
+    "nameField": "DISTRICT_NAME",
+    "codeField": "DISTRICT_CODE",
+    "style": {
+      "color": "#dc2626",
+      "weight": 3,
+      "fillOpacity": 0.05,
+      "dashArray": "8, 4"
+    },
+    "fallbackGeojson": "shared/boundaries/virginia_vdot_districts.geojson"
+  },
+  "mpo": {
+    "source": "bts_ntad",
+    "stateFilter": "VA"
+  },
+  "counties": {
+    "source": "census_tiger",
+    "geojson": "shared/boundaries/virginia_counties.geojson"
+  }
+}
+```
+
+```json
+// states/colorado/boundaries.json
+{
+  "state": "colorado",
+  "dotDistricts": {
+    "name": "CDOT Engineering Regions",
+    "term": "Region",
+    "count": 5,
+    "source": "arcgis_rest",
+    "endpoint": "https://dtdapps.coloradodot.info/arcgis/rest/services/CPLAN/open_data_sde/FeatureServer/3",
+    "nameField": "REGION",
+    "codeField": "REGION_ID",
+    "style": {
+      "color": "#2563eb",
+      "weight": 3,
+      "fillOpacity": 0.05,
+      "dashArray": "8, 4"
+    },
+    "fallbackGeojson": "shared/boundaries/colorado_cdot_regions.geojson"
+  },
+  "mpo": {
+    "source": "bts_ntad",
+    "stateFilter": "CO"
+  },
+  "counties": {
+    "source": "census_tiger",
+    "geojson": "shared/boundaries/colorado_counties.geojson"
+  }
+}
+```
+
+#### Why Per-State Config Files?
+
+| Reason | Detail |
+|--------|--------|
+| **Field names differ** | VDOT uses `DISTRICT_NAME`, CDOT uses `REGION`, TxDOT uses `DIST_NM` |
+| **Terminology differs** | "Districts" vs "Regions" vs "Divisions" — the UI label must match what state DOT staff expect |
+| **Endpoint URLs differ** | Each state DOT has their own ArcGIS server with unique URLs |
+| **Styling may differ** | Different colors/weights to distinguish from other boundary layers |
+| **Some states have sub-districts** | VDOT has Districts > Residencies. Config can optionally include sub-layers |
+| **Fallback strategy** | Pre-downloaded GeoJSON in R2 in case the live API is down |
+
+#### Dual-Source Strategy: Live API + Cached Fallback
+
+1. **At onboarding:** Run a one-time script to download the state's district boundaries as GeoJSON → upload to R2 as `shared/boundaries/{state}_dot_districts.geojson`
+2. **At runtime:** Try the live ArcGIS REST API first (gives freshest data). If the API fails (timeout, CORS, server down), fall back to the cached GeoJSON from R2
+3. **Periodic refresh:** A scheduled workflow (annually) re-downloads from the live API and updates the R2 cache. District boundaries change very rarely (CDOT last changed in 2013)
+
+```javascript
+// Pseudocode for boundary loading
+async function loadDOTDistrictBoundary(stateKey) {
+  const cfg = stateBoundaryConfigs[stateKey].dotDistricts;
+  try {
+    // Try live API first
+    const url = `${cfg.endpoint}/query?where=1=1&outFields=${cfg.nameField},${cfg.codeField}&f=geojson`;
+    const resp = await fetch(url);
+    return await resp.json();
+  } catch (err) {
+    // Fall back to cached GeoJSON from R2
+    const fallbackUrl = resolveDataUrl(cfg.fallbackGeojson);
+    const resp = await fetch(fallbackUrl);
+    return await resp.json();
+  }
+}
+```
+
+#### New State Onboarding Checklist (Boundary Edition)
+
+When onboarding a new state, the boundary setup process is:
+
+1. [ ] Find the state DOT's ArcGIS REST API for district/region boundaries (most have one)
+2. [ ] Identify the field names for district name and code
+3. [ ] Create `states/{state}/boundaries.json` with endpoint, fields, styling
+4. [ ] Run the download script to cache boundaries as GeoJSON in R2
+5. [ ] Test: district overlay renders on the State Map, labels are correct
+6. [ ] If no ArcGIS API exists: manually obtain Shapefile from state DOT, convert to GeoJSON, upload to R2 as static fallback
+
+### 5.5 MPO Boundary Auto-Load from Dropdown Selection
+
+When the user selects an MPO from the dropdown in the Upload Data tab, the map should **automatically** fetch and display that MPO's boundary from BTS NTAD — no manual toggle needed.
+
+#### Connection Flow
+
+```
+User selects "State: Virginia" in tier selector
+    ↓
+User selects "MPO: Hampton Roads TPO" from dropdown
+    ↓
+1. UI reads hierarchy.json to get MPO acronym ("HRTPO")
+    ↓
+2. Fetch from BTS NTAD:
+   /query?where=ACRONYM='HRTPO'&outFields=*&returnGeometry=true&f=geojson
+    ↓
+3. Add GeoJSON polygon to map as bold MPO boundary layer
+    ↓
+4. Zoom map to MPO polygon bounds (fitBounds)
+    ↓
+5. Load member county boundaries (filtered from state counties GeoJSON)
+    ↓
+6. Load MPO aggregate data from R2
+```
+
+#### Mapping MPO Dropdown to BTS NTAD
+
+The `hierarchy.json` must include the BTS NTAD `ACRONYM` or `MPO_ID` for each MPO so the correct boundary can be fetched:
+
+```json
+// states/virginia/hierarchy.json — MPO entries with BTS NTAD mapping
+{
+  "mpos": {
+    "hrtpo": {
+      "name": "Hampton Roads Transportation Planning Organization",
+      "btsAcronym": "HRTPO",
+      "btsMpoId": "VA-125",
+      "counties": ["norfolk", "virginia_beach", "chesapeake", ...],
+      "center": [-76.28, 36.85],
+      "zoom": 10
+    },
+    "nvta": {
+      "name": "Northern Virginia Transportation Authority",
+      "btsAcronym": "NVTC",
+      "btsMpoId": "VA-150",
+      "counties": ["arlington", "fairfax", "loudoun", ...],
+      "center": [-77.35, 38.85],
+      "zoom": 10
+    }
+  }
+}
+```
+
+#### Implementation in the UI
+
+```javascript
+// When MPO dropdown changes:
+async function onMPOSelected(stateKey, mpoKey) {
+  const mpoConfig = hierarchy[stateKey].mpos[mpoKey];
+
+  // 1. Fetch MPO boundary from BTS NTAD
+  const btsQuery = `https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/` +
+    `NTAD_Metropolitan_Planning_Organizations/FeatureServer/0/query` +
+    `?where=ACRONYM='${mpoConfig.btsAcronym}'&outFields=*&returnGeometry=true&f=geojson`;
+
+  const mpoBoundary = await fetch(btsQuery).then(r => r.json());
+
+  // 2. Add to map with bold styling
+  mpoBoundaryLayer = L.geoJSON(mpoBoundary, {
+    style: { color: '#7c3aed', weight: 3, fillOpacity: 0.06, dashArray: '6,3' },
+    onEachFeature: (f, layer) => {
+      layer.bindPopup(`<b>${f.properties.MPO_NAME}</b><br>Pop: ${f.properties.POP?.toLocaleString()}`);
+    }
+  }).addTo(map);
+
+  // 3. Zoom to MPO bounds
+  map.fitBounds(mpoBoundaryLayer.getBounds(), { padding: [20, 20] });
+
+  // 4. Load member county fills + aggregate data
+  loadMPOCountyFills(stateKey, mpoConfig.counties);
+  loadMPOAggregates(stateKey, mpoKey);
+}
+```
+
 ---
 
-## 6. Explore Section: Tab Behavior Per Tier
+## 6. EPDO Configuration: State vs Federal Weights
 
-### 6.1 Tab Visibility Matrix
+### 6.1 Current State
+
+EPDO (Equivalent Property Damage Only) weights are currently **hardcoded identically** everywhere:
+
+| Location | Weights | Purpose |
+|----------|---------|---------|
+| `app/index.html` line 19910 | `{ K:462, A:62, B:12, C:5, O:1 }` | Primary `EPDO_WEIGHTS` constant |
+| `app/index.html` line 28795 | `calcEPDO()` function | Used in 60+ places across all tabs |
+| `states/virginia/config.json` | `"epdoWeights": { K:462, A:62, B:12, C:5, O:1 }` | Virginia config |
+| `states/colorado/config.json` | `"epdoWeights": { K:462, A:62, B:12, C:5, O:1 }` | Colorado config |
+| `send_notifications.py` | `{ K:462, A:62, B:12, C:5, O:1 }` | Email reports |
+| `tests/test_prediction_accuracy.py` | `{ K:462, A:62, B:12, C:5, O:1 }` | Forecast tests |
+
+There is also a **second set** used only for Street Light Warrant Analysis:
+- `app/index.html` line 106333: `{ K:1500, A:240, B:12, C:6, O:1 }` — research-based weights for lighting analysis
+
+### 6.2 Should EPDO Weights Differ by State and Federal Level?
+
+**Yes — they absolutely should be configurable per state.** Here's why:
+
+| Factor | Detail |
+|--------|--------|
+| **FHWA publishes standard comprehensive crash costs** | The K:462, A:62 weights come from FHWA's 2016 Crash Costs report. These are the national baseline. |
+| **States calculate their own** | Many state SHSPs (Strategic Highway Safety Plans) use state-specific crash costs based on local medical costs, wage rates, and legal costs. For example, Virginia's crash costs may differ from Colorado's because medical costs and income levels differ. |
+| **HSIP benefit-cost analysis** | FHWA requires states to use state-specific crash costs for HSIP project prioritization (23 CFR 924). Many states publish these in their SHSP or HSIP manual. |
+| **Inflation adjustments** | Crash costs should be updated for inflation. The 2016 FHWA values may be outdated by 2026. States update at different intervals. |
+| **Federal comparisons** | When comparing states at the Federal tier, should we use each state's own weights (fair comparison of local priorities) or a uniform national weight (apples-to-apples)? Both have merit. |
+
+#### Standard EPDO Weight Sources
+
+| Source | K (Fatal) | A (Incapacitating) | B (Non-Incapacitating) | C (Possible) | O (PDO) | Year |
+|--------|-----------|---------------------|------------------------|---------------|---------|------|
+| **FHWA 2016 (current default)** | 462 | 62 | 12 | 5 | 1 | 2016 |
+| **FHWA comprehensive (2024 update)** | ~550 | ~75 | ~15 | ~6 | 1 | 2024 |
+| **VDOT HSIP (example)** | 490 | 68 | 14 | 5 | 1 | 2023 |
+| **CDOT (example)** | 475 | 65 | 13 | 5 | 1 | 2022 |
+| **Street Light Warrant (research)** | 1500 | 240 | 12 | 6 | 1 | Research |
+
+*Note: VDOT and CDOT values above are illustrative. Actual state-specific values should be obtained from each state's current SHSP or HSIP manual.*
+
+### 6.3 Configuration Architecture
+
+**Three levels of EPDO configuration, with cascading defaults:**
+
+```
+Federal default (FHWA standard)
+    ↓ inherits if state doesn't override
+State-specific override (from state SHSP/HSIP)
+    ↓ inherits if user doesn't customize
+User-customized (via UI in Upload Data tab)
+```
+
+#### Where the Weights Live
+
+| Level | File | Purpose |
+|-------|------|---------|
+| **Federal default** | `config.json` → `epdoWeights.federal` | National baseline, used for cross-state comparisons at Federal tier |
+| **State default** | `states/{state}/config.json` → `epdoWeights` | State-specific weights from SHSP/HSIP |
+| **User override** | In-memory only (not persisted to file) | User adjusts via UI for "what-if" analysis |
+
+#### Updated Config Schema
+
+```json
+// config.json (root) — federal defaults
+{
+  "epdoWeights": {
+    "federal": {
+      "K": 462, "A": 62, "B": 12, "C": 5, "O": 1,
+      "source": "FHWA Crash Costs for Safety Analysis, 2016",
+      "year": 2016
+    }
+  }
+}
+
+// states/virginia/config.json — state override
+{
+  "epdoWeights": {
+    "K": 490, "A": 68, "B": 14, "C": 5, "O": 1,
+    "source": "VDOT HSIP Manual, 2023 Edition",
+    "year": 2023
+  }
+}
+
+// states/colorado/config.json — state override
+{
+  "epdoWeights": {
+    "K": 475, "A": 65, "B": 13, "C": 5, "O": 1,
+    "source": "CDOT Strategic Highway Safety Plan, 2022",
+    "year": 2022
+  }
+}
+```
+
+### 6.4 Which Weights Apply at Each Tier?
+
+| Tier | Default Weights Used | Why |
+|------|---------------------|-----|
+| **Federal** | `config.json` → `epdoWeights.federal` | Cross-state comparisons must use uniform weights for apples-to-apples |
+| **State** | `states/{state}/config.json` → `epdoWeights` (falls back to federal if not set) | State users expect their own state's official weights |
+| **MPO** | Inherits from parent state | MPOs operate within a state's framework |
+| **County** | Inherits from parent state (existing behavior) | Counties operate within a state's framework |
+
+**Key insight:** At the Federal tier, we use **uniform national weights** so that comparing Virginia EPDO to Colorado EPDO is meaningful. At State/MPO/County tiers, we use the **state's own weights** to match what state DOT staff use in their own analyses.
+
+### 6.5 UI: EPDO Weight Configuration in Upload Data Tab
+
+Add an expandable **"EPDO Scoring"** panel to the Upload Data tab. It appears at all tiers and shows which weights are currently active.
+
+```
+┌──────────────────────────────────────────────────────┐
+│  ⚖️ EPDO Scoring                          [▼ Expand] │
+│                                                       │
+│  Currently using: Virginia HSIP 2023 weights          │
+│  Source: VDOT HSIP Manual, 2023 Edition               │
+│                                                       │
+│  ┌────────────────────────────────────────────────┐   │
+│  │  Severity │ Weight │ Default │ Custom          │   │
+│  │  ─────────┼────────┼─────────┼────────         │   │
+│  │  K Fatal  │  490   │  490    │ [    490  ]     │   │
+│  │  A Incap  │   68   │   68    │ [     68  ]     │   │
+│  │  B Non-In │   14   │   14    │ [     14  ]     │   │
+│  │  C Poss.  │    5   │    5    │ [      5  ]     │   │
+│  │  O PDO    │    1   │    1    │ [      1  ]     │   │
+│  └────────────────────────────────────────────────┘   │
+│                                                       │
+│  Presets: [State Default] [FHWA 2016] [Custom]        │
+│                                                       │
+│  ℹ️ Changes recalculate all EPDO scores in real-time.  │
+│     Custom weights are session-only (not saved).       │
+│                                                       │
+│  [Reset to State Default]                              │
+│                                                       │
+└──────────────────────────────────────────────────────┘
+```
+
+#### UI Behavior
+
+| Action | Result |
+|--------|--------|
+| **Tier changes to Federal** | Weights auto-switch to Federal defaults. "Currently using: FHWA 2016 National Weights" |
+| **Tier changes to State/MPO/County** | Weights auto-switch to state-specific defaults (if configured). "Currently using: Virginia HSIP 2023" |
+| **User selects "Custom" preset** | Input fields become editable. User types custom values |
+| **User types custom weight** | All EPDO scores across all tabs recalculate in real-time using new weights |
+| **User clicks "Reset to State Default"** | Reverts to state config weights |
+| **User changes state dropdown** | Weights auto-update to new state's defaults |
+
+#### How Real-Time Recalculation Works
+
+Currently `calcEPDO()` reads from the hardcoded `EPDO_WEIGHTS` constant. The change:
+
+```javascript
+// Before (hardcoded):
+const EPDO_WEIGHTS = { K: 462, A: 62, B: 12, C: 5, O: 1 };
+const calcEPDO = s => (s.K||0)*EPDO_WEIGHTS.K + ...;
+
+// After (configurable):
+let activeEPDOWeights = { K: 462, A: 62, B: 12, C: 5, O: 1 }; // mutable
+const calcEPDO = s => (s.K||0)*activeEPDOWeights.K + ...;
+
+function updateEPDOWeights(newWeights) {
+  activeEPDOWeights = { ...newWeights };
+  // Recalculate all pre-computed EPDO values
+  recalcAggregateEPDO();        // crashState.aggregates
+  recalcHotspotEPDO();          // hotspot rankings
+  recalcGrantLocationEPDO();    // grant location scores
+  // Re-render active tab
+  renderCurrentTab();
+}
+```
+
+**Performance note:** EPDO is a simple 5-term multiplication — recalculating across even 100K crash records takes <100ms. No performance concern.
+
+### 6.6 How to Update EPDO Weights When Needed
+
+| Scenario | Who Updates | Where | Process |
+|----------|-------------|-------|---------|
+| **FHWA publishes new national crash costs** | Dev team | `config.json` → `epdoWeights.federal` | Update values, commit, deploy |
+| **State DOT updates their SHSP/HSIP weights** | Dev team or state admin | `states/{state}/config.json` → `epdoWeights` | Update values, commit, deploy. Note the `source` and `year` fields for traceability |
+| **User wants to test different weights** | End user | UI (Upload Data tab) → Custom preset | Real-time in browser. Session-only, not persisted |
+| **New state onboarded** | Dev team | Create `states/{state}/config.json` with state's official EPDO weights | Research state's current SHSP for published crash costs |
+
+#### Aggregate JSONs and EPDO
+
+Pre-computed aggregate JSONs (`county_summary.json`, `aggregates.json`) include EPDO scores calculated with the state's default weights at pipeline generation time. The `epdoWeights` used are recorded in the JSON:
+
+```json
+{
+  "epdoWeights": { "K": 490, "A": 68, "B": 14, "C": 5, "O": 1 },
+  "epdoSource": "VDOT HSIP Manual, 2023 Edition",
+  "counties": {
+    "henrico": { "total": 28500, "K": 89, "A": 412, "epdo": 112340 }
+  }
+}
+```
+
+When the user selects custom weights in the UI, the browser **recalculates** EPDO from the raw K/A/B/C/O counts in the aggregate JSON — it does NOT re-fetch data. The raw severity counts are always available in the aggregate, so client-side recalculation is instant.
+
+---
+
+## 7. Explore Section: Tab Behavior Per Tier
+
+### 7.1 Tab Visibility Matrix
 
 **County view is completely untouched.** The following shows behavior for the 3 new tiers only:
 
@@ -661,7 +1031,7 @@ The NTAD provides ~90 datasets. Beyond the 5 already integrated + MPO Boundaries
 | Crash Prediction | ❌ Hidden | ❌ Hidden | ❌ Hidden |
 | Deep Dive | ❌ Hidden | ❌ Hidden | ❌ Hidden |
 
-### 6.2 Drill-Down Navigation
+### 7.2 Drill-Down Navigation
 
 Every higher-tier view supports drill-down to County:
 
@@ -678,108 +1048,124 @@ Drill-down loads the county CSV from R2 (existing behavior), sets the road type 
 
 ---
 
-## 7. Complete Phased Roadmap
+## 8. Complete Phased Roadmap
 
-### Phase 1 — Pipeline: Size Reduction + Multi-County (Build First)
-- [ ] Add `--slim` flag to `state_adapter.py` to drop 26 unused columns
-- [ ] Implement boolean encoding (`1`/`0`) and coordinate rounding (5 decimals)
-- [ ] Add categorical value encoding (numeric prefix only) + create `shared/value_labels.json`
+### Phase 1 — Pipeline: Gzip + Multi-County (Build First)
+- [ ] Enable gzip compression on R2 uploads (configure `upload-to-r2.py` to compress CSVs before upload, set `Content-Encoding: gzip`)
 - [ ] Add `--all-jurisdictions` flag to `download_crash_data.py` (VA: split from statewide download)
 - [ ] Extend `split_cdot_data.py` to emit all 64 CO counties
 - [ ] Extend `scripts/upload-to-r2.py` to batch-upload all jurisdictions
-- [ ] Enable gzip/brotli compression on R2 uploads
+- [ ] Test: verify browser auto-decompresses gzipped CSVs from R2 correctly
 
-### Phase 2 — Pipeline: Aggregates + Hierarchy
+### Phase 2 — Pipeline: Aggregates + Hierarchy + EPDO Config
 - [ ] Create `scripts/generate_aggregates.py` (reads county CSVs → produces aggregates with road-type breakdowns)
-- [ ] Create `states/virginia/hierarchy.json` (all MPOs, VDOT districts, PDCs)
-- [ ] Complete `states/colorado/hierarchy.json` (CDOT regions, MPOs/TPRs)
+- [ ] Add `epdoWeights.federal` to root `config.json` (FHWA 2016 national baseline)
+- [ ] Update `states/virginia/config.json` with Virginia-specific EPDO weights from VDOT HSIP
+- [ ] Update `states/colorado/config.json` with Colorado-specific EPDO weights from CDOT SHSP
+- [ ] Include `epdoWeights` + `epdoSource` in generated aggregate JSONs for traceability
+- [ ] Create `states/virginia/hierarchy.json` (all MPOs with `btsAcronym`/`btsMpoId`, VDOT districts, PDCs)
+- [ ] Complete `states/colorado/hierarchy.json` (CDOT regions, MPOs/TPRs with BTS mapping)
 - [ ] Generate and upload state + MPO aggregates for VA and CO
 - [ ] Archive monthly aggregate snapshots in `_statewide/snapshots/`
 - [ ] Update `download-data.yml` workflow for batch processing + aggregate generation
 
-### Phase 3 — Map: Boundaries + BTS MPO Layer
-- [ ] Pre-download state/county boundary GeoJSONs from Census TIGER/Line → upload to R2 `shared/boundaries/`
+### Phase 3 — Config: State DOT Boundary Files
+- [ ] Create `states/virginia/boundaries.json` (VDOT districts endpoint, fields, styling, fallback)
+- [ ] Create `states/colorado/boundaries.json` (CDOT regions endpoint, fields, styling, fallback)
+- [ ] Run one-time download of VDOT district + CDOT region boundaries → upload to R2 `shared/boundaries/`
+- [ ] Pre-download state/county boundary GeoJSONs from Census TIGER/Line → upload to R2
+- [ ] Pre-download MPO boundaries from BTS NTAD per state → upload to R2 as fallback cache
+
+### Phase 4 — Map: Boundaries + BTS Layers
 - [ ] Add BTS MPO Boundaries as new layer in `BTS_ENDPOINTS` object
 - [ ] Implement `addBTSMPOBoundaryLayer()` with state-filtered queries
-- [ ] Add MPO Boundaries toggle to Asset Layers Panel
-- [ ] Test: VA MPOs load correctly, CO MPOs load correctly, multi-state MPOs handled
+- [ ] Add DOT District Boundary layer (reads from `states/{state}/boundaries.json`)
+- [ ] Add MPO Boundaries + DOT Districts toggles to Asset Layers Panel
+- [ ] Implement MPO auto-load on dropdown selection (fetch BTS by `btsAcronym` from hierarchy.json)
+- [ ] Test: VA MPOs load correctly, VDOT districts overlay, CO MPOs + CDOT regions
 
-### Phase 4 — UI: Tier Selector
+### Phase 5 — UI: Tier Selector + EPDO Panel
 - [ ] Add tier selector segmented control (Federal / State / MPO / County) to Upload Data tab
 - [ ] Add road type selector to Federal, State, MPO tiers (reuse existing radio component)
+- [ ] Add EPDO Scoring expandable panel (shows current weights, presets, custom input)
+- [ ] Make `EPDO_WEIGHTS` mutable (`let activeEPDOWeights`), auto-switch on tier/state change
+- [ ] Implement `updateEPDOWeights()` with real-time recalculation across all tabs
 - [ ] Add `viewTier` to global `jurisdictionContext` state object
 - [ ] Implement data loading logic per tier (aggregate JSONs from R2)
 - [ ] Implement tab visibility toggling based on tier (hide/show tabs per matrix above)
 
-### Phase 5 — UI: State View
+### Phase 6 — UI: State View
 - [ ] Implement State Dashboard (county ranking table with road-type switching)
-- [ ] Implement State Map (county choropleth with metric dropdown + MPO overlay toggle)
+- [ ] Implement State Map (county choropleth + DOT district overlay + MPO overlay toggles)
 - [ ] Adapt Hot Spots for cross-county ranking
 - [ ] Adapt Safety Focus for statewide emphasis areas
 - [ ] Adapt Analysis for county comparison charts
 - [ ] Implement drill-down: click county → load County view
 
-### Phase 6 — UI: MPO View
+### Phase 7 — UI: MPO View
 - [ ] Implement MPO Dashboard (member county breakdown table)
-- [ ] Implement MPO Map (MPO boundary + county fills + progressive crash heatmap/clusters)
+- [ ] Implement MPO Map (auto-loaded BTS boundary + county fills + progressive crash heatmap/clusters)
 - [ ] Implement lazy-loading of member county CSVs for crash-level heatmap
 - [ ] Adapt Hot Spots for cross-county hotspot ranking within MPO
 - [ ] Implement drill-down: click county → load County view
 
-### Phase 7 — UI: Federal View
+### Phase 8 — UI: Federal View
 - [ ] Create `scripts/generate_national_summary.py` (roll up state aggregates + FARS data)
 - [ ] Implement Federal Dashboard (state comparison table)
 - [ ] Implement Federal Map (US state choropleth with metric dropdown)
 - [ ] Adapt Safety Focus for national emphasis areas
 - [ ] Implement drill-down: click state → load State view
 
-### Phase 8 — New State Onboarding
-- [ ] Document onboarding checklist (states/{state}/config.json template)
+### Phase 9 — New State Onboarding
+- [ ] Document onboarding checklist (states/{state}/config.json + boundaries.json + hierarchy.json)
 - [ ] Create state onboarding script (column mapping wizard)
 - [ ] Onboard first new state (e.g., Maryland or North Carolina)
 - [ ] Verify full pipeline: download → validate → geocode → split → aggregate → upload → display
+- [ ] Verify boundary config: DOT districts render, BTS MPOs connect, EPDO weights correct
 
 ---
 
-## 8. Key Recommendations
+## 9. Key Recommendations
 
-### 8.1 Storage Strategy
+### 9.1 Storage Strategy
 
 | Data Tier | Store in R2? | Store in Git? | Format | Update |
 |-----------|-------------|---------------|--------|--------|
 | National aggregates | ✅ | ❌ | JSON | Monthly |
 | State aggregates | ✅ | ❌ | JSON | Monthly (archive snapshots) |
 | MPO aggregates | ✅ | ❌ | JSON | Monthly |
-| County crash CSVs | ✅ | ❌ | CSV (slim+encoded) | Monthly (replace, no snapshots) |
+| County crash CSVs | ✅ (gzipped) | ❌ | CSV.gz | Monthly (replace, no snapshots) |
 | County forecasts | ✅ | ✅ (small) | JSON | Monthly |
-| Value labels | ✅ | ✅ | JSON (~5 KB) | Rarely |
-| Boundary GeoJSONs | ✅ | ❌ | GeoJSON | Annually (Census updates) |
+| Boundary GeoJSONs (cached) | ✅ | ❌ | GeoJSON | Annually (Census updates) |
+| DOT district boundaries | ✅ (fallback) | ❌ | GeoJSON | Annually (rare changes) |
 | Grants | ❌ | ✅ | CSV | Weekly |
 | CMF data | ❌ | ✅ | JSON | Quarterly |
-| Config/hierarchy | ❌ | ✅ | JSON | As needed |
+| State config (EPDO, columns) | ❌ | ✅ | JSON | As needed |
+| State hierarchy (MPOs, districts) | ❌ | ✅ | JSON | As needed |
+| State boundaries config | ❌ | ✅ | JSON | Per state onboarding |
 | R2 manifest | ❌ | ✅ | JSON | After each upload |
 
-### 8.2 R2 Cost Projection (with size reduction)
+### 9.2 R2 Cost Projection (gzipped CSVs)
 
-| Scale | Storage (slim CSVs) | Monthly Cost |
-|-------|---------------------|-------------|
-| Current (2 counties) | ~80 MB | Free |
-| Virginia (133 counties) | ~3-5 GB | Free (10 GB free tier) |
-| VA + CO (133 + 64) | ~5-9 GB | Free |
-| 5 states | ~20-40 GB | ~$0.45/month |
-| All 50 states | ~300-600 GB | ~$4.50-$9/month |
+| Scale | Storage (gzipped) | Raw Equivalent | Monthly Cost |
+|-------|-------------------|----------------|-------------|
+| Current (2 counties) | ~35 MB | ~134 MB | Free |
+| Virginia (133 counties) | ~3 GB | ~10 GB | Free (10 GB free tier) |
+| VA + CO (133 + 64) | ~4.5 GB | ~15 GB | Free |
+| 5 states | ~15-25 GB | ~50-80 GB | ~$0.22-$0.38/month |
+| All 50 states | ~200-400 GB | ~700 GB-1.3 TB | ~$3-$6/month |
 
-### 8.3 Performance Strategy
+### 9.3 Performance Strategy
 
-| Tier | Data Load | Transfer (gzipped) | Load Time |
-|------|-----------|-------------------|-----------|
+| Tier | Data Load (raw) | Transfer (gzipped) | Load Time |
+|------|----------------|-------------------|-----------|
 | Federal | ~50 KB aggregate JSON | ~15 KB | Instant |
 | State | ~200-500 KB summary JSON | ~60-150 KB | Instant |
 | MPO | ~50-100 KB aggregate JSON | ~15-30 KB | Instant |
 | MPO (with crash heatmap) | ~30-90 MB member county CSVs | ~8-25 MB | Progressive (2-5s per county) |
-| County | ~15 MB slim CSV | ~4 MB | 1-3 seconds |
+| County | ~25 MB CSV | ~6-7 MB (gzipped) | 1-3 seconds |
 
-### 8.4 Asset Layer Adaptations Summary
+### 9.4 Asset Layer Adaptations Summary
 
 | Asset Layer | Federal | State | MPO | County |
 |-------------|---------|-------|-----|--------|
@@ -791,12 +1177,13 @@ Drill-down loads the county CSV from R2 (existing behavior), sets the road type 
 | BTS Railroad Crossings | ❌ | ✅ Clustered | ✅ | ✅ |
 | BTS Transit Stops | ❌ | ❌ | ✅ | ✅ |
 | BTS Transit Routes | ❌ | ✅ Major | ✅ | ✅ |
-| **BTS MPO Boundaries** | ✅ All | ✅ State-filtered | ✅ Selected | ⚠️ Intersecting |
+| **BTS MPO Boundaries** | ✅ All | ✅ State-filtered | ✅ Auto-loaded | ⚠️ Intersecting |
+| **DOT District Boundaries** | ❌ | ✅ Toggle | ❌ | ❌ |
 | TIGERweb Boundary | ❌ | Via choropleth | Via choropleth | ✅ Existing |
 | Magisterial Districts | ❌ | ❌ | ⚠️ On drill | ✅ Existing |
 | User Assets | ✅ | ✅ | ✅ | ✅ |
 
-### 8.5 BTS MPO Boundary Queries Per Tier
+### 9.5 BTS MPO Boundary Queries Per Tier
 
 | Tier | Query | Expected Records |
 |------|-------|-----------------|
@@ -805,7 +1192,7 @@ Drill-down loads the county CSV from R2 (existing behavior), sets the road type 
 | MPO | `where=MPO_ID='{selected}'` | 1 |
 | County | Spatial query: `geometry={county_bbox}&spatialRel=esriSpatialRelIntersects` | 0-3 |
 
-### 8.6 Additional Federal Data Sources
+### 9.6 Additional Federal Data Sources
 
 | Source | What It Provides | Download | Integration |
 |--------|-----------------|----------|-------------|
