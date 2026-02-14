@@ -139,6 +139,7 @@
   },
 
   "epdoWeights": {
+    "_source": "HSM Standard (2010) - CDOT uses AASHTO/FHWA standard weights",
     "K": 462,
     "A": 62,
     "B": 12,
