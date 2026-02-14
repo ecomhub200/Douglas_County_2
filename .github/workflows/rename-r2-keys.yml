@@ -1,0 +1,79 @@
+name: Rename R2 Keys (one-time)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (show what would be renamed without doing it)'
+        type: boolean
+        default: true
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Configure AWS CLI for R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+        run: |
+          aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+          aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+          aws configure set default.region auto
+
+      - name: Rename Henrico R2 keys to lowercase convention
+        env:
+          R2_ENDPOINT: "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET: crash-lens-data
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          echo "=========================================="
+          echo "  Rename Henrico R2 keys"
+          echo "  Dry run: $DRY_RUN"
+          echo "=========================================="
+
+          declare -A RENAMES
+          RENAMES["virginia/Henrico/henrico_county_roads.csv"]="virginia/henrico/county_roads.csv"
+          RENAMES["virginia/Henrico/henrico_no_interstate.csv"]="virginia/henrico/no_interstate.csv"
+          RENAMES["virginia/Henrico/henrico_all_roads.csv"]="virginia/henrico/all_roads.csv"
+          RENAMES["virginia/Henrico/crashes.csv"]="virginia/henrico/crashes.csv"
+
+          for old_key in "${!RENAMES[@]}"; do
+            new_key="${RENAMES[$old_key]}"
+            echo ""
+            echo "  $old_key -> $new_key"
+
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "    [DRY RUN] Would copy and delete"
+              continue
+            fi
+
+            # Copy to new key
+            aws s3 cp \
+              "s3://$R2_BUCKET/$old_key" \
+              "s3://$R2_BUCKET/$new_key" \
+              --endpoint-url "$R2_ENDPOINT" && \
+            echo "    Copied OK" || { echo "    COPY FAILED"; continue; }
+
+            # Verify new key exists
+            aws s3 ls "s3://$R2_BUCKET/$new_key" --endpoint-url "$R2_ENDPOINT" && \
+            echo "    Verified new key exists" || { echo "    VERIFY FAILED - skipping delete"; continue; }
+
+            # Delete old key
+            aws s3 rm "s3://$R2_BUCKET/$old_key" --endpoint-url "$R2_ENDPOINT" && \
+            echo "    Deleted old key" || echo "    DELETE FAILED (non-critical)"
+          done
+
+          echo ""
+          echo "=========================================="
+          echo "  Done!"
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "  This was a dry run. Re-run with dry_run=false to apply."
+          else
+            echo "  Keys renamed. Update r2-manifest.json to use lowercase keys."
+          fi
+          echo "=========================================="
