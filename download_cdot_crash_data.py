@@ -510,6 +510,128 @@ def extract_viewer_binary_urls(html_content, base_url):
     return urls
 
 
+# ═══════════════════════════════════════════════════════════════════
+# AUTO-DISCOVERY
+# ═══════════════════════════════════════════════════════════════════
+
+def discover_crash_listings(headless=True):
+    """
+    Browse OnBase DocPop to find crash listing documents.
+
+    Scans the portal page for links containing docid parameters and
+    table rows mentioning "crash listing", extracting doc IDs and year
+    labels.  Returns a list of ``{doc_id, title, year}`` dicts.
+    """
+    if not _playwright_available():
+        logger.warning("  Auto-discovery requires Playwright. Skipping.")
+        return []
+
+    from playwright.sync_api import sync_playwright
+
+    logger.info("Auto-discovery: Browsing OnBase for crash listings...")
+    found = []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=headless,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        context = browser.new_context(viewport={"width": 1280, "height": 900})
+        page = context.new_page()
+
+        try:
+            page.goto(ONBASE_BASE_URL, wait_until="networkidle", timeout=30000)
+            page.wait_for_timeout(2000)
+
+            for frame in page.frames:
+                try:
+                    links = frame.evaluate("""() => {
+                        const results = [];
+                        document.querySelectorAll('a[href*="docid"], a[href*="docId"]').forEach(a => {
+                            const match = (a.href || '').match(/docid=(\\d+)/i);
+                            if (match) results.push({
+                                doc_id: match[1], title: a.textContent.trim()
+                            });
+                        });
+                        document.querySelectorAll('tr').forEach(tr => {
+                            const text = tr.textContent || '';
+                            if (text.toLowerCase().includes('crash listing')) {
+                                const idMatch = text.match(/(\\d{7,9})/);
+                                if (idMatch) results.push({
+                                    doc_id: idMatch[1], title: text.trim().substring(0, 200)
+                                });
+                            }
+                        });
+                        return results;
+                    }""")
+                    found.extend([l for l in links if l.get("doc_id")])
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning(f"  Discovery failed: {e}")
+        finally:
+            browser.close()
+
+    seen = set()
+    unique = []
+    for item in found:
+        did = item.get("doc_id")
+        if did and did not in seen:
+            seen.add(did)
+            year_match = re.search(r'20\d{2}', item.get("title", ""))
+            item["year"] = year_match.group(0) if year_match else None
+            unique.append(item)
+            logger.info(f"  Found: docid={did} year={item['year']} "
+                        f"title={item.get('title', '')[:80]}")
+    return unique
+
+
+def check_for_new_year(manifest, manifest_path):
+    """
+    Check if CDOT published new year data via auto-discovery.
+
+    Compares discovered crash listings against known years in the manifest.
+    If a new year is found, it's added as ``preliminary`` and the previous
+    year is marked ``final`` (since CDOT only publishes the next year when
+    the current one is finalized).
+
+    Returns True if manifest was updated.
+    """
+    files = manifest.get("files", {})
+    known_years = set(files.keys())
+    logger.info(f"Checking for new data (known years: {', '.join(sorted(known_years))})")
+
+    discovered = discover_crash_listings()
+    updated = False
+    for item in discovered:
+        year = item.get("year")
+        doc_id = item.get("doc_id")
+        if year and doc_id and year not in known_years:
+            logger.info(f"  New year discovered: {year} (docid={doc_id})")
+            files[year] = {
+                "docid": int(doc_id),
+                "status": "preliminary",
+                "note": f"Auto-discovered {datetime.now().isoformat()}",
+            }
+            # Finalize previous year — a newer one exists
+            prev = str(int(year) - 1)
+            if prev in files and files[prev].get("status") == "preliminary":
+                files[prev]["status"] = "final"
+                logger.info(f"  {prev} -> finalized (newer year {year} exists)")
+            updated = True
+
+    if updated:
+        manifest["files"] = files
+        manifest["_updated"] = datetime.now().strftime("%Y-%m-%d")
+        with open(manifest_path, 'w') as f:
+            json.dump(manifest, f, indent=2)
+        logger.info(f"  Manifest updated: {manifest_path}")
+    else:
+        logger.info("  No new years found via auto-discovery.")
+
+    return updated
+
+
 def _playwright_available():
     """Check if Playwright is installed and has browsers."""
     try:
@@ -526,6 +648,115 @@ def _playwright_available():
     except Exception as e:
         logger.warning(f"  Playwright availability check failed: {e}")
         return False
+
+
+def download_with_playwright_event(docid, label='document', timeout_sec=90):
+    """
+    Strategy 0 (primary): Playwright two-phase session + download event.
+
+    OnBase's OleHandler.ashx fires a native browser download when the page
+    is loaded with a valid session.  Instead of trying to extract OBTokens
+    or parse viewer HTML, we let the browser handle it:
+
+      1. Navigate to the base DocPop URL to establish an ASP.NET session
+      2. Navigate to the docid URL — OleHandler.ashx triggers a download
+      3. Capture the download via Playwright's download event handler
+
+    This is the proven approach from the tested working script.
+
+    Returns (content_bytes, extension) or raises on failure.
+    """
+    from playwright.sync_api import sync_playwright
+    import tempfile
+
+    url = f"{ONBASE_BASE_URL}?clienttype=html&docid={docid}"
+    logger.info(f"  Strategy 0 (Playwright event): launching browser for docid={docid}")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-features=ProtocolHandlerPermissionPrompt",
+                "--disable-external-intent-requests",
+            ],
+        )
+        try:
+            context = browser.new_context(
+                accept_downloads=True,
+                viewport={"width": 1280, "height": 900},
+            )
+            page = context.new_page()
+
+            captured = {}
+
+            # Use a temporary file to save the download
+            tmp_dir = tempfile.mkdtemp(prefix='onbase_dl_')
+            output_path = os.path.join(tmp_dir, f'doc_{docid}')
+
+            def on_download(download):
+                logger.info(f"  Download event fired: {download.suggested_filename}")
+                try:
+                    download.save_as(output_path)
+                    captured["ok"] = True
+                    captured["filename"] = download.suggested_filename
+                except Exception as e:
+                    logger.error(f"  Download save failed: {e}")
+                    captured["error"] = str(e)
+
+            page.on("download", on_download)
+            page.on("dialog", lambda d: d.accept())
+
+            # Phase 1: Establish session by visiting the base URL
+            logger.info(f"  Phase 1: establishing session at base URL...")
+            page.goto(ONBASE_BASE_URL, wait_until="networkidle", timeout=30000)
+            page.wait_for_timeout(1000)
+
+            # Phase 2: Navigate to the document — OleHandler.ashx fires download
+            logger.info(f"  Phase 2: navigating to docid={docid}...")
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+
+            # Poll for download completion
+            for _ in range(timeout_sec):
+                if captured.get("ok"):
+                    break
+                page.wait_for_timeout(1000)
+
+            browser.close()
+
+            if captured.get("ok") and os.path.isfile(output_path):
+                with open(output_path, 'rb') as f:
+                    content = f.read()
+
+                # Clean up temp file
+                try:
+                    os.remove(output_path)
+                    os.rmdir(tmp_dir)
+                except OSError:
+                    pass
+
+                if len(content) > 500:
+                    is_valid, ext, reason = detect_file_type(content)
+                    if is_valid:
+                        logger.info(f"  Strategy 0 success: {len(content):,} bytes "
+                                    f"({captured.get('filename', 'unknown')}, {reason})")
+                        return content, ext
+                    else:
+                        logger.info(f"  Strategy 0: downloaded {len(content):,} bytes "
+                                    f"but not valid: {reason}")
+                        raise Exception(f"Downloaded file is not valid Excel: {reason}")
+                else:
+                    raise Exception(f"Downloaded file too small: {len(content)} bytes")
+
+            error = captured.get("error", "no download event received")
+            raise Exception(f"Strategy 0 failed: {error}")
+
+        except Exception:
+            try:
+                browser.close()
+            except Exception:
+                pass
+            raise
 
 
 def download_with_playwright(docid, label='document', timeout_ms=60000):
@@ -918,6 +1149,7 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
 def download_onbase_document(session, docid, label='document'):
     """
     Download a document from Hyland OnBase. Tries multiple strategies:
+      0.  Playwright two-phase session + download event (primary, proven)
       1.  Direct requests with redirect following
       1b. Re-bootstrap session and retry (if strategy 1 got 403)
       1.5 Extract OBToken from HTML (A: explicit pattern, B: GUID scan
@@ -926,7 +1158,7 @@ def download_onbase_document(session, docid, label='document'):
       1c. Direct document retrieval endpoints (GetDoc, PdfPop, /api)
       2.  Parse HTML response for real download URL
       3.  clienttype=activex parameter
-      4.  Playwright headless browser (fallback for JS-rendered pages)
+      4.  Playwright headless browser (complex fallback)
 
     Returns (content_bytes, extension) or raises on failure.
     """
@@ -934,6 +1166,19 @@ def download_onbase_document(session, docid, label='document'):
     params = {'clienttype': 'html', 'docid': str(docid)}
 
     logger.info(f"Downloading {label} (docid={docid})...")
+
+    # --- Strategy 0: Playwright two-phase session + download event ---
+    # This is the proven primary approach.  OnBase's OleHandler.ashx fires
+    # a native browser download when the page loads with a valid session.
+    # We try this FIRST because it works reliably where HTTP strategies fail.
+    if _playwright_available():
+        try:
+            return download_with_playwright_event(docid, label=label)
+        except Exception as e:
+            logger.warning(f"  Strategy 0 failed: {e}")
+            logger.info("  Falling back to HTTP-based strategies...")
+    else:
+        logger.info("  Playwright not available, using HTTP-based strategies")
 
     html_content = None  # Saved for strategy 2 if strategy 1 returns HTML
     response_url = None

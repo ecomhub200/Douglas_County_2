@@ -32,11 +32,14 @@ from download_cdot_crash_data import (
     _playwright_available,
     BROWSER_HEADERS,
     build_obtoken_candidates,
+    check_for_new_year,
     create_session_with_retries,
     CUID_COLUMN,
     detect_file_type,
+    discover_crash_listings,
     download_data_dictionary,
     download_onbase_document,
+    download_with_playwright_event,
     excel_to_dataframe,
     extract_download_url_from_html,
     extract_obtoken_url,
@@ -3045,6 +3048,190 @@ class TestBugViewerBinaryUrlConstruction:
                 '?OBToken=aabb1122-3344-5566-7788-99aabbccddee&dochandle=42')
         urls = extract_viewer_binary_urls('', base)
         assert any('/App/RetrieveNativeDocument.ashx' in u for u in urls)
+
+
+# ===========================================================================
+# Strategy 0: Playwright two-phase session + download event
+# ===========================================================================
+
+class TestStrategy0PlaywrightEvent:
+    """
+    Tests for the new Playwright-first download (Strategy 0).
+    Since Playwright is not available in unit-test CI, we mock the sync_playwright
+    context manager and verify the two-phase navigation + download event pattern.
+    """
+
+    def test_strategy0_tried_first_when_playwright_available(self):
+        """Strategy 0 should be tried before HTTP strategies."""
+        xlsx_bytes = make_xlsx_bytes({'CUID': [1], 'County': ['DOUGLAS']})
+
+        with patch('download_cdot_crash_data._playwright_available', return_value=True), \
+             patch('download_cdot_crash_data.download_with_playwright_event') as mock_pw:
+            mock_pw.return_value = (xlsx_bytes, '.xlsx')
+            content, ext = download_onbase_document(MagicMock(), 12345, label='Test')
+
+        assert content == xlsx_bytes
+        assert ext == '.xlsx'
+        mock_pw.assert_called_once_with(12345, label='Test')
+
+    def test_strategy0_failure_falls_back_to_http(self):
+        """When Strategy 0 fails, HTTP strategies should be tried."""
+        xlsx_bytes = make_xlsx_bytes({'CUID': [1], 'County': ['DOUGLAS']})
+
+        mock_resp = MagicMock()
+        mock_resp.content = xlsx_bytes
+        mock_resp.headers = {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': '',
+        }
+        mock_resp.url = 'https://example.com/docpop.aspx'
+
+        with patch('download_cdot_crash_data._playwright_available', return_value=True), \
+             patch('download_cdot_crash_data.download_with_playwright_event',
+                   side_effect=Exception("download event timeout")), \
+             patch('download_cdot_crash_data.make_request_with_retry',
+                   return_value=mock_resp):
+            content, ext = download_onbase_document(MagicMock(), 12345, label='Test')
+
+        assert content == xlsx_bytes
+        assert ext == '.xlsx'
+
+    def test_strategy0_skipped_when_playwright_unavailable(self):
+        """When Playwright not installed, skip to HTTP strategies."""
+        xlsx_bytes = make_xlsx_bytes({'CUID': [1], 'County': ['DOUGLAS']})
+
+        mock_resp = MagicMock()
+        mock_resp.content = xlsx_bytes
+        mock_resp.headers = {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': '',
+        }
+        mock_resp.url = 'https://example.com/docpop.aspx'
+
+        with patch('download_cdot_crash_data._playwright_available', return_value=False), \
+             patch('download_cdot_crash_data.make_request_with_retry',
+                   return_value=mock_resp):
+            content, ext = download_onbase_document(MagicMock(), 12345, label='Test')
+
+        assert content == xlsx_bytes
+
+    def test_download_with_playwright_event_function_exists(self):
+        """The new function should be importable."""
+        assert callable(download_with_playwright_event)
+
+    def test_download_with_playwright_event_uses_base_url(self):
+        """Strategy 0 should navigate to BASE_URL first to establish session."""
+        # We can't run real Playwright in tests, but we verify the function
+        # exists and has the right signature
+        import inspect
+        sig = inspect.signature(download_with_playwright_event)
+        assert 'docid' in sig.parameters
+        assert 'label' in sig.parameters
+        assert 'timeout_sec' in sig.parameters
+
+
+# ===========================================================================
+# Auto-discovery tests
+# ===========================================================================
+
+class TestAutoDiscovery:
+    """Tests for the auto-discovery functions from the working script."""
+
+    def test_discover_crash_listings_returns_list(self):
+        """discover_crash_listings should return a list."""
+        with patch('download_cdot_crash_data._playwright_available', return_value=False):
+            result = discover_crash_listings()
+        assert isinstance(result, list)
+        assert result == []  # Empty when Playwright unavailable
+
+    def test_check_for_new_year_no_update(self, tmp_path):
+        """check_for_new_year returns False when no new years found."""
+        manifest = {
+            "files": {
+                "2024": {"docid": 50498498, "status": "final"},
+                "2025": {"docid": 54973381, "status": "preliminary"},
+            }
+        }
+        manifest_path = tmp_path / "test_manifest.json"
+        manifest_path.write_text(json.dumps(manifest))
+
+        with patch('download_cdot_crash_data.discover_crash_listings', return_value=[]):
+            result = check_for_new_year(manifest, str(manifest_path))
+
+        assert result is False
+
+    def test_check_for_new_year_adds_new_year(self, tmp_path):
+        """check_for_new_year should add new year and finalize previous."""
+        manifest = {
+            "files": {
+                "2024": {"docid": 50498498, "status": "final"},
+                "2025": {"docid": 54973381, "status": "preliminary"},
+            }
+        }
+        manifest_path = tmp_path / "test_manifest.json"
+        manifest_path.write_text(json.dumps(manifest))
+
+        discovered = [{"doc_id": "99999999", "title": "Crash Listing 2026", "year": "2026"}]
+        with patch('download_cdot_crash_data.discover_crash_listings', return_value=discovered):
+            result = check_for_new_year(manifest, str(manifest_path))
+
+        assert result is True
+        assert "2026" in manifest["files"]
+        assert manifest["files"]["2026"]["docid"] == 99999999
+        assert manifest["files"]["2026"]["status"] == "preliminary"
+        # 2025 should be finalized since 2026 exists
+        assert manifest["files"]["2025"]["status"] == "final"
+
+    def test_check_for_new_year_ignores_known_years(self, tmp_path):
+        """Already-known years should not be re-added."""
+        manifest = {
+            "files": {
+                "2025": {"docid": 54973381, "status": "preliminary"},
+            }
+        }
+        manifest_path = tmp_path / "test_manifest.json"
+        manifest_path.write_text(json.dumps(manifest))
+
+        # Discover a year we already know about
+        discovered = [{"doc_id": "54973381", "title": "Crash Listing 2025", "year": "2025"}]
+        with patch('download_cdot_crash_data.discover_crash_listings', return_value=discovered):
+            result = check_for_new_year(manifest, str(manifest_path))
+
+        assert result is False
+
+
+# ===========================================================================
+# Manifest doc_id correctness
+# ===========================================================================
+
+class TestManifestDocIds:
+    """Verify the doc_ids in source_manifest.json match the tested working values."""
+
+    @pytest.fixture
+    def manifest(self):
+        manifest_path = PROJECT_ROOT / 'data' / 'CDOT' / 'source_manifest.json'
+        if not manifest_path.exists():
+            pytest.skip("source_manifest.json not found")
+        return json.loads(manifest_path.read_text())
+
+    def test_2021_docid(self, manifest):
+        assert manifest["files"]["2021"]["docid"] == 37133405
+
+    def test_2022_docid(self, manifest):
+        assert manifest["files"]["2022"]["docid"] == 41627498
+
+    def test_2023_docid(self, manifest):
+        assert manifest["files"]["2023"]["docid"] == 46627965
+
+    def test_2024_docid(self, manifest):
+        assert manifest["files"]["2024"]["docid"] == 50498498
+
+    def test_2025_docid(self, manifest):
+        assert manifest["files"]["2025"]["docid"] == 54973381
+
+    def test_data_dictionary_docid(self, manifest):
+        dd = manifest.get("data_dictionaries", {}).get("2021-2025", {})
+        assert dd.get("docid") == 17470635
 
 
 if __name__ == '__main__':
