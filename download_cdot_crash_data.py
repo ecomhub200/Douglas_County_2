@@ -313,6 +313,140 @@ def extract_obtoken_url(html_content, base_url):
     return None
 
 
+def _extract_virtual_root(html_str):
+    """
+    Extract the __VirtualRoot variable from OnBase page JavaScript.
+
+    OnBase pages set ``var __VirtualRoot="https://…/cdotrmpop"`` which is
+    the application root (one directory above /docpop/).  ViewDocumentEx.aspx
+    lives directly under this root, not under /docpop/.
+    """
+    match = re.search(r'__VirtualRoot\s*=\s*["\']([^"\']+)["\']', html_str)
+    return match.group(1).rstrip('/') if match else None
+
+
+def _extract_guids_from_html(html_str):
+    """
+    Find all GUID-formatted strings in the HTML page.
+
+    The OBToken is a GUID embedded in inline JavaScript (e.g. as a variable
+    value) but not necessarily in a URL string.  This function extracts all
+    candidate GUIDs so we can try each one as a potential OBToken.
+    """
+    guid_pattern = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+    return list(dict.fromkeys(re.findall(guid_pattern, html_str)))  # unique, preserve order
+
+
+def _extract_onbase_keys(html_str):
+    """
+    Extract underscore-separated hex strings from OnBase HTML.
+
+    The ``k`` parameter in ViewDocumentEx URLs uses the format
+    ``xxxxxxxx_xxxx_xxxx_xxxx_`` (hex with underscores).  This is a
+    validation key generated server-side.
+    """
+    pattern = r'[0-9a-fA-F]{8}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_'
+    return list(dict.fromkeys(re.findall(pattern, html_str)))
+
+
+def build_obtoken_candidates(html_content, base_url, docid):
+    """
+    Build candidate ViewDocumentEx URLs when :func:`extract_obtoken_url`
+    cannot find a direct ``OBToken=…`` pattern.
+
+    OnBase DocPop renders an ASP.NET frameset where the iframe src starts as
+    ``blank.aspx`` and is then set by JavaScript to a ViewDocumentEx URL.
+    Because `requests` does not execute JavaScript, we must extract the
+    OBToken GUID, dochandle, and k values from the raw HTML and reconstruct
+    the URL ourselves.
+
+    Returns a list of candidate URLs to try, ordered by likelihood.
+    """
+    html_str = (html_content.decode('utf-8', errors='ignore')
+                if isinstance(html_content, bytes) else html_content)
+
+    # --- Determine the application root ---
+    virtual_root = _extract_virtual_root(html_str)
+    if not virtual_root:
+        # Derive from base_url: …/CDOTRMPop/docpop/docpop.aspx → …/CDOTRMPop
+        from urllib.parse import urlparse
+        parsed = urlparse(base_url)
+        path = parsed.path
+        docpop_idx = path.lower().find('/docpop/')
+        if docpop_idx >= 0:
+            path = path[:docpop_idx]
+        virtual_root = f"{parsed.scheme}://{parsed.netloc}{path}"
+
+    # --- Extract GUID candidates ---
+    guids = _extract_guids_from_html(html_str)
+    if not guids:
+        return []
+
+    # --- Extract underscore-hex keys (potential k parameter) ---
+    keys = _extract_onbase_keys(html_str)
+
+    logger.info(f"  [GUID scan] Found {len(guids)} GUIDs, {len(keys)} k-keys "
+                f"in {len(html_str):,}-char HTML")
+    for g in guids[:6]:
+        logger.info(f"    GUID: {g}")
+    for k in keys[:3]:
+        logger.info(f"    k-key: {k}")
+
+    candidates = []
+    for guid in guids:
+        base = (f"{virtual_root}/ViewDocumentEx.aspx"
+                f"?OBToken={guid}&dochandle={docid}")
+        # Try with k value first (more likely to succeed)
+        if keys:
+            candidates.append(f"{base}&k={keys[0]}")
+        # Also try without k (may be optional)
+        candidates.append(base)
+
+    return candidates
+
+
+def extract_viewer_binary_urls(html_content, base_url):
+    """
+    Parse a ViewDocumentEx HTML viewer page for URLs that serve the
+    actual binary document content.
+
+    OnBase renders an HTML viewer (using Infragistics controls) that makes
+    AJAX calls to endpoints like ``Retrieve.ashx``, ``RenderPage.aspx``,
+    ``GetDocumentContent.ashx`` etc. to load document pages/content.
+    """
+    html_str = (html_content.decode('utf-8', errors='ignore')
+                if isinstance(html_content, bytes) else html_content)
+
+    from urllib.parse import urljoin
+
+    # Look for binary-serving endpoint patterns in the viewer HTML
+    patterns = [
+        # .ashx handlers (common for binary content in ASP.NET)
+        r'["\']([^"\']*(?:Retrieve|GetDoc|DocumentContent|RenderPage|'
+        r'FetchDocument|PageContent|SendTo|GetNativeDoc)[^"\']*\.ashx[^"\']*)["\']',
+        # .aspx pages that serve content
+        r'["\']([^"\']*(?:Retrieve|GetDoc|FetchDocument|RenderPage|'
+        r'DocumentContent|GetNativeDocument|SendToApplication)[^"\']*\.aspx[^"\']*)["\']',
+        # Generic download/content URLs
+        r'["\']([^"\']*(?:download|retrieve|getdoc|fetchdoc|sendto|'
+        r'nativedoc|docstream)[^"\']*)["\']',
+    ]
+
+    urls = []
+    for pattern in patterns:
+        for match in re.finditer(pattern, html_str, re.IGNORECASE):
+            url = match.group(1)
+            # Skip JavaScript function calls and CSS
+            if any(s in url.lower() for s in ('javascript:', 'function', '.css', '.gif', '.png')):
+                continue
+            if not url.startswith('http'):
+                url = urljoin(base_url, url)
+            if url not in urls:
+                urls.append(url)
+
+    return urls
+
+
 def _playwright_available():
     """Check if Playwright is installed and has browsers."""
     try:
@@ -373,6 +507,9 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                 has_file_url = any(k in resp_url for k in [
                     '.xlsx', '.xls', 'getdoc', 'retrievedoc',
                     'fetchdocument', 'renderpage',
+                    # Additional OnBase stream endpoints
+                    'getdocument', 'retrievedocument', 'documentstream',
+                    'docstream', 'viewdoc', 'binarydata', 'getfile',
                 ])
                 has_file_disp = '.xls' in cd.lower()
 
@@ -467,6 +604,16 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                 'text=Download', 'text=Retrieve',
                 'text=Open', 'text=Save',
                 'text=Send to', 'text=Send To',
+                # OnBase-specific button IDs
+                '#SaveButton', '#btnSave', '#btnExport',
+                # Title-based toolbar actions
+                '[title="Save As"]', '[title="Export"]', '[title="Print"]',
+                '[title*="export" i]',
+                # Infragistics toolbar controls (OnBase UI framework)
+                '.ig_Item', '.ig_ToolbarItem',
+                '[class*="toolbar"] button', '[class*="toolbar"] a',
+                # ARIA roles
+                '[role="button"]', '[role="menuitem"]',
             ]
 
             for target_frame in all_frames:
@@ -539,6 +686,90 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                     except Exception:
                         continue
 
+            # --- Keyboard shortcut (Ctrl+S) to trigger viewer save ---
+            if downloaded_path is None and not captured_excel:
+                for target_frame in all_frames:
+                    try:
+                        logger.info("  Trying Ctrl+S keyboard shortcut...")
+                        target_frame.locator('body').first.focus()
+                        with page.expect_download(timeout=8000) as dl_info:
+                            page.keyboard.press('Control+s')
+                        download = dl_info.value
+                        downloaded_path = download.path()
+                        logger.info(f"  Ctrl+S download: {download.suggested_filename}")
+                        break
+                    except Exception:
+                        if captured_excel:
+                            break
+                        continue
+
+            # --- Scan JS and DOM for hidden document URLs ---
+            if downloaded_path is None and not captured_excel:
+                logger.info("  Scanning page scripts and DOM for document URLs...")
+                for target_frame in all_frames:
+                    try:
+                        discovered_urls = target_frame.evaluate("""() => {
+                            const urls = new Set();
+                            const scripts = document.querySelectorAll('script');
+                            const urlPatterns = [
+                                /['"](https?:\\/\\/[^'"]*(?:GetDoc|Download|Retrieve|Stream|Export|document)[^'"]*)['"]/gi,
+                                /documentUrl\\s*[:=]\\s*['"]([^'"]+)['"]/gi,
+                                /downloadUrl\\s*[:=]\\s*['"]([^'"]+)['"]/gi,
+                                /fileUrl\\s*[:=]\\s*['"]([^'"]+)['"]/gi,
+                                /blobUrl\\s*[:=]\\s*['"]([^'"]+)['"]/gi
+                            ];
+                            for (const script of scripts) {
+                                const text = script.textContent || '';
+                                for (const pattern of urlPatterns) {
+                                    pattern.lastIndex = 0;
+                                    let match;
+                                    while ((match = pattern.exec(text)) !== null) {
+                                        urls.add(match[1]);
+                                    }
+                                }
+                            }
+                            for (const tag of ['object', 'embed', 'iframe']) {
+                                for (const el of document.querySelectorAll(tag)) {
+                                    const src = el.getAttribute('data') || el.getAttribute('src') || '';
+                                    if (src && (src.startsWith('blob:') ||
+                                        /GetDoc|Download|Retrieve|Stream|document/i.test(src))) {
+                                        urls.add(src);
+                                    }
+                                }
+                            }
+                            return Array.from(urls).slice(0, 10);
+                        }""")
+                    except Exception:
+                        discovered_urls = []
+                        continue
+
+                    if discovered_urls:
+                        logger.info(f"  Found {len(discovered_urls)} candidate URL(s) in page scripts")
+
+                    for di, disc_url in enumerate(discovered_urls):
+                        if disc_url.startswith('blob:'):
+                            logger.info(f"    [{di+1}] Skipping blob URL: {disc_url[:80]}")
+                            continue
+                        logger.info(f"    [{di+1}] Trying: {disc_url[:120]}")
+                        try:
+                            resp = page.request.get(disc_url)
+                            body = resp.body()
+                            ct = (resp.headers.get('content-type') or '').lower()
+                            cd = resp.headers.get('content-disposition') or ''
+                            is_valid, ext, reason = detect_file_type(body, ct, cd)
+                            if is_valid:
+                                browser.close()
+                                logger.info(f"  Playwright success via JS-discovered URL: {reason}")
+                                return body, ext
+                            else:
+                                logger.info(f"    Not a valid file: {reason}")
+                        except Exception as e:
+                            logger.info(f"    Fetch failed: {e}")
+                        if captured_excel:
+                            break
+                    if captured_excel:
+                        break
+
             # --- Final check on network interceptor ---
             if captured_excel:
                 browser.close()
@@ -580,6 +811,37 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                                 logger.info(f"  [Playwright diag] Frame {frame.url[:80]} HTML ({len(fc)} chars):\n{fc[:1000]}")
                             except Exception:
                                 pass
+                    # Dump toolbar / Infragistics control structure
+                    try:
+                        toolbar_info = page.evaluate("""() => {
+                            const selectors = [
+                                '[class*="toolbar" i]', '[id*="toolbar" i]',
+                                '.ig_Control', '[class*="ig_"]'
+                            ];
+                            const results = [];
+                            for (const sel of selectors) {
+                                try {
+                                    const els = document.querySelectorAll(sel);
+                                    for (const el of Array.from(els).slice(0, 5)) {
+                                        results.push({
+                                            tag: el.tagName,
+                                            id: el.id || '',
+                                            className: (el.className || '').toString().substring(0, 80),
+                                            childCount: el.children.length,
+                                            innerText: (el.innerText || '').substring(0, 60)
+                                        });
+                                    }
+                                } catch(e) {}
+                            }
+                            return results;
+                        }""")
+                        if toolbar_info:
+                            logger.info(f"  [Playwright diag] Toolbar/Infragistics controls: {len(toolbar_info)}")
+                            for ti in toolbar_info:
+                                logger.info(f"    <{ti['tag']} id='{ti['id']}' class='{ti['className']}' "
+                                           f"children={ti['childCount']}>{ti['innerText']}</{ti['tag']}>")
+                    except Exception:
+                        pass
                     logger.info(f"  [Playwright diag] Main HTML preview:\n{page_html[:1500]}")
                 except Exception as diag_err:
                     logger.warning(f"  [Playwright diag] Failed to dump page: {diag_err}")
@@ -611,7 +873,9 @@ def download_onbase_document(session, docid, label='document'):
     Download a document from Hyland OnBase. Tries multiple strategies:
       1.  Direct requests with redirect following
       1b. Re-bootstrap session and retry (if strategy 1 got 403)
-      1.5 Extract OBToken from HTML frameset → fetch ViewDocumentEx directly
+      1.5 Extract OBToken from HTML (A: explicit pattern, B: GUID scan
+          from script blocks) → fetch ViewDocumentEx → parse viewer HTML
+          for binary download endpoints
       1c. Direct document retrieval endpoints (GetDoc, PdfPop, /api)
       2.  Parse HTML response for real download URL
       3.  clienttype=activex parameter
@@ -680,62 +944,102 @@ def download_onbase_document(session, docid, label='document'):
     except Exception as e:
         logger.warning(f"  Strategy 1 failed: {e}")
 
-    # --- Strategy 1.5: extract OBToken from HTML and fetch ViewDocumentEx ---
-    # OnBase embeds a session-scoped OBToken in the DocPop frameset/iframe.
-    # ViewDocumentEx.aspx?OBToken=<GUID> serves the actual file when called
-    # with the same session cookies (ASP.NET_SessionId).
+    # --- Strategy 1.5: extract OBToken and fetch ViewDocumentEx directly ---
+    # OnBase embeds a session-scoped OBToken in the DocPop HTML (in the
+    # frameset, iframe src, or inline JavaScript).  ViewDocumentEx.aspx
+    # needs this token + the ASP.NET_SessionId cookie to serve content.
+    #
+    # Phase A: look for an explicit OBToken=GUID pattern in the HTML.
+    # Phase B: if not found, extract bare GUIDs from <script> blocks and
+    #          try each one as a candidate OBToken (the iframe src starts
+    #          as blank.aspx and JS sets it dynamically — the GUID is in
+    #          the JS vars, not in a URL string).
     if html_content is not None:
+        # --- Phase A: direct OBToken pattern ---
         obtoken_url = extract_obtoken_url(html_content, response_url or url)
-        if obtoken_url:
-            logger.info(f"  Strategy 1.5: found OBToken URL: {obtoken_url[:150]}")
+        candidate_urls = [obtoken_url] if obtoken_url else []
+
+        # --- Phase B: broader GUID extraction from scripts ---
+        if not candidate_urls:
+            candidate_urls = build_obtoken_candidates(
+                html_content, response_url or url, docid)
+
+        if candidate_urls:
+            logger.info(f"  Strategy 1.5: trying {len(candidate_urls)} "
+                        f"candidate URL(s)...")
+        else:
+            logger.info("  Strategy 1.5: no OBToken or GUID candidates "
+                        "found in HTML response")
+
+        for ci, candidate_url in enumerate(candidate_urls):
+            logger.info(f"  Strategy 1.5 [{ci+1}/{len(candidate_urls)}]: "
+                        f"{candidate_url[:150]}")
             try:
-                response = make_request_with_retry(session, obtoken_url, timeout=180,
-                                                    max_manual_retries=2)
+                response = make_request_with_retry(
+                    session, candidate_url, timeout=60,
+                    max_manual_retries=1)
                 content = response.content
                 content_type = response.headers.get('Content-Type', '')
-                content_disposition = response.headers.get('Content-Disposition', '')
+                content_disposition = response.headers.get(
+                    'Content-Disposition', '')
 
-                is_valid, ext, reason = detect_file_type(content, content_type,
-                                                          content_disposition)
-                logger.info(f"  Strategy 1.5 (OBToken): {reason}")
+                is_valid, ext, reason = detect_file_type(
+                    content, content_type, content_disposition)
+                logger.info(f"    Result: {reason}")
                 logger.info(f"    Content-Type: {content_type}")
-                logger.info(f"    Response URL: {response.url[:150]}")
-                logger.info(f"    Response size: {len(content):,} bytes")
+                logger.info(f"    Size: {len(content):,} bytes")
 
                 if is_valid:
-                    logger.info(f"  Downloaded {len(content):,} bytes via OBToken")
+                    logger.info(f"  Downloaded {len(content):,} bytes "
+                                f"via OBToken candidate {ci+1}")
                     return content, ext
 
-                # ViewDocumentEx returned HTML (viewer page) — search for the
-                # native-document download link inside the viewer.
-                viewer_download_url = extract_download_url_from_html(
-                    content, response.url)
-                if viewer_download_url:
-                    logger.info(f"  OBToken viewer returned HTML. "
-                                f"Following download link: {viewer_download_url[:120]}")
-                    try:
-                        resp2 = make_request_with_retry(
-                            session, viewer_download_url, timeout=180,
-                            max_manual_retries=2)
-                        content2 = resp2.content
-                        ct2 = resp2.headers.get('Content-Type', '')
-                        cd2 = resp2.headers.get('Content-Disposition', '')
+                # ViewDocumentEx returned HTML (viewer) — dig into it for
+                # the actual binary download URL.
+                if len(content) > 50:
+                    # Try standard download link patterns first
+                    viewer_link = extract_download_url_from_html(
+                        content, response.url)
+                    # Then try OnBase-specific binary endpoints
+                    binary_urls = extract_viewer_binary_urls(
+                        content, response.url)
 
-                        is_valid2, ext2, reason2 = detect_file_type(content2, ct2, cd2)
-                        logger.info(f"  Strategy 1.5 viewer follow-up: {reason2}")
+                    follow_urls = []
+                    if viewer_link:
+                        follow_urls.append(viewer_link)
+                    follow_urls.extend(
+                        u for u in binary_urls if u != viewer_link)
 
-                        if is_valid2:
-                            logger.info(f"  Downloaded {len(content2):,} bytes via "
-                                        f"OBToken viewer link")
-                            return content2, ext2
-                    except Exception as e2:
-                        logger.info(f"  OBToken viewer follow-up failed: {e2}")
-                else:
-                    logger.info("  No native download link found in OBToken viewer HTML")
+                    if follow_urls:
+                        logger.info(f"    Viewer HTML returned. Found "
+                                    f"{len(follow_urls)} sub-link(s)")
+
+                    for fi, follow_url in enumerate(follow_urls[:5]):
+                        logger.info(f"    Following sub-link {fi+1}: "
+                                    f"{follow_url[:120]}")
+                        try:
+                            resp2 = make_request_with_retry(
+                                session, follow_url, timeout=60,
+                                max_manual_retries=1)
+                            c2 = resp2.content
+                            ct2 = resp2.headers.get('Content-Type', '')
+                            cd2 = resp2.headers.get(
+                                'Content-Disposition', '')
+                            ok2, ext2, r2 = detect_file_type(c2, ct2, cd2)
+                            logger.info(f"      Sub-link result: {r2}")
+                            if ok2:
+                                logger.info(
+                                    f"  Downloaded {len(c2):,} bytes "
+                                    f"via viewer sub-link")
+                                return c2, ext2
+                        except Exception as e2:
+                            logger.info(f"      Sub-link failed: {e2}")
+            except requests.exceptions.HTTPError as e:
+                status = (e.response.status_code
+                          if e.response is not None else '?')
+                logger.info(f"    HTTP {status} — skipping candidate")
             except Exception as e:
-                logger.warning(f"  Strategy 1.5 (OBToken) failed: {e}")
-        else:
-            logger.info("  Strategy 1.5: no OBToken found in HTML response")
+                logger.info(f"    Failed: {e}")
 
     # --- Strategy 1c: try direct document retrieval endpoints ---
     for i, getdoc_url in enumerate(ONBASE_GETDOC_URLS):

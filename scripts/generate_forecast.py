@@ -65,8 +65,27 @@ ENDPOINT_NAME = "crashlens-chronos2-endpoint"
 QUANTILE_LEVELS = [0.1, 0.25, 0.5, 0.75, 0.9]
 DEFAULT_HORIZON = 12  # months
 
-# EPDO weights (must match index.html)
-EPDO_WEIGHTS = {"K": 462, "A": 62, "B": 12, "C": 5, "O": 1}
+# EPDO weights — loaded from state config, falls back to HSM standard
+def load_epdo_weights(config_path=None):
+    """Load EPDO weights from state config JSON file."""
+    default_weights = {"K": 462, "A": 62, "B": 12, "C": 5, "O": 1}
+    if config_path is None:
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        config_path = os.path.join(project_root, "data", "CDOT", "config.json")
+    try:
+        with open(config_path, "r") as f:
+            config = json.load(f)
+        weights = config.get("epdoWeights", default_weights)
+        for key in ["K", "A", "B", "C", "O"]:
+            if key not in weights:
+                weights[key] = default_weights[key]
+        print(f"[Config] EPDO weights loaded from {config_path}: {weights}")
+        return weights
+    except Exception as e:
+        print(f"[Config] Using default EPDO weights: {e}")
+        return default_weights
+
+EPDO_WEIGHTS = load_epdo_weights()
 
 # Default top corridors (Douglas County, Colorado — used as fallback)
 DEFAULT_CORRIDORS = [
