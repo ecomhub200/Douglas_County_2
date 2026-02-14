@@ -25,9 +25,13 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from download_cdot_crash_data import (
+    _extract_guids_from_html,
+    _extract_onbase_keys,
+    _extract_virtual_root,
     _get_output_filename,
     _playwright_available,
     BROWSER_HEADERS,
+    build_obtoken_candidates,
     create_session_with_retries,
     CUID_COLUMN,
     detect_file_type,
@@ -36,6 +40,7 @@ from download_cdot_crash_data import (
     excel_to_dataframe,
     extract_download_url_from_html,
     extract_obtoken_url,
+    extract_viewer_binary_urls,
     filter_to_jurisdiction,
     list_available,
     load_manifest,
@@ -438,6 +443,131 @@ class TestExtractObtokenUrl:
         url = extract_obtoken_url(html, self.BASE_URL)
         assert url is not None
         assert 'OBToken=deadbeef-1234-5678-9abc-def012345678' in url
+
+
+# ===========================================================================
+# GUID / VirtualRoot / key extraction helpers
+# ===========================================================================
+
+class TestExtractVirtualRoot:
+
+    def test_standard_virtual_root(self):
+        html = 'var __VirtualRoot="https://oitco.hylandcloud.com/cdotrmpop";'
+        assert _extract_virtual_root(html) == 'https://oitco.hylandcloud.com/cdotrmpop'
+
+    def test_with_trailing_slash(self):
+        html = "var __VirtualRoot='https://host.com/app/';"
+        assert _extract_virtual_root(html) == 'https://host.com/app'
+
+    def test_no_virtual_root(self):
+        html = '<html><body>nothing here</body></html>'
+        assert _extract_virtual_root(html) is None
+
+
+class TestExtractGuidsFromHtml:
+
+    def test_finds_standard_guids(self):
+        html = '''<script>
+        var token = "407b6bf6-c00d-4450-9db9-72e58cfc2447";
+        var session = "aabbccdd-1122-3344-5566-778899001122";
+        </script>'''
+        guids = _extract_guids_from_html(html)
+        assert len(guids) == 2
+        assert '407b6bf6-c00d-4450-9db9-72e58cfc2447' in guids
+        assert 'aabbccdd-1122-3344-5566-778899001122' in guids
+
+    def test_deduplicates(self):
+        html = 'id="407b6bf6-c00d-4450-9db9-72e58cfc2447" data="407b6bf6-c00d-4450-9db9-72e58cfc2447"'
+        guids = _extract_guids_from_html(html)
+        assert len(guids) == 1
+
+    def test_no_guids(self):
+        html = '<html><body>no guids here</body></html>'
+        guids = _extract_guids_from_html(html)
+        assert len(guids) == 0
+
+
+class TestExtractOnbaseKeys:
+
+    def test_finds_underscore_hex_keys(self):
+        html = 'var k = "6754fac4_c7b2_4cbb_ad8a_";'
+        keys = _extract_onbase_keys(html)
+        assert len(keys) == 1
+        assert '6754fac4_c7b2_4cbb_ad8a_' in keys
+
+    def test_no_keys(self):
+        html = 'var x = "normal_text";'
+        keys = _extract_onbase_keys(html)
+        assert len(keys) == 0
+
+
+class TestBuildObtokenCandidates:
+
+    def test_builds_urls_with_virtual_root(self):
+        html = '''<script>
+        var __VirtualRoot="https://oitco.hylandcloud.com/cdotrmpop";
+        var token = "407b6bf6-c00d-4450-9db9-72e58cfc2447";
+        </script>'''
+        candidates = build_obtoken_candidates(
+            html.encode(),
+            'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx',
+            '17470635')
+        assert len(candidates) >= 1
+        found_url = candidates[0]
+        assert 'cdotrmpop/ViewDocumentEx.aspx' in found_url
+        assert 'OBToken=407b6bf6' in found_url
+        assert 'dochandle=17470635' in found_url
+
+    def test_includes_k_param(self):
+        html = '''<script>
+        var __VirtualRoot="https://host.com/app";
+        var t = "11112222-3333-4444-5555-666677778888";
+        var k = "aabbccdd_1122_3344_5566_";
+        </script>'''
+        candidates = build_obtoken_candidates(html, 'https://host.com/app/docpop/docpop.aspx', '999')
+        # First candidate should have k param
+        assert any('k=aabbccdd_1122_3344_5566_' in c for c in candidates)
+        # Should also have a version without k
+        assert any('k=' not in c for c in candidates)
+
+    def test_no_guids_returns_empty(self):
+        html = '<html><body>nothing</body></html>'
+        candidates = build_obtoken_candidates(html, 'https://host.com/docpop.aspx', '123')
+        assert candidates == []
+
+    def test_fallback_base_url_without_virtual_root(self):
+        """When __VirtualRoot is not found, derive from base_url."""
+        html = '<script>var t = "aabb1122-3344-5566-7788-99aabbccddee";</script>'
+        candidates = build_obtoken_candidates(
+            html,
+            'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx',
+            '12345')
+        assert len(candidates) >= 1
+        assert '/CDOTRMPop/ViewDocumentEx.aspx' in candidates[0]
+
+
+class TestExtractViewerBinaryUrls:
+
+    def test_finds_ashx_handlers(self):
+        html = '<script>var url = "/app/GetDocumentContent.ashx?id=1";</script>'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/app/viewer.aspx')
+        assert len(urls) >= 1
+        assert any('GetDocumentContent.ashx' in u for u in urls)
+
+    def test_finds_aspx_pages(self):
+        html = '<a href="RetrieveNativeDocument.aspx?token=abc">Save</a>'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/app/viewer.aspx')
+        assert any('RetrieveNativeDocument.aspx' in u for u in urls)
+
+    def test_skips_css_and_images(self):
+        html = '<link href="styles.css"><img src="/app/download.gif">'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/')
+        assert not any('.css' in u for u in urls)
+        assert not any('.gif' in u for u in urls)
+
+    def test_empty_html(self):
+        urls = extract_viewer_binary_urls('', 'https://host.com/')
+        assert urls == []
 
 
 # ===========================================================================
@@ -1495,6 +1625,97 @@ class TestDownloadOnbaseDocument:
             if 'ViewDocumentEx' in url or 'OBToken' in url:
                 return mock_resp_viewer
             return mock_resp_frameset
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
+            content, ext = download_onbase_document(MagicMock(), 123, label='Test')
+
+        assert content == xlsx_bytes
+
+    def test_strategy1_5_guid_scan_from_js_variables(self):
+        """Strategy 1.5 Phase B: OBToken is a bare GUID in JS (iframe starts at blank.aspx)."""
+        xlsx_bytes = make_xlsx_bytes({'CUID': [1, 2], 'County': ['DOUGLAS', 'DOUGLAS']})
+
+        # Realistic DocPop HTML: iframe starts at blank.aspx, OBToken in JS variable
+        docpop_html = (
+            b'<html><head>'
+            b'<script type="text/javascript">'
+            b'var __VirtualRoot="https://oitco.hylandcloud.com/cdotrmpop";'
+            b'</script></head><body>'
+            b'<iframe src="blank.aspx" id="DocSelectPage"></iframe>'
+            b'<script>'
+            b'var _obToken="407b6bf6-c00d-4450-9db9-72e58cfc2447";'
+            b'var _kVal="6754fac4_c7b2_4cbb_ad8a_";'
+            b'</script></body></html>'
+        )
+
+        mock_resp_html = MagicMock()
+        mock_resp_html.content = docpop_html
+        mock_resp_html.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_html.url = 'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx'
+
+        mock_resp_excel = MagicMock()
+        mock_resp_excel.content = xlsx_bytes
+        mock_resp_excel.headers = {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': '',
+        }
+        mock_resp_excel.url = 'https://oitco.hylandcloud.com/cdotrmpop/ViewDocumentEx.aspx'
+
+        def mock_request(session, url, **kwargs):
+            if 'ViewDocumentEx' in url and '407b6bf6' in url:
+                return mock_resp_excel
+            return mock_resp_html
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
+            content, ext = download_onbase_document(MagicMock(), 17470635, label='Test')
+
+        assert content == xlsx_bytes
+        assert ext == '.xlsx'
+
+    def test_strategy1_5_guid_scan_with_viewer_binary_urls(self):
+        """Strategy 1.5 Phase B: GUID scan → ViewDocumentEx returns viewer → follow binary URL."""
+        xlsx_bytes = make_xlsx_bytes({'A': [1]})
+
+        # DocPop HTML with GUID in JS
+        docpop_html = (
+            b'<html><head><script>'
+            b'var __VirtualRoot="https://host.com/app";'
+            b'</script></head><body>'
+            b'<iframe src="blank.aspx" id="DocSelectPage"></iframe>'
+            b'<script>var tok="aabb1122-3344-5566-7788-99aabbccddee";</script>'
+            b'</body></html>'
+        )
+
+        # ViewDocumentEx returns HTML viewer with binary endpoint
+        viewer_html = (
+            b'<html><script>'
+            b'var contentUrl = "/app/GetDocumentContent.ashx?id=123";'
+            b'</script></html>'
+        )
+
+        mock_resp_docpop = MagicMock()
+        mock_resp_docpop.content = docpop_html
+        mock_resp_docpop.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_docpop.url = 'https://host.com/app/docpop/docpop.aspx'
+
+        mock_resp_viewer = MagicMock()
+        mock_resp_viewer.content = viewer_html
+        mock_resp_viewer.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_viewer.url = 'https://host.com/app/ViewDocumentEx.aspx'
+
+        mock_resp_binary = MagicMock()
+        mock_resp_binary.content = xlsx_bytes
+        mock_resp_binary.headers = {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': 'attachment; filename="data.xlsx"',
+        }
+
+        def mock_request(session, url, **kwargs):
+            if 'GetDocumentContent' in url:
+                return mock_resp_binary
+            if 'ViewDocumentEx' in url:
+                return mock_resp_viewer
+            return mock_resp_docpop
 
         with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
             content, ext = download_onbase_document(MagicMock(), 123, label='Test')
