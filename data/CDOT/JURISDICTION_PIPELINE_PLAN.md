@@ -810,204 +810,278 @@ async function onMPOSelected(stateKey, mpoKey) {
 
 ---
 
-## 6. EPDO Configuration: State vs Federal Weights
+## 6. Dynamic EPDO Scoring System
 
-### 6.1 Current State
+> **Reference Implementation:** See `data/CDOT/epdo/` for complete code:
+> - `EPDO_PLAN.md` — Detailed implementation plan with line-by-line changes
+> - `epdo_presets.js` — Frontend preset system, UI HTML, recalculation cascade
+> - `epdo_config_loader.py` — Python config loader for backend scripts
 
-EPDO (Equivalent Property Damage Only) weights are currently **hardcoded identically** everywhere:
+### 6.1 Current State & Problem
+
+EPDO (Equivalent Property Damage Only) weights are **hardcoded identically** in 14+ locations across the codebase:
 
 | Location | Weights | Purpose |
 |----------|---------|---------|
 | `app/index.html` line 19910 | `{ K:462, A:62, B:12, C:5, O:1 }` | Primary `EPDO_WEIGHTS` constant |
 | `app/index.html` line 28795 | `calcEPDO()` function | Used in 60+ places across all tabs |
-| `states/virginia/config.json` | `"epdoWeights": { K:462, A:62, B:12, C:5, O:1 }` | Virginia config |
-| `states/colorado/config.json` | `"epdoWeights": { K:462, A:62, B:12, C:5, O:1 }` | Colorado config |
-| `send_notifications.py` | `{ K:462, A:62, B:12, C:5, O:1 }` | Email reports |
-| `tests/test_prediction_accuracy.py` | `{ K:462, A:62, B:12, C:5, O:1 }` | Forecast tests |
+| `app/index.html` — **14 inline calculations** | `d.K*462 + d.A*62 + d.B*12 + d.C*5 + d.O` | Bypass `calcEPDO()` entirely |
+| `app/index.html` line 69187 | `EPDO_WEIGHTS_AD` (unused duplicate) | Dead code to remove |
+| `states/virginia/config.json` | `"epdoWeights": { K:462, ... }` | Config exists but is **never read by the app** |
+| `states/colorado/config.json` | `"epdoWeights": { K:462, ... }` | Config exists but is **never read by the app** |
+| `scripts/generate_forecast.py` line 88 | `EPDO_WEIGHTS = load_epdo_weights()` | **Already updated** — reads from config |
+| `send_notifications.py` line 131 | `epdo_weights = _load_epdo_weights()` | **Already updated** — reads from config |
 
-There is also a **second set** used only for Street Light Warrant Analysis:
-- `app/index.html` line 106333: `{ K:1500, A:240, B:12, C:6, O:1 }` — research-based weights for lighting analysis
+**Separate warrant-specific weights (intentionally NOT standard EPDO):**
 
-### 6.2 Should EPDO Weights Differ by State and Federal Level?
+| Line | Function | Weights | Methodology |
+|------|----------|---------|-------------|
+| 106360 | Streetlight warrant | K=1500, A=240 | Warrant-specific, NOT standard EPDO |
+| 96525 | Roundabout warrant | K=1500, A=240 | Warrant-specific |
+| 119030, 119197 | School zone analysis | K=1500, A=240 | Warrant-specific |
+| 60512, 61542 | Grant application PDF | K=1500, A=240 | Grant application standard |
 
-**Yes — they absolutely should be configurable per state.** Here's why:
+These warrant-specific weights use local `const` declarations that shadow the global — they will NOT be affected by changes to the global `EPDO_WEIGHTS` and must remain unchanged.
 
-| Factor | Detail |
-|--------|--------|
-| **FHWA publishes standard comprehensive crash costs** | The K:462, A:62 weights come from FHWA's 2016 Crash Costs report. These are the national baseline. |
-| **States calculate their own** | Many state SHSPs (Strategic Highway Safety Plans) use state-specific crash costs based on local medical costs, wage rates, and legal costs. For example, Virginia's crash costs may differ from Colorado's because medical costs and income levels differ. |
-| **HSIP benefit-cost analysis** | FHWA requires states to use state-specific crash costs for HSIP project prioritization (23 CFR 924). Many states publish these in their SHSP or HSIP manual. |
-| **Inflation adjustments** | Crash costs should be updated for inflation. The 2016 FHWA values may be outdated by 2026. States update at different intervals. |
-| **Federal comparisons** | When comparing states at the Federal tier, should we use each state's own weights (fair comparison of local priorities) or a uniform national weight (apples-to-apples)? Both have merit. |
+### 6.2 Research: State EPDO Weights Vary Significantly
 
-#### Standard EPDO Weight Sources
+**EPDO weights are derived from crash cost ratios:** `Weight = CrashCost(severity) / CrashCost(PDO)`
 
-| Source | K (Fatal) | A (Incapacitating) | B (Non-Incapacitating) | C (Possible) | O (PDO) | Year |
-|--------|-----------|---------------------|------------------------|---------------|---------|------|
-| **FHWA 2016 (current default)** | 462 | 62 | 12 | 5 | 1 | 2016 |
-| **FHWA comprehensive (2024 update)** | ~550 | ~75 | ~15 | ~6 | 1 | 2024 |
-| **VDOT HSIP (example)** | 490 | 68 | 14 | 5 | 1 | 2023 |
-| **CDOT (example)** | 475 | 65 | 13 | 5 | 1 | 2022 |
-| **Street Light Warrant (research)** | 1500 | 240 | 12 | 6 | 1 | Research |
+Since every state DOT calculates their own crash costs, the resulting weights vary significantly:
 
-*Note: VDOT and CDOT values above are illustrative. Actual state-specific values should be obtained from each state's current SHSP or HSIP manual.*
+| Source / Agency | K (Fatal) | A (Serious) | B (Minor) | C (Possible) | O (PDO) | Year |
+|-----------------|-----------|-------------|-----------|---------------|---------|------|
+| **HSM Standard (current tool default)** | 462 | 62 | 12 | 5 | 1 | 2010 |
+| **VDOT 2024 crash costs** | **1,032** | 53 | 16 | 10 | 1 | 2024 |
+| **FHWA 2022 crash costs** | **975** | 48 | 13 | 8 | 1 | 2022 |
+| **North Carolina DOT** | 76.8 (K+A) | — | 8.4 (B+C) | — | 1 | — |
+| **New Mexico DOT** | 567 | 33 (all injury) | — | — | 1 | — |
+| **Massachusetts DOT** | 21 (all F+I) | — | — | — | 1 | — |
+| **Illinois DOT** | 25 | 10 | 1 | — | — | — |
 
-### 6.3 Configuration Architecture
+**Critical finding:** The VDOT 2024 crash costs already in the tool ($12.8M K / $12.4K O) yield **K=1032 — more than double the current 462**. This means all EPDO scores in the Virginia view are currently understated by ~2x.
 
-**Three levels of EPDO configuration, with cascading defaults:**
+#### How EPDO Weights Are Derived
 
 ```
-Federal default (FHWA standard)
-    ↓ inherits if state doesn't override
-State-specific override (from state SHSP/HSIP)
-    ↓ inherits if user doesn't customize
-User-customized (via UI in Upload Data tab)
+EPDO Weight = Crash Cost for Severity Level / Crash Cost for PDO
+
+Example (VDOT 2024):
+  K weight = $12,800,000 / $12,400 = 1,032
+  A weight = $655,000 / $12,400 = 53
+  B weight = $198,000 / $12,400 = 16
+  C weight = $125,000 / $12,400 = 10
+  O weight = $12,400 / $12,400 = 1
 ```
 
-#### Where the Weights Live
+**Sources:**
+- FHWA Highway Safety Manual (HSM), AASHTO, 2010 — Table 4-7
+- FHWA HSIP Manual: https://safety.fhwa.dot.gov/hsip/resources/fhwasa09029/sec2.cfm
+- FHWA Network Screening Training: https://safety.fhwa.dot.gov/local_rural/training/fhwasa14072/sec4.cfm
 
-| Level | File | Purpose |
-|-------|------|---------|
-| **Federal default** | `config.json` → `epdoWeights.federal` | National baseline, used for cross-state comparisons at Federal tier |
-| **State default** | `states/{state}/config.json` → `epdoWeights` | State-specific weights from SHSP/HSIP |
-| **User override** | In-memory only (not persisted to file) | User adjusts via UI for "what-if" analysis |
+### 6.3 Preset-Based Configuration Architecture
 
-#### Updated Config Schema
+Instead of a simple config cascade, the system uses **named presets** with a custom option. Presets persist via `localStorage` (survive page refresh) while custom weights also persist to `localStorage`.
 
-```json
-// config.json (root) — federal defaults
-{
-  "epdoWeights": {
-    "federal": {
-      "K": 462, "A": 62, "B": 12, "C": 5, "O": 1,
-      "source": "FHWA Crash Costs for Safety Analysis, 2016",
-      "year": 2016
+#### Built-In Presets
+
+```javascript
+const EPDO_PRESETS = {
+    hsm2010: {
+        name: 'HSM Standard (2010)',
+        weights: { K: 462, A: 62, B: 12, C: 5, O: 1 },
+        description: 'Highway Safety Manual standard weights (AASHTO/FHWA)'
+    },
+    vdot2024: {
+        name: 'VDOT 2024',
+        weights: { K: 1032, A: 53, B: 16, C: 10, O: 1 },
+        description: 'Derived from VDOT 2024 crash cost ratios ($12.8M K / $12.4K O)'
+    },
+    fhwa2022: {
+        name: 'FHWA 2022',
+        weights: { K: 975, A: 48, B: 13, C: 8, O: 1 },
+        description: 'Derived from FHWA 2022 crash cost ratios ($11.6M K / $11.9K O)'
+    },
+    custom: {
+        name: 'Custom',
+        weights: { K: 462, A: 62, B: 12, C: 5, O: 1 },
+        description: 'User-defined custom weights'
     }
-  }
-}
-
-// states/virginia/config.json — state override
-{
-  "epdoWeights": {
-    "K": 490, "A": 68, "B": 14, "C": 5, "O": 1,
-    "source": "VDOT HSIP Manual, 2023 Edition",
-    "year": 2023
-  }
-}
-
-// states/colorado/config.json — state override
-{
-  "epdoWeights": {
-    "K": 475, "A": 65, "B": 13, "C": 5, "O": 1,
-    "source": "CDOT Strategic Highway Safety Plan, 2022",
-    "year": 2022
-  }
-}
+};
 ```
 
-### 6.4 Which Weights Apply at Each Tier?
+> See `data/CDOT/epdo/epdo_presets.js` for full implementation reference.
 
-| Tier | Default Weights Used | Why |
-|------|---------------------|-----|
-| **Federal** | `config.json` → `epdoWeights.federal` | Cross-state comparisons must use uniform weights for apples-to-apples |
-| **State** | `states/{state}/config.json` → `epdoWeights` (falls back to federal if not set) | State users expect their own state's official weights |
+#### Which Preset Applies at Each Tier?
+
+| Tier | Default Preset | Why |
+|------|---------------|-----|
+| **Federal** | `hsm2010` (HSM Standard) | Cross-state comparisons need uniform national weights for apples-to-apples |
+| **State (Virginia)** | `vdot2024` (VDOT 2024) | Virginia DOT staff expect their own state's official weights |
+| **State (Colorado)** | `hsm2010` (HSM Standard) — until CDOT-specific preset added | Falls back to HSM if no state-specific preset exists |
 | **MPO** | Inherits from parent state | MPOs operate within a state's framework |
-| **County** | Inherits from parent state (existing behavior) | Counties operate within a state's framework |
+| **County** | Inherits from parent state | Counties operate within a state's framework |
 
-**Key insight:** At the Federal tier, we use **uniform national weights** so that comparing Virginia EPDO to Colorado EPDO is meaningful. At State/MPO/County tiers, we use the **state's own weights** to match what state DOT staff use in their own analyses.
+**Key insight:** At the Federal tier, we use **uniform national weights** so that comparing Virginia EPDO to Colorado EPDO is meaningful. At State/MPO/County tiers, we use the **state's own weights** to match what state DOT staff use in their own analyses. Users can override any preset at any tier via the "Custom" option.
 
-### 6.5 UI: EPDO Weight Configuration in Upload Data Tab
+#### Persistence Strategy
 
-Add an expandable **"EPDO Scoring"** panel to the Upload Data tab. It appears at all tiers and shows which weights are currently active.
+| Storage | Scope | Survives Refresh? | Purpose |
+|---------|-------|-------------------|---------|
+| `localStorage('epdoActivePreset')` | Per browser | Yes | Remembers which preset (hsm2010, vdot2024, fhwa2022, custom) |
+| `localStorage('epdoCustomWeights')` | Per browser | Yes | Stores custom K/A/B/C/O values |
+| State config files (`states/{state}/config.json`) | Per deployment | Yes | Server-side default per state |
+| Aggregate JSONs (`epdoWeights` field) | Per R2 file | Yes | Records which weights generated the pre-computed EPDO |
+
+### 6.4 Implementation: 8-Step Plan
+
+> Full line-by-line details in `data/CDOT/epdo/EPDO_PLAN.md`
+
+#### Step 1: Make `EPDO_WEIGHTS` mutable + add presets
+**File:** `app/index.html:19916`
+
+Change `const` to `let`, add `EPDO_ACTIVE_PRESET`, add `EPDO_PRESETS` constant (see `epdo_presets.js` for code).
+
+#### Step 2: Add preset switching + recalculation functions
+**File:** `app/index.html` (insert after EPDO_PRESETS)
+
+New functions from `epdo_presets.js`:
+- `loadEPDOPreset(presetKey)` — sets `EPDO_WEIGHTS`, saves to `localStorage`, triggers recalc cascade
+- `loadSavedEPDOPreset()` — restores from `localStorage` on startup
+- `saveCustomEPDOWeights()` — handles custom weight input changes
+- `updateEPDOPresetUI()` — toggles active radio button
+- `updateEPDOWeightLabels()` — updates dashboard label + glossary dynamically
+- `recalculateAllEPDO()` — cascades recalculation across ALL tabs (Dashboard, Hotspots, Grants, CMF, Safety Focus, Before/After, Map stats, AI context)
+
+#### Step 3: Fix ALL 14 inline hardcoded EPDO calculations
+**File:** `app/index.html` — replace each `*462 + *62 + *12 + *5 +` with `calcEPDO()`
+
+| Line | Current Code | Replacement |
+|------|-------------|-------------|
+| 53437 | `epdo: d.K*462 + d.A*62 + d.B*12 + d.C*5 + d.O,` | `epdo: calcEPDO(d),` |
+| 53684 | `const epdo = severity.K*462 + ...` | `const epdo = calcEPDO(severity);` |
+| 54213 | `epdo: d.K*462 + d.A*62 + d.B*12 + d.C*5 + d.O,` | `epdo: calcEPDO(d),` |
+| 54453 | `const epdo = severity.K*462 + ...` | `const epdo = calcEPDO(severity);` |
+| 54903 | `const epdo = severity.K*462 + ...` | `const epdo = calcEPDO(severity);` |
+| 54953 | `const epdo = severity.K*462 + ...` | `const epdo = calcEPDO(severity);` |
+| 55101 | `const epdo = severity.K*462 + ...` | `const epdo = calcEPDO(severity);` |
+| 55151 | `const epdo = severity.K*462 + ...` | `const epdo = calcEPDO(severity);` |
+| 55444 | `const epdo = stats.K*462 + ...` | `const epdo = calcEPDO(stats);` |
+| 55996 | `const epdo = sevCounts.K * 462 + ...` | `const epdo = calcEPDO(sevCounts);` |
+| 61922 | `const epdo = severities.K * 462 + ...` | `const epdo = calcEPDO(severities);` |
+| 76112 | `(profile.severity?.K \|\| 0) * 462 + ...` | `calcEPDO(profile.severity \|\| {})` |
+| 80782 | `calculateEPDO(severity) { return (severity.K * 462) + ...; }` | `calculateEPDO(severity) { return calcEPDO(severity); }` |
+| 126554 | `kSum * 462 + aSum * 62` | `kSum * EPDO_WEIGHTS.K + aSum * EPDO_WEIGHTS.A` |
+
+#### Step 4: Remove unused `EPDO_WEIGHTS_AD`
+**File:** `app/index.html:69187-69188` — Delete the unused duplicate constant.
+
+#### Step 5: Make UI labels dynamic
+- Line 5447: Add `id="epdoWeightsLabel"` to the weights display div
+- Line 19734: Add `id="epdoGlossaryDef"` to the glossary definition
+
+#### Step 6: Add EPDO preset selector UI in Upload Data tab
+**File:** `app/index.html` — Insert after Road Type Filter (~line 4700)
+
+Radio button group with 4 options (HSM 2010, VDOT 2024, FHWA 2022, Custom). Custom option reveals 5 number inputs (K/A/B/C/O). See `epdo_presets.js` for full HTML reference.
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  ⚖️ EPDO Scoring                          [▼ Expand] │
+│  ⚖ EPDO Weight System                                │
 │                                                       │
-│  Currently using: Virginia HSIP 2023 weights          │
-│  Source: VDOT HSIP Manual, 2023 Edition               │
+│  ○ HSM Standard (2010) - K=462, A=62, B=12, C=5, O=1│
+│  ○ VDOT 2024 - K=1032, A=53, B=16, C=10, O=1        │
+│  ○ FHWA 2022 - K=975, A=48, B=13, C=8, O=1          │
+│  ○ Custom                                             │
+│    ┌─────┬─────┬─────┬─────┬─────┐                   │
+│    │  K  │  A  │  B  │  C  │  O  │  (shown when      │
+│    │[   ]│[   ]│[   ]│[   ]│[   ]│   Custom selected) │
+│    └─────┴─────┴─────┴─────┴─────┘                   │
 │                                                       │
-│  ┌────────────────────────────────────────────────┐   │
-│  │  Severity │ Weight │ Default │ Custom          │   │
-│  │  ─────────┼────────┼─────────┼────────         │   │
-│  │  K Fatal  │  490   │  490    │ [    490  ]     │   │
-│  │  A Incap  │   68   │   68    │ [     68  ]     │   │
-│  │  B Non-In │   14   │   14    │ [     14  ]     │   │
-│  │  C Poss.  │    5   │    5    │ [      5  ]     │   │
-│  │  O PDO    │    1   │    1    │ [      1  ]     │   │
-│  └────────────────────────────────────────────────┘   │
-│                                                       │
-│  Presets: [State Default] [FHWA 2016] [Custom]        │
-│                                                       │
-│  ℹ️ Changes recalculate all EPDO scores in real-time.  │
-│     Custom weights are session-only (not saved).       │
-│                                                       │
-│  [Reset to State Default]                              │
-│                                                       │
+│  EPDO weights affect severity scoring across all tabs │
 └──────────────────────────────────────────────────────┘
 ```
 
-#### UI Behavior
+#### Step 7: Initialize saved preset on app load
+Call `loadSavedEPDOPreset()` in a `DOMContentLoaded` handler, BEFORE the first `updateDashboard()` call.
 
-| Action | Result |
-|--------|--------|
-| **Tier changes to Federal** | Weights auto-switch to Federal defaults. "Currently using: FHWA 2016 National Weights" |
-| **Tier changes to State/MPO/County** | Weights auto-switch to state-specific defaults (if configured). "Currently using: Virginia HSIP 2023" |
-| **User selects "Custom" preset** | Input fields become editable. User types custom values |
-| **User types custom weight** | All EPDO scores across all tabs recalculate in real-time using new weights |
-| **User clicks "Reset to State Default"** | Reverts to state config weights |
-| **User changes state dropdown** | Weights auto-update to new state's defaults |
+#### Step 8: Python scripts — read from config
+**Already implemented** in `generate_forecast.py` (line 69-88) and `send_notifications.py` (line 122-131). Both now call `load_epdo_weights()` which reads `epdoWeights` from the state's `config.json`. See `data/CDOT/epdo/epdo_config_loader.py` for the reference loader with full validation, auto-detection, and fallback.
 
-#### How Real-Time Recalculation Works
+### 6.5 Recalculation Cascade
 
-Currently `calcEPDO()` reads from the hardcoded `EPDO_WEIGHTS` constant. The change:
+When the user switches presets, ALL tabs recalculate EPDO scores in real-time:
 
-```javascript
-// Before (hardcoded):
-const EPDO_WEIGHTS = { K: 462, A: 62, B: 12, C: 5, O: 1 };
-const calcEPDO = s => (s.K||0)*EPDO_WEIGHTS.K + ...;
-
-// After (configurable):
-let activeEPDOWeights = { K: 462, A: 62, B: 12, C: 5, O: 1 }; // mutable
-const calcEPDO = s => (s.K||0)*activeEPDOWeights.K + ...;
-
-function updateEPDOWeights(newWeights) {
-  activeEPDOWeights = { ...newWeights };
-  // Recalculate all pre-computed EPDO values
-  recalcAggregateEPDO();        // crashState.aggregates
-  recalcHotspotEPDO();          // hotspot rankings
-  recalcGrantLocationEPDO();    // grant location scores
-  // Re-render active tab
-  renderCurrentTab();
-}
+```
+User clicks preset radio button
+    ↓
+loadEPDOPreset(presetKey)
+    ├─ 1. Update global EPDO_WEIGHTS object
+    ├─ 2. Persist to localStorage
+    ├─ 3. Update UI radio buttons + weight labels
+    └─ 4. recalculateAllEPDO()
+           ├─ updateDashboard()           — Dashboard totals
+           ├─ analyzeHotspots()           — Hotspot rankings (cache cleared)
+           ├─ rankLocationsForGrants()    — Grant location scores (cache cleared)
+           ├─ buildCMFCrashProfile()      — CMF tab profile
+           ├─ updateSafetyCategory()      — Safety Focus active category
+           ├─ updateBAStudy()             — Before/After study
+           ├─ updateMapStats()            — Map stats panel
+           └─ updateAIContextIndicator()  — AI context
 ```
 
-**Performance note:** EPDO is a simple 5-term multiplication — recalculating across even 100K crash records takes <100ms. No performance concern.
+**Performance:** EPDO is a 5-term multiplication — recalculating even 100K crash records takes <100ms. No performance concern.
 
-### 6.6 How to Update EPDO Weights When Needed
+**Key insight:** Because `calcEPDO()` reads from the global `EPDO_WEIGHTS`, any function that calls `calcEPDO()` at render-time automatically picks up the new weights. The cascade function just triggers re-rendering of each affected component.
 
-| Scenario | Who Updates | Where | Process |
-|----------|-------------|-------|---------|
-| **FHWA publishes new national crash costs** | Dev team | `config.json` → `epdoWeights.federal` | Update values, commit, deploy |
-| **State DOT updates their SHSP/HSIP weights** | Dev team or state admin | `states/{state}/config.json` → `epdoWeights` | Update values, commit, deploy. Note the `source` and `year` fields for traceability |
-| **User wants to test different weights** | End user | UI (Upload Data tab) → Custom preset | Real-time in browser. Session-only, not persisted |
-| **New state onboarded** | Dev team | Create `states/{state}/config.json` with state's official EPDO weights | Research state's current SHSP for published crash costs |
+### 6.6 Aggregate JSONs and EPDO
 
-#### Aggregate JSONs and EPDO
-
-Pre-computed aggregate JSONs (`county_summary.json`, `aggregates.json`) include EPDO scores calculated with the state's default weights at pipeline generation time. The `epdoWeights` used are recorded in the JSON:
+Pre-computed aggregate JSONs (`county_summary.json`, `aggregates.json`) include EPDO scores calculated with the pipeline's default weights. The `epdoWeights` used are recorded in the JSON for traceability:
 
 ```json
 {
-  "epdoWeights": { "K": 490, "A": 68, "B": 14, "C": 5, "O": 1 },
-  "epdoSource": "VDOT HSIP Manual, 2023 Edition",
+  "epdoWeights": { "K": 1032, "A": 53, "B": 16, "C": 10, "O": 1 },
+  "epdoSource": "VDOT 2024 crash costs",
   "counties": {
-    "henrico": { "total": 28500, "K": 89, "A": 412, "epdo": 112340 }
+    "henrico": { "total": 28500, "K": 89, "A": 412, "B": 1205, "C": 3800, "O": 23094, "epdo": 136790 }
   }
 }
 ```
 
-When the user selects custom weights in the UI, the browser **recalculates** EPDO from the raw K/A/B/C/O counts in the aggregate JSON — it does NOT re-fetch data. The raw severity counts are always available in the aggregate, so client-side recalculation is instant.
+When the user selects a different preset in the UI, the browser **recalculates** EPDO from the raw K/A/B/C/O counts in the aggregate JSON — it does NOT re-fetch data. The raw severity counts are always available in the aggregate, so client-side recalculation is instant.
+
+### 6.7 Verification Plan
+
+After implementation, verify all 9 items:
+
+| # | Test | Expected Result |
+|---|------|-----------------|
+| 1 | **Dashboard:** Load app, note EPDO, switch to VDOT 2024 | EPDO increases (K: 462→1032). Switch back → original restores |
+| 2 | **Dynamic labels:** Switch preset | "Weights: K=..." text updates in dashboard breakdown AND glossary |
+| 3 | **All tabs:** Switch preset | Hotspots, Grants, CMF, Safety Focus tabs all update |
+| 4 | **Persistence:** Set VDOT 2024, refresh page | VDOT 2024 still active |
+| 5 | **Custom weights:** Select Custom, enter K=500 | Calculations use K=500. Refresh → persists |
+| 6 | **Warrant independence:** Change to VDOT 2024, run streetlight warrant | Warrant still uses K=1500 (local const shadows global) |
+| 7 | **No inline hardcoding:** Search `*462` in `app/index.html` | 0 results (except warrant sections which use `*1500`) |
+| 8 | **Python scripts:** Run `python scripts/generate_forecast.py` | Reads from config, prints loaded weights |
+| 9 | **Console:** Switch presets | No errors. `console.log(EPDO_WEIGHTS)` shows correct values |
+
+### 6.8 How to Add New State Presets
+
+When onboarding a new state:
+
+1. **Research:** Find the state DOT's current crash costs from their SHSP or HSIP manual
+2. **Calculate weights:** Divide each severity cost by the PDO cost (e.g., K = $KFatalCost / $PDOCost)
+3. **Add to `EPDO_PRESETS`:** Add a new entry in `epdo_presets.js` with the state key, name, weights, and description
+4. **Add to state config:** Set `epdoWeights` in `states/{state}/config.json` for Python scripts
+5. **Update aggregates:** Re-generate aggregate JSONs with the new state's weights. Include `epdoWeights` and `epdoSource` fields
+
+| Scenario | Who Updates | Where | Process |
+|----------|-------------|-------|---------|
+| **New state onboarded** | Dev team | `EPDO_PRESETS` in `index.html` + `states/{state}/config.json` | Calculate from state crash costs |
+| **FHWA publishes new crash costs** | Dev team | Add new preset (e.g., `fhwa2026`) to `EPDO_PRESETS` | Derive weights, add preset, update aggregates |
+| **State updates crash costs** | Dev team | Update existing preset weights | Derive new weights, note source + year |
+| **User wants to test different weights** | End user | UI → Custom preset | Real-time in browser. Persists to `localStorage` |
 
 ---
 
@@ -1059,9 +1133,8 @@ Drill-down loads the county CSV from R2 (existing behavior), sets the road type 
 
 ### Phase 2 — Pipeline: Aggregates + Hierarchy + EPDO Config
 - [ ] Create `scripts/generate_aggregates.py` (reads county CSVs → produces aggregates with road-type breakdowns)
-- [ ] Add `epdoWeights.federal` to root `config.json` (FHWA 2016 national baseline)
-- [ ] Update `states/virginia/config.json` with Virginia-specific EPDO weights from VDOT HSIP
-- [ ] Update `states/colorado/config.json` with Colorado-specific EPDO weights from CDOT SHSP
+- [ ] Update `states/virginia/config.json` with VDOT 2024 EPDO weights (K=1032, A=53, B=16, C=10, O=1)
+- [ ] Update `states/colorado/config.json` with CDOT-specific EPDO weights (research needed from CDOT SHSP)
 - [ ] Include `epdoWeights` + `epdoSource` in generated aggregate JSONs for traceability
 - [ ] Create `states/virginia/hierarchy.json` (all MPOs with `btsAcronym`/`btsMpoId`, VDOT districts, PDCs)
 - [ ] Complete `states/colorado/hierarchy.json` (CDOT regions, MPOs/TPRs with BTS mapping)
@@ -1084,12 +1157,17 @@ Drill-down loads the county CSV from R2 (existing behavior), sets the road type 
 - [ ] Implement MPO auto-load on dropdown selection (fetch BTS by `btsAcronym` from hierarchy.json)
 - [ ] Test: VA MPOs load correctly, VDOT districts overlay, CO MPOs + CDOT regions
 
-### Phase 5 — UI: Tier Selector + EPDO Panel
+### Phase 5 — UI: Tier Selector + Dynamic EPDO System
 - [ ] Add tier selector segmented control (Federal / State / MPO / County) to Upload Data tab
 - [ ] Add road type selector to Federal, State, MPO tiers (reuse existing radio component)
-- [ ] Add EPDO Scoring expandable panel (shows current weights, presets, custom input)
-- [ ] Make `EPDO_WEIGHTS` mutable (`let activeEPDOWeights`), auto-switch on tier/state change
-- [ ] Implement `updateEPDOWeights()` with real-time recalculation across all tabs
+- [ ] **EPDO Step 1:** Change `const EPDO_WEIGHTS` to `let` + add `EPDO_PRESETS` (4 presets: HSM 2010, VDOT 2024, FHWA 2022, Custom) — see `data/CDOT/epdo/epdo_presets.js`
+- [ ] **EPDO Step 2:** Add preset switching functions (`loadEPDOPreset`, `loadSavedEPDOPreset`, `recalculateAllEPDO`, etc.)
+- [ ] **EPDO Step 3:** Fix all 14 inline hardcoded EPDO calculations → use `calcEPDO()` — see line table in Section 6.4
+- [ ] **EPDO Step 4:** Remove unused `EPDO_WEIGHTS_AD` at line 69187
+- [ ] **EPDO Step 5:** Add dynamic `id` attributes to EPDO labels (dashboard + glossary)
+- [ ] **EPDO Step 6:** Add EPDO preset selector UI (radio group + custom inputs) in Upload Data tab
+- [ ] **EPDO Step 7:** Call `loadSavedEPDOPreset()` in `DOMContentLoaded` BEFORE first `updateDashboard()`
+- [ ] **EPDO Verify:** Run 9-point verification plan (Section 6.7) — dashboard, persistence, warrant independence, no inline `*462`
 - [ ] Add `viewTier` to global `jurisdictionContext` state object
 - [ ] Implement data loading logic per tier (aggregate JSONs from R2)
 - [ ] Implement tab visibility toggling based on tier (hide/show tabs per matrix above)
