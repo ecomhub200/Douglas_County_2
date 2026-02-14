@@ -1,0 +1,36 @@
+{
+  "source": "CDOT OnBase",
+  "portal_url": "https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx",
+  "data_dictionary": {
+    "doc_id": "17470635",
+    "label": "Data Dictionary (2021+)"
+  },
+  "years": {
+    "2021": {
+      "doc_id": "37133405",
+      "status": "finalized",
+      "label": "Crash Listing 2021"
+    },
+    "2022": {
+      "doc_id": "41627498",
+      "status": "finalized",
+      "label": "Crash Listing 2022"
+    },
+    "2023": {
+      "doc_id": "46627965",
+      "status": "finalized",
+      "label": "Crash Listing 2023"
+    },
+    "2024": {
+      "doc_id": "50498498",
+      "status": "finalized",
+      "label": "Crash Listing 2024"
+    },
+    "2025": {
+      "doc_id": "54973381",
+      "status": "preliminary",
+      "label": "Crash Listing 2025 (preliminary)"
+    }
+  },
+  "_notes": "A year stays 'preliminary' until a NEWER year is added. When CDOT publishes 2026 data, change 2025 to 'finalized' and add 2026 as 'preliminary' with its new doc_id."
+}
