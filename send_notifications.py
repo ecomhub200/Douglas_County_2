@@ -119,8 +119,16 @@ def load_crash_summary():
             if sev in severity_counts:
                 severity_counts[sev] += 1
 
-        # Calculate EPDO
-        epdo_weights = {'K': 462, 'A': 62, 'B': 12, 'C': 5, 'O': 1}
+        # Calculate EPDO — load weights from config, fallback to HSM standard
+        def _load_epdo_weights():
+            default = {'K': 462, 'A': 62, 'B': 12, 'C': 5, 'O': 1}
+            try:
+                config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'CDOT', 'config.json')
+                with open(config_path, 'r') as f:
+                    return json.load(f).get('epdoWeights', default)
+            except Exception:
+                return default
+        epdo_weights = _load_epdo_weights()
         epdo = sum(severity_counts[s] * epdo_weights[s] for s in severity_counts)
 
         return {
