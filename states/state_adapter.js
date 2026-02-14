@@ -731,6 +731,15 @@ const StateAdapter = (() => {
                 if (cachedJurisdictions && Object.keys(cachedJurisdictions).length > 0) {
                     console.log(`[StateAdapter] Using cached config.json jurisdictions for ${stateInfo.name} (${Object.keys(cachedJurisdictions).length} entries)`);
                     dynamicGeoConfig = FIPSDatabase.buildGeoConfig(padded, cachedJurisdictions);
+                    // Override defaultJurisdiction with the config-driven value (e.g., 'henrico' for Virginia)
+                    // buildGeoConfig uses Object.keys()[0] which gives alphabetical first (e.g., 'accomack'),
+                    // but the state config knows which jurisdiction has data available
+                    const stateKey = fipsToKey[padded];
+                    const configDefault = stateKey && appConfig?.states?.[stateKey]?.defaultJurisdiction;
+                    if (configDefault && cachedJurisdictions[configDefault]) {
+                        dynamicGeoConfig.defaultJurisdiction = configDefault;
+                        console.log(`[StateAdapter] Default jurisdiction overridden to config value: ${configDefault}`);
+                    }
                     try { localStorage.setItem('selectedStateFips', padded); } catch(e) {}
                     return dynamicGeoConfig;
                 }
@@ -750,6 +759,14 @@ const StateAdapter = (() => {
 
             // Build dynamic geo config
             dynamicGeoConfig = FIPSDatabase.buildGeoConfig(padded, counties);
+
+            // Override defaultJurisdiction with the config-driven value for all states
+            const stateKeyForDefault = fipsToKey[padded];
+            const configDefaultJurisdiction = stateKeyForDefault && appConfig?.states?.[stateKeyForDefault]?.defaultJurisdiction;
+            if (configDefaultJurisdiction && dynamicGeoConfig.jurisdictions?.[configDefaultJurisdiction]) {
+                dynamicGeoConfig.defaultJurisdiction = configDefaultJurisdiction;
+                console.log(`[StateAdapter] Default jurisdiction overridden to config value: ${configDefaultJurisdiction}`);
+            }
 
             // Save selection
             try { localStorage.setItem('selectedStateFips', padded); } catch(e) {}
