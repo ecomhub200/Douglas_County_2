@@ -847,6 +847,81 @@ assert(indexHtml.includes('zIndex = 340') || indexHtml.includes("zIndex = '340'"
 
 
 // ═════════════════════════════════════════════════════════════
+//  21. COUNTY BOUNDARY CLEANUP — Non-County Tier Switches
+// ═════════════════════════════════════════════════════════════
+section('21. County Boundary Cleanup on Non-County Tier Switch');
+
+// handleTierChange must remove county jurisdiction boundary for non-county tiers
+if (tierChangeFnMatch) {
+    const fnBody = tierChangeFnMatch[1];
+    assert(fnBody.includes('removeJurisdictionBoundaryLayer'),
+        'handleTierChange calls removeJurisdictionBoundaryLayer for non-county tiers');
+    assert(fnBody.includes("tier !== 'county'") && fnBody.includes('removeJurisdictionBoundaryLayer'),
+        'handleTierChange guards county boundary removal with tier !== county check');
+    assert(fnBody.includes('jurisdictionBoundary.enabled = false'),
+        'handleTierChange disables county boundary enabled flag for non-county tiers');
+}
+
+// handleMPOSelection must clear county boundary before loading MPO boundary
+if (mpoSelMatch) {
+    const fnBody = mpoSelMatch[1];
+    assert(fnBody.includes('removeJurisdictionBoundaryLayer'),
+        'handleMPOSelection calls removeJurisdictionBoundaryLayer to clear county boundary');
+    assert(fnBody.includes('jurisdictionBoundary.enabled = false'),
+        'handleMPOSelection disables county boundary enabled flag');
+    // Verify county boundary removal comes before BTS boundary fetch
+    const removeJurisIdx = fnBody.indexOf('removeJurisdictionBoundaryLayer');
+    const btsFetchIdx = fnBody.indexOf('getMPOByAcronym');
+    assert(removeJurisIdx > 0 && btsFetchIdx > 0 && removeJurisIdx < btsFetchIdx,
+        'handleMPOSelection clears county boundary BEFORE fetching BTS MPO boundary');
+}
+
+// handleRegionSelection must clear county boundary before loading region boundary
+if (regionSelMatch) {
+    const fnBody = regionSelMatch[1];
+    assert(fnBody.includes('removeJurisdictionBoundaryLayer'),
+        'handleRegionSelection calls removeJurisdictionBoundaryLayer to clear county boundary');
+    assert(fnBody.includes('jurisdictionBoundary.enabled = false'),
+        'handleRegionSelection disables county boundary enabled flag');
+}
+
+// displayMPOBoundary must also clear county boundary as safety net
+const displayMpoMatch = indexHtml.match(
+    /function displayMPOBoundary\(geojson,\s*mpoId,\s*mpoName\)\s*\{([\s\S]*?)\nconsole\.log/
+) || indexHtml.match(
+    /function displayMPOBoundary\(geojson,\s*mpoId,\s*mpoName\)\s*\{([\s\S]*?)\n\}/
+);
+if (displayMpoMatch) {
+    const fnBody = displayMpoMatch[1];
+    assert(fnBody.includes('removeJurisdictionBoundaryLayer'),
+        'displayMPOBoundary clears county boundary layer as safety net');
+} else {
+    assert(false, 'displayMPOBoundary function not found for county boundary cleanup check');
+}
+
+// displayRegionBoundary must also clear county boundary as safety net
+const displayRegMatch = indexHtml.match(
+    /function displayRegionBoundary\(region,\s*regionId\)\s*\{([\s\S]*?)\n\}/
+);
+if (displayRegMatch) {
+    const fnBody = displayRegMatch[1];
+    assert(fnBody.includes('removeJurisdictionBoundaryLayer'),
+        'displayRegionBoundary clears county boundary layer as safety net');
+} else {
+    assert(false, 'displayRegionBoundary function not found for county boundary cleanup check');
+}
+
+// updateJurisdictionBoundary must skip auto-enable when non-county tier is active
+if (updateBndMatch) {
+    const fnBody = updateBndMatch[1];
+    assert(fnBody.includes('viewTier'),
+        'updateJurisdictionBoundary checks active viewTier before auto-enabling');
+    assert(fnBody.includes("!== 'county'") || fnBody.includes("activeTier !== 'county'"),
+        'updateJurisdictionBoundary skips auto-enable for non-county tiers');
+}
+
+
+// ═════════════════════════════════════════════════════════════
 //  RESULTS
 // ═════════════════════════════════════════════════════════════
 console.log(`\n${'═'.repeat(60)}`);
@@ -872,5 +947,6 @@ console.log(`    - TIGERweb + BTS NTAD API integration verified`);
 console.log(`    - Boundary auto-display on jurisdiction change verified`);
 console.log(`    - Boundary restoration on map tab switch verified`);
 console.log(`    - Cross-tier boundary mutual exclusion verified`);
+console.log(`    - County boundary cleanup on non-county tier switch verified`);
 
 process.exit(failed > 0 ? 1 : 0);
