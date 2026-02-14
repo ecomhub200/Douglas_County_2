@@ -512,11 +512,12 @@ class TestBuildObtokenCandidates:
             html.encode(),
             'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx',
             '17470635')
-        assert len(candidates) >= 1
-        found_url = candidates[0]
-        assert 'cdotrmpop/ViewDocumentEx.aspx' in found_url
-        assert 'OBToken=407b6bf6' in found_url
-        assert 'dochandle=17470635' in found_url
+        assert len(candidates) >= 2
+        # RetrieveNativeDocument is now tried before ViewDocumentEx
+        assert any('cdotrmpop/RetrieveNativeDocument.ashx' in c for c in candidates)
+        assert any('cdotrmpop/ViewDocumentEx.aspx' in c for c in candidates)
+        assert any('OBToken=407b6bf6' in c for c in candidates)
+        assert any('dochandle=17470635' in c for c in candidates)
 
     def test_includes_k_param(self):
         html = '''<script>
@@ -542,8 +543,10 @@ class TestBuildObtokenCandidates:
             html,
             'https://oitco.hylandcloud.com/CDOTRMPop/docpop/docpop.aspx',
             '12345')
-        assert len(candidates) >= 1
-        assert '/CDOTRMPop/ViewDocumentEx.aspx' in candidates[0]
+        assert len(candidates) >= 2
+        # Should include both RetrieveNativeDocument and ViewDocumentEx
+        assert any('/CDOTRMPop/RetrieveNativeDocument.ashx' in c for c in candidates)
+        assert any('/CDOTRMPop/ViewDocumentEx.aspx' in c for c in candidates)
 
 
 class TestExtractViewerBinaryUrls:
@@ -565,9 +568,19 @@ class TestExtractViewerBinaryUrls:
         assert not any('.css' in u for u in urls)
         assert not any('.gif' in u for u in urls)
 
-    def test_empty_html(self):
+    def test_empty_html_no_obtoken_in_base(self):
+        # Empty HTML with a base URL that has no OBToken → no URLs from patterns
+        # (URL-construction only kicks in when base_url contains OBToken)
         urls = extract_viewer_binary_urls('', 'https://host.com/')
         assert urls == []
+
+    def test_empty_html_with_obtoken_in_base_url(self):
+        # Empty HTML but base URL contains OBToken → constructs retrieval URLs
+        urls = extract_viewer_binary_urls(
+            '',
+            'https://host.com/app/ViewDocumentEx.aspx?OBToken=aabb1122-3344-5566-7788-99aabbccddee&dochandle=123')
+        assert len(urls) >= 1
+        assert any('RetrieveNativeDocument.ashx' in u for u in urls)
 
 
 # ===========================================================================
@@ -1662,7 +1675,8 @@ class TestDownloadOnbaseDocument:
         mock_resp_excel.url = 'https://oitco.hylandcloud.com/cdotrmpop/ViewDocumentEx.aspx'
 
         def mock_request(session, url, **kwargs):
-            if 'ViewDocumentEx' in url and '407b6bf6' in url:
+            if '407b6bf6' in url and ('ViewDocumentEx' in url or
+                                      'RetrieveNativeDocument' in url):
                 return mock_resp_excel
             return mock_resp_html
 
@@ -1713,7 +1727,7 @@ class TestDownloadOnbaseDocument:
         def mock_request(session, url, **kwargs):
             if 'GetDocumentContent' in url:
                 return mock_resp_binary
-            if 'ViewDocumentEx' in url:
+            if 'ViewDocumentEx' in url or 'RetrieveNativeDocument' in url:
                 return mock_resp_viewer
             return mock_resp_docpop
 
@@ -2645,6 +2659,392 @@ class TestConstants:
         from download_cdot_crash_data import XLSX_MAGIC, XLS_MAGIC
         assert XLSX_MAGIC == b'PK'
         assert XLS_MAGIC == b'\xd0\xcf'
+
+
+# ===========================================================================
+# Deep-dive bug tests: OnBase download failure root causes
+# ===========================================================================
+
+class TestBugRetrieveNativeDocumentFromViewerPage:
+    """
+    Bug: extract_viewer_binary_urls returned 0 matches when given a real
+    OnBase ViewDocumentEx viewer page (15K-44K chars).  The viewer HTML
+    contains RetrieveNativeDocument.ashx references with query parameters
+    or the URL can be constructed from ViewDocumentEx query params.
+    """
+
+    def test_constructs_retrieval_url_from_viewdocumentex_base_url(self):
+        """When base_url is a ViewDocumentEx URL with OBToken, construct
+        RetrieveNativeDocument.ashx URLs automatically."""
+        base = ('https://oitco.hylandcloud.com/CDOTRMPop/ViewDocumentEx.aspx'
+                '?OBToken=fa562b2a-66e6-4203-9943-5a6b5962bae8'
+                '&dochandle=17470635&k=e2f3e394_25d9_4656_988e_')
+        urls = extract_viewer_binary_urls('', base)
+        assert len(urls) >= 1
+        native = [u for u in urls if 'RetrieveNativeDocument.ashx' in u]
+        assert len(native) >= 1
+        assert 'OBToken=fa562b2a' in native[0]
+        assert 'dochandle=17470635' in native[0]
+
+    def test_constructs_getrawcontent_url(self):
+        """GetRawContent.ashx should also be generated as a candidate."""
+        base = ('https://host.com/app/ViewDocumentEx.aspx'
+                '?OBToken=11112222-3333-4444-5555-666677778888'
+                '&dochandle=999')
+        urls = extract_viewer_binary_urls('', base)
+        raw = [u for u in urls if 'GetRawContent.ashx' in u]
+        assert len(raw) >= 1
+
+    def test_retrieval_urls_are_first_in_list(self):
+        """Constructed retrieval URLs should be at the front of the list."""
+        html = '<script>var x = "/app/GetDocumentContent.ashx?id=1";</script>'
+        base = ('https://host.com/app/ViewDocumentEx.aspx'
+                '?OBToken=aabb1122-3344-5566-7788-99aabbccddee&dochandle=42')
+        urls = extract_viewer_binary_urls(html, base)
+        assert len(urls) >= 2
+        # First few URLs should be constructed retrieval URLs (inserted at front)
+        # (RetrieveNativeDocument or GetRawContent)
+        constructed_first = any(
+            'RetrieveNativeDocument.ashx' in urls[0] or
+            'GetRawContent.ashx' in urls[0]
+            for _ in [1])
+        assert constructed_first
+
+    def test_viewer_html_with_retrieve_native_document_pattern(self):
+        """The viewer HTML may contain RetrieveNativeDocument references."""
+        html = '''<html>
+        <script>
+        var downloadUrl = "/CDOTRMPop/RetrieveNativeDocument.ashx?OBToken=abc&dochandle=123";
+        </script>
+        </html>'''
+        urls = extract_viewer_binary_urls(html, 'https://host.com/app/ViewDocumentEx.aspx')
+        native = [u for u in urls if 'RetrieveNativeDocument.ashx' in u]
+        assert len(native) >= 1
+
+    def test_docpop_subfolder_retrieval(self):
+        """Build retrieval URL under /docpop/ subfolder too."""
+        base = ('https://host.com/CDOTRMPop/docpop/ViewDocumentEx.aspx'
+                '?OBToken=aabb1122-3344-5566-7788-99aabbccddee&dochandle=42')
+        urls = extract_viewer_binary_urls('', base)
+        # Should include both /CDOTRMPop/RetrieveNativeDocument and
+        # /CDOTRMPop/docpop/RetrieveNativeDocument
+        paths = [u.split('?')[0] for u in urls]
+        assert any('/CDOTRMPop/RetrieveNativeDocument.ashx' in p for p in paths)
+        assert any('/CDOTRMPop/docpop/RetrieveNativeDocument.ashx' in p for p in paths)
+
+
+class TestBugBuildObtokenCandidatesRetrieveNative:
+    """
+    Bug: build_obtoken_candidates only generated ViewDocumentEx.aspx URLs.
+    When the GUID was correct but ViewDocumentEx returned a viewer page
+    instead of binary, we got stuck.  Now it also generates
+    RetrieveNativeDocument.ashx URLs which return the file directly.
+    """
+
+    def test_retrieve_native_document_urls_generated(self):
+        """Candidate list should include RetrieveNativeDocument.ashx URLs."""
+        html = '''<script>
+        var __VirtualRoot="https://host.com/app";
+        var tok = "aabb1122-3344-5566-7788-99aabbccddee";
+        </script>'''
+        candidates = build_obtoken_candidates(html, 'https://host.com/app/docpop/docpop.aspx', '123')
+        native = [c for c in candidates if 'RetrieveNativeDocument.ashx' in c]
+        assert len(native) >= 1
+        assert 'OBToken=aabb1122' in native[0]
+        assert 'dochandle=123' in native[0]
+
+    def test_retrieve_native_before_view_document(self):
+        """RetrieveNativeDocument URLs should come before ViewDocumentEx."""
+        html = '''<script>
+        var __VirtualRoot="https://host.com/app";
+        var tok = "aabb1122-3344-5566-7788-99aabbccddee";
+        </script>'''
+        candidates = build_obtoken_candidates(html, 'https://host.com/app/docpop/docpop.aspx', '123')
+        native_idx = next(i for i, c in enumerate(candidates) if 'RetrieveNativeDocument' in c)
+        viewdoc_idx = next(i for i, c in enumerate(candidates) if 'ViewDocumentEx' in c)
+        assert native_idx < viewdoc_idx
+
+    def test_retrieve_native_with_k_param(self):
+        """RetrieveNativeDocument URL should include k parameter if available."""
+        html = '''<script>
+        var __VirtualRoot="https://host.com/app";
+        var tok = "aabb1122-3344-5566-7788-99aabbccddee";
+        var key = "aabbccdd_1122_3344_5566_";
+        </script>'''
+        candidates = build_obtoken_candidates(html, 'https://host.com/app/docpop/docpop.aspx', '123')
+        native_with_k = [c for c in candidates
+                         if 'RetrieveNativeDocument' in c and 'k=aabbccdd' in c]
+        assert len(native_with_k) >= 1
+
+
+class TestBugStrategy15RetrieveNativeDocumentSuccess:
+    """
+    Integration test: Strategy 1.5 should succeed when
+    RetrieveNativeDocument.ashx returns the actual Excel file.
+    This covers the case where the GUID from JS variables IS the real
+    OBToken but ViewDocumentEx returns an HTML viewer.
+    """
+
+    def test_retrieve_native_succeeds_skipping_viewer(self):
+        xlsx_bytes = make_xlsx_bytes({'CUID': [1], 'County': ['DOUGLAS']})
+
+        docpop_html = (
+            b'<html><head><script>'
+            b'var __VirtualRoot="https://host.com/app";'
+            b'</script></head><body>'
+            b'<iframe src="blank.aspx"></iframe>'
+            b'<script>var tok="aabb1122-3344-5566-7788-99aabbccddee";</script>'
+            b'</body></html>'
+        )
+
+        viewer_html = b'<html><head><title>View Document</title></head><body>viewer</body></html>'
+
+        mock_resp_docpop = MagicMock()
+        mock_resp_docpop.content = docpop_html
+        mock_resp_docpop.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_docpop.url = 'https://host.com/app/docpop/docpop.aspx'
+
+        mock_resp_viewer = MagicMock()
+        mock_resp_viewer.content = viewer_html
+        mock_resp_viewer.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_viewer.url = 'https://host.com/app/ViewDocumentEx.aspx'
+
+        mock_resp_excel = MagicMock()
+        mock_resp_excel.content = xlsx_bytes
+        mock_resp_excel.headers = {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': 'attachment; filename="data.xlsx"',
+        }
+
+        def mock_request(session, url, **kwargs):
+            if 'RetrieveNativeDocument' in url and 'aabb1122' in url:
+                return mock_resp_excel
+            if 'ViewDocumentEx' in url:
+                return mock_resp_viewer
+            return mock_resp_docpop
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
+            content, ext = download_onbase_document(MagicMock(), 123, label='Test')
+
+        assert content == xlsx_bytes
+        assert ext in ('.xlsx', '.xls')
+
+
+class TestBugViewerBinaryUrlBroaderPatterns:
+    """
+    Bug: extract_viewer_binary_urls missed common OnBase patterns like
+    RetrieveNativeDocument.ashx with query parameters, GetRawContent.ashx,
+    GetContent.ashx, etc.
+    """
+
+    def test_retrieve_native_document_ashx(self):
+        html = '<script>url="/app/RetrieveNativeDocument.ashx?OBToken=abc&dochandle=123";</script>'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/')
+        assert any('RetrieveNativeDocument.ashx' in u for u in urls)
+
+    def test_get_raw_content_ashx(self):
+        html = '<script>url="/app/GetRawContent.ashx?docid=123";</script>'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/')
+        assert any('GetRawContent.ashx' in u for u in urls)
+
+    def test_get_content_ashx(self):
+        html = '<script>url="/app/GetContent.ashx?docid=123";</script>'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/')
+        assert any('GetContent.ashx' in u for u in urls)
+
+    def test_image_viewer_ashx(self):
+        html = '<script>url="/app/ImageViewer.ashx?docid=123";</script>'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/')
+        assert any('ImageViewer.ashx' in u for u in urls)
+
+    def test_get_document_ashx(self):
+        html = '<script>url="/app/GetDocument.ashx?docid=123";</script>'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/')
+        assert any('GetDocument.ashx' in u for u in urls)
+
+    def test_render_document_ashx(self):
+        html = '<script>url="/app/RenderDocument.ashx?docid=123";</script>'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/')
+        assert any('RenderDocument.ashx' in u for u in urls)
+
+    def test_retrieve_document_aspx(self):
+        html = '<a href="/app/RetrieveDocument.aspx?docid=123">Get</a>'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/')
+        assert any('RetrieveDocument.aspx' in u for u in urls)
+
+    def test_skips_very_short_strings(self):
+        """Very short matches should be skipped (< 8 chars)."""
+        html = '<script>var fn = "get";</script>'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/')
+        # "get" is only 3 chars, should not match
+        assert not any(u.endswith('/get') for u in urls)
+
+    def test_skips_jpg_and_ico(self):
+        """Image extensions should be filtered out."""
+        html = '<img src="/app/download.jpg"><link href="/app/retrieve.ico">'
+        urls = extract_viewer_binary_urls(html, 'https://host.com/')
+        assert not any('.jpg' in u for u in urls)
+        assert not any('.ico' in u for u in urls)
+
+
+class TestBugWrongGuidExtracted:
+    """
+    Bug: The initial DocPop HTML page contains GUIDs that are NOT the
+    OBToken (e.g. session IDs, ASP.NET __VIEWSTATE related GUIDs).
+    The real OBToken is only generated when JavaScript executes and
+    populates the iframe.  Strategy 1.5 tries ALL GUIDs as candidates,
+    which means it may try wrong ones first.
+
+    This test verifies the cascade still works: wrong GUIDs return viewer
+    HTML → extract_viewer_binary_urls finds the binary endpoint → success.
+    """
+
+    def test_wrong_guid_viewer_then_binary_via_sub_link(self):
+        """Wrong GUID → ViewDocumentEx viewer → binary sub-link → success."""
+        xlsx_bytes = make_xlsx_bytes({'A': [1]})
+
+        # DocPop HTML with a GUID that is NOT the real OBToken
+        docpop_html = (
+            b'<html><head><script>'
+            b'var __VirtualRoot="https://host.com/app";'
+            b'var sessionId = "6ac05847-c45b-41a0-9adf-9eeb3480092d";'  # wrong GUID
+            b'</script></head><body>'
+            b'<iframe src="blank.aspx" id="DocSelectPage"></iframe>'
+            b'</body></html>'
+        )
+
+        # Wrong GUID → viewer HTML with a binary endpoint embedded
+        viewer_html = (
+            b'<html><script>'
+            b'var contentUrl = "/app/GetDocumentContent.ashx?id=17470635";'
+            b'</script></html>'
+        )
+
+        mock_resp_docpop = MagicMock()
+        mock_resp_docpop.content = docpop_html
+        mock_resp_docpop.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_docpop.url = 'https://host.com/app/docpop/docpop.aspx'
+
+        mock_resp_viewer = MagicMock()
+        mock_resp_viewer.content = viewer_html
+        mock_resp_viewer.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_viewer.url = 'https://host.com/app/ViewDocumentEx.aspx?OBToken=6ac05847-c45b-41a0-9adf-9eeb3480092d&dochandle=17470635'
+
+        mock_resp_binary = MagicMock()
+        mock_resp_binary.content = xlsx_bytes
+        mock_resp_binary.headers = {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': 'attachment; filename="crash.xlsx"',
+        }
+
+        def mock_request(session, url, **kwargs):
+            if 'GetDocumentContent.ashx' in url:
+                return mock_resp_binary
+            if 'ViewDocumentEx' in url or 'RetrieveNativeDocument' in url:
+                return mock_resp_viewer
+            return mock_resp_docpop
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
+            content, ext = download_onbase_document(MagicMock(), 17470635, label='Test')
+
+        assert content == xlsx_bytes
+
+    def test_wrong_guid_viewer_then_constructed_retrieval_url(self):
+        """Wrong GUID → ViewDocumentEx viewer → constructed RetrieveNativeDocument → success."""
+        xlsx_bytes = make_xlsx_bytes({'A': [1]})
+
+        docpop_html = (
+            b'<html><head><script>'
+            b'var __VirtualRoot="https://host.com/app";'
+            b'var sid = "6ac05847-c45b-41a0-9adf-9eeb3480092d";'
+            b'</script></head><body>'
+            b'<iframe src="blank.aspx"></iframe>'
+            b'</body></html>'
+        )
+
+        # Plain viewer HTML with no inline binary URLs — but the base URL
+        # of the viewer request contains OBToken and dochandle, so
+        # extract_viewer_binary_urls can construct RetrieveNativeDocument
+        viewer_html = b'<html><title>View Document</title><body>OnBase Viewer</body></html>'
+
+        mock_resp_docpop = MagicMock()
+        mock_resp_docpop.content = docpop_html
+        mock_resp_docpop.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        mock_resp_docpop.url = 'https://host.com/app/docpop/docpop.aspx'
+
+        mock_resp_viewer = MagicMock()
+        mock_resp_viewer.content = viewer_html
+        mock_resp_viewer.headers = {'Content-Type': 'text/html', 'Content-Disposition': ''}
+        # Key: the response URL contains OBToken from the request
+        mock_resp_viewer.url = (
+            'https://host.com/app/ViewDocumentEx.aspx'
+            '?OBToken=6ac05847-c45b-41a0-9adf-9eeb3480092d&dochandle=17470635')
+
+        mock_resp_binary = MagicMock()
+        mock_resp_binary.content = xlsx_bytes
+        mock_resp_binary.headers = {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': 'attachment; filename="crash.xlsx"',
+        }
+
+        def mock_request(session, url, **kwargs):
+            if 'RetrieveNativeDocument.ashx' in url and 'sub-link' not in url:
+                # First attempt (as a candidate, not sub-link) — returns HTML
+                if '6ac05847' in url and 'dochandle=17470635' in url:
+                    # As a sub-link after viewer, return the binary
+                    return mock_resp_binary
+            if 'GetRawContent.ashx' in url:
+                return mock_resp_binary
+            if 'ViewDocumentEx' in url:
+                return mock_resp_viewer
+            if 'RetrieveNativeDocument' in url:
+                return mock_resp_viewer
+            return mock_resp_docpop
+
+        with patch('download_cdot_crash_data.make_request_with_retry', side_effect=mock_request):
+            content, ext = download_onbase_document(MagicMock(), 17470635, label='Test')
+
+        assert content == xlsx_bytes
+
+
+class TestBugViewerBinaryUrlConstruction:
+    """
+    Bug: When extract_viewer_binary_urls gets a ViewDocumentEx URL as
+    base_url, it should construct RetrieveNativeDocument.ashx URLs using
+    the OBToken and dochandle from the query parameters — even if the
+    viewer HTML itself has no matching patterns.
+    """
+
+    def test_constructs_from_viewdocumentex_url(self):
+        base = ('https://oitco.hylandcloud.com/CDOTRMPop/ViewDocumentEx.aspx'
+                '?OBToken=fa562b2a-66e6-4203-9943-5a6b5962bae8'
+                '&dochandle=17470635')
+        urls = extract_viewer_binary_urls('<html></html>', base)
+        assert any('RetrieveNativeDocument.ashx' in u and
+                    'OBToken=fa562b2a' in u and
+                    'dochandle=17470635' in u
+                    for u in urls)
+
+    def test_no_construction_without_obtoken_in_url(self):
+        """Don't construct if base_url has no OBToken."""
+        base = 'https://host.com/app/ViewDocumentEx.aspx?docid=123'
+        urls = extract_viewer_binary_urls('<html></html>', base)
+        # No OBToken → no constructed URLs (only pattern-matched ones)
+        assert not any('RetrieveNativeDocument.ashx' in u for u in urls)
+
+    def test_app_root_extraction_from_docpop_path(self):
+        """Application root should be correctly extracted from /docpop/ path."""
+        base = ('https://host.com/CDOTRMPop/docpop/ViewDocumentEx.aspx'
+                '?OBToken=aabb1122-3344-5566-7788-99aabbccddee&dochandle=42')
+        urls = extract_viewer_binary_urls('', base)
+        assert any('/CDOTRMPop/RetrieveNativeDocument.ashx' in u for u in urls)
+
+    def test_app_root_extraction_from_viewdocumentex_path(self):
+        """Application root extracted when ViewDocumentEx is directly under app root."""
+        base = ('https://host.com/App/ViewDocumentEx.aspx'
+                '?OBToken=aabb1122-3344-5566-7788-99aabbccddee&dochandle=42')
+        urls = extract_viewer_binary_urls('', base)
+        assert any('/App/RetrieveNativeDocument.ashx' in u for u in urls)
 
 
 if __name__ == '__main__':

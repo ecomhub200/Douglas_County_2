@@ -394,13 +394,19 @@ def build_obtoken_candidates(html_content, base_url, docid):
 
     candidates = []
     for guid in guids:
-        base = (f"{virtual_root}/ViewDocumentEx.aspx"
-                f"?OBToken={guid}&dochandle={docid}")
-        # Try with k value first (more likely to succeed)
+        # --- RetrieveNativeDocument first (returns binary directly) ---
+        native_base = (f"{virtual_root}/RetrieveNativeDocument.ashx"
+                       f"?OBToken={guid}&dochandle={docid}")
         if keys:
-            candidates.append(f"{base}&k={keys[0]}")
-        # Also try without k (may be optional)
-        candidates.append(base)
+            candidates.append(f"{native_base}&k={keys[0]}")
+        candidates.append(native_base)
+
+        # --- ViewDocumentEx (may return HTML viewer or binary) ---
+        view_base = (f"{virtual_root}/ViewDocumentEx.aspx"
+                     f"?OBToken={guid}&dochandle={docid}")
+        if keys:
+            candidates.append(f"{view_base}&k={keys[0]}")
+        candidates.append(view_base)
 
     return candidates
 
@@ -413,21 +419,44 @@ def extract_viewer_binary_urls(html_content, base_url):
     OnBase renders an HTML viewer (using Infragistics controls) that makes
     AJAX calls to endpoints like ``Retrieve.ashx``, ``RenderPage.aspx``,
     ``GetDocumentContent.ashx`` etc. to load document pages/content.
+
+    The viewer HTML also contains ``RetrieveNativeDocument.ashx`` URLs with
+    query parameters like ``docid=`` or ``documentId=`` that return the
+    original file directly.  These are the highest-value targets.
     """
     html_str = (html_content.decode('utf-8', errors='ignore')
                 if isinstance(html_content, bytes) else html_content)
 
-    from urllib.parse import urljoin
+    from urllib.parse import urljoin, urlparse, parse_qs
 
     # Look for binary-serving endpoint patterns in the viewer HTML
     patterns = [
-        # .ashx handlers (common for binary content in ASP.NET)
+        # --- High-value: full URLs with query parameters (ashx + aspx) ---
+        # Matches quoted strings containing .ashx?... or .aspx?... with
+        # document-retrieval function names.  The query string often
+        # carries docid / documentId / dochandle which makes the URL
+        # self-contained.
+        r'["\']([^"\']*(?:RetrieveNativeDocument|GetNativeDocument|'
+        r'GetRawContent|GetDocument|RetrieveDocument|GetContent|'
+        r'DocumentContent|GetDocumentContent|RenderDocument|'
+        r'SendToApplication|FetchDocument|ImageViewer|'
+        r'RetrieveNativeDoc|NativeDocRetrieval|'
+        r'GetOriginalDocument|DownloadNativeFile)'
+        r'\.(?:ashx|aspx)[^"\']*)["\']',
+
+        # --- .ashx handlers (common for binary content in ASP.NET) ---
         r'["\']([^"\']*(?:Retrieve|GetDoc|DocumentContent|RenderPage|'
         r'FetchDocument|PageContent|SendTo|GetNativeDoc)[^"\']*\.ashx[^"\']*)["\']',
         # .aspx pages that serve content
         r'["\']([^"\']*(?:Retrieve|GetDoc|FetchDocument|RenderPage|'
         r'DocumentContent|GetNativeDocument|SendToApplication)[^"\']*\.aspx[^"\']*)["\']',
-        # Generic download/content URLs
+
+        # --- JS string assignments containing .ashx/.aspx paths ---
+        # OnBase viewer JS may assign these as string literals used in
+        # AJAX requests, e.g.  var url = "/CDOTRMPop/Retrieve.ashx?…"
+        r'=\s*["\']([^"\']*\.ashx\?[^"\']*(?:doc|content|render)[^"\']*)["\']',
+
+        # --- Generic download/content URLs ---
         r'["\']([^"\']*(?:download|retrieve|getdoc|fetchdoc|sendto|'
         r'nativedoc|docstream)[^"\']*)["\']',
     ]
@@ -436,13 +465,47 @@ def extract_viewer_binary_urls(html_content, base_url):
     for pattern in patterns:
         for match in re.finditer(pattern, html_str, re.IGNORECASE):
             url = match.group(1)
-            # Skip JavaScript function calls and CSS
-            if any(s in url.lower() for s in ('javascript:', 'function', '.css', '.gif', '.png')):
+            # Skip JavaScript function calls, CSS, and images
+            if any(s in url.lower() for s in (
+                'javascript:', 'function', '.css', '.gif', '.png',
+                '.jpg', '.ico', '.svg', 'void(0)',
+            )):
+                continue
+            # Skip very short matches that are likely just function names
+            if len(url) < 8:
                 continue
             if not url.startswith('http'):
                 url = urljoin(base_url, url)
             if url not in urls:
                 urls.append(url)
+
+    # --- Construct RetrieveNativeDocument URL from ViewDocumentEx params ---
+    # If we're on a ViewDocumentEx page, the OBToken and dochandle from the
+    # URL can be used to build a direct RetrieveNativeDocument request.
+    try:
+        parsed = urlparse(base_url)
+        qs = parse_qs(parsed.query)
+        obtoken = qs.get('OBToken', [None])[0]
+        dochandle = qs.get('dochandle', [None])[0]
+        if obtoken and dochandle:
+            # Build the retrieval URL at the same application root
+            app_root = parsed.path
+            docpop_idx = app_root.lower().find('/docpop/')
+            viewdoc_idx = app_root.lower().find('/viewdocumentex')
+            if docpop_idx >= 0:
+                app_root = app_root[:docpop_idx]
+            elif viewdoc_idx >= 0:
+                app_root = app_root[:viewdoc_idx]
+            root = f"{parsed.scheme}://{parsed.netloc}{app_root}"
+            for endpoint in [
+                f"{root}/RetrieveNativeDocument.ashx?OBToken={obtoken}&dochandle={dochandle}",
+                f"{root}/docpop/RetrieveNativeDocument.ashx?OBToken={obtoken}&dochandle={dochandle}",
+                f"{root}/GetRawContent.ashx?OBToken={obtoken}&dochandle={dochandle}",
+            ]:
+                if endpoint not in urls:
+                    urls.insert(0, endpoint)  # highest priority
+    except Exception:
+        pass
 
     return urls
 
@@ -641,6 +704,8 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                     break
 
             # --- Try fetching iframe URL directly (it may serve the file) ---
+            viewer_html_for_extraction = None
+            viewer_base_url = None
             if downloaded_path is None and doc_frame and doc_frame.url:
                 frame_url = doc_frame.url
                 if 'blank.aspx' not in frame_url.lower():
@@ -653,8 +718,43 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                             browser.close()
                             logger.info(f"  Playwright success via iframe URL: {reason}")
                             return body, ext
+                        # Save the viewer HTML for binary URL extraction below
+                        if len(body) > 1000:
+                            viewer_html_for_extraction = body
+                            viewer_base_url = frame_url
+                            logger.info(f"  Iframe returned HTML viewer ({len(body):,} bytes), "
+                                        f"will extract binary URLs")
                     except Exception as e:
                         logger.info(f"  Direct iframe URL fetch failed: {e}")
+
+            # --- Extract binary URLs from the viewer HTML page ---
+            # When the iframe URL returns a ViewDocumentEx HTML viewer (not
+            # the binary file), parse it for RetrieveNativeDocument.ashx and
+            # other binary-serving endpoints, then fetch them using
+            # Playwright's authenticated session (which has the correct
+            # ASP.NET_SessionId cookie).
+            if downloaded_path is None and viewer_html_for_extraction:
+                binary_urls = extract_viewer_binary_urls(
+                    viewer_html_for_extraction, viewer_base_url)
+                if binary_urls:
+                    logger.info(f"  Playwright: found {len(binary_urls)} binary "
+                                f"endpoint(s) in viewer HTML")
+                for bi, burl in enumerate(binary_urls[:8]):
+                    logger.info(f"  Playwright binary [{bi+1}]: {burl[:140]}")
+                    try:
+                        resp = page.request.get(burl)
+                        body = resp.body()
+                        ct = (resp.headers.get('content-type') or '').lower()
+                        cd = resp.headers.get('content-disposition') or ''
+                        is_valid, ext, reason = detect_file_type(body, ct, cd)
+                        logger.info(f"    Result: {reason} ({len(body):,} bytes)")
+                        if is_valid:
+                            browser.close()
+                            logger.info(f"  Playwright success via viewer binary "
+                                        f"endpoint: {reason}")
+                            return body, ext
+                    except Exception as e:
+                        logger.info(f"    Failed: {e}")
 
             # --- JavaScript-based download trigger across all frames ---
             if downloaded_path is None:
@@ -771,6 +871,81 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                         break
 
             # --- Final check on network interceptor ---
+            if captured_excel:
+                browser.close()
+                logger.info(f"  Playwright success ({captured_excel['reason']})")
+                return captured_excel['data'], captured_excel['ext']
+
+            # --- Try RetrieveNativeDocument using OBToken from iframe URL ---
+            # The iframe URL contains the real OBToken that was generated
+            # server-side after JS execution.  Use it to build direct
+            # retrieval URLs and fetch with Playwright's authenticated
+            # session cookies.
+            if downloaded_path is None and doc_frame and doc_frame.url:
+                from urllib.parse import urlparse, parse_qs
+                try:
+                    parsed_frame = urlparse(doc_frame.url)
+                    qs = parse_qs(parsed_frame.query)
+                    real_obtoken = qs.get('OBToken', [None])[0]
+                    real_dochandle = qs.get('dochandle', [None])[0]
+                    real_k = qs.get('k', [None])[0]
+
+                    if real_obtoken:
+                        logger.info(f"  Playwright: extracted real OBToken "
+                                    f"from iframe: {real_obtoken}")
+                        # Build application root from frame URL
+                        fpath = parsed_frame.path
+                        for marker in ('/ViewDocumentEx', '/docpop/', '/DocPop/'):
+                            idx = fpath.lower().find(marker.lower())
+                            if idx >= 0:
+                                fpath = fpath[:idx]
+                                break
+                        app_root = (f"{parsed_frame.scheme}://"
+                                    f"{parsed_frame.netloc}{fpath}")
+
+                        native_urls = []
+                        dh = real_dochandle or str(docid)
+                        for ep in [
+                            f"{app_root}/RetrieveNativeDocument.ashx"
+                            f"?OBToken={real_obtoken}&dochandle={dh}",
+                            f"{app_root}/docpop/RetrieveNativeDocument.ashx"
+                            f"?OBToken={real_obtoken}&dochandle={dh}",
+                            f"{app_root}/GetRawContent.ashx"
+                            f"?OBToken={real_obtoken}&dochandle={dh}",
+                            f"{app_root}/GetDocument.ashx"
+                            f"?OBToken={real_obtoken}&dochandle={dh}",
+                        ]:
+                            if real_k:
+                                native_urls.append(f"{ep}&k={real_k}")
+                            native_urls.append(ep)
+
+                        for ni, nurl in enumerate(native_urls):
+                            logger.info(f"  Playwright native [{ni+1}]: "
+                                        f"{nurl[:140]}")
+                            try:
+                                resp = page.request.get(nurl)
+                                body = resp.body()
+                                ct = (resp.headers.get('content-type')
+                                      or '').lower()
+                                cd = (resp.headers.get('content-disposition')
+                                      or '')
+                                is_valid, ext, reason = detect_file_type(
+                                    body, ct, cd)
+                                logger.info(f"    Result: {reason} "
+                                            f"({len(body):,} bytes)")
+                                if is_valid:
+                                    browser.close()
+                                    logger.info(
+                                        f"  Playwright success via "
+                                        f"RetrieveNativeDocument: {reason}")
+                                    return body, ext
+                            except Exception as e:
+                                logger.info(f"    Failed: {e}")
+                except Exception as e:
+                    logger.info(f"  Playwright native doc extraction "
+                                f"failed: {e}")
+
+            # --- Final check on network interceptor (again) ---
             if captured_excel:
                 browser.close()
                 logger.info(f"  Playwright success ({captured_excel['reason']})")
@@ -1014,7 +1189,7 @@ def download_onbase_document(session, docid, label='document'):
                         logger.info(f"    Viewer HTML returned. Found "
                                     f"{len(follow_urls)} sub-link(s)")
 
-                    for fi, follow_url in enumerate(follow_urls[:5]):
+                    for fi, follow_url in enumerate(follow_urls[:10]):
                         logger.info(f"    Following sub-link {fi+1}: "
                                     f"{follow_url[:120]}")
                         try:
