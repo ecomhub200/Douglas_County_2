@@ -507,6 +507,9 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                 has_file_url = any(k in resp_url for k in [
                     '.xlsx', '.xls', 'getdoc', 'retrievedoc',
                     'fetchdocument', 'renderpage',
+                    # Additional OnBase stream endpoints
+                    'getdocument', 'retrievedocument', 'documentstream',
+                    'docstream', 'viewdoc', 'binarydata', 'getfile',
                 ])
                 has_file_disp = '.xls' in cd.lower()
 
@@ -601,6 +604,16 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                 'text=Download', 'text=Retrieve',
                 'text=Open', 'text=Save',
                 'text=Send to', 'text=Send To',
+                # OnBase-specific button IDs
+                '#SaveButton', '#btnSave', '#btnExport',
+                # Title-based toolbar actions
+                '[title="Save As"]', '[title="Export"]', '[title="Print"]',
+                '[title*="export" i]',
+                # Infragistics toolbar controls (OnBase UI framework)
+                '.ig_Item', '.ig_ToolbarItem',
+                '[class*="toolbar"] button', '[class*="toolbar"] a',
+                # ARIA roles
+                '[role="button"]', '[role="menuitem"]',
             ]
 
             for target_frame in all_frames:
@@ -673,6 +686,90 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                     except Exception:
                         continue
 
+            # --- Keyboard shortcut (Ctrl+S) to trigger viewer save ---
+            if downloaded_path is None and not captured_excel:
+                for target_frame in all_frames:
+                    try:
+                        logger.info("  Trying Ctrl+S keyboard shortcut...")
+                        target_frame.locator('body').first.focus()
+                        with page.expect_download(timeout=8000) as dl_info:
+                            page.keyboard.press('Control+s')
+                        download = dl_info.value
+                        downloaded_path = download.path()
+                        logger.info(f"  Ctrl+S download: {download.suggested_filename}")
+                        break
+                    except Exception:
+                        if captured_excel:
+                            break
+                        continue
+
+            # --- Scan JS and DOM for hidden document URLs ---
+            if downloaded_path is None and not captured_excel:
+                logger.info("  Scanning page scripts and DOM for document URLs...")
+                for target_frame in all_frames:
+                    try:
+                        discovered_urls = target_frame.evaluate("""() => {
+                            const urls = new Set();
+                            const scripts = document.querySelectorAll('script');
+                            const urlPatterns = [
+                                /['"](https?:\\/\\/[^'"]*(?:GetDoc|Download|Retrieve|Stream|Export|document)[^'"]*)['"]/gi,
+                                /documentUrl\\s*[:=]\\s*['"]([^'"]+)['"]/gi,
+                                /downloadUrl\\s*[:=]\\s*['"]([^'"]+)['"]/gi,
+                                /fileUrl\\s*[:=]\\s*['"]([^'"]+)['"]/gi,
+                                /blobUrl\\s*[:=]\\s*['"]([^'"]+)['"]/gi
+                            ];
+                            for (const script of scripts) {
+                                const text = script.textContent || '';
+                                for (const pattern of urlPatterns) {
+                                    pattern.lastIndex = 0;
+                                    let match;
+                                    while ((match = pattern.exec(text)) !== null) {
+                                        urls.add(match[1]);
+                                    }
+                                }
+                            }
+                            for (const tag of ['object', 'embed', 'iframe']) {
+                                for (const el of document.querySelectorAll(tag)) {
+                                    const src = el.getAttribute('data') || el.getAttribute('src') || '';
+                                    if (src && (src.startsWith('blob:') ||
+                                        /GetDoc|Download|Retrieve|Stream|document/i.test(src))) {
+                                        urls.add(src);
+                                    }
+                                }
+                            }
+                            return Array.from(urls).slice(0, 10);
+                        }""")
+                    except Exception:
+                        discovered_urls = []
+                        continue
+
+                    if discovered_urls:
+                        logger.info(f"  Found {len(discovered_urls)} candidate URL(s) in page scripts")
+
+                    for di, disc_url in enumerate(discovered_urls):
+                        if disc_url.startswith('blob:'):
+                            logger.info(f"    [{di+1}] Skipping blob URL: {disc_url[:80]}")
+                            continue
+                        logger.info(f"    [{di+1}] Trying: {disc_url[:120]}")
+                        try:
+                            resp = page.request.get(disc_url)
+                            body = resp.body()
+                            ct = (resp.headers.get('content-type') or '').lower()
+                            cd = resp.headers.get('content-disposition') or ''
+                            is_valid, ext, reason = detect_file_type(body, ct, cd)
+                            if is_valid:
+                                browser.close()
+                                logger.info(f"  Playwright success via JS-discovered URL: {reason}")
+                                return body, ext
+                            else:
+                                logger.info(f"    Not a valid file: {reason}")
+                        except Exception as e:
+                            logger.info(f"    Fetch failed: {e}")
+                        if captured_excel:
+                            break
+                    if captured_excel:
+                        break
+
             # --- Final check on network interceptor ---
             if captured_excel:
                 browser.close()
@@ -714,6 +811,37 @@ def download_with_playwright(docid, label='document', timeout_ms=60000):
                                 logger.info(f"  [Playwright diag] Frame {frame.url[:80]} HTML ({len(fc)} chars):\n{fc[:1000]}")
                             except Exception:
                                 pass
+                    # Dump toolbar / Infragistics control structure
+                    try:
+                        toolbar_info = page.evaluate("""() => {
+                            const selectors = [
+                                '[class*="toolbar" i]', '[id*="toolbar" i]',
+                                '.ig_Control', '[class*="ig_"]'
+                            ];
+                            const results = [];
+                            for (const sel of selectors) {
+                                try {
+                                    const els = document.querySelectorAll(sel);
+                                    for (const el of Array.from(els).slice(0, 5)) {
+                                        results.push({
+                                            tag: el.tagName,
+                                            id: el.id || '',
+                                            className: (el.className || '').toString().substring(0, 80),
+                                            childCount: el.children.length,
+                                            innerText: (el.innerText || '').substring(0, 60)
+                                        });
+                                    }
+                                } catch(e) {}
+                            }
+                            return results;
+                        }""")
+                        if toolbar_info:
+                            logger.info(f"  [Playwright diag] Toolbar/Infragistics controls: {len(toolbar_info)}")
+                            for ti in toolbar_info:
+                                logger.info(f"    <{ti['tag']} id='{ti['id']}' class='{ti['className']}' "
+                                           f"children={ti['childCount']}>{ti['innerText']}</{ti['tag']}>")
+                    except Exception:
+                        pass
                     logger.info(f"  [Playwright diag] Main HTML preview:\n{page_html[:1500]}")
                 except Exception as diag_err:
                     logger.warning(f"  [Playwright diag] Failed to dump page: {diag_err}")
