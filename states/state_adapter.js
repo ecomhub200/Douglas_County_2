@@ -729,14 +729,38 @@ const StateAdapter = (() => {
                     ? (window._defaultStateConfigJurisdictions || window._virginiaConfigJurisdictions)
                     : null;
                 if (cachedJurisdictions && Object.keys(cachedJurisdictions).length > 0) {
-                    console.log(`[StateAdapter] Using cached config.json jurisdictions for ${stateInfo.name} (${Object.keys(cachedJurisdictions).length} entries)`);
-                    dynamicGeoConfig = FIPSDatabase.buildGeoConfig(padded, cachedJurisdictions);
+                    // Filter cached jurisdictions to only include entries for the target state.
+                    // config.json may contain jurisdictions for multiple states (e.g., VA + CO).
+                    // We must not pass all of them to buildGeoConfig or downstream code will
+                    // see accumulated counties from every state in the config.
+                    const targetAbbr = stateInfo.abbr;
+                    const hasTaggedForTarget = Object.values(cachedJurisdictions).some(j => j.state === targetAbbr);
+                    let filteredJurisdictions;
+                    if (hasTaggedForTarget) {
+                        // Entries explicitly tagged for this state exist — keep only those
+                        filteredJurisdictions = {};
+                        for (const [key, val] of Object.entries(cachedJurisdictions)) {
+                            if (val.state === targetAbbr) {
+                                filteredJurisdictions[key] = val;
+                            }
+                        }
+                    } else {
+                        // No entries tagged for this state — untagged entries belong to it
+                        filteredJurisdictions = {};
+                        for (const [key, val] of Object.entries(cachedJurisdictions)) {
+                            if (!val.state) {
+                                filteredJurisdictions[key] = val;
+                            }
+                        }
+                    }
+                    console.log(`[StateAdapter] Using cached config.json jurisdictions for ${stateInfo.name} (${Object.keys(filteredJurisdictions).length} of ${Object.keys(cachedJurisdictions).length} entries after filtering)`);
+                    dynamicGeoConfig = FIPSDatabase.buildGeoConfig(padded, filteredJurisdictions);
                     // Override defaultJurisdiction with the config-driven value (e.g., 'henrico' for Virginia)
                     // buildGeoConfig uses Object.keys()[0] which gives alphabetical first (e.g., 'accomack'),
                     // but the state config knows which jurisdiction has data available
                     const stateKey = fipsToKey[padded];
                     const configDefault = stateKey && appConfig?.states?.[stateKey]?.defaultJurisdiction;
-                    if (configDefault && cachedJurisdictions[configDefault]) {
+                    if (configDefault && filteredJurisdictions[configDefault]) {
                         dynamicGeoConfig.defaultJurisdiction = configDefault;
                         console.log(`[StateAdapter] Default jurisdiction overridden to config value: ${configDefault}`);
                     }
