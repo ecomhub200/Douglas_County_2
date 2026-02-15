@@ -5,10 +5,19 @@
 # in the crash-lens-data R2 bucket. Creates zero-byte marker objects so that
 # folders appear in the R2 dashboard and are ready for data uploads.
 #
-# Reads jurisdiction lists from:
-#   - config.json (Virginia)
-#   - data/{State}DOT/source_manifest.json (all other states)
+# Reads from:
+#   - config.json (Virginia jurisdictions)
+#   - data/{State}DOT/source_manifest.json (other state jurisdictions)
+#   - states/{state}/hierarchy.json (DOT regions + MPOs/TPRs for all 50 states)
 #   - Fallback known lists for states without populated manifests
+#
+# Folder structure per state:
+#   {state}/_state/             — Statewide raw data
+#   {state}/_statewide/         — Statewide aggregates
+#   {state}/_region/{id}/       — DOT district/region aggregates
+#   {state}/_mpo/{id}/          — MPO/TPR aggregates
+#   {state}/{jurisdiction}/     — Per-jurisdiction crash data
+#   {state}/{jurisdiction}/raw/ — Raw annual source data
 #
 # Safe to re-run — creating an existing folder marker is a no-op.
 # ============================================================================
@@ -78,7 +87,7 @@ jobs:
               echo "::error::Failed to access R2 bucket. Check secrets."
               exit 1
             }
-          echo "✓ R2 access confirmed"
+          echo "R2 access confirmed"
 
       # ── Create Folders ──
       - name: Create R2 folder structure
@@ -95,53 +104,10 @@ jobs:
             ARGS="--state ${{ inputs.state }}"
             echo "Scope: single state (${{ inputs.state }})"
           elif [ "${{ inputs.scope }}" = "top_level_only" ]; then
-            echo "Scope: top-level folders only (no jurisdiction subfolders)"
-            # For top-level only, we'll use --list-only to show what would be created
-            # then create just the state-level folders via inline script
-            python3 scripts/create_r2_folders.py --list-only | grep -E '^  [a-z_]+/$' | head -40
-            echo ""
-            echo "Creating top-level state folders..."
-
-            ENDPOINT="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
-            TOP_FOLDERS=(
-              "_federal/"
-              "_national/"
-              "_national/snapshots/"
-              "shared/"
-              "shared/boundaries/"
-              "shared/mutcd/"
-            )
-
-            # State prefixes
-            STATES=(
-              virginia colorado maryland connecticut delaware new_york nyc
-              hawaii iowa illinois louisiana alaska massachusetts pennsylvania
-              florida georgia south_carolina ohio wisconsin nevada utah
-              oregon washington idaho montana west_virginia mississippi
-              oklahoma arkansas vermont texas
-            )
-
-            for folder in "${TOP_FOLDERS[@]}"; do
-              echo "  Creating: $folder"
-              aws s3api put-object --bucket "${R2_BUCKET}" --key "$folder" --content-length 0 \
-                --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || echo "  [WARN] Failed: $folder"
-            done
-
-            for state in "${STATES[@]}"; do
-              for sub in "" "_state/" "_statewide/" "_statewide/snapshots/"; do
-                key="${state}/${sub}"
-                if [ -z "$sub" ]; then key="${state}/"; fi
-                echo "  Creating: $key"
-                aws s3api put-object --bucket "${R2_BUCKET}" --key "$key" --content-length 0 \
-                  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || echo "  [WARN] Failed: $key"
-              done
-            done
-
-            echo ""
-            echo "Top-level folder creation complete."
-            exit 0
+            ARGS="--top-level-only"
+            echo "Scope: top-level + regions + MPOs (no jurisdiction subfolders)"
           else
-            echo "Scope: all states and jurisdictions"
+            echo "Scope: all states, regions, MPOs, and jurisdictions"
           fi
 
           # Add dry-run flag if requested
@@ -166,16 +132,16 @@ jobs:
           aws s3 ls "s3://${R2_BUCKET}/" --endpoint-url "$ENDPOINT" | head -50
 
           echo ""
-          echo "Listing Virginia folders (sample)..."
-          aws s3 ls "s3://${R2_BUCKET}/virginia/" --endpoint-url "$ENDPOINT" | head -20
+          echo "Listing Virginia structure (sample)..."
+          aws s3 ls "s3://${R2_BUCKET}/virginia/" --endpoint-url "$ENDPOINT" | head -25
 
           echo ""
-          echo "Listing Colorado folders (sample)..."
-          aws s3 ls "s3://${R2_BUCKET}/colorado/" --endpoint-url "$ENDPOINT" | head -20
+          echo "Listing Colorado structure (sample)..."
+          aws s3 ls "s3://${R2_BUCKET}/colorado/" --endpoint-url "$ENDPOINT" | head -25
 
           echo ""
-          echo "Listing Maryland folders (sample)..."
-          aws s3 ls "s3://${R2_BUCKET}/maryland/" --endpoint-url "$ENDPOINT" | head -20
+          echo "Listing Maryland structure (sample)..."
+          aws s3 ls "s3://${R2_BUCKET}/maryland/" --endpoint-url "$ENDPOINT" | head -25
 
           # Count total objects
           echo ""

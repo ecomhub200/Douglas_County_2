@@ -32,37 +32,37 @@ ENDPOINT = f"https://{ACCOUNT_ID}.r2.cloudflarestorage.com"
 # ─── State Prefixes & Data Directories ───────────────────────────────────────
 # Maps R2 state prefix → data directory name (relative to data/)
 STATE_MAP = {
-    "virginia":       None,          # Jurisdictions from config.json
-    "colorado":       "CDOT",
-    "maryland":       "MarylandDOT",
-    "connecticut":    "ConnecticutDOT",
-    "delaware":       "DelawareDOT",
-    "new_york":       "NewYorkDOT",
-    "nyc":            "NYCDOT",
-    "hawaii":         "HawaiiDOT",
-    "iowa":           "IowaDOT",
-    "illinois":       "IllinoisDOT",
-    "louisiana":      "LouisianaDOT",
-    "alaska":         "AlaskaDOT",
-    "massachusetts":  "MassachusettsDOT",
-    "pennsylvania":   "PennsylvaniaDOT",
-    "florida":        "FloridaDOT",
-    "georgia":        "GeorgiaDOT",
-    "south_carolina": "SouthCarolinaDOT",
-    "ohio":           "OhioDOT",
-    "wisconsin":      "WisconsinDOT",
-    "nevada":         "NevadaDOT",
-    "utah":           "UtahDOT",
-    "oregon":         "OregonDOT",
-    "washington":     "WashingtonDOT",
-    "idaho":          "IdahoDOT",
-    "montana":        "MontanaDOT",
-    "west_virginia":  "WestVirginiaDOT",
-    "mississippi":    "MississippiDOT",
-    "oklahoma":       "OklahomaDOT",
-    "arkansas":       "ArkansasDOT",
-    "vermont":        "VermontDOT",
-    "texas":          "TexasDOT",
+    "virginia":       {"data_dir": None,               "hierarchy": "virginia"},
+    "colorado":       {"data_dir": "CDOT",             "hierarchy": "colorado"},
+    "maryland":       {"data_dir": "MarylandDOT",      "hierarchy": "maryland"},
+    "connecticut":    {"data_dir": "ConnecticutDOT",   "hierarchy": "connecticut"},
+    "delaware":       {"data_dir": "DelawareDOT",      "hierarchy": "delaware"},
+    "new_york":       {"data_dir": "NewYorkDOT",       "hierarchy": "new_york"},
+    "nyc":            {"data_dir": "NYCDOT",           "hierarchy": None},
+    "hawaii":         {"data_dir": "HawaiiDOT",        "hierarchy": "hawaii"},
+    "iowa":           {"data_dir": "IowaDOT",          "hierarchy": "iowa"},
+    "illinois":       {"data_dir": "IllinoisDOT",      "hierarchy": "illinois"},
+    "louisiana":      {"data_dir": "LouisianaDOT",     "hierarchy": "louisiana"},
+    "alaska":         {"data_dir": "AlaskaDOT",        "hierarchy": "alaska"},
+    "massachusetts":  {"data_dir": "MassachusettsDOT", "hierarchy": "massachusetts"},
+    "pennsylvania":   {"data_dir": "PennsylvaniaDOT",  "hierarchy": "pennsylvania"},
+    "florida":        {"data_dir": "FloridaDOT",       "hierarchy": "florida"},
+    "georgia":        {"data_dir": "GeorgiaDOT",       "hierarchy": "georgia"},
+    "south_carolina": {"data_dir": "SouthCarolinaDOT", "hierarchy": "south_carolina"},
+    "ohio":           {"data_dir": "OhioDOT",          "hierarchy": "ohio"},
+    "wisconsin":      {"data_dir": "WisconsinDOT",     "hierarchy": "wisconsin"},
+    "nevada":         {"data_dir": "NevadaDOT",        "hierarchy": "nevada"},
+    "utah":           {"data_dir": "UtahDOT",          "hierarchy": "utah"},
+    "oregon":         {"data_dir": "OregonDOT",        "hierarchy": "oregon"},
+    "washington":     {"data_dir": "WashingtonDOT",    "hierarchy": "washington"},
+    "idaho":          {"data_dir": "IdahoDOT",         "hierarchy": "idaho"},
+    "montana":        {"data_dir": "MontanaDOT",       "hierarchy": "montana"},
+    "west_virginia":  {"data_dir": "WestVirginiaDOT",  "hierarchy": "west_virginia"},
+    "mississippi":    {"data_dir": "MississippiDOT",   "hierarchy": "mississippi"},
+    "oklahoma":       {"data_dir": "OklahomaDOT",      "hierarchy": "oklahoma"},
+    "arkansas":       {"data_dir": "ArkansasDOT",      "hierarchy": "arkansas"},
+    "vermont":        {"data_dir": "VermontDOT",       "hierarchy": "vermont"},
+    "texas":          {"data_dir": "TexasDOT",         "hierarchy": "texas"},
 }
 
 # Known jurisdiction lists for states without source_manifest.json jurisdiction_filters
@@ -131,7 +131,8 @@ def get_jurisdictions(state_prefix, project_root):
     if state_prefix == "virginia":
         return load_virginia_jurisdictions(project_root)
 
-    data_dir = STATE_MAP.get(state_prefix)
+    state_cfg = STATE_MAP.get(state_prefix, {})
+    data_dir = state_cfg.get("data_dir") if isinstance(state_cfg, dict) else state_cfg
     if data_dir:
         jurisdictions = load_jurisdictions_from_manifest(project_root, data_dir)
         if jurisdictions:
@@ -144,8 +145,45 @@ def get_jurisdictions(state_prefix, project_root):
     return []
 
 
-def generate_all_folders(state_filter=None):
-    """Generate the complete list of R2 folder paths to create."""
+def load_hierarchy(state_prefix, project_root):
+    """Load regions and MPOs/TPRs from states/{hierarchy_name}/hierarchy.json.
+
+    Returns:
+        tuple: (region_keys, mpo_keys) — each a list of snake_case folder names
+    """
+    state_cfg = STATE_MAP.get(state_prefix, {})
+    hierarchy_name = state_cfg.get("hierarchy") if isinstance(state_cfg, dict) else None
+    if not hierarchy_name:
+        return [], []
+
+    hierarchy_path = project_root / "states" / hierarchy_name / "hierarchy.json"
+    if not hierarchy_path.exists():
+        return [], []
+
+    try:
+        with open(hierarchy_path) as f:
+            hierarchy = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return [], []
+
+    # Regions / Districts — stored under "regions" key
+    regions = hierarchy.get("regions", {})
+    region_keys = [k for k in regions.keys() if not k.startswith("_")]
+
+    # MPOs / TPRs — stored under "tprs" key
+    tprs = hierarchy.get("tprs", {})
+    mpo_keys = [k for k in tprs.keys() if not k.startswith("_")]
+
+    return region_keys, mpo_keys
+
+
+def generate_all_folders(state_filter=None, top_level_only=False):
+    """Generate the complete list of R2 folder paths to create.
+
+    Args:
+        state_filter: Only generate folders for this state prefix
+        top_level_only: If True, skip jurisdiction subfolders (keep state meta + regions + MPOs)
+    """
     project_root = get_project_root()
     folders = []
 
@@ -175,14 +213,29 @@ def generate_all_folders(state_filter=None):
             f"{state_prefix}/_statewide/snapshots/",
         ])
 
-        # Load jurisdictions
-        jurisdictions = get_jurisdictions(state_prefix, project_root)
-        print(f"    Found {len(jurisdictions)} jurisdictions")
+        # ── Regions / DOT Districts ──
+        region_keys, mpo_keys = load_hierarchy(state_prefix, project_root)
+        if region_keys:
+            print(f"    Found {len(region_keys)} regions: {', '.join(region_keys[:5])}{'...' if len(region_keys) > 5 else ''}")
+            for r in sorted(region_keys):
+                folders.append(f"{state_prefix}/_region/{r}/")
 
-        # Jurisdiction folders
-        for j in sorted(jurisdictions):
-            folders.append(f"{state_prefix}/{j}/")
-            folders.append(f"{state_prefix}/{j}/raw/")
+        # ── MPOs / TPRs ──
+        if mpo_keys:
+            print(f"    Found {len(mpo_keys)} MPOs/TPRs: {', '.join(mpo_keys[:5])}{'...' if len(mpo_keys) > 5 else ''}")
+            for m in sorted(mpo_keys):
+                folders.append(f"{state_prefix}/_mpo/{m}/")
+
+        # ── Jurisdictions (skip if top_level_only) ──
+        if not top_level_only:
+            jurisdictions = get_jurisdictions(state_prefix, project_root)
+            print(f"    Found {len(jurisdictions)} jurisdictions")
+
+            for j in sorted(jurisdictions):
+                folders.append(f"{state_prefix}/{j}/")
+                folders.append(f"{state_prefix}/{j}/raw/")
+        else:
+            print(f"    Skipping jurisdictions (top-level-only mode)")
 
     return folders
 
@@ -255,6 +308,8 @@ def main():
                         help="Only create folders for a specific state prefix")
     parser.add_argument("--list-only", action="store_true",
                         help="Just list all folder paths and exit")
+    parser.add_argument("--top-level-only", action="store_true",
+                        help="Only create state meta folders + regions + MPOs (skip jurisdictions)")
     args = parser.parse_args()
 
     # Validate environment
@@ -267,7 +322,10 @@ def main():
             sys.exit(1)
 
     print("Generating R2 folder structure...")
-    folders = generate_all_folders(state_filter=args.state)
+    folders = generate_all_folders(
+        state_filter=args.state,
+        top_level_only=args.top_level_only
+    )
 
     if args.list_only:
         print(f"\nTotal folders: {len(folders)}\n")
