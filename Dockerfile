@@ -5,8 +5,8 @@
 
 FROM node:18-alpine AS base
 
-# Install nginx and supervisord
-RUN apk add --no-cache nginx supervisor
+# Install nginx, supervisord, and curl (needed for Coolify healthcheck)
+RUN apk add --no-cache nginx supervisor curl
 
 # ------------------------------------------------------------
 # Copy application files
@@ -39,11 +39,8 @@ COPY logi[n]/ /usr/share/nginx/html/login/
 # Configure Nginx
 # ------------------------------------------------------------
 
-# Remove default nginx config
-RUN rm -f /etc/nginx/http.d/default.conf
-
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/http.d/default.conf
+# Replace the ENTIRE nginx config (not just a server block include)
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Ensure nginx directories exist
 RUN mkdir -p /var/log/nginx /var/lib/nginx/tmp /run/nginx
@@ -68,9 +65,9 @@ COPY supervisord.conf /etc/supervisord.conf
 # Expose port 80 (Coolify will map this automatically)
 EXPOSE 80
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -q --spider http://localhost:80/ || exit 1
+# Health check using curl against the dedicated /health endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:80/health || exit 1
 
 # Start both Nginx and the API proxy via supervisord
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
