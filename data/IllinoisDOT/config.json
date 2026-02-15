@@ -17,38 +17,49 @@
   "columnMapping": {
     "_description": "Maps Illinois IDOT crash data fields to CRASH LENS field codes",
     "_note": "Yearly ArcGIS layers from 2014-2024 (e.g., 'Crashes - 2024'). FeatureServer URLs are dynamically assigned per dataset page. Download CSV to inspect exact field names. Data dictionary: IL SR 1050 Traffic Crash Report. Crash types: Type A (PDO), Type B (injury/tow).",
-    "ID": "_TBD_CRASH_ID",
-    "DATE": "_TBD_CRASH_DATE",
-    "TIME": "_TBD_CRASH_TIME",
-    "LAT": "_TBD_LATITUDE",
-    "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "_TBD_SEVERITY",
-    "JURISDICTION": "_TBD_COUNTY",
-    "ROUTE": "_TBD_ROAD_NAME",
-    "COLLISION": "_TBD_COLLISION_TYPE",
-    "WEATHER": "_TBD_WEATHER",
-    "LIGHT": "_TBD_LIGHTING",
-    "SURFACE_CONDITION": "_TBD_SURFACE",
-    "JUNCTION": "_TBD_JUNCTION_TYPE",
-    "HITRUN": "_TBD_HIT_AND_RUN"
+    "ID": "OBJECTID",
+    "DATE": "CrashDate",
+    "TIME": "_EMBEDDED_IN_CRASHDATE",
+    "LAT": "Latitude",
+    "LON": "Longitude",
+    "SEVERITY": "Severity",
+    "JURISDICTION": "County",
+    "COUNTY_NUMBER": "County_No",
+    "CITY": "City",
+    "ROUTE": "Road_Name",
+    "CROSS_STREET": "Street_Name_2",
+    "COLLISION": "First_Crash_Type",
+    "WEATHER": "Weather_Condition_1",
+    "WEATHER_2": "Weather_Condition_2",
+    "LIGHT": "Light_Condition",
+    "SURFACE_CONDITION": "Road_Surface_Condition",
+    "JUNCTION": "Intersection_Type",
+    "HITRUN": "Hit_And_Run",
+    "FUNCTIONAL_CLASS": "Functional_Class",
+    "SPEED_LIMIT": "Speed_Limit",
+    "TRAFFICWAY_TYPE": "Trafficway_Type",
+    "TRAFFIC_CONTROL": "Traffic_Control_Device",
+    "ROAD_DEFECT": "Road_Defect",
+    "ALIGNMENT": "Alignment",
+    "NUM_LANES": "Number_of_Lanes",
+    "FATAL_COUNT": "Number_Of_Fatalities",
+    "INJURY_COUNT": "Number_Of_Injuries"
   },
   "derivedFields": {
-    "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
+    "_description": "Fields computed from raw data during Stage 1 (CONVERT)",
+    "_field_name_note": "Field names may vary slightly between years (e.g., Weather_Condition_1 vs WEATHER_CONDITION). Verify by downloading sample from latest year. City of Chicago uses uppercase underscore convention.",
     "SEVERITY": {
-      "method": "direct_or_derived",
-      "source": "_TBD",
-      "_note": "Update with Illinois-specific severity derivation method"
+      "method": "direct_text",
+      "source": "Severity",
+      "_note": "Illinois provides Severity as text. Map to KABCO based on SR 1050 data dictionary values."
     },
     "YEAR": {
       "method": "extract_year",
-      "source": "_TBD_CRASH_DATE"
+      "source": "CrashDate"
     },
     "NODE": {
       "method": "concatenate",
-      "sources": [
-        "_TBD_ROAD1",
-        "_TBD_ROAD2"
-      ],
+      "sources": ["Road_Name", "Street_Name_2"],
       "separator": " & "
     }
   },
