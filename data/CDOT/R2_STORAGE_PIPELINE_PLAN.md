@@ -564,8 +564,8 @@ crash-lens-data/
 |------|--------|---------|
 | `scripts/split_jurisdictions.py` | **NEW** — Split statewide CSV into all jurisdictions | Multi-jurisdiction splitting |
 | `.github/workflows/batch-all-jurisdictions.yml` | **NEW** — Batch workflow for all jurisdictions | Orchestration |
-| `download_crash_data.py` | `--save-statewide` flag (existing) | VA statewide save |
-| `download_cdot_crash_data.py` | `--save-statewide-gzip` flag (existing) | CO statewide save |
+| `download_crash_data.py` | `--save-statewide` flag; keep uncompressed CSV for batch splitting | VA statewide save |
+| `download_cdot_crash_data.py` | `--save-statewide-gzip` flag; keep uncompressed CSV for batch splitting | CO statewide save |
 | `.github/actions/upload-r2/action.yml` | Gzip Content-Encoding support (existing) | R2 upload |
 | `.github/workflows/download-data.yml` | Stage 4.5 + 6.5 (existing) | VA single-jurisdiction |
 | `.github/workflows/download-cdot-crash-data.yml` | Stage 2a.5 (existing) | CO single-jurisdiction |
@@ -583,9 +583,11 @@ crash-lens-data/
 | 1 | **CRITICAL** | `hashFiles()` evaluated at parse time — never matches runtime-generated gzip files. | Replaced with runtime `[ -f "$GZ" ]` check. |
 | 2 | **CRITICAL** | `--output-dir data` causes aggregates to write wrong path. | Changed to `--output-dir data/$STATE`. |
 | 3 | **CRITICAL** | Frontend had no code to fetch statewide gzip CSV from R2. | Added `AggregateLoader.loadStatewideCSV()`, `resolveDataUrl()` Strategy 3, `loadStatewideCSVForTier()`. |
-| 4 | **MODERATE** | `uncompressed_size` never passed to upload-r2 action. | Added gzip footer read. |
-| 5 | **MODERATE** | `_get_col_mapping()` hardcoded to VA/CO. | Rewrote to scan `states/` dynamically. |
-| 6 | **USER-REQ** | Colorado statewide skipped geocoding. | Removed `--skip-geocode`; timeout 1800s. |
+| 4 | **CRITICAL** | `resolveDataUrl()` Strategy 2 split at first underscore — 23+ VA jurisdictions with underscores (fairfax_county, richmond_city, etc.) got wrong R2 keys. | Match known suffixes from end of filename first. |
+| 5 | **CRITICAL** | Both download scripts deleted uncompressed statewide CSV after gzipping (`os.remove(statewide_path)`). Batch splitting workflow needs uncompressed CSV. | Removed `os.remove()` — keep both `.csv` and `.csv.gz`. |
+| 6 | **MODERATE** | `uncompressed_size` never passed to upload-r2 action. | Added gzip footer read. |
+| 7 | **MODERATE** | `_get_col_mapping()` hardcoded to VA/CO. | Rewrote to scan `states/` dynamically. |
+| 8 | **USER-REQ** | Colorado statewide skipped geocoding. | Removed `--skip-geocode`; timeout 1800s. |
 
 ---
 

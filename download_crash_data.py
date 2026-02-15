@@ -775,7 +775,9 @@ def main():
                         shutil.copyfileobj(f_in, f_out)
                 uncompressed_size = os.path.getsize(statewide_path)
                 compressed_size = os.path.getsize(gz_path)
-                os.remove(statewide_path)  # Keep only gzipped version
+                # Keep uncompressed CSV alongside gzip for batch splitting workflows
+                # (split_jurisdictions.py needs the uncompressed CSV to split into
+                # per-jurisdiction files). The batch workflow cleans up after splitting.
                 ratio = uncompressed_size / compressed_size if compressed_size > 0 else 0
                 logger.info(f"Statewide gzip saved: {gz_path} ({compressed_size:,} bytes, {ratio:.1f}x compression)")
             except Exception as e:
