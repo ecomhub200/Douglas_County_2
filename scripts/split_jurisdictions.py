@@ -68,20 +68,22 @@ def get_jurisdictions(config, state):
         'virginia': 'VA', 'colorado': 'CO'
     }.get(state, state.upper()[:2])
 
-    state_prefix = {
-        'colorado': 'co_'
-    }.get(state, '')
-
     result = {}
     for jid, jconfig in jurisdictions.items():
         if jid.startswith('_'):
             continue  # Skip separators
 
-        # Virginia jurisdictions have no prefix; Colorado uses "co_"
+        # Check explicit state field first (e.g., "state": "CO")
+        j_state = jconfig.get('state', '')
+        if j_state:
+            if j_state.upper() == state_abbr:
+                result[jid] = jconfig
+            continue
+
+        # Fallback: Virginia jurisdictions have no prefix; Colorado uses "co_"
         if state == 'virginia' and not jid.startswith('co_'):
             result[jid] = jconfig
         elif state == 'colorado' and jid.startswith('co_'):
-            # Strip co_ prefix for output naming
             result[jid] = jconfig
 
     return result
@@ -94,7 +96,9 @@ def get_colorado_jurisdictions_from_manifest():
         return {}
     with open(manifest_path) as f:
         manifest = json.load(f)
-    return manifest.get('jurisdiction_filters', {})
+    filters = manifest.get('jurisdiction_filters', {})
+    # Remove metadata keys (e.g., _description)
+    return {k: v for k, v in filters.items() if not k.startswith('_') and isinstance(v, dict)}
 
 
 def get_filter_profiles(config):
@@ -399,8 +403,12 @@ def main():
         print(f"\n{args.state.upper()} Jurisdictions ({len(jurisdictions)} total):")
         print("=" * 60)
         for jid, jconfig in sorted(jurisdictions.items()):
-            name = jconfig.get('name', jconfig.get('display_name', jid))
-            fips = jconfig.get('fips', 'N/A')
+            if isinstance(jconfig, dict):
+                name = jconfig.get('name', jconfig.get('display_name', jid))
+                fips = jconfig.get('fips', 'N/A')
+            else:
+                name = str(jconfig)
+                fips = 'N/A'
             print(f"  {jid:<25s} {name:<35s} FIPS: {fips}")
         return 0
 
