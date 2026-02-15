@@ -390,7 +390,8 @@ jobs:
           echo "Stage 6.5: Generating aggregates (bottom-up from county CSVs)"
           echo "=========================================="
 
-          python scripts/generate_aggregates.py --state "$STATE" --data-dir data/CDOT --output-dir data || {
+          # Output to data/{STATE}/ so paths match R2 hierarchy: {state}/_statewide/, _region/, _mpo/
+          python scripts/generate_aggregates.py --state "$STATE" --data-dir data/CDOT --output-dir "data/$STATE" || {
             echo "WARNING: Aggregate generation failed (non-fatal)"
           }
 

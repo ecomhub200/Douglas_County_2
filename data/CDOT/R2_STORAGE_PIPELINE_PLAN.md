@@ -29,13 +29,13 @@ Colorado statewide data goes through **the same convert + validate pipeline** as
 | **MERGE** | Combine per-year CSVs into single file | Yes — merges all years, deduplicates by CUID |
 | **CONVERT** | `ColoradoNormalizer` transforms CDOT columns → Virginia-compatible format | **Yes — REQUIRED** (severity, collision types, weather, route names, etc.) |
 | **VALIDATE** | Quality checks, bounds validation, duplicate detection, auto-correction | **Yes — REQUIRED** |
-| **GEOCODE** | Fill missing GPS coordinates | Skipped for statewide (too slow for CI; can run separately) |
+| **GEOCODE** | Fill missing GPS coordinates | **Yes** — runs on statewide data (timeout raised to 1800s) |
 | **SPLIT** | Create road-type variants (all_roads, county_roads, no_interstate) | Skipped — statewide is kept as single `all_roads` |
 | **GZIP** | Compress for R2 storage | Yes |
 
 **Implementation**: `download_cdot_crash_data.py --save-statewide-gzip` calls
-`scripts/process_crash_data.py` with `--skip-split --skip-geocode` to run
-CONVERT + VALIDATE on the merged statewide CSV before gzipping.
+`scripts/process_crash_data.py` with `--skip-split` to run
+CONVERT + VALIDATE + GEOCODE on the merged statewide CSV before gzipping.
 
 ### Virginia — Standardize Only (No Conversion Needed)
 
@@ -192,8 +192,20 @@ The `--save-statewide-gzip` flag in `download_cdot_crash_data.py` performs:
 6. UPLOAD: R2 at colorado/_state/statewide_all_roads.csv.gz
 ```
 
-**Geocoding is skipped** for statewide (processing ~500K+ records would exceed CI timeout).
-Geocoding continues to run on county-level data as before.
+**Geocoding runs** on statewide data with a 1800s timeout (30 min). The geocode
+cache from county-level runs will be reused, so only new locations need API calls.
+
+---
+
+## Bug Fixes Applied (Post-Review)
+
+| # | Severity | Bug | Fix |
+|---|----------|-----|-----|
+| 1 | **CRITICAL** | `hashFiles()` evaluated at parse time — never matches runtime-generated gzip files. Stage 4.5 (VA) and 2a.5 (CO) **never execute**. | Replaced with runtime `[ -f "$GZ" ]` check via step output. |
+| 2 | **CRITICAL** | `--output-dir data` causes aggregates to write to `data/_statewide/` but upload manifest looks for `data/{state}/_statewide/`. **Aggregates never uploaded.** | Changed to `--output-dir data/$STATE` in both workflows. |
+| 3 | **MODERATE** | `uncompressed_size` never passed to upload-r2 action — manifest lacks gzip metadata. | Added gzip footer read to extract uncompressed size; passed in `files_json`. |
+| 4 | **MODERATE** | `_get_col_mapping()` had dead code (`config_path` unused) and was hardcoded to only VA/CO. | Rewrote to scan `states/` directory dynamically. |
+| 5 | **USER-REQ** | Colorado statewide skipped geocoding (`--skip-geocode`). | Removed `--skip-geocode`; increased timeout to 1800s. |
 
 ---
 

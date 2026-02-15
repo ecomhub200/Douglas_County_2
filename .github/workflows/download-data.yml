@@ -407,13 +407,35 @@ jobs:
           r2_public_url: ${{ vars.R2_PUBLIC_URL }}
 
       # Stage 4.5: Upload statewide gzip to R2 (if saved at Stage 1.5)
+      - name: Check statewide gzip exists
+        id: check-statewide-gzip
+        run: |
+          GZ="data/virginia_statewide_all_roads.csv.gz"
+          if [ -f "$GZ" ]; then
+            SIZE=$(stat -c%s "$GZ" 2>/dev/null || stat -f%z "$GZ" 2>/dev/null || echo 0)
+            # Read uncompressed size from gzip footer (last 4 bytes, little-endian)
+            UNCOMPRESSED=$(python3 -c "
+          import struct
+          with open('$GZ', 'rb') as f:
+              f.seek(-4, 2)
+              print(struct.unpack('<I', f.read(4))[0])
+          " 2>/dev/null || echo 0)
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "size=$SIZE" >> $GITHUB_OUTPUT
+            echo "uncompressed=$UNCOMPRESSED" >> $GITHUB_OUTPUT
+            echo "Statewide gzip found: $GZ ($SIZE bytes, uncompressed ~$UNCOMPRESSED bytes)"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Statewide gzip not found (--save-statewide may have been skipped or failed)"
+          fi
+
       - name: Upload statewide gzip to R2 (Stage 4.5)
-        if: ${{ hashFiles('data/virginia_statewide_all_roads.csv.gz') != '' }}
+        if: steps.check-statewide-gzip.outputs.exists == 'true'
         uses: ./.github/actions/upload-r2
         with:
           files_json: |
             [
-              {"local_path": "data/virginia_statewide_all_roads.csv.gz", "r2_key": "${{ env.R2_STATE_PREFIX || 'virginia' }}/_state/statewide_all_roads.csv.gz"}
+              {"local_path": "data/virginia_statewide_all_roads.csv.gz", "r2_key": "${{ env.R2_STATE_PREFIX || 'virginia' }}/_state/statewide_all_roads.csv.gz", "uncompressed_size": ${{ steps.check-statewide-gzip.outputs.uncompressed || 0 }}}
             ]
           cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
           r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
@@ -483,7 +505,8 @@ jobs:
           echo "=========================================="
 
           # Generate statewide + region + MPO aggregates from available county CSVs
-          python scripts/generate_aggregates.py --state "$STATE" --data-dir data --output-dir data || {
+          # Output to data/{STATE}/ so paths match R2 hierarchy: {state}/_statewide/, _region/, _mpo/
+          python scripts/generate_aggregates.py --state "$STATE" --data-dir data --output-dir "data/$STATE" || {
             echo "WARNING: Aggregate generation failed (non-fatal)"
           }
 

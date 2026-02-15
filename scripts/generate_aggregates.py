@@ -407,17 +407,29 @@ def generate_group_aggregates(county_data, group_counties, hierarchy, epdo_weigh
 
 
 def _get_col_mapping(hierarchy):
-    """Get column mapping for the state."""
-    state_key = hierarchy.get('state', {}).get('abbreviation', '').lower()
-    config_path = PROJECT_ROOT / 'states' / (state_key if state_key not in ('va', 'co') else
-                                              ('virginia' if state_key == 'va' else 'colorado')) / 'config.json'
-    # Try common directory names
-    for dirname in [state_key, 'virginia' if state_key == 'va' else None, 'colorado' if state_key == 'co' else None]:
-        if dirname:
-            p = PROJECT_ROOT / 'states' / dirname / 'config.json'
-            if p.exists():
-                with open(p) as f:
-                    config = json.load(f)
+    """Get column mapping for the state.
+
+    Resolves the state directory by trying the abbreviation (e.g. 'co'),
+    then scanning states/ for a config.json whose abbreviation matches.
+    """
+    abbreviation = hierarchy.get('state', {}).get('abbreviation', '').lower()
+
+    # Try abbreviation directly, then scan states/ dirs for a matching abbreviation
+    states_dir = PROJECT_ROOT / 'states'
+    candidates = [states_dir / abbreviation]
+    if states_dir.is_dir():
+        for d in sorted(states_dir.iterdir()):
+            if d.is_dir() and d.name != abbreviation:
+                candidates.append(d)
+
+    for d in candidates:
+        p = d / 'config.json'
+        if p.exists():
+            with open(p) as f:
+                config = json.load(f)
+            # Verify this config belongs to the right state
+            cfg_abbr = config.get('state', {}).get('abbreviation', '').lower()
+            if cfg_abbr == abbreviation or d.name == abbreviation:
                 return config.get('columnMapping', {})
     return {}
 

@@ -2054,12 +2054,11 @@ def main():
                     '-j', 'statewide',
                     '-o', str(data_dir),
                     '--skip-split',      # Don't split into road types — keep all roads
-                    '--skip-geocode',    # Geocoding statewide is too slow for CI; skip for now
                     '-f', '-v'
                 ]
                 logger.info(f"  Pipeline cmd: {' '.join(pipeline_cmd)}")
 
-                result = sp.run(pipeline_cmd, capture_output=True, text=True, timeout=600)
+                result = sp.run(pipeline_cmd, capture_output=True, text=True, timeout=1800)
                 if result.returncode == 0:
                     logger.info("  Convert + validate pipeline completed successfully")
                     if result.stdout:
