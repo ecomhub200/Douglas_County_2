@@ -2012,6 +2012,7 @@ def main():
 
             import gzip
             import shutil
+            import subprocess as sp
 
             year_dfs = []
             for year, path in successes:
@@ -2037,11 +2038,53 @@ def main():
                     if deduped > 0:
                         logger.info(f"  Deduplicated: removed {deduped:,} duplicate CUIDs")
 
-                statewide_path = os.path.join(str(data_dir), "colorado_statewide_all_roads.csv")
-                combined.to_csv(statewide_path, index=False)
-                logger.info(f"  Statewide CSV: {statewide_path} ({len(combined):,} records, {os.path.getsize(statewide_path):,} bytes)")
+                # Save raw merged CSV (temporary — will be converted)
+                raw_statewide_path = os.path.join(str(data_dir), "colorado_statewide_raw.csv")
+                combined.to_csv(raw_statewide_path, index=False)
+                logger.info(f"  Raw merged CSV: {raw_statewide_path} ({len(combined):,} records)")
 
-                # Gzip compress
+                # Run through convert + validate pipeline (same as county data)
+                # This normalizes CDOT columns to Virginia-compatible format and validates
+                logger.info("  Running convert + validate pipeline on statewide data...")
+                scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts')
+                pipeline_cmd = [
+                    sys.executable, os.path.join(scripts_dir, 'process_crash_data.py'),
+                    '-i', raw_statewide_path,
+                    '-s', 'colorado',
+                    '-j', 'statewide',
+                    '-o', str(data_dir),
+                    '--skip-split',      # Don't split into road types — keep all roads
+                    '--skip-geocode',    # Geocoding statewide is too slow for CI; skip for now
+                    '-f', '-v'
+                ]
+                logger.info(f"  Pipeline cmd: {' '.join(pipeline_cmd)}")
+
+                result = sp.run(pipeline_cmd, capture_output=True, text=True, timeout=600)
+                if result.returncode == 0:
+                    logger.info("  Convert + validate pipeline completed successfully")
+                    if result.stdout:
+                        for line in result.stdout.strip().split('\n')[-10:]:
+                            logger.info(f"    {line}")
+                else:
+                    logger.warning(f"  Pipeline returned code {result.returncode}")
+                    if result.stderr:
+                        for line in result.stderr.strip().split('\n')[-5:]:
+                            logger.warning(f"    {line}")
+                    logger.warning("  Falling back to raw merged CSV (without conversion)")
+
+                # Find the standardized output (process_crash_data.py creates statewide_standardized.csv)
+                standardized_path = os.path.join(str(data_dir), "statewide_standardized.csv")
+                if os.path.isfile(standardized_path):
+                    source_path = standardized_path
+                    logger.info(f"  Using standardized output: {standardized_path}")
+                else:
+                    source_path = raw_statewide_path
+                    logger.info(f"  Using raw merged CSV (no standardized output found)")
+
+                # Rename to final statewide name and gzip
+                statewide_path = os.path.join(str(data_dir), "colorado_statewide_all_roads.csv")
+                os.rename(source_path, statewide_path)
+
                 gz_path = f"{statewide_path}.gz"
                 with open(statewide_path, 'rb') as f_in:
                     with gzip.open(gz_path, 'wb', compresslevel=6) as f_out:
@@ -2051,6 +2094,10 @@ def main():
                 os.remove(statewide_path)  # Keep only gzipped version
                 ratio = uncompressed_size / compressed_size if compressed_size > 0 else 0
                 logger.info(f"  Statewide gzip: {gz_path} ({compressed_size:,} bytes, {ratio:.1f}x compression)")
+
+                # Cleanup temporary raw file
+                if os.path.isfile(raw_statewide_path) and raw_statewide_path != source_path:
+                    os.remove(raw_statewide_path)
             else:
                 logger.warning("  No year CSVs available for statewide assembly")
 
