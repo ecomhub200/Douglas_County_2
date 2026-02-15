@@ -1,0 +1,562 @@
+# ==============================================================================
+# Batch Process All Jurisdictions
+# ==============================================================================
+# Downloads statewide data ONCE, splits into all jurisdictions, validates,
+# geocodes, and uploads all CSVs to R2. Produces 3 road-type variants per
+# jurisdiction (county_roads, no_interstate, all_roads).
+#
+# Virginia: 133 jurisdictions × 3 variants = 399 CSVs
+# Colorado:  64 counties × 3 variants      = 192 CSVs
+#
+# This workflow is designed to run ONCE for initial population or periodically
+# for full refresh. For single-jurisdiction updates, use the regular workflows.
+# ==============================================================================
+
+name: Batch All Jurisdictions
+
+on:
+  workflow_dispatch:
+    inputs:
+      state:
+        description: 'State to process'
+        required: true
+        type: choice
+        options:
+          - virginia
+          - colorado
+      batch_size:
+        description: 'Jurisdictions per upload batch (0=all at once)'
+        required: false
+        default: '20'
+        type: string
+      jurisdictions:
+        description: 'Specific jurisdictions (comma-separated, empty=all)'
+        required: false
+        default: ''
+        type: string
+      skip_validation:
+        description: 'Skip validation step'
+        required: false
+        default: false
+        type: boolean
+      skip_geocode:
+        description: 'Skip geocoding step'
+        required: false
+        default: false
+        type: boolean
+      skip_forecasts:
+        description: 'Skip forecast generation'
+        required: false
+        default: true
+        type: boolean
+      dry_run:
+        description: 'Dry run (report sizes only, no uploads)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NOTIFICATION_EMAIL: ecomhub200@gmail.com
+
+jobs:
+  # ============================================================
+  # JOB 1: Download statewide data & split into all jurisdictions
+  # ============================================================
+  download-and-split:
+    name: Download & Split (${{ github.event.inputs.state }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      state: ${{ github.event.inputs.state }}
+      jurisdiction_count: ${{ steps.split.outputs.jurisdiction_count }}
+      total_records: ${{ steps.download.outputs.total_records }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pandas requests
+
+          # Colorado needs Playwright for OnBase
+          if [ "${{ github.event.inputs.state }}" = "colorado" ]; then
+            pip install playwright openpyxl
+            playwright install chromium
+          fi
+
+      # ── Stage 1: Download full statewide data ──
+      - name: Download statewide data
+        id: download
+        timeout-minutes: 30
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+          echo "=========================================="
+          echo "Stage 1: Download statewide data for $STATE"
+          echo "Started: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+          if [ "$STATE" = "virginia" ]; then
+            # Virginia: Download full statewide CSV (single API call gets all data)
+            python download_crash_data.py \
+              --jurisdiction henrico \
+              --filter allRoads \
+              --output data/_statewide_temp.csv \
+              --save-statewide
+
+            # The statewide raw data is saved before jurisdiction filtering
+            # by the --save-statewide flag. We need the raw data, not the
+            # filtered output. The download script saves the full dataset
+            # to data/virginia_statewide_all_roads.csv before filtering.
+            # If that file doesn't exist, use the filter-all download.
+            if [ -f "data/virginia_statewide_all_roads.csv" ]; then
+              STATEWIDE="data/virginia_statewide_all_roads.csv"
+            elif [ -f "data/virginia_statewide_all_roads.csv.gz" ]; then
+              # Decompress for splitting
+              gunzip -k data/virginia_statewide_all_roads.csv.gz
+              STATEWIDE="data/virginia_statewide_all_roads.csv"
+            else
+              # Fallback: re-download without jurisdiction filter
+              # The full CSV from Virginia Roads contains all jurisdictions
+              python -c "
+          import sys
+          sys.path.insert(0, '.')
+          from download_crash_data import download_from_fallback, standardize_columns
+          import json
+          config = json.load(open('config.json'))
+          df = download_from_fallback(config)
+          df = standardize_columns(df)
+          df.to_csv('data/virginia_statewide_all_roads.csv', index=False)
+          print(f'Saved {len(df)} statewide records')
+          "
+              STATEWIDE="data/virginia_statewide_all_roads.csv"
+            fi
+
+          elif [ "$STATE" = "colorado" ]; then
+            # Colorado: Download all years, merge, convert, validate
+            python download_cdot_crash_data.py \
+              --data-dir data/CDOT \
+              --save-statewide-gzip
+
+            # Decompress for splitting
+            if [ -f "data/CDOT/colorado_statewide_all_roads.csv.gz" ]; then
+              gunzip -k data/CDOT/colorado_statewide_all_roads.csv.gz
+              STATEWIDE="data/CDOT/colorado_statewide_all_roads.csv"
+            elif [ -f "data/CDOT/colorado_statewide_raw.csv" ]; then
+              STATEWIDE="data/CDOT/colorado_statewide_raw.csv"
+            else
+              echo "::error::No statewide CSV found for Colorado"
+              exit 1
+            fi
+          fi
+
+          # Verify
+          if [ ! -f "$STATEWIDE" ]; then
+            echo "::error::Statewide CSV not found at $STATEWIDE"
+            exit 1
+          fi
+
+          TOTAL=$(wc -l < "$STATEWIDE" | tr -d ' ')
+          SIZE=$(ls -lh "$STATEWIDE" | awk '{print $5}')
+          echo "Statewide: $STATEWIDE ($((TOTAL - 1)) records, $SIZE)"
+          echo "statewide_path=$STATEWIDE" >> $GITHUB_OUTPUT
+          echo "total_records=$((TOTAL - 1))" >> $GITHUB_OUTPUT
+
+      # ── Stage 2: Split into all jurisdictions ──
+      - name: Split into jurisdictions
+        id: split
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+          STATEWIDE="${{ steps.download.outputs.statewide_path }}"
+          JURISDICTIONS="${{ github.event.inputs.jurisdictions }}"
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+
+          if [ "$STATE" = "virginia" ]; then
+            OUTPUT_DIR="data"
+          else
+            OUTPUT_DIR="data/CDOT"
+          fi
+
+          echo "=========================================="
+          echo "Stage 2: Splitting statewide data into jurisdictions"
+          echo "=========================================="
+
+          ARGS="--state $STATE --input $STATEWIDE --output-dir $OUTPUT_DIR"
+
+          # Optional: specific jurisdictions
+          if [ -n "$JURISDICTIONS" ]; then
+            # Convert comma-separated to space-separated
+            JURIS_LIST=$(echo "$JURISDICTIONS" | tr ',' ' ')
+            ARGS="$ARGS --jurisdictions $JURIS_LIST"
+          fi
+
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          python scripts/split_jurisdictions.py $ARGS
+
+          # Count jurisdictions processed
+          if [ -f "$OUTPUT_DIR/.split_report.json" ]; then
+            JCOUNT=$(python -c "import json; r=json.load(open('$OUTPUT_DIR/.split_report.json')); print(r['successful'])")
+            echo "jurisdiction_count=$JCOUNT" >> $GITHUB_OUTPUT
+            echo "Split complete: $JCOUNT jurisdictions processed"
+          else
+            echo "jurisdiction_count=0" >> $GITHUB_OUTPUT
+          fi
+
+      # ── Stage 3: Validate all jurisdictions ──
+      - name: Validate jurisdiction CSVs
+        if: github.event.inputs.skip_validation != 'true' && github.event.inputs.dry_run != 'true'
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+
+          if [ "$STATE" = "virginia" ]; then
+            DATA_DIR="data"
+          else
+            DATA_DIR="data/CDOT"
+          fi
+
+          echo "=========================================="
+          echo "Stage 3: Batch validation"
+          echo "=========================================="
+
+          pip install -r validation/requirements.txt 2>/dev/null || true
+
+          # Validate each all_roads file (superset)
+          SUCCESS=0
+          FAIL=0
+          for f in "$DATA_DIR"/*_all_roads.csv; do
+            [ -f "$f" ] || continue
+            JURISDICTION=$(basename "$f" | sed 's/_all_roads\.csv$//')
+            echo "  Validating: $JURISDICTION..."
+            python validation/run_validation.py --jurisdiction "$JURISDICTION" 2>/dev/null && {
+              SUCCESS=$((SUCCESS + 1))
+            } || {
+              echo "    WARNING: Validation failed for $JURISDICTION (non-fatal)"
+              FAIL=$((FAIL + 1))
+            }
+          done
+
+          echo "Validation: $SUCCESS passed, $FAIL failed"
+
+      # ── Stage 4: Geocode all jurisdictions ──
+      - name: Geocode jurisdiction CSVs
+        if: github.event.inputs.skip_geocode != 'true' && github.event.inputs.dry_run != 'true'
+        timeout-minutes: 45
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+
+          if [ "$STATE" = "virginia" ]; then
+            DATA_DIR="data"
+          else
+            DATA_DIR="data/CDOT"
+          fi
+
+          echo "=========================================="
+          echo "Stage 4: Batch geocoding"
+          echo "=========================================="
+
+          SUCCESS=0
+          for f in "$DATA_DIR"/*_all_roads.csv; do
+            [ -f "$f" ] || continue
+            JURISDICTION=$(basename "$f" | sed 's/_all_roads\.csv$//')
+            echo "  Geocoding: $JURISDICTION..."
+            python scripts/process_crash_data.py \
+              -i "$f" \
+              -s "$STATE" -j "$JURISDICTION" \
+              -o "$DATA_DIR" \
+              --skip-split --skip-validation --convert-only=false \
+              -f 2>/dev/null && {
+              SUCCESS=$((SUCCESS + 1))
+            } || {
+              echo "    WARNING: Geocode failed for $JURISDICTION (non-fatal)"
+            }
+          done
+
+          echo "Geocoded: $SUCCESS jurisdictions"
+
+      # ── Stage 5: Upload all CSVs to R2 in batches ──
+      - name: Upload jurisdiction CSVs to R2
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+          BATCH_SIZE="${{ github.event.inputs.batch_size || '20' }}"
+
+          if [ "$STATE" = "virginia" ]; then
+            DATA_DIR="data"
+            R2_PREFIX="virginia"
+          else
+            DATA_DIR="data/CDOT"
+            R2_PREFIX="colorado"
+          fi
+
+          echo "=========================================="
+          echo "Stage 5: Uploading to R2 (batch size: $BATCH_SIZE)"
+          echo "=========================================="
+
+          # Generate the full R2 upload manifest
+          MANIFEST=$(python scripts/split_jurisdictions.py \
+            --state "$STATE" --r2-manifest --r2-prefix "$R2_PREFIX" --output-dir "$DATA_DIR")
+
+          TOTAL_FILES=$(echo "$MANIFEST" | python -c "import json,sys; print(len(json.load(sys.stdin)))")
+          echo "Total files to upload: $TOTAL_FILES"
+
+          # Split into batches and upload
+          python3 -c "
+          import json, subprocess, sys, os, math
+
+          manifest = json.loads('''$MANIFEST''')
+          batch_size = int('$BATCH_SIZE') if int('$BATCH_SIZE') > 0 else len(manifest)
+          total = len(manifest)
+          batches = math.ceil(total / batch_size)
+
+          print(f'Uploading {total} files in {batches} batch(es) of {batch_size}')
+
+          for i in range(0, total, batch_size):
+            batch = manifest[i:i+batch_size]
+            batch_num = (i // batch_size) + 1
+            print(f'\n--- Batch {batch_num}/{batches}: {len(batch)} files ---')
+
+            # Write batch to temp file
+            batch_file = f'/tmp/r2_batch_{batch_num}.json'
+            with open(batch_file, 'w') as f:
+              json.dump(batch, f)
+
+            # The upload-r2 action is called from the workflow step below
+            # Here we just prepare the batch files
+            print(f'  Batch file: {batch_file}')
+            for entry in batch:
+              print(f'  → {entry[\"r2_key\"]}')
+          "
+
+          # Upload using the composite action for each batch
+          # Note: This step generates the manifest; actual upload uses upload-r2 action
+
+      - name: Upload batch to R2 (all files)
+        if: github.event.inputs.dry_run != 'true'
+        uses: ./.github/actions/upload-r2
+        with:
+          files_json: ${{ steps.build-r2-manifest.outputs.files_json || '[]' }}
+          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          r2_public_url: ${{ vars.R2_PUBLIC_URL }}
+
+      # ── Build R2 upload manifest for action ──
+      - name: Build R2 upload manifest
+        if: github.event.inputs.dry_run != 'true'
+        id: build-r2-manifest
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+
+          if [ "$STATE" = "virginia" ]; then
+            DATA_DIR="data"
+            R2_PREFIX="virginia"
+          else
+            DATA_DIR="data/CDOT"
+            R2_PREFIX="colorado"
+          fi
+
+          # Generate manifest from existing files
+          FILES_JSON=$(python scripts/split_jurisdictions.py \
+            --state "$STATE" --r2-manifest --r2-prefix "$R2_PREFIX" --output-dir "$DATA_DIR")
+
+          # GitHub has a 1MB limit on step outputs. For large states, upload in
+          # batches using direct AWS CLI instead.
+          FILE_COUNT=$(echo "$FILES_JSON" | python -c "import json,sys; print(len(json.load(sys.stdin)))")
+
+          if [ "$FILE_COUNT" -gt 50 ]; then
+            echo "Large upload ($FILE_COUNT files) — using direct AWS CLI"
+
+            # Configure AWS for R2
+            export AWS_ACCESS_KEY_ID="${{ secrets.CF_R2_ACCESS_KEY_ID }}"
+            export AWS_SECRET_ACCESS_KEY="${{ secrets.CF_R2_SECRET_ACCESS_KEY }}"
+            export AWS_DEFAULT_REGION="auto"
+            R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+
+            # Upload each file
+            echo "$FILES_JSON" | python3 -c "
+          import json, sys, subprocess, os
+
+          files = json.load(sys.stdin)
+          endpoint = os.environ.get('R2_ENDPOINT', '$R2_ENDPOINT')
+          bucket = 'crash-lens-data'
+          success = 0
+          failed = 0
+
+          for i, entry in enumerate(files):
+              local = entry['local_path']
+              r2_key = entry['r2_key']
+              if not os.path.exists(local):
+                  print(f'  SKIP (not found): {local}')
+                  continue
+
+              content_type = 'text/csv' if local.endswith('.csv') else 'application/octet-stream'
+              cmd = [
+                  'aws', 's3', 'cp', local, f's3://{bucket}/{r2_key}',
+                  '--endpoint-url', endpoint,
+                  '--content-type', content_type
+              ]
+
+              try:
+                  subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+                  success += 1
+                  if (i + 1) % 20 == 0:
+                      print(f'  Progress: {i+1}/{len(files)} uploaded')
+              except Exception as e:
+                  print(f'  FAIL: {r2_key}: {e}')
+                  failed += 1
+
+          print(f'\nUpload complete: {success} succeeded, {failed} failed out of {len(files)} files')
+          "
+
+            echo "files_json=[]" >> $GITHUB_OUTPUT
+          else
+            echo "files_json<<EOF" >> $GITHUB_OUTPUT
+            echo "$FILES_JSON" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      # ── Stage 6: Generate forecasts (optional) ──
+      - name: Generate forecasts for all jurisdictions
+        if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
+        timeout-minutes: 60
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+
+          if [ "$STATE" = "virginia" ]; then
+            DATA_DIR="data"
+          else
+            DATA_DIR="data/CDOT"
+          fi
+
+          echo "=========================================="
+          echo "Stage 6: Batch forecast generation"
+          echo "=========================================="
+
+          # Determine if dry-run (no AWS creds)
+          FORECAST_FLAGS=""
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "No AWS credentials — using dry-run mode"
+            FORECAST_FLAGS="--dry-run"
+          fi
+
+          SUCCESS=0
+          for f in "$DATA_DIR"/*_all_roads.csv; do
+            [ -f "$f" ] || continue
+            JURISDICTION=$(basename "$f" | sed 's/_all_roads\.csv$//')
+            echo "  Forecasting: $JURISDICTION..."
+            python scripts/generate_forecast.py \
+              --all-road-types \
+              --jurisdiction "$JURISDICTION" \
+              --data-dir "$DATA_DIR" \
+              $FORECAST_FLAGS 2>/dev/null && {
+              SUCCESS=$((SUCCESS + 1))
+            } || {
+              echo "    WARNING: Forecast failed for $JURISDICTION (non-fatal)"
+            }
+          done
+
+          echo "Forecasts generated: $SUCCESS jurisdictions"
+
+      # ── Stage 7: Generate aggregates ──
+      - name: Generate region/MPO/federal aggregates
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+
+          if [ "$STATE" = "virginia" ]; then
+            DATA_DIR="data"
+          else
+            DATA_DIR="data/CDOT"
+          fi
+
+          echo "=========================================="
+          echo "Stage 7: Generating aggregates"
+          echo "=========================================="
+
+          # Region + MPO + statewide aggregates
+          python scripts/generate_aggregates.py \
+            --state "$STATE" \
+            --data-dir "$DATA_DIR" \
+            --output-dir "data/$STATE" || {
+            echo "WARNING: Aggregate generation failed (non-fatal)"
+          }
+
+          # Federal cross-state aggregates
+          python scripts/generate_aggregates.py \
+            --federal \
+            --output-dir data || {
+            echo "WARNING: Federal aggregate generation failed (non-fatal)"
+          }
+
+          # Upload aggregates
+          if [ -d "data/$STATE/_statewide" ] || [ -d "data/$STATE/_region" ]; then
+            echo "Aggregate files generated:"
+            find "data/$STATE" -name "*.json" -path "*/_*" | head -20
+          fi
+
+      # ── Stage 8: Commit metadata ──
+      - name: Commit metadata and manifest
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Stage manifest and reports (NOT large CSVs)
+          git add data/r2-manifest.json || true
+          git add data/.validation/ || true
+          git add data/.split_report.json data/CDOT/.split_report.json || true
+
+          if git diff --cached --quiet; then
+            echo "No metadata changes to commit"
+          else
+            JCOUNT="${{ steps.split.outputs.jurisdiction_count || '0' }}"
+            git commit -m "batch: process $JCOUNT ${STATE} jurisdictions ($(date -u '+%Y-%m-%d'))"
+
+            # Push with retry
+            MAX_RETRIES=4
+            for i in $(seq 1 $MAX_RETRIES); do
+              if git push origin main; then
+                echo "Push succeeded"
+                break
+              fi
+              echo "Push failed (attempt $i/$MAX_RETRIES), retrying in $((2 ** i))s..."
+              sleep $((2 ** i))
+              git fetch origin main
+              git rebase origin/main || git pull --no-edit origin main
+            done
+          fi
+
+      # ── Job Summary ──
+      - name: Job summary
+        if: always()
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+          echo "## Batch Processing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| State | $STATE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Total Records | ${{ steps.download.outputs.total_records || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Jurisdictions | ${{ steps.split.outputs.jurisdiction_count || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "data/.split_report.json" ] || [ -f "data/CDOT/.split_report.json" ]; then
+            REPORT=$(cat data/.split_report.json 2>/dev/null || cat data/CDOT/.split_report.json 2>/dev/null)
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Split Report" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            echo "$REPORT" | python -m json.tool >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi

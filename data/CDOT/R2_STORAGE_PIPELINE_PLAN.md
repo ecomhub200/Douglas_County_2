@@ -6,15 +6,173 @@ The Crash Lens app supports 7 view tiers: **Federal > State > Region > MPO > Cou
 This plan covers how data flows from the CI/CD pipeline into R2 storage and back to the
 frontend app for each tier. It is designed to be **reusable for any new state** added to the system.
 
+**Current scale:**
+- Virginia: **133 jurisdictions** (96 counties + 37 independent cities) — all configured in `config.json`
+- Colorado: **64 counties** — all configured in `data/CDOT/source_manifest.json`
+
 ## Approach
 
 1. **Bottom-up**: Aggregate existing county-level CSVs → form Region and MPO datasets
 2. **Top-down**: Download a separate copy of the statewide dataset → save as gzip in R2
-3. **County data**: Untouched — existing pipeline continues as-is
+3. **County data**: 3 road-type CSVs per jurisdiction, all uploaded to R2
 4. **Federal**: Cross-state aggregation of statewide aggregates
+5. **Batch**: Download statewide data ONCE, split into ALL jurisdictions locally
 
-**Key constraint**: Use the existing pipeline architecture. Inject statewide download
-into the right stage rather than creating a separate pipeline.
+**Key constraint**: Use the existing pipeline architecture. The statewide data download
+already gets ALL jurisdictions in a single API call — we split locally, not per-jurisdiction.
+
+---
+
+## Multi-Jurisdiction Architecture (Download Once, Split All)
+
+### The Key Insight
+
+Both Virginia and Colorado download **all statewide data** in a single API call:
+
+- **Virginia**: `download_from_fallback()` fetches the full statewide CSV from Virginia Roads
+  portal (~200K+ records). Currently filters to 1 jurisdiction, discards the rest.
+- **Colorado**: `download_cdot_crash_data.py` downloads per-year Excel files from CDOT OnBase.
+  Each file contains **all 64 counties**. Currently filters to 1 county per run.
+
+**The waste**: Running the pipeline 133 times for Virginia = 133 identical downloads of the
+same statewide dataset, each keeping only ~1/133 of the data.
+
+**The solution**: Download once → split locally into all jurisdictions → upload all to R2.
+
+### Data Volume Estimates
+
+| State | Statewide Records | Jurisdictions | Per-Jurisdiction Avg | 3 CSVs × All |
+|-------|------------------|---------------|---------------------|---------------|
+| Virginia | ~200K | 133 | ~1,500 records | 399 CSVs (~400 MB total) |
+| Colorado | ~150K | 64 | ~2,300 records | 192 CSVs (~200 MB total) |
+
+R2 storage is cheap ($0.015/GB/month). 600 MB total ≈ $0.01/month.
+
+### Split Script (`scripts/split_jurisdictions.py`)
+
+The script takes a statewide CSV and splits it into all jurisdictions with 3 road-type variants:
+
+```bash
+# Virginia: Split into all 133 jurisdictions
+python scripts/split_jurisdictions.py \
+  --state virginia \
+  --input data/virginia_statewide_all_roads.csv \
+  --output-dir data
+
+# Colorado: Split into all 64 counties
+python scripts/split_jurisdictions.py \
+  --state colorado \
+  --input data/CDOT/colorado_statewide_all_roads.csv \
+  --output-dir data/CDOT
+
+# Specific jurisdictions only
+python scripts/split_jurisdictions.py \
+  --state virginia \
+  --input data/virginia_statewide_all_roads.csv \
+  --jurisdictions henrico chesterfield fairfax_county
+
+# List all jurisdictions
+python scripts/split_jurisdictions.py --state virginia --list
+
+# Dry run (report sizes without writing)
+python scripts/split_jurisdictions.py --state virginia --input data/va.csv --dry-run
+
+# Generate R2 upload manifest JSON
+python scripts/split_jurisdictions.py --state virginia --r2-manifest --output-dir data
+```
+
+**Output per jurisdiction:**
+```
+data/henrico_county_roads.csv      # County/city roads only
+data/henrico_no_interstate.csv     # All roads except interstate
+data/henrico_all_roads.csv         # All roads including interstate
+```
+
+**Filtering logic:**
+- Virginia: Uses `jurisCode`, `namePatterns`, and `fips` from config.json
+- Colorado: Uses `County` column matched against CDOT source manifest
+
+### Batch Workflow (`.github/workflows/batch-all-jurisdictions.yml`)
+
+Manual-trigger workflow that processes ALL jurisdictions for a state:
+
+```
+Stage 1: Download statewide data (single API call)
+Stage 2: Split into all jurisdictions (split_jurisdictions.py)
+Stage 3: Validate all jurisdiction CSVs (batch)
+Stage 4: Geocode all jurisdiction CSVs (batch)
+Stage 5: Upload all CSVs to R2 (batched, 20 files per batch)
+Stage 6: Generate forecasts for all jurisdictions (optional)
+Stage 7: Generate region/MPO/federal aggregates
+Stage 8: Commit metadata
+```
+
+**Inputs:**
+| Input | Description | Default |
+|-------|-------------|---------|
+| `state` | virginia or colorado | required |
+| `batch_size` | Files per R2 upload batch | 20 |
+| `jurisdictions` | Specific jurisdictions (comma-separated) | all |
+| `skip_validation` | Skip validation step | false |
+| `skip_geocode` | Skip geocoding step | false |
+| `skip_forecasts` | Skip forecast generation | true |
+| `dry_run` | Report sizes only | false |
+
+**Usage examples:**
+```bash
+# Full Virginia batch (133 jurisdictions × 3 = 399 CSVs)
+gh workflow run batch-all-jurisdictions.yml -f state=virginia
+
+# Full Colorado batch (64 counties × 3 = 192 CSVs)
+gh workflow run batch-all-jurisdictions.yml -f state=colorado
+
+# Just a few jurisdictions
+gh workflow run batch-all-jurisdictions.yml -f state=virginia -f jurisdictions="henrico,chesterfield,richmond_city"
+
+# Dry run (estimate sizes without uploading)
+gh workflow run batch-all-jurisdictions.yml -f state=virginia -f dry_run=true
+```
+
+**R2 result after batch run:**
+```
+crash-lens-data/
+  virginia/
+    accomack/county_roads.csv, no_interstate.csv, all_roads.csv
+    albemarle/county_roads.csv, no_interstate.csv, all_roads.csv
+    ...
+    henrico/county_roads.csv, no_interstate.csv, all_roads.csv
+    ...
+    winchester_city/county_roads.csv, no_interstate.csv, all_roads.csv
+    (133 jurisdictions × 3 = 399 CSVs)
+
+  colorado/
+    adams/county_roads.csv, no_interstate.csv, all_roads.csv
+    ...
+    douglas/county_roads.csv, no_interstate.csv, all_roads.csv
+    ...
+    yuma/county_roads.csv, no_interstate.csv, all_roads.csv
+    (64 counties × 3 = 192 CSVs)
+```
+
+### Single vs Batch Pipeline Comparison
+
+| Aspect | Single Jurisdiction (current) | Batch All Jurisdictions (new) |
+|--------|------------------------------|-------------------------------|
+| **API calls** | 1 download per jurisdiction | 1 download total |
+| **Network** | ~50 MB × 133 = 6.5 GB transferred | ~50 MB once |
+| **Time** | ~5 min × 133 = 11 hours | ~20 min total |
+| **R2 uploads** | 3 CSVs | 399 CSVs (batched) |
+| **Trigger** | Scheduled monthly | Manual (initial + periodic refresh) |
+| **Use case** | Update single jurisdiction | Populate all jurisdictions |
+
+### When to Use Each Pipeline
+
+| Scenario | Use |
+|----------|-----|
+| **Initial population** of a new state | `batch-all-jurisdictions.yml` |
+| **Monthly refresh** of a single county | `download-data.yml` or `download-cdot-crash-data.yml` |
+| **Full state refresh** (e.g., new year's data added) | `batch-all-jurisdictions.yml` |
+| **Add a few new jurisdictions** | `batch-all-jurisdictions.yml` with `--jurisdictions` |
 
 ---
 
@@ -48,16 +206,44 @@ states/{state_key}/
 }
 ```
 
-### 2. State Adapter (if non-Virginia format)
+### 2. Jurisdiction Registry
+
+Add all jurisdictions to `config.json` under `jurisdictions`:
+```json
+{
+  "tx_harris": {
+    "name": "Harris County",
+    "type": "county",
+    "fips": "201",
+    "jurisCode": "...",
+    "namePatterns": ["harris"],
+    "mapCenter": [29.76, -95.36],
+    "mapZoom": 10
+  }
+}
+```
+
+For states with separate manifest files (like Colorado), create:
+```json
+// data/TXDOT/source_manifest.json
+{
+  "jurisdiction_filters": {
+    "harris": { "county": "HARRIS", "fips": "48201", "display_name": "Harris County" },
+    ...
+  }
+}
+```
+
+### 3. State Adapter (if non-Virginia format)
 
 If the state's raw CSV format differs from Virginia's, create a normalizer in
 `scripts/state_adapter.py` (pattern: `ColoradoNormalizer`). The normalizer maps
 the state's columns to the standard format used by the app.
 
-### 3. Download Script
+### 4. Download Script
 
 Create `download_{state}_crash_data.py` following the pattern of:
-- `download_crash_data.py` (Virginia — ArcGIS API)
+- `download_crash_data.py` (Virginia — ArcGIS/Virginia Roads API)
 - `download_cdot_crash_data.py` (Colorado — Hyland OnBase)
 
 Must support:
@@ -65,27 +251,23 @@ Must support:
 - Calls `scripts/process_crash_data.py` with `--skip-split` for statewide processing
 - Outputs `{state}_statewide_all_roads.csv.gz`
 
-### 4. GitHub Actions Workflow
+### 5. Add State to split_jurisdictions.py
 
-Create `.github/workflows/download-{state}-crash-data.yml` following the pattern.
-Required stages:
+Add the state to the split script's jurisdiction filtering:
+- Add state-specific filter function (`filter_jurisdiction_{state}()`)
+- Add state to `get_jurisdictions()` lookup
+- Add default output directory mapping
 
-```
-Stage 1:    Download raw data from state source
-Stage 1.5:  Assemble statewide gzip (merge → convert → validate → geocode → gzip)
-Stage 2:    Upload raw/county CSVs to R2
-Stage 2.5:  Upload statewide gzip to R2
-Stage 3-6:  Process → Forecast → Upload (same as existing)
-Stage 6.5:  Generate & upload region/MPO/federal aggregates
-Stage 7:    Commit metadata to Git
-```
+### 6. GitHub Actions Workflows
 
-**Critical patterns** (learned from bug fixes):
-- Use `[ -f "$GZ" ]` runtime check for gzip existence, NOT `hashFiles()`
-- Use `--output-dir "data/$STATE"` for aggregate generation (not `--output-dir data`)
-- Pass `uncompressed_size` in `files_json` for gzip uploads
+**Per-jurisdiction workflow** (monthly updates):
+Create `.github/workflows/download-{state}-crash-data.yml`
 
-### 5. Frontend Registration
+**Batch workflow** (initial population):
+The generic `batch-all-jurisdictions.yml` already supports new states —
+just add the state to the `choices` list in the workflow inputs.
+
+### 7. Frontend Registration
 
 In `config.json`, add the state to the `states` registry:
 ```json
@@ -102,9 +284,17 @@ In `config.json`, add the state to the `states` registry:
 }
 ```
 
-### 6. R2 Storage
+### 8. Run Initial Batch
 
-After the first pipeline run, the state will have:
+```bash
+# Populate all jurisdictions for the new state
+gh workflow run batch-all-jurisdictions.yml -f state=texas
+
+# Verify
+gh run list --workflow=batch-all-jurisdictions.yml
+```
+
+After the first batch run, the state will have:
 ```
 crash-lens-data/
   texas/
@@ -113,7 +303,11 @@ crash-lens-data/
     _statewide/county_summary.json
     _region/{id}/aggregates.json         # Per-region aggregates
     _mpo/{id}/aggregates.json            # Per-MPO aggregates
-    {jurisdiction}/all_roads.csv         # County-level data
+    harris/all_roads.csv                 # County-level data (×254 counties)
+    harris/county_roads.csv
+    harris/no_interstate.csv
+    dallas/all_roads.csv
+    ...
 ```
 
 ---
@@ -124,22 +318,19 @@ crash-lens-data/
 
 States with non-Virginia CSV formats require the full pipeline:
 
-| Stage | What It Does | Applied to Statewide? |
-|-------|-------------|----------------------|
-| **MERGE** | Combine per-year/per-source CSVs into single file | Yes — deduplicates by unique crash ID |
-| **CONVERT** | State normalizer transforms columns → standard format | **Yes — REQUIRED** |
-| **VALIDATE** | Quality checks, bounds validation, auto-correction | **Yes — REQUIRED** |
-| **GEOCODE** | Fill missing GPS coordinates | **Yes** (timeout: 1800s) |
-| **SPLIT** | Create road-type variants | Skipped — statewide is single `all_roads` |
-| **GZIP** | Compress for R2 storage | Yes |
+| Stage | What It Does | Applied to Statewide? | Applied to Split CSVs? |
+|-------|-------------|----------------------|----------------------|
+| **MERGE** | Combine per-year/per-source CSVs into single file | Yes | No (already merged) |
+| **CONVERT** | State normalizer transforms columns → standard format | **Yes — REQUIRED** | No (done on statewide) |
+| **VALIDATE** | Quality checks, bounds validation, auto-correction | **Yes** | Optional per-jurisdiction |
+| **GEOCODE** | Fill missing GPS coordinates | **Yes** (1800s timeout) | Optional per-jurisdiction |
+| **SPLIT** | Split statewide → per-jurisdiction + road-type variants | N/A | **Yes — split_jurisdictions.py** |
+| **GZIP** | Compress statewide for R2 storage | Yes | No (county CSVs are small) |
 
-**Implementation**: `download_{state}_crash_data.py --save-statewide-gzip` calls
-`scripts/process_crash_data.py` with `--skip-split` to run the full pipeline.
-
-### Virginia — Exception (Standardize Only)
+### Virginia — Standardize Only
 
 Virginia data from `virginiaroads.org` is **already in the standard format**.
-Only column renaming via `standardize_columns()` is needed before gzipping.
+Only column renaming via `standardize_columns()` is needed before splitting.
 
 ---
 
@@ -155,6 +346,11 @@ Only column renaming via `standardize_columns()` is needed before gzipping.
 | **2. Dynamic construction** | `{r2Prefix}/{jurisdiction}/{filter}.{ext}` | `data/CDOT/douglas_all_roads.csv` → `colorado/douglas/all_roads.csv` |
 | **3. Tier path passthrough** | Direct R2 key for `_state/`, `_statewide/`, `_region/`, `_mpo/`, `_federal/` paths | `colorado/_state/statewide_all_roads.csv.gz` → R2 URL directly |
 
+**Strategy 2** is critical for multi-jurisdiction: it dynamically constructs R2 URLs
+from the state's `r2Prefix` + jurisdiction ID + filename, so **any jurisdiction works
+without being listed in the manifest**. As long as the CSV exists in R2, the frontend
+will find it.
+
 ### How the App Loads Data Per Tier
 
 | Tier | Data Source | Loading Mechanism |
@@ -166,17 +362,22 @@ Only column renaming via `standardize_columns()` is needed before gzipping.
 | **MPO** | `{state}/_mpo/{id}/aggregates.json` | `AggregateLoader.loadMPO(stateKey, mpoId)` |
 | **Federal** | `_federal/aggregates.json` | `AggregateLoader.loadNational()` |
 
+### Jurisdiction Switching in the Frontend
+
+When a user selects a different jurisdiction in the dropdown:
+1. `getActiveJurisdictionId()` returns the new jurisdiction ID (e.g., `fairfax_county`)
+2. `getDataFilePath()` builds `data/{stateDir}/fairfax_county_all_roads.csv`
+3. `resolveDataUrl()` (Strategy 2) maps to `virginia/fairfax_county/all_roads.csv` in R2
+4. `autoLoadCrashData()` fetches and parses the CSV
+5. All tabs update with the new jurisdiction's data
+
+**No frontend code changes needed** for multi-jurisdiction — the dynamic URL construction
+already handles any jurisdiction that has data in R2.
+
 ### Gzip Transparent Decompression
 
 Files uploaded to R2 with `Content-Encoding: gzip` header are **automatically decompressed
 by the browser** when fetched via `fetch()`. No frontend decompression library (like pako) is needed.
-
-```
-R2 stores: statewide_all_roads.csv.gz (8 MB compressed)
-Browser fetches URL → R2 responds with Content-Encoding: gzip
-fetch().text() → returns full decompressed CSV text (50 MB)
-Papa.parse(csvText) → processes rows normally
-```
 
 ### Key Frontend Functions
 
@@ -190,124 +391,187 @@ Papa.parse(csvText) → processes rows normally
 
 ---
 
-## Current Pipeline Stages (Reference)
+## Pipeline Stages Reference
 
-### Virginia (`download-data.yml`)
+### Single-Jurisdiction Pipeline (Monthly Updates)
+
+#### Virginia (`download-data.yml`)
 
 ```
 Stage 0:   Pre-flight (determine jurisdiction, health check)
-Stage 1:   Download 3 road-type CSVs per county
-Stage 1.5: Save statewide copy as gzip (NEW — standardize_columns only)
+Stage 1:   Download statewide CSV (filters to 1 jurisdiction)
+Stage 1.5: Save statewide copy as gzip (standardize_columns only)
 Stage 2:   Validate & Auto-Correct county data
 Stage 3:   Geocode county data
-Stage 4:   Upload county CSVs to R2
-Stage 4.5: Check gzip exists (runtime) → Upload statewide gzip to R2 (NEW)
+Stage 4:   Upload 3 county CSVs to R2
+Stage 4.5: Upload statewide gzip to R2
 Stage 5:   Generate Forecasts
 Stage 6:   Upload Forecasts to R2
-Stage 6.5: Generate & upload region/MPO/federal aggregates (NEW)
+Stage 6.5: Generate & upload region/MPO/federal aggregates
 Stage 7:   Commit metadata to Git
 ```
 
-### Colorado (`download-cdot-crash-data.yml` → `process-cdot-data.yml`)
+#### Colorado (`download-cdot-crash-data.yml` → `process-cdot-data.yml`)
 
 ```
 Stage 1:    Download per-year Excel from CDOT OnBase
-Stage 1.5:  Assemble statewide: merge → CONVERT → VALIDATE → GEOCODE → gzip (NEW)
+Stage 1.5:  Assemble statewide: merge → CONVERT → VALIDATE → GEOCODE → gzip
 Stage 2a:   Upload raw year CSVs to R2
-Stage 2a.5: Check gzip exists (runtime) → Upload statewide gzip to R2 (NEW)
+Stage 2a.5: Upload statewide gzip to R2
 Stage 2b:   Commit metadata
             ─── auto-triggers process-cdot-data.yml ───
 Stage 3:    Process county data (Merge → Convert → Validate → Geocode → Split)
 Stage 4:    Upload processed county CSVs to R2
 Stage 5:    Generate Forecasts
 Stage 6:    Upload Forecasts
-Stage 6.5:  Generate & upload region/MPO/federal aggregates (NEW)
+Stage 6.5:  Generate & upload region/MPO/federal aggregates
 Stage 7:    Commit metadata
+```
+
+### Batch Pipeline (Initial Population / Full Refresh)
+
+#### `batch-all-jurisdictions.yml`
+
+```
+Stage 1: Download statewide data (SINGLE API call)
+         VA: download_crash_data.py → Virginia Roads CSV (~200K records)
+         CO: download_cdot_crash_data.py → OnBase Excel (~150K records)
+
+Stage 2: Split into ALL jurisdictions (split_jurisdictions.py)
+         VA: 133 jurisdictions × 3 road-type variants = 399 CSVs
+         CO:  64 counties × 3 road-type variants      = 192 CSVs
+
+Stage 3: Validate all jurisdiction CSVs (batch, non-fatal)
+
+Stage 4: Geocode all jurisdiction CSVs (batch, 45 min timeout)
+
+Stage 5: Upload ALL CSVs to R2
+         VA: 399 files → virginia/{jurisdiction}/{road_type}.csv
+         CO: 192 files → colorado/{jurisdiction}/{road_type}.csv
+
+Stage 6: Generate forecasts (optional, 60 min timeout)
+
+Stage 7: Generate aggregates
+         - {state}/_statewide/aggregates.json (from all county CSVs)
+         - {state}/_region/{id}/aggregates.json
+         - {state}/_mpo/{id}/aggregates.json
+         - _federal/aggregates.json
+
+Stage 8: Commit metadata
 ```
 
 ---
 
-## R2 Storage Layout
+## R2 Storage Layout (Full Scale)
 
 ```
 crash-lens-data/
   _federal/                                    # Cross-state aggregation
-    aggregates.json                            #   national totals (sum of all states)
-    state_summary.json                         #   per-state ranking by EPDO
+    aggregates.json                            #   national totals
+    state_summary.json                         #   per-state ranking
 
-  {state}/                                     # e.g., colorado/, virginia/, texas/
-    _state/                                    # Full state dataset (gzipped)
-      statewide_all_roads.csv.gz               #   Served with Content-Encoding: gzip
-                                               #   Browser auto-decompresses on fetch
+  virginia/                                    # 133 jurisdictions
+    _state/
+      statewide_all_roads.csv.gz               #   ~50 MB compressed
+    _statewide/
+      aggregates.json, county_summary.json, mpo_summary.json
+    _region/{district_id}/
+      aggregates.json, hotspots.json           #   9 VDOT districts
+    _mpo/{mpo_id}/
+      aggregates.json, hotspots.json           #   8 MPOs
+    accomack/
+      county_roads.csv, no_interstate.csv, all_roads.csv
+    albemarle/
+      county_roads.csv, no_interstate.csv, all_roads.csv
+    ...
+    henrico/
+      county_roads.csv, no_interstate.csv, all_roads.csv, forecasts_*.json
+    ...
+    winchester_city/
+      county_roads.csv, no_interstate.csv, all_roads.csv
 
-    _statewide/                                # Statewide aggregate JSONs
-      aggregates.json                          #   (built bottom-up from county CSVs)
-      county_summary.json                      #   per-county ranking by EPDO
-      mpo_summary.json                         #   per-MPO ranking
-
-    _region/{region_id}/                       # Region aggregates (JSON only)
-      aggregates.json                          #   (built from member county CSVs)
-      hotspots.json
-
-    _mpo/{mpo_id}/                             # MPO aggregates (JSON only)
-      aggregates.json                          #   (built from member county CSVs)
-      hotspots.json
-
-    {jurisdiction}/                            # UNCHANGED: Existing county data
-      all_roads.csv
-      county_roads.csv
-      no_interstate.csv
-      standardized.csv
-      forecasts_*.json
+  colorado/                                    # 64 counties
+    _state/
+      statewide_all_roads.csv.gz               #   ~15 MB compressed
+    _statewide/
+      aggregates.json, county_summary.json, mpo_summary.json
+    _region/{region_id}/
+      aggregates.json, hotspots.json           #   5 engineering regions
+    _mpo/{mpo_id}/
+      aggregates.json, hotspots.json           #   9 MPOs/TPRs
+    adams/
+      county_roads.csv, no_interstate.csv, all_roads.csv
+    ...
+    douglas/
+      county_roads.csv, no_interstate.csv, all_roads.csv, forecasts_*.json
+    ...
+    yuma/
+      county_roads.csv, no_interstate.csv, all_roads.csv
 ```
+
+**Total R2 objects**: ~700 CSVs + ~80 JSONs + 2 gzips ≈ **~800 objects, ~600 MB**
 
 ---
 
 ## Data Flow Diagram
 
 ```
-  EXISTING COUNTY PIPELINE (untouched)        STATEWIDE (new, parallel path)
-  ═══════════════════════════                 ════════════════════════════════
+  SINGLE JURISDICTION (existing)              BATCH ALL JURISDICTIONS (new)
+  ══════════════════════════════              ═══════════════════════════════
 
-  download_{state}_crash_data.py              Same download call
-  --jurisdiction {county}                     but save pre-filter DataFrame
+  download_{state}_crash_data.py              download_{state}_crash_data.py
+  --jurisdiction {single county}              (same download, full statewide)
         │                                           │
         ▼                                           ▼
-  County CSVs (filtered)                      Full State CSV (unfiltered)
+  Statewide CSV (downloaded)                  Statewide CSV (same data)
         │                                           │
-        ▼                                     ┌─────▼──────────────────────┐
-  Validate → Geocode → R2                     │ Non-VA: CONVERT+VALIDATE   │
-        │                                     │     VA: standardize only   │
-        ▼                                     └─────┬──────────────────────┘
-  generate_aggregates.py                            │
-  --state {state} --data-dir {dir}                  ▼
-  --output-dir data/{state}                   gzip → R2: {state}/_state/
-        │                                     statewide_all_roads.csv.gz
-        ├──► {state}/_statewide/aggregates.json
-        ├──► {state}/_region/{id}/aggregates.json        FRONTEND
-        ├──► {state}/_mpo/{id}/aggregates.json     ══════════════════
-        │                                     AggregateLoader._fetch(path)
-        ▼                                       → loads JSON aggregates
-  _federal/aggregates.json                    AggregateLoader.loadStatewideCSV()
-  (combine all state aggregates)                → fetch gzip CSV from R2
-                                                → browser auto-decompresses
-                                                → Papa.parse → crashState
+        ├── filter to 1 jurisdiction          split_jurisdictions.py
+        │                                     --state {state}
+        ▼                                           │
+  3 CSVs for 1 jurisdiction                   ┌─────▼───────────────────────┐
+        │                                     │ Filter to ALL jurisdictions  │
+        ▼                                     │ × 3 road-type variants      │
+  Validate → Geocode                          └─────┬───────────────────────┘
+        │                                           │
+        ▼                                     VA: 133 × 3 = 399 CSVs
+  R2: {state}/{jurisdiction}/                 CO:  64 × 3 = 192 CSVs
+      county_roads.csv                              │
+      no_interstate.csv                       Validate (batch) → Geocode (batch)
+      all_roads.csv                                 │
+                                                    ▼
+                                              R2: {state}/{each jurisdiction}/
+                                                  county_roads.csv
+                                                  no_interstate.csv
+                                                  all_roads.csv
+                                                    │
+                                                    ▼
+                                              generate_aggregates.py
+                                              (reads ALL county CSVs from R2)
+                                                    │
+                                              ┌─────┴──────────────────────┐
+                                              │ _statewide/aggregates.json │
+                                              │ _region/{id}/aggregates    │
+                                              │ _mpo/{id}/aggregates       │
+                                              │ _federal/aggregates        │
+                                              └────────────────────────────┘
 ```
 
 ---
 
 ## Files Changed
 
-| File | Change | Stage |
-|------|--------|-------|
-| `download_crash_data.py` | `--save-statewide` flag; standardize + gzip | 1.5 |
-| `download_cdot_crash_data.py` | `--save-statewide-gzip` flag; merge + convert + validate + geocode + gzip | 1.5 |
-| `.github/actions/upload-r2/action.yml` | Gzip Content-Encoding support | 4.5 |
-| `.github/workflows/download-data.yml` | Stage 4.5 + 6.5 injection | 4.5, 6.5 |
-| `.github/workflows/download-cdot-crash-data.yml` | Stage 2a.5 injection | 2a.5 |
-| `.github/workflows/process-cdot-data.yml` | Stage 6.5 injection | 6.5 |
-| `scripts/generate_aggregates.py` | `--federal` flag; dynamic state config lookup | 6.5 |
-| `data/r2-manifest.json` | Version 3 with gzip metadata | 7 |
+| File | Change | Purpose |
+|------|--------|---------|
+| `scripts/split_jurisdictions.py` | **NEW** — Split statewide CSV into all jurisdictions | Multi-jurisdiction splitting |
+| `.github/workflows/batch-all-jurisdictions.yml` | **NEW** — Batch workflow for all jurisdictions | Orchestration |
+| `download_crash_data.py` | `--save-statewide` flag (existing) | VA statewide save |
+| `download_cdot_crash_data.py` | `--save-statewide-gzip` flag (existing) | CO statewide save |
+| `.github/actions/upload-r2/action.yml` | Gzip Content-Encoding support (existing) | R2 upload |
+| `.github/workflows/download-data.yml` | Stage 4.5 + 6.5 (existing) | VA single-jurisdiction |
+| `.github/workflows/download-cdot-crash-data.yml` | Stage 2a.5 (existing) | CO single-jurisdiction |
+| `.github/workflows/process-cdot-data.yml` | Stage 6.5 (existing) | CO processing |
+| `scripts/generate_aggregates.py` | `--federal` flag (existing) | Aggregate generation |
+| `data/r2-manifest.json` | Version 3 with gzip metadata (existing) | R2 manifest |
 | `app/index.html` | `AggregateLoader.loadStatewideCSV()`, `resolveDataUrl()` Strategy 3, `loadStatewideCSVForTier()`, tier-aware `getDataFilePath()` | Frontend |
 
 ---
@@ -316,12 +580,12 @@ crash-lens-data/
 
 | # | Severity | Bug | Fix |
 |---|----------|-----|-----|
-| 1 | **CRITICAL** | `hashFiles()` evaluated at parse time — never matches runtime-generated gzip files. Stage 4.5 (VA) and 2a.5 (CO) **never execute**. | Replaced with runtime `[ -f "$GZ" ]` check via step output. |
-| 2 | **CRITICAL** | `--output-dir data` causes aggregates to write to `data/_statewide/` but upload manifest looks for `data/{state}/_statewide/`. **Aggregates never uploaded.** | Changed to `--output-dir data/$STATE` in both workflows. |
-| 3 | **CRITICAL** | Frontend had no code to fetch statewide gzip CSV from R2 — `resolveDataUrl()` couldn't handle `_state/` paths, no CSV loader existed. | Added `AggregateLoader.loadStatewideCSV()`, `resolveDataUrl()` Strategy 3, `loadStatewideCSVForTier()`, tier-aware `getDataFilePath()`. |
-| 4 | **MODERATE** | `uncompressed_size` never passed to upload-r2 action — manifest lacks gzip metadata. | Added gzip footer read to extract uncompressed size; passed in `files_json`. |
-| 5 | **MODERATE** | `_get_col_mapping()` had dead code (`config_path` unused) and was hardcoded to only VA/CO. | Rewrote to scan `states/` directory dynamically. |
-| 6 | **USER-REQ** | Colorado statewide skipped geocoding (`--skip-geocode`). | Removed `--skip-geocode`; increased timeout to 1800s. |
+| 1 | **CRITICAL** | `hashFiles()` evaluated at parse time — never matches runtime-generated gzip files. | Replaced with runtime `[ -f "$GZ" ]` check. |
+| 2 | **CRITICAL** | `--output-dir data` causes aggregates to write wrong path. | Changed to `--output-dir data/$STATE`. |
+| 3 | **CRITICAL** | Frontend had no code to fetch statewide gzip CSV from R2. | Added `AggregateLoader.loadStatewideCSV()`, `resolveDataUrl()` Strategy 3, `loadStatewideCSVForTier()`. |
+| 4 | **MODERATE** | `uncompressed_size` never passed to upload-r2 action. | Added gzip footer read. |
+| 5 | **MODERATE** | `_get_col_mapping()` hardcoded to VA/CO. | Rewrote to scan `states/` dynamically. |
+| 6 | **USER-REQ** | Colorado statewide skipped geocoding. | Removed `--skip-geocode`; timeout 1800s. |
 
 ---
 
@@ -332,6 +596,8 @@ crash-lens-data/
 3. **Injection point**: Stage 1.5 (post-download, pre-validate) for statewide save
 4. **Non-VA processing**: Full CONVERT + VALIDATE + GEOCODE pipeline (same as county)
 5. **VA processing**: standardize_columns() only (already in standard format)
-6. **No new scripts**: Uses existing download + process + aggregate scripts with new flags
-7. **Gzip serving**: `Content-Encoding: gzip` header on R2 → browser auto-decompresses
-8. **Frontend tier-aware**: `getDataFilePath()` returns R2 tier paths for state view
+6. **Gzip serving**: `Content-Encoding: gzip` header on R2 → browser auto-decompresses
+7. **Frontend tier-aware**: `getDataFilePath()` returns R2 tier paths for state view
+8. **Multi-jurisdiction**: Download once, split locally — not 133 separate downloads
+9. **Batch pipeline**: Separate workflow for initial population and full refresh
+10. **Dynamic R2 URLs**: Strategy 2 in `resolveDataUrl()` handles any jurisdiction without manifest entries
