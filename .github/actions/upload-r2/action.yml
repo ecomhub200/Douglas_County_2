@@ -107,7 +107,14 @@ runs:
                 continue
 
             size = os.path.getsize(local_path)
-            content_type = 'text/csv' if local_path.endswith('.csv') else 'application/octet-stream'
+            if local_path.endswith('.csv.gz'):
+                content_type = 'application/gzip'
+            elif local_path.endswith('.csv'):
+                content_type = 'text/csv'
+            elif local_path.endswith('.json'):
+                content_type = 'application/json'
+            else:
+                content_type = 'application/octet-stream'
 
             s3_uri = f's3://{bucket}/{r2_key}'
             cmd = [

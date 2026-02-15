@@ -1,0 +1,142 @@
+{
+  "state": {
+    "name": "South Carolina",
+    "abbreviation": "SC",
+    "fips": "45",
+    "dotName": "SCDOT",
+    "dotFullName": "South Carolina Department of Transportation",
+    "dataPortalUrl": "https://fatality-count-scdps.hub.arcgis.com",
+    "coordinateBounds": {
+      "latMin": 32.03,
+      "latMax": 35.22,
+      "lonMin": -83.35,
+      "lonMax": -78.54
+    },
+    "dataDir": "SouthCarolinaDOT"
+  },
+  "columnMapping": {
+    "_description": "Maps South Carolina crash data fields to internal CRASH LENS field codes",
+    "_note": "Column names sourced from South Carolina data dictionary. Update as API schema is confirmed.",
+    "ID": "_TBD_CRASH_ID",
+    "DATE": "_TBD_CRASH_DATE",
+    "TIME": "_TBD_CRASH_TIME",
+    "LAT": "_TBD_LATITUDE",
+    "LON": "_TBD_LONGITUDE",
+    "SEVERITY": "_TBD_SEVERITY",
+    "JURISDICTION": "_TBD_COUNTY",
+    "ROUTE": "_TBD_ROAD_NAME",
+    "COLLISION": "_TBD_COLLISION_TYPE",
+    "WEATHER": "_TBD_WEATHER",
+    "LIGHT": "_TBD_LIGHTING",
+    "SURFACE_CONDITION": "_TBD_SURFACE",
+    "JUNCTION": "_TBD_JUNCTION_TYPE",
+    "HITRUN": "_TBD_HIT_AND_RUN"
+  },
+  "derivedFields": {
+    "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
+    "SEVERITY": {
+      "method": "direct_or_derived",
+      "source": "_TBD",
+      "_note": "Update with South Carolina-specific severity derivation method"
+    },
+    "YEAR": {
+      "method": "extract_year",
+      "source": "_TBD_CRASH_DATE"
+    },
+    "NODE": {
+      "method": "concatenate",
+      "sources": [
+        "_TBD_ROAD1",
+        "_TBD_ROAD2"
+      ],
+      "separator": " & "
+    }
+  },
+  "roadSystems": {
+    "_description": "South Carolina road classification for road-type filtering",
+    "values": {
+      "Interstate": {
+        "classification": "state_maintained",
+        "label": "Interstate"
+      },
+      "US Route": {
+        "classification": "state_maintained",
+        "label": "US Route"
+      },
+      "State Route": {
+        "classification": "state_maintained",
+        "label": "State Route"
+      },
+      "County Road": {
+        "classification": "local",
+        "label": "County Road"
+      },
+      "Local Road": {
+        "classification": "local",
+        "label": "Local Road"
+      }
+    },
+    "filterProfiles": {
+      "countyOnly": {
+        "include": [
+          "County Road",
+          "Local Road"
+        ],
+        "label": "County & Local Roads Only"
+      },
+      "countyPlusState": {
+        "include": [
+          "County Road",
+          "Local Road",
+          "State Route",
+          "US Route"
+        ],
+        "label": "County + State Routes"
+      },
+      "allRoads": {
+        "include": [
+          "Interstate",
+          "US Route",
+          "State Route",
+          "County Road",
+          "Local Road"
+        ],
+        "label": "All Roads"
+      }
+    }
+  },
+  "crashTypeMapping": {
+    "_description": "Maps South Carolina collision type values to CRASH LENS standard",
+    "_note": "Update with actual state values from data dictionary"
+  },
+  "epdoWeights": {
+    "K": 462,
+    "A": 62,
+    "B": 12,
+    "C": 5,
+    "O": 1,
+    "_source": "FHWA/HSM Standard"
+  },
+  "validValues": {
+    "severity": {
+      "K": "Fatal",
+      "A": "Suspected Serious Injury",
+      "B": "Suspected Minor Injury",
+      "C": "Possible Injury",
+      "O": "Property Damage Only"
+    }
+  },
+  "dataSource": {
+    "name": "SCDOT GIS Portal",
+    "url": "https://fatality-count-scdps.hub.arcgis.com",
+    "apiUrl": "https://fatality-count-scdps.hub.arcgis.com/datasets/crashes/FeatureServer/0",
+    "fileFormat": "GeoJSON/CSV (ArcGIS)",
+    "dataDictionary": "See fatality-count-scdps.hub.arcgis.com dataset metadata",
+    "pagination": {
+      "method": "offset",
+      "maxPerRequest": 2000,
+      "paramOffset": "resultOffset",
+      "paramCount": "resultRecordCount"
+    }
+  }
+}

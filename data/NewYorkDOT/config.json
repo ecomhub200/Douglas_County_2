@@ -1,0 +1,143 @@
+{
+  "state": {
+    "name": "New York",
+    "abbreviation": "NY",
+    "fips": "36",
+    "dotName": "NYSDOT",
+    "dotFullName": "New York State Department of Transportation",
+    "dataPortalUrl": "https://data.ny.gov",
+    "coordinateBounds": {
+      "latMin": 40.5,
+      "latMax": 45.02,
+      "lonMin": -79.76,
+      "lonMax": -71.86
+    },
+    "dataDir": "NewYorkDOT"
+  },
+  "columnMapping": {
+    "_description": "Maps New York crash data fields to internal CRASH LENS field codes",
+    "_note": "Column names sourced from New York data dictionary. Update as API schema is confirmed.",
+    "ID": "_TBD_CRASH_ID",
+    "DATE": "_TBD_CRASH_DATE",
+    "TIME": "_TBD_CRASH_TIME",
+    "LAT": "_TBD_LATITUDE",
+    "LON": "_TBD_LONGITUDE",
+    "SEVERITY": "_TBD_SEVERITY",
+    "JURISDICTION": "_TBD_COUNTY",
+    "ROUTE": "_TBD_ROAD_NAME",
+    "COLLISION": "_TBD_COLLISION_TYPE",
+    "WEATHER": "_TBD_WEATHER",
+    "LIGHT": "_TBD_LIGHTING",
+    "SURFACE_CONDITION": "_TBD_SURFACE",
+    "JUNCTION": "_TBD_JUNCTION_TYPE",
+    "HITRUN": "_TBD_HIT_AND_RUN"
+  },
+  "derivedFields": {
+    "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
+    "SEVERITY": {
+      "method": "direct_or_derived",
+      "source": "_TBD",
+      "_note": "Update with New York-specific severity derivation method"
+    },
+    "YEAR": {
+      "method": "extract_year",
+      "source": "_TBD_CRASH_DATE"
+    },
+    "NODE": {
+      "method": "concatenate",
+      "sources": [
+        "_TBD_ROAD1",
+        "_TBD_ROAD2"
+      ],
+      "separator": " & "
+    }
+  },
+  "roadSystems": {
+    "_description": "New York road classification for road-type filtering",
+    "values": {
+      "Interstate": {
+        "classification": "state_maintained",
+        "label": "Interstate"
+      },
+      "US Route": {
+        "classification": "state_maintained",
+        "label": "US Route"
+      },
+      "State Route": {
+        "classification": "state_maintained",
+        "label": "State Route"
+      },
+      "County Road": {
+        "classification": "local",
+        "label": "County Road"
+      },
+      "Local Road": {
+        "classification": "local",
+        "label": "Local Road"
+      }
+    },
+    "filterProfiles": {
+      "countyOnly": {
+        "include": [
+          "County Road",
+          "Local Road"
+        ],
+        "label": "County & Local Roads Only"
+      },
+      "countyPlusState": {
+        "include": [
+          "County Road",
+          "Local Road",
+          "State Route",
+          "US Route"
+        ],
+        "label": "County + State Routes"
+      },
+      "allRoads": {
+        "include": [
+          "Interstate",
+          "US Route",
+          "State Route",
+          "County Road",
+          "Local Road"
+        ],
+        "label": "All Roads"
+      }
+    }
+  },
+  "crashTypeMapping": {
+    "_description": "Maps New York collision type values to CRASH LENS standard",
+    "_note": "Update with actual state values from data dictionary"
+  },
+  "epdoWeights": {
+    "K": 462,
+    "A": 62,
+    "B": 12,
+    "C": 5,
+    "O": 1,
+    "_source": "FHWA/HSM Standard"
+  },
+  "validValues": {
+    "severity": {
+      "K": "Fatal",
+      "A": "Suspected Serious Injury",
+      "B": "Suspected Minor Injury",
+      "C": "Possible Injury",
+      "O": "Property Damage Only"
+    }
+  },
+  "dataSource": {
+    "name": "NYSDOT Open Data Portal",
+    "url": "https://data.ny.gov",
+    "apiUrl": "https://data.ny.gov/resource/e8ky-4vqe.json",
+    "fileFormat": "JSON/CSV (Socrata SODA API)",
+    "dataDictionary": "See data.ny.gov dataset metadata",
+    "resourceId": "e8ky-4vqe",
+    "pagination": {
+      "method": "offset",
+      "maxPerRequest": 50000,
+      "paramLimit": "$limit",
+      "paramOffset": "$offset"
+    }
+  }
+}
