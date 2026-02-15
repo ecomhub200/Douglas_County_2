@@ -74,8 +74,7 @@ jobs:
         run: |
           echo "Testing R2 access..."
           aws s3 ls "s3://${R2_BUCKET}/" \
-            --endpoint-url "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com" \
-            --max-items 5 || {
+            --endpoint-url "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com" | head -5 || {
               echo "::error::Failed to access R2 bucket. Check secrets."
               exit 1
             }
