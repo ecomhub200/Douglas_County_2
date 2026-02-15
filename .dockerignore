@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python scripts (not needed in runtime container)
+scripts/
+requirements.txt
+*.py
+
+# Development files
+.vscode
+.idea
+*.md
+LICENSE
+
+# Netlify (replaced by Docker/Coolify)
+netlify.toml
+netlify/
+
+# Config examples
+config/api-keys.example.json
+
+# Tests and validation
+tests/
+validation/
+
+# Node modules (will be installed in container if needed)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
