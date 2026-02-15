@@ -3,21 +3,24 @@
 Create R2 folder structure for crash-lens-data bucket.
 
 Creates zero-byte marker objects in Cloudflare R2 (S3-compatible) to establish
-the complete folder hierarchy for all states and jurisdictions.
+the complete folder hierarchy for all 50 US states + DC.
+
+Reads from:
+  - states/{state}/hierarchy.json — regions, MPOs/TPRs, allCounties (all 51)
+  - config.json — Virginia jurisdiction keys (authoritative, includes independent cities)
+  - data/{State}DOT/source_manifest.json — CO, MD jurisdiction keys (authoritative)
 
 Usage:
-    python create_r2_folders.py [--dry-run] [--state STATE_PREFIX]
+    python create_r2_folders.py [--dry-run] [--state STATE_PREFIX] [--list-only]
 
-Environment variables required:
+Environment variables required (for actual R2 creation):
     CF_ACCOUNT_ID          - Cloudflare Account ID
     CF_R2_ACCESS_KEY_ID    - R2 Access Key ID
     CF_R2_SECRET_ACCESS_KEY - R2 Secret Access Key
-
-Optional:
-    R2_BUCKET              - Bucket name (default: crash-lens-data)
 """
 
 import os
+import re
 import sys
 import json
 import time
@@ -29,67 +32,69 @@ BUCKET = os.environ.get("R2_BUCKET", "crash-lens-data")
 ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID", "")
 ENDPOINT = f"https://{ACCOUNT_ID}.r2.cloudflarestorage.com"
 
-# ─── State Prefixes & Data Directories ───────────────────────────────────────
-# Maps R2 state prefix → data directory name (relative to data/)
+# ─── All 50 States + DC + NYC ────────────────────────────────────────────────
+# Maps R2 state prefix → { hierarchy: states/ dir name, data_dir: data/ dir name }
+# hierarchy.json is the SINGLE SOURCE OF TRUTH for regions, MPOs, and counties.
 STATE_MAP = {
-    "virginia":       None,          # Jurisdictions from config.json
-    "colorado":       "CDOT",
-    "maryland":       "MarylandDOT",
-    "connecticut":    "ConnecticutDOT",
-    "delaware":       "DelawareDOT",
-    "new_york":       "NewYorkDOT",
-    "nyc":            "NYCDOT",
-    "hawaii":         "HawaiiDOT",
-    "iowa":           "IowaDOT",
-    "illinois":       "IllinoisDOT",
-    "louisiana":      "LouisianaDOT",
-    "alaska":         "AlaskaDOT",
-    "massachusetts":  "MassachusettsDOT",
-    "pennsylvania":   "PennsylvaniaDOT",
-    "florida":        "FloridaDOT",
-    "georgia":        "GeorgiaDOT",
-    "south_carolina": "SouthCarolinaDOT",
-    "ohio":           "OhioDOT",
-    "wisconsin":      "WisconsinDOT",
-    "nevada":         "NevadaDOT",
-    "utah":           "UtahDOT",
-    "oregon":         "OregonDOT",
-    "washington":     "WashingtonDOT",
-    "idaho":          "IdahoDOT",
-    "montana":        "MontanaDOT",
-    "west_virginia":  "WestVirginiaDOT",
-    "mississippi":    "MississippiDOT",
-    "oklahoma":       "OklahomaDOT",
-    "arkansas":       "ArkansasDOT",
-    "vermont":        "VermontDOT",
-    "texas":          "TexasDOT",
+    # ── States with active data pipelines ──
+    "virginia":             {"hierarchy": "virginia",             "data_dir": None},
+    "colorado":             {"hierarchy": "colorado",             "data_dir": "CDOT"},
+    "maryland":             {"hierarchy": "maryland",             "data_dir": "MarylandDOT"},
+    "connecticut":          {"hierarchy": "connecticut",          "data_dir": "ConnecticutDOT"},
+    "delaware":             {"hierarchy": "delaware",             "data_dir": "DelawareDOT"},
+    "new_york":             {"hierarchy": "new_york",             "data_dir": "NewYorkDOT"},
+    "hawaii":               {"hierarchy": "hawaii",               "data_dir": "HawaiiDOT"},
+    "iowa":                 {"hierarchy": "iowa",                 "data_dir": "IowaDOT"},
+    "illinois":             {"hierarchy": "illinois",             "data_dir": "IllinoisDOT"},
+    "louisiana":            {"hierarchy": "louisiana",            "data_dir": "LouisianaDOT"},
+    "alaska":               {"hierarchy": "alaska",               "data_dir": "AlaskaDOT"},
+    "massachusetts":        {"hierarchy": "massachusetts",        "data_dir": "MassachusettsDOT"},
+    "pennsylvania":         {"hierarchy": "pennsylvania",         "data_dir": "PennsylvaniaDOT"},
+    "florida":              {"hierarchy": "florida",              "data_dir": "FloridaDOT"},
+    "georgia":              {"hierarchy": "georgia",              "data_dir": "GeorgiaDOT"},
+    "south_carolina":       {"hierarchy": "south_carolina",       "data_dir": "SouthCarolinaDOT"},
+    "ohio":                 {"hierarchy": "ohio",                 "data_dir": "OhioDOT"},
+    "wisconsin":            {"hierarchy": "wisconsin",            "data_dir": "WisconsinDOT"},
+    "nevada":               {"hierarchy": "nevada",               "data_dir": "NevadaDOT"},
+    "utah":                 {"hierarchy": "utah",                 "data_dir": "UtahDOT"},
+    "oregon":               {"hierarchy": "oregon",               "data_dir": "OregonDOT"},
+    "washington":           {"hierarchy": "washington",           "data_dir": "WashingtonDOT"},
+    "idaho":                {"hierarchy": "idaho",                "data_dir": "IdahoDOT"},
+    "montana":              {"hierarchy": "montana",              "data_dir": "MontanaDOT"},
+    "west_virginia":        {"hierarchy": "west_virginia",        "data_dir": "WestVirginiaDOT"},
+    "mississippi":          {"hierarchy": "mississippi",          "data_dir": "MississippiDOT"},
+    "oklahoma":             {"hierarchy": "oklahoma",             "data_dir": "OklahomaDOT"},
+    "arkansas":             {"hierarchy": "arkansas",             "data_dir": "ArkansasDOT"},
+    "vermont":              {"hierarchy": "vermont",              "data_dir": "VermontDOT"},
+    "texas":                {"hierarchy": "texas",                "data_dir": "TexasDOT"},
+    # ── Remaining US states + DC ──
+    "alabama":              {"hierarchy": "alabama",              "data_dir": None},
+    "arizona":              {"hierarchy": "arizona",              "data_dir": None},
+    "california":           {"hierarchy": "california",           "data_dir": None},
+    "district_of_columbia": {"hierarchy": "district_of_columbia", "data_dir": None},
+    "indiana":              {"hierarchy": "indiana",              "data_dir": None},
+    "kansas":               {"hierarchy": "kansas",               "data_dir": None},
+    "kentucky":             {"hierarchy": "kentucky",             "data_dir": None},
+    "maine":                {"hierarchy": "maine",                "data_dir": None},
+    "michigan":             {"hierarchy": "michigan",             "data_dir": None},
+    "minnesota":            {"hierarchy": "minnesota",            "data_dir": None},
+    "missouri":             {"hierarchy": "missouri",             "data_dir": None},
+    "nebraska":             {"hierarchy": "nebraska",             "data_dir": None},
+    "new_hampshire":        {"hierarchy": "new_hampshire",        "data_dir": None},
+    "new_jersey":           {"hierarchy": "new_jersey",           "data_dir": None},
+    "new_mexico":           {"hierarchy": "new_mexico",           "data_dir": None},
+    "north_carolina":       {"hierarchy": "north_carolina",       "data_dir": None},
+    "north_dakota":         {"hierarchy": "north_dakota",         "data_dir": None},
+    "rhode_island":         {"hierarchy": "rhode_island",         "data_dir": None},
+    "south_dakota":         {"hierarchy": "south_dakota",         "data_dir": None},
+    "tennessee":            {"hierarchy": "tennessee",            "data_dir": None},
+    "wyoming":              {"hierarchy": "wyoming",              "data_dir": None},
+    # ── NYC (special sub-state entity, no hierarchy.json) ──
+    "nyc":                  {"hierarchy": None,                   "data_dir": "NYCDOT"},
 }
 
-# Known jurisdiction lists for states without source_manifest.json jurisdiction_filters
-# These are the standard US county/jurisdiction lists used as R2 folder names
-KNOWN_JURISDICTIONS = {
-    "connecticut": [
-        "fairfield", "hartford", "litchfield", "middlesex",
-        "new_haven", "new_london", "tolland", "windham"
-    ],
-    "delaware": ["kent", "new_castle", "sussex"],
-    "hawaii": ["hawaii", "honolulu", "kauai", "maui"],
-    "nyc": ["bronx", "brooklyn", "manhattan", "queens", "staten_island"],
-    "alaska": [
-        "anchorage", "fairbanks_north_star", "matanuska_susitna", "kenai_peninsula",
-        "juneau", "bethel", "nome", "north_slope", "northwest_arctic", "kodiak_island",
-        "valdez_cordova", "southeast_fairbanks", "denali", "dillingham", "haines",
-        "ketchikan_gateway", "lake_and_peninsula", "prince_of_wales_hyder",
-        "sitka", "skagway", "wrangell", "yakutat", "aleutians_east",
-        "aleutians_west", "bristol_bay", "hoonah_angoon", "kusilvak",
-        "petersburg", "yukon_koyukuk", "copper_river"
-    ],
-    "vermont": [
-        "addison", "bennington", "caledonia", "chittenden", "essex",
-        "franklin", "grand_isle", "lamoille", "orange", "orleans",
-        "rutland", "washington", "windham", "windsor"
-    ],
-}
+# NYC boroughs — hardcoded since NYC has no hierarchy.json
+NYC_JURISDICTIONS = ["bronx", "brooklyn", "manhattan", "queens", "staten_island"]
 
 
 def get_project_root():
@@ -97,16 +102,62 @@ def get_project_root():
     return Path(__file__).resolve().parent.parent
 
 
+def county_name_to_key(name):
+    """Convert a county display name to a snake_case R2 folder key.
+
+    Examples:
+        "Adams"           -> "adams"
+        "El Paso"         -> "el_paso"
+        "Prince George's" -> "prince_georges"
+        "St. Mary's"      -> "st_marys"
+        "De Kalb"         -> "de_kalb"
+        "Alexandria City"  -> "alexandria_city"  (VA independent cities)
+    """
+    key = name.lower()
+    # Remove apostrophes: Prince George's -> prince georges
+    key = key.replace("'", "")
+    # Replace periods: St. Mary -> st mary
+    key = key.replace(".", "")
+    # Replace spaces/hyphens with underscores
+    key = re.sub(r'[\s\-]+', '_', key)
+    # Remove any remaining non-alphanumeric except underscores
+    key = re.sub(r'[^a-z0-9_]', '', key)
+    # Collapse multiple underscores
+    key = re.sub(r'_+', '_', key)
+    # Strip leading/trailing underscores
+    key = key.strip('_')
+    return key
+
+
+def load_hierarchy(state_prefix, project_root):
+    """Load full hierarchy.json for a state.
+
+    Returns the parsed JSON dict, or None if not found.
+    """
+    state_cfg = STATE_MAP.get(state_prefix, {})
+    hierarchy_name = state_cfg.get("hierarchy")
+    if not hierarchy_name:
+        return None
+
+    hierarchy_path = project_root / "states" / hierarchy_name / "hierarchy.json"
+    if not hierarchy_path.exists():
+        return None
+
+    try:
+        with open(hierarchy_path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
+
+
 def load_virginia_jurisdictions(project_root):
-    """Load Virginia jurisdiction keys from config.json."""
+    """Load Virginia jurisdiction keys from config.json (authoritative source)."""
     config_path = project_root / "config.json"
     if not config_path.exists():
-        print(f"  [WARN] config.json not found at {config_path}")
         return []
     with open(config_path) as f:
         config = json.load(f)
     jurisdictions = list(config.get("jurisdictions", {}).keys())
-    # Filter out separators and Colorado legacy entries
     return [j for j in jurisdictions
             if not j.startswith("_") and not j.startswith("co_")]
 
@@ -120,31 +171,67 @@ def load_jurisdictions_from_manifest(project_root, data_dir):
         with open(manifest_path) as f:
             manifest = json.load(f)
         filters = manifest.get("jurisdiction_filters", {})
-        # Filter out metadata keys starting with _
-        return [k for k in filters.keys() if not k.startswith("_")]
+        keys = [k for k in filters.keys() if not k.startswith("_")]
+        return keys if keys else []
     except (json.JSONDecodeError, KeyError):
         return []
 
 
-def get_jurisdictions(state_prefix, project_root):
-    """Get jurisdiction list for a given state prefix."""
+def get_jurisdictions_from_hierarchy(hierarchy):
+    """Extract jurisdiction folder names from hierarchy.json allCounties.
+
+    Converts county display names to snake_case keys.
+    """
+    all_counties = hierarchy.get("allCounties", {})
+    if not all_counties:
+        return []
+    return [county_name_to_key(name) for name in all_counties.values()]
+
+
+def get_regions(hierarchy):
+    """Extract region keys from hierarchy.json."""
+    regions = hierarchy.get("regions", {})
+    return [k for k in regions.keys() if not k.startswith("_")]
+
+
+def get_mpos(hierarchy):
+    """Extract MPO/TPR keys from hierarchy.json."""
+    tprs = hierarchy.get("tprs", {})
+    return [k for k in tprs.keys() if not k.startswith("_")]
+
+
+def get_jurisdictions(state_prefix, project_root, hierarchy):
+    """Get jurisdiction list for a state, using the best available source.
+
+    Priority:
+      1. Virginia: config.json (has curated keys with _city/_county suffixes)
+      2. CO/MD: source_manifest.json (has curated keys)
+      3. All others: hierarchy.json allCounties (convert names to snake_case)
+    """
+    # Virginia — config.json is authoritative (independent cities, etc.)
     if state_prefix == "virginia":
         return load_virginia_jurisdictions(project_root)
 
-    data_dir = STATE_MAP.get(state_prefix)
-    if data_dir:
-        jurisdictions = load_jurisdictions_from_manifest(project_root, data_dir)
-        if jurisdictions:
-            return jurisdictions
+    # NYC — hardcoded boroughs
+    if state_prefix == "nyc":
+        return NYC_JURISDICTIONS
 
-    # Fall back to known jurisdictions
-    if state_prefix in KNOWN_JURISDICTIONS:
-        return KNOWN_JURISDICTIONS[state_prefix]
+    # States with curated source_manifest.json
+    state_cfg = STATE_MAP.get(state_prefix, {})
+    data_dir = state_cfg.get("data_dir")
+    if data_dir:
+        manifest_jurisdictions = load_jurisdictions_from_manifest(project_root, data_dir)
+        if manifest_jurisdictions:
+            return manifest_jurisdictions
+
+    # Fallback: derive from hierarchy.json allCounties
+    if hierarchy:
+        return get_jurisdictions_from_hierarchy(hierarchy)
 
     return []
 
 
-def generate_all_folders(state_filter=None):
+def generate_all_folders(state_filter=None, top_level_only=False):
     """Generate the complete list of R2 folder paths to create."""
     project_root = get_project_root()
     folders = []
@@ -175,22 +262,38 @@ def generate_all_folders(state_filter=None):
             f"{state_prefix}/_statewide/snapshots/",
         ])
 
-        # Load jurisdictions
-        jurisdictions = get_jurisdictions(state_prefix, project_root)
-        print(f"    Found {len(jurisdictions)} jurisdictions")
+        # Load hierarchy
+        hierarchy = load_hierarchy(state_prefix, project_root)
 
-        # Jurisdiction folders
-        for j in sorted(jurisdictions):
-            folders.append(f"{state_prefix}/{j}/")
-            folders.append(f"{state_prefix}/{j}/raw/")
+        # ── Regions / DOT Districts ──
+        region_keys = get_regions(hierarchy) if hierarchy else []
+        if region_keys:
+            print(f"    {len(region_keys)} regions: {', '.join(sorted(region_keys)[:5])}{'...' if len(region_keys) > 5 else ''}")
+            for r in sorted(region_keys):
+                folders.append(f"{state_prefix}/_region/{r}/")
+
+        # ── MPOs / TPRs ──
+        mpo_keys = get_mpos(hierarchy) if hierarchy else []
+        if mpo_keys:
+            print(f"    {len(mpo_keys)} MPOs/TPRs: {', '.join(sorted(mpo_keys)[:5])}{'...' if len(mpo_keys) > 5 else ''}")
+            for m in sorted(mpo_keys):
+                folders.append(f"{state_prefix}/_mpo/{m}/")
+
+        # ── Jurisdictions ──
+        if not top_level_only:
+            jurisdictions = get_jurisdictions(state_prefix, project_root, hierarchy)
+            print(f"    {len(jurisdictions)} jurisdictions")
+            for j in sorted(jurisdictions):
+                folders.append(f"{state_prefix}/{j}/")
+                folders.append(f"{state_prefix}/{j}/raw/")
+        else:
+            print(f"    (skipping jurisdictions — top-level-only mode)")
 
     return folders
 
 
 def create_folder_via_cli(folder_key, dry_run=False):
     """Create a single folder marker in R2 using AWS CLI."""
-    s3_uri = f"s3://{BUCKET}/{folder_key}"
-
     if dry_run:
         print(f"  [DRY-RUN] Would create: {folder_key}")
         return True
@@ -232,7 +335,7 @@ def create_folders_batch(folders, dry_run=False):
     print(f"{'='*60}\n")
 
     for i, folder in enumerate(folders, 1):
-        if i % 50 == 0 or i == total:
+        if i % 100 == 0 or i == total:
             print(f"  Progress: {i}/{total} ({i*100//total}%)")
 
         if create_folder_via_cli(folder, dry_run=dry_run):
@@ -255,6 +358,8 @@ def main():
                         help="Only create folders for a specific state prefix")
     parser.add_argument("--list-only", action="store_true",
                         help="Just list all folder paths and exit")
+    parser.add_argument("--top-level-only", action="store_true",
+                        help="Only create state meta folders + regions + MPOs (skip jurisdictions)")
     args = parser.parse_args()
 
     # Validate environment
@@ -267,7 +372,10 @@ def main():
             sys.exit(1)
 
     print("Generating R2 folder structure...")
-    folders = generate_all_folders(state_filter=args.state)
+    folders = generate_all_folders(
+        state_filter=args.state,
+        top_level_only=args.top_level_only
+    )
 
     if args.list_only:
         print(f"\nTotal folders: {len(folders)}\n")
