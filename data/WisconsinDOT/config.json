@@ -15,22 +15,24 @@
     "dataDir": "WisconsinDOT"
   },
   "columnMapping": {
-    "_description": "Maps Wisconsin crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Wisconsin data dictionary. Update as API schema is confirmed.",
+    "_description": "Maps WisDOT DT4000 crash data fields to CRASH LENS field codes",
+    "_note": "Column names from WisDOT DT4000 Crash Data User Guide. Community Maps data updated nightly.",
     "ID": "_TBD_CRASH_ID",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
     "LAT": "_TBD_LATITUDE",
     "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "_TBD_SEVERITY",
-    "JURISDICTION": "_TBD_COUNTY",
+    "SEVERITY": "CRSHSVR",
+    "JURISDICTION": "CNTYNAME",
     "ROUTE": "_TBD_ROAD_NAME",
     "COLLISION": "_TBD_COLLISION_TYPE",
     "WEATHER": "_TBD_WEATHER",
     "LIGHT": "_TBD_LIGHTING",
     "SURFACE_CONDITION": "_TBD_SURFACE",
     "JUNCTION": "_TBD_JUNCTION_TYPE",
-    "HITRUN": "_TBD_HIT_AND_RUN"
+    "HITRUN": "_TBD_HIT_AND_RUN",
+    "CONSTRUCTION_ZONE": "CONSZONE",
+    "REGION": "REGION"
   },
   "derivedFields": {
     "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
@@ -131,7 +133,7 @@
     "url": "https://data-wisdot.opendata.arcgis.com",
     "apiUrl": "https://data-wisdot.opendata.arcgis.com/datasets/crashes/FeatureServer/0",
     "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See data-wisdot.opendata.arcgis.com dataset metadata",
+    "dataDictionary": "https://transportal.cee.wisc.edu/documents/applications/crash-data/TOPS_DT4000_Data_Guide.pdf",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

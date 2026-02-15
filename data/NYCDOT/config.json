@@ -15,40 +15,55 @@
     "dataDir": "NYCDOT"
   },
   "columnMapping": {
-    "_description": "Maps New York City crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from New York City data dictionary. Update as API schema is confirmed.",
-    "ID": "_TBD_CRASH_ID",
-    "DATE": "_TBD_CRASH_DATE",
-    "TIME": "_TBD_CRASH_TIME",
-    "LAT": "_TBD_LATITUDE",
-    "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "_TBD_SEVERITY",
-    "JURISDICTION": "_TBD_COUNTY",
-    "ROUTE": "_TBD_ROAD_NAME",
-    "COLLISION": "_TBD_COLLISION_TYPE",
-    "WEATHER": "_TBD_WEATHER",
-    "LIGHT": "_TBD_LIGHTING",
-    "SURFACE_CONDITION": "_TBD_SURFACE",
-    "JUNCTION": "_TBD_JUNCTION_TYPE",
-    "HITRUN": "_TBD_HIT_AND_RUN"
+    "_description": "Maps NYC Motor Vehicle Collisions (h9gi-nx95) fields to CRASH LENS field codes",
+    "_note": "Column names from NYC Open Data Motor Vehicle Collisions - Crashes dataset",
+    "ID": "collision_id",
+    "DATE": "crash_date",
+    "TIME": "crash_time",
+    "LAT": "latitude",
+    "LON": "longitude",
+    "SEVERITY": "_DERIVED",
+    "JURISDICTION": "borough",
+    "ROUTE": "on_street_name",
+    "CROSS_STREET": "cross_street_name",
+    "OFF_STREET": "off_street_name",
+    "COLLISION": "contributing_factor_vehicle_1",
+    "WEATHER": "_NOT_IN_CRASHES_TABLE",
+    "LIGHT": "_NOT_IN_CRASHES_TABLE",
+    "SURFACE_CONDITION": "_NOT_IN_CRASHES_TABLE",
+    "JUNCTION": "_NOT_IN_CRASHES_TABLE",
+    "HITRUN": "_NOT_IN_CRASHES_TABLE",
+    "ZIP_CODE": "zip_code",
+    "VEHICLE_TYPE_1": "vehicle_type_code1",
+    "VEHICLE_TYPE_2": "vehicle_type_code2",
+    "CONTRIBUTING_FACTOR_1": "contributing_factor_vehicle_1",
+    "CONTRIBUTING_FACTOR_2": "contributing_factor_vehicle_2"
   },
   "derivedFields": {
-    "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
+    "_description": "Fields computed from raw data during Stage 1 (CONVERT)",
     "SEVERITY": {
-      "method": "direct_or_derived",
-      "source": "_TBD",
-      "_note": "Update with New York City-specific severity derivation method"
+      "method": "derived_from_counts",
+      "_note": "NYC Crashes table has injury/fatality counts, not KABCO directly",
+      "rule": "If number_of_persons_killed > 0 → K; Elif number_of_persons_injured > 0 → B (conservative); Else → O",
+      "sources": ["number_of_persons_killed", "number_of_persons_injured"]
+    },
+    "PED": {
+      "method": "flag_from_count",
+      "sources": ["number_of_pedestrians_killed", "number_of_pedestrians_injured"],
+      "rule": "True if sum > 0"
+    },
+    "BIKE": {
+      "method": "flag_from_count",
+      "sources": ["number_of_cyclist_killed", "number_of_cyclist_injured"],
+      "rule": "True if sum > 0"
     },
     "YEAR": {
       "method": "extract_year",
-      "source": "_TBD_CRASH_DATE"
+      "source": "crash_date"
     },
     "NODE": {
       "method": "concatenate",
-      "sources": [
-        "_TBD_ROAD1",
-        "_TBD_ROAD2"
-      ],
+      "sources": ["on_street_name", "cross_street_name"],
       "separator": " & "
     }
   },

@@ -129,10 +129,10 @@
   "dataSource": {
     "name": "CTDOT Open Data Portal",
     "url": "https://data.ct.gov",
-    "apiUrl": "https://data.ct.gov/resource/2cim-gya4.json",
+    "apiUrl": "https://data.ct.gov/resource/tusz-n3pv.json",
     "fileFormat": "JSON/CSV (Socrata SODA API)",
-    "dataDictionary": "See data.ct.gov dataset metadata",
-    "resourceId": "2cim-gya4",
+    "dataDictionary": "See data.ct.gov dataset metadata and https://www.ctcrash.uconn.edu/",
+    "resourceId": "tusz-n3pv",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 50000,

@@ -15,33 +15,36 @@
     "dataDir": "PennsylvaniaDOT"
   },
   "columnMapping": {
-    "_description": "Maps Pennsylvania crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Pennsylvania data dictionary. Update as API schema is confirmed.",
-    "ID": "_TBD_CRASH_ID",
-    "DATE": "_TBD_CRASH_DATE",
-    "TIME": "_TBD_CRASH_TIME",
-    "LAT": "_TBD_LATITUDE",
-    "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "_TBD_SEVERITY",
-    "JURISDICTION": "_TBD_COUNTY",
+    "_description": "Maps PennDOT CRASH table fields to CRASH LENS field codes",
+    "_note": "Column names from PennDOT Open Data Portal Data Dictionary (2025). Primary key is CRN. CRASH_DATE is stored as text yyyymmdd.",
+    "ID": "CRN",
+    "DATE": "CRASH_DATE",
+    "TIME": "_TBD_TIME",
+    "LAT": "DEC_LAT",
+    "LON": "DEC_LONG",
+    "SEVERITY": "MAX_SEVERITY_LEVEL",
+    "JURISDICTION": "COUNTY",
     "ROUTE": "_TBD_ROAD_NAME",
-    "COLLISION": "_TBD_COLLISION_TYPE",
-    "WEATHER": "_TBD_WEATHER",
-    "LIGHT": "_TBD_LIGHTING",
-    "SURFACE_CONDITION": "_TBD_SURFACE",
-    "JUNCTION": "_TBD_JUNCTION_TYPE",
-    "HITRUN": "_TBD_HIT_AND_RUN"
+    "COLLISION": "COLLISION_TYPE",
+    "WEATHER": "WEATHER",
+    "LIGHT": "ILLUMINATION",
+    "SURFACE_CONDITION": "ROAD_CONDITION",
+    "JUNCTION": "INTERSECT_TYPE",
+    "HITRUN": "_TBD_HIT_AND_RUN",
+    "FATAL_COUNT": "FATAL_COUNT",
+    "AGGRESSIVE_DRIVING": "AGGRESSIVE_DRIVING"
   },
   "derivedFields": {
     "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
     "SEVERITY": {
-      "method": "direct_or_derived",
-      "source": "_TBD",
-      "_note": "Update with Pennsylvania-specific severity derivation method"
+      "method": "direct_coded",
+      "source": "MAX_SEVERITY_LEVEL",
+      "_note": "PennDOT MAX_SEVERITY_LEVEL maps to KABCO. Also available: FATAL_COUNT for fatal flag, INJ_SEVERITY in PERSON table for individual KABCO."
     },
     "YEAR": {
-      "method": "extract_year",
-      "source": "_TBD_CRASH_DATE"
+      "method": "extract_from_text",
+      "source": "CRASH_DATE",
+      "_note": "CRASH_DATE is stored as text in yyyymmdd format, extract first 4 chars for year"
     },
     "NODE": {
       "method": "concatenate",
@@ -131,7 +134,7 @@
     "url": "https://crashinfo.penndot.pa.gov",
     "apiUrl": "https://gis.penndot.pa.gov/arcgis/rest/services/CrashData/FeatureServer/0",
     "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See crashinfo.penndot.pa.gov dataset metadata",
+    "dataDictionary": "https://gis.penndot.pa.gov/gishub/crashZip/Crash_Data_Dictionary_2025.pdf",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,
