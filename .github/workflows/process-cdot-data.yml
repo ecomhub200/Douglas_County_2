@@ -381,6 +381,81 @@ jobs:
           r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
           r2_public_url: ${{ vars.R2_PUBLIC_URL }}
 
+      # Stage 6.5: Generate region/MPO aggregates from county CSVs (bottom-up)
+      - name: Generate region/MPO aggregates (Stage 6.5)
+        if: steps.detect.outputs.has_files == 'true' && steps.detect.outputs.dry_run != 'true'
+        run: |
+          STATE="${{ env.R2_STATE_PREFIX }}"
+          echo "=========================================="
+          echo "Stage 6.5: Generating aggregates (bottom-up from county CSVs)"
+          echo "=========================================="
+
+          # Output to data/{STATE}/ so paths match R2 hierarchy: {state}/_statewide/, _region/, _mpo/
+          python scripts/generate_aggregates.py --state "$STATE" --data-dir data/CDOT --output-dir "data/$STATE" || {
+            echo "WARNING: Aggregate generation failed (non-fatal)"
+          }
+
+          python scripts/generate_aggregates.py --federal --output-dir data || {
+            echo "WARNING: Federal aggregate generation failed (non-fatal)"
+          }
+
+          echo "Generated aggregate files:"
+          find data -name "aggregates.json" -o -name "county_summary.json" -o -name "mpo_summary.json" -o -name "hotspots.json" -o -name "state_summary.json" 2>/dev/null | sort
+        continue-on-error: true
+
+      - name: Build aggregate upload manifest (Stage 6.5)
+        id: build-aggregate-manifest
+        if: steps.detect.outputs.has_files == 'true' && steps.detect.outputs.dry_run != 'true'
+        run: |
+          STATE="${{ env.R2_STATE_PREFIX }}"
+          python3 -c "
+          import json, os, glob
+
+          state = '$STATE'
+          files = []
+
+          for name in ['aggregates.json', 'county_summary.json', 'mpo_summary.json']:
+              path = f'data/{state}/_statewide/{name}'
+              if os.path.isfile(path):
+                  files.append({'local_path': path, 'r2_key': f'{state}/_statewide/{name}'})
+
+          for agg in glob.glob(f'data/{state}/_region/*/aggregates.json'):
+              region_id = agg.split('/')[-2]
+              files.append({'local_path': agg, 'r2_key': f'{state}/_region/{region_id}/aggregates.json'})
+          for hs in glob.glob(f'data/{state}/_region/*/hotspots.json'):
+              region_id = hs.split('/')[-2]
+              files.append({'local_path': hs, 'r2_key': f'{state}/_region/{region_id}/hotspots.json'})
+
+          for agg in glob.glob(f'data/{state}/_mpo/*/aggregates.json'):
+              mpo_id = agg.split('/')[-2]
+              files.append({'local_path': agg, 'r2_key': f'{state}/_mpo/{mpo_id}/aggregates.json'})
+          for hs in glob.glob(f'data/{state}/_mpo/*/hotspots.json'):
+              mpo_id = hs.split('/')[-2]
+              files.append({'local_path': hs, 'r2_key': f'{state}/_mpo/{mpo_id}/hotspots.json'})
+
+          for name in ['aggregates.json', 'state_summary.json']:
+              path = f'data/_federal/{name}'
+              if os.path.isfile(path):
+                  files.append({'local_path': path, 'r2_key': f'_federal/{name}'})
+
+          print(f'Found {len(files)} aggregate files to upload')
+          with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+              f.write(f'files_json={json.dumps(files)}\n')
+          "
+        continue-on-error: true
+
+      - name: Upload aggregate JSONs to R2 (Stage 6.5)
+        if: steps.build-aggregate-manifest.outputs.files_json != '[]' && steps.detect.outputs.dry_run != 'true'
+        uses: ./.github/actions/upload-r2
+        with:
+          files_json: |
+            ${{ steps.build-aggregate-manifest.outputs.files_json || '[]' }}
+          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          r2_public_url: ${{ vars.R2_PUBLIC_URL }}
+        continue-on-error: true
+
       - name: Commit manifest and pipeline metadata
         if: steps.detect.outputs.has_files == 'true' && steps.detect.outputs.dry_run != 'true'
         run: |

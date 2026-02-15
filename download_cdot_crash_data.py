@@ -1879,6 +1879,12 @@ Examples:
     )
 
     parser.add_argument(
+        '--save-statewide-gzip',
+        action='store_true',
+        help='After downloading, merge all year CSVs into a single gzipped statewide file'
+    )
+
+    parser.add_argument(
         '--data-dir', '-d',
         type=str,
         default=None,
@@ -1993,9 +1999,114 @@ def main():
                                    force=args.force)
         results.append(year_result)
 
-    # Print summary
+    # Stage 1.5: Assemble statewide gzip from all downloaded year CSVs
     successes = [(y, p) for y, ok, p in results if ok]
     failures = [(y, e) for y, ok, e in results if not ok]
+
+    if args.save_statewide_gzip and successes:
+        try:
+            logger.info("")
+            logger.info("=" * 60)
+            logger.info("STAGE 1.5: Assembling statewide gzip from per-year CSVs")
+            logger.info("=" * 60)
+
+            import gzip
+            import shutil
+            import subprocess as sp
+
+            year_dfs = []
+            for year, path in successes:
+                if os.path.isfile(path):
+                    logger.info(f"  Reading {year}: {path}")
+                    year_df = pd.read_csv(path, dtype=str)
+                    year_dfs.append(year_df)
+
+            if year_dfs:
+                combined = pd.concat(year_dfs, ignore_index=True)
+                total_records = len(combined)
+
+                # Deduplicate by CUID if column exists
+                cuid_col = None
+                for col in combined.columns:
+                    if col.upper() == 'CUID':
+                        cuid_col = col
+                        break
+                if cuid_col:
+                    before_dedup = len(combined)
+                    combined = combined.drop_duplicates(subset=[cuid_col], keep='first')
+                    deduped = before_dedup - len(combined)
+                    if deduped > 0:
+                        logger.info(f"  Deduplicated: removed {deduped:,} duplicate CUIDs")
+
+                # Save raw merged CSV (temporary — will be converted)
+                raw_statewide_path = os.path.join(str(data_dir), "colorado_statewide_raw.csv")
+                combined.to_csv(raw_statewide_path, index=False)
+                logger.info(f"  Raw merged CSV: {raw_statewide_path} ({len(combined):,} records)")
+
+                # Run through convert + validate pipeline (same as county data)
+                # This normalizes CDOT columns to Virginia-compatible format and validates
+                logger.info("  Running convert + validate pipeline on statewide data...")
+                scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts')
+                pipeline_cmd = [
+                    sys.executable, os.path.join(scripts_dir, 'process_crash_data.py'),
+                    '-i', raw_statewide_path,
+                    '-s', 'colorado',
+                    '-j', 'statewide',
+                    '-o', str(data_dir),
+                    '--skip-split',      # Don't split into road types — keep all roads
+                    '-f', '-v'
+                ]
+                logger.info(f"  Pipeline cmd: {' '.join(pipeline_cmd)}")
+
+                result = sp.run(pipeline_cmd, capture_output=True, text=True, timeout=1800)
+                if result.returncode == 0:
+                    logger.info("  Convert + validate pipeline completed successfully")
+                    if result.stdout:
+                        for line in result.stdout.strip().split('\n')[-10:]:
+                            logger.info(f"    {line}")
+                else:
+                    logger.warning(f"  Pipeline returned code {result.returncode}")
+                    if result.stderr:
+                        for line in result.stderr.strip().split('\n')[-5:]:
+                            logger.warning(f"    {line}")
+                    logger.warning("  Falling back to raw merged CSV (without conversion)")
+
+                # Find the standardized output (process_crash_data.py creates statewide_standardized.csv)
+                standardized_path = os.path.join(str(data_dir), "statewide_standardized.csv")
+                if os.path.isfile(standardized_path):
+                    source_path = standardized_path
+                    logger.info(f"  Using standardized output: {standardized_path}")
+                else:
+                    source_path = raw_statewide_path
+                    logger.info(f"  Using raw merged CSV (no standardized output found)")
+
+                # Rename to final statewide name and gzip
+                statewide_path = os.path.join(str(data_dir), "colorado_statewide_all_roads.csv")
+                os.rename(source_path, statewide_path)
+
+                gz_path = f"{statewide_path}.gz"
+                with open(statewide_path, 'rb') as f_in:
+                    with gzip.open(gz_path, 'wb', compresslevel=6) as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                uncompressed_size = os.path.getsize(statewide_path)
+                compressed_size = os.path.getsize(gz_path)
+                # Keep uncompressed CSV alongside gzip for batch splitting workflows
+                # (split_jurisdictions.py needs the uncompressed CSV to split into
+                # per-jurisdiction files). The batch workflow cleans up after splitting.
+                ratio = uncompressed_size / compressed_size if compressed_size > 0 else 0
+                logger.info(f"  Statewide gzip: {gz_path} ({compressed_size:,} bytes, {ratio:.1f}x compression)")
+                logger.info(f"  Statewide CSV kept: {statewide_path} ({uncompressed_size:,} bytes)")
+
+                # Cleanup temporary raw file (only if different from processed statewide CSV)
+                if os.path.isfile(raw_statewide_path) and raw_statewide_path != source_path and raw_statewide_path != statewide_path:
+                    os.remove(raw_statewide_path)
+            else:
+                logger.warning("  No year CSVs available for statewide assembly")
+
+        except Exception as e:
+            logger.warning(f"  Statewide gzip assembly failed (non-fatal): {e}")
+
+    # Print summary
 
     logger.info("")
     logger.info("=" * 60)

@@ -107,11 +107,12 @@ runs:
                 continue
 
             size = os.path.getsize(local_path)
-            if local_path.endswith('.csv.gz'):
-                content_type = 'application/gzip'
-            elif local_path.endswith('.csv'):
+            is_gzipped = local_path.endswith('.gz')
+
+            # Determine content type
+            if local_path.endswith('.csv') or local_path.endswith('.csv.gz'):
                 content_type = 'text/csv'
-            elif local_path.endswith('.json'):
+            elif local_path.endswith('.json') or local_path.endswith('.json.gz'):
                 content_type = 'application/json'
             else:
                 content_type = 'application/octet-stream'
@@ -122,6 +123,10 @@ runs:
                 '--endpoint-url', endpoint,
                 '--content-type', content_type
             ]
+
+            # Add Content-Encoding for gzipped files so browsers decompress transparently
+            if is_gzipped:
+                cmd.extend(['--content-encoding', 'gzip'])
 
             print(f'  Uploading: {local_path} ({size:,} bytes) -> {s3_uri}')
 
@@ -148,11 +153,21 @@ runs:
             with open(local_path, 'rb') as fh:
                 md5 = hashlib.md5(fh.read()).hexdigest()
 
-            manifest['files'][r2_key] = {
+            file_meta = {
                 'size': size,
                 'md5': md5,
                 'uploaded': datetime.now(timezone.utc).isoformat()
             }
+
+            # Record gzip metadata for compressed files
+            if is_gzipped:
+                file_meta['contentEncoding'] = 'gzip'
+                # Try to read uncompressed size from entry metadata if provided
+                uncompressed = entry.get('uncompressed_size')
+                if uncompressed:
+                    file_meta['uncompressedSize'] = int(uncompressed)
+
+            manifest['files'][r2_key] = file_meta
             manifest['localPathMapping'][local_path] = r2_key
 
             uploaded += 1

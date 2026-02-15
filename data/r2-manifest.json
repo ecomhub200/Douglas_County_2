@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "_comment": "Version 2: Normalized R2 key structure - {state}/{jurisdiction}/{file}.csv(.gz). New states use gzip-compressed CSVs (.csv.gz) for R2 storage. Virginia/Henrico uses uppercase folder + prefixed filenames matching actual R2 keys.",
+  "version": 3,
+  "_comment": "Version 3: Added gzip support (contentEncoding, uncompressedSize) for state-level datasets. Statewide CSVs stored at {state}/_state/. Aggregate JSONs at {state}/_statewide/, _region/, _mpo/, _federal/.",
   "r2BaseUrl": "https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev",
   "updated": "2026-02-13T13:10:00.000000+00:00",
   "files": {
