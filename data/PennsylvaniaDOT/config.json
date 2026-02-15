@@ -26,13 +26,15 @@
     "JURISDICTION": "COUNTY",
     "DISTRICT": "DISTRICT",
     "MUNICIPALITY": "MUNICIPALITY",
-    "ROUTE": "_TBD_ROAD_NAME",
+    "ROUTE": "_ROADWAY_TABLE_JOIN",
+    "_ROUTE_NOTE": "Road name is in the ROADWAY table (joined via CRN). Fields: ROAD_NAME, ROUTE, STREET_NAME. CRASH table has no direct road name column.",
     "COLLISION": "COLLISION_TYPE",
     "WEATHER": "WEATHER",
     "LIGHT": "ILLUMINATION",
     "SURFACE_CONDITION": "ROAD_CONDITION",
     "JUNCTION": "INTERSECT_TYPE",
-    "HITRUN": "_TBD_HIT_AND_RUN",
+    "HITRUN": "_FLAG_TABLE_JOIN",
+    "_HITRUN_NOTE": "Hit-and-run flag is in the FLAG table (joined via CRN). Field: HIT_RUN. CRASH table has no direct hit-and-run column.",
     "YEAR": "CRASH_YEAR",
     "MONTH": "CRASH_MONTH",
     "DAY_OF_WEEK": "DAY_OF_WEEK",
@@ -58,10 +60,8 @@
     },
     "NODE": {
       "method": "concatenate",
-      "sources": [
-        "_TBD_ROAD1",
-        "_TBD_ROAD2"
-      ],
+      "sources": ["_ROADWAY_TABLE.ROAD_NAME", "_ROADWAY_TABLE.INTERSECT_ROAD_NAME"],
+      "_note": "Road names are in the ROADWAY table joined via CRN. Requires table join during CONVERT stage.",
       "separator": " & "
     }
   },

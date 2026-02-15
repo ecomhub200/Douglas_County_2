@@ -37,7 +37,8 @@
     "SURFACE_CONDITION": "RD_SRFC_COND_CD",
     "JUNCTION": "JCT_CD",
     "INTERSECTION_TYPE": "INTCT_TYP_CD",
-    "HITRUN": "_TBD_HIT_AND_RUN",
+    "HITRUN": "_VEHICLE_LEVEL_FIELD",
+    "_HITRUN_NOTE": "Hit-and-run is derived at vehicle level in Signal4, not directly in Crashes_All crash-level FeatureServer. May need vehicle table join or check for HITRUN_IND field.",
     "PED_COUNT": "NUMBER_OF_PEDESTRIANS",
     "BIKE_COUNT": "NUMBER_OF_BICYCLISTS",
     "VEHICLE_COUNT": "NUMBER_OF_VEHICLES",
@@ -64,8 +65,8 @@
     "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
     "SEVERITY": {
       "method": "direct_or_derived",
-      "source": "_TBD_SEVERITY_FIELD",
-      "_note": "Florida severity may require joining with person-level data or using crash-level severity field. Check Crashes_All FeatureServer fields for CRASH_SEV or similar."
+      "source": "INJSEVER",
+      "_note": "INJSEVER is the crash-level highest injury severity field (string, length 1). Maps to KABCO directly. Also check INJSEVERCD for numeric code."
     },
     "YEAR": {
       "method": "direct",
