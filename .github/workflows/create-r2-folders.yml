@@ -1,0 +1,199 @@
+# ============================================================================
+# Create R2 Folder Structure
+# ============================================================================
+# One-time (or re-runnable) workflow to create the complete folder hierarchy
+# in the crash-lens-data R2 bucket. Creates zero-byte marker objects so that
+# folders appear in the R2 dashboard and are ready for data uploads.
+#
+# Reads jurisdiction lists from:
+#   - config.json (Virginia)
+#   - data/{State}DOT/source_manifest.json (all other states)
+#   - Fallback known lists for states without populated manifests
+#
+# Safe to re-run — creating an existing folder marker is a no-op.
+# ============================================================================
+
+name: Create R2 Folder Structure
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Scope of folders to create'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - top_level_only
+          - single_state
+      state:
+        description: 'State prefix (only used when scope=single_state)'
+        required: false
+        default: ''
+        type: string
+      dry_run:
+        description: 'Dry run (list folders without creating)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  R2_BUCKET: crash-lens-data
+
+jobs:
+  create-folders:
+    name: Create R2 Folders
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── Checkout ──
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Setup Python ──
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ── Configure AWS CLI for R2 ──
+      - name: Configure AWS CLI for Cloudflare R2
+        run: |
+          aws configure set aws_access_key_id "${{ secrets.CF_R2_ACCESS_KEY_ID }}"
+          aws configure set aws_secret_access_key "${{ secrets.CF_R2_SECRET_ACCESS_KEY }}"
+          aws configure set default.region auto
+          aws configure set default.output json
+
+      # ── Verify R2 Access ──
+      - name: Verify R2 credentials
+        run: |
+          echo "Testing R2 access..."
+          aws s3 ls "s3://${R2_BUCKET}/" \
+            --endpoint-url "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com" \
+            --max-items 5 || {
+              echo "::error::Failed to access R2 bucket. Check secrets."
+              exit 1
+            }
+          echo "✓ R2 access confirmed"
+
+      # ── Create Folders ──
+      - name: Create R2 folder structure
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ env.R2_BUCKET }}
+        run: |
+          ARGS=""
+
+          # Determine scope
+          if [ "${{ inputs.scope }}" = "single_state" ] && [ -n "${{ inputs.state }}" ]; then
+            ARGS="--state ${{ inputs.state }}"
+            echo "Scope: single state (${{ inputs.state }})"
+          elif [ "${{ inputs.scope }}" = "top_level_only" ]; then
+            echo "Scope: top-level folders only (no jurisdiction subfolders)"
+            # For top-level only, we'll use --list-only to show what would be created
+            # then create just the state-level folders via inline script
+            python3 scripts/create_r2_folders.py --list-only | grep -E '^  [a-z_]+/$' | head -40
+            echo ""
+            echo "Creating top-level state folders..."
+
+            ENDPOINT="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
+            TOP_FOLDERS=(
+              "_federal/"
+              "_national/"
+              "_national/snapshots/"
+              "shared/"
+              "shared/boundaries/"
+              "shared/mutcd/"
+            )
+
+            # State prefixes
+            STATES=(
+              virginia colorado maryland connecticut delaware new_york nyc
+              hawaii iowa illinois louisiana alaska massachusetts pennsylvania
+              florida georgia south_carolina ohio wisconsin nevada utah
+              oregon washington idaho montana west_virginia mississippi
+              oklahoma arkansas vermont texas
+            )
+
+            for folder in "${TOP_FOLDERS[@]}"; do
+              echo "  Creating: $folder"
+              aws s3api put-object --bucket "${R2_BUCKET}" --key "$folder" --content-length 0 \
+                --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || echo "  [WARN] Failed: $folder"
+            done
+
+            for state in "${STATES[@]}"; do
+              for sub in "" "_state/" "_statewide/" "_statewide/snapshots/"; do
+                key="${state}/${sub}"
+                if [ -z "$sub" ]; then key="${state}/"; fi
+                echo "  Creating: $key"
+                aws s3api put-object --bucket "${R2_BUCKET}" --key "$key" --content-length 0 \
+                  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || echo "  [WARN] Failed: $key"
+              done
+            done
+
+            echo ""
+            echo "Top-level folder creation complete."
+            exit 0
+          else
+            echo "Scope: all states and jurisdictions"
+          fi
+
+          # Add dry-run flag if requested
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          python3 scripts/create_r2_folders.py $ARGS
+
+      # ── Verify ──
+      - name: Verify R2 folder structure
+        if: inputs.dry_run == false
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+        run: |
+          ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          echo "Listing top-level R2 folders..."
+          echo ""
+
+          aws s3 ls "s3://${R2_BUCKET}/" --endpoint-url "$ENDPOINT" | head -50
+
+          echo ""
+          echo "Listing Virginia folders (sample)..."
+          aws s3 ls "s3://${R2_BUCKET}/virginia/" --endpoint-url "$ENDPOINT" | head -20
+
+          echo ""
+          echo "Listing Colorado folders (sample)..."
+          aws s3 ls "s3://${R2_BUCKET}/colorado/" --endpoint-url "$ENDPOINT" | head -20
+
+          echo ""
+          echo "Listing Maryland folders (sample)..."
+          aws s3 ls "s3://${R2_BUCKET}/maryland/" --endpoint-url "$ENDPOINT" | head -20
+
+          # Count total objects
+          echo ""
+          TOTAL=$(aws s3 ls "s3://${R2_BUCKET}/" --endpoint-url "$ENDPOINT" --recursive | wc -l)
+          echo "Total objects in bucket: $TOTAL"
+
+      # ── Summary ──
+      - name: Print summary
+        if: always()
+        run: |
+          echo "============================================"
+          echo "R2 Folder Creation Summary"
+          echo "============================================"
+          echo "Bucket:    ${R2_BUCKET}"
+          echo "Scope:     ${{ inputs.scope }}"
+          if [ "${{ inputs.scope }}" = "single_state" ]; then
+            echo "State:     ${{ inputs.state }}"
+          fi
+          echo "Dry Run:   ${{ inputs.dry_run }}"
+          echo "============================================"
