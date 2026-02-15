@@ -1,0 +1,24 @@
+{
+  "_description": "DelDOT crash data registry. 3 jurisdictions available.",
+  "_updated": "2026-02-15",
+  "source": {
+    "name": "Delaware Department of Transportation",
+    "base_url": "https://data.delaware.gov",
+    "api_url": "https://data.delaware.gov/resource/827n-m6xc.json",
+    "file_format": "JSON/CSV"
+  },
+  "jurisdiction_filters": {
+    "_description": "All 3 Delaware counties. FIPS codes are 5-digit (state 10 + 3-digit county).",
+    "_placeholder": "Populate with all 3 jurisdictions and FIPS codes"
+  },
+  "api": {
+    "endpoint": "https://data.delaware.gov/resource/827n-m6xc.json",
+    "resource_id": "827n-m6xc",
+    "pagination": {
+      "method": "offset",
+      "limit_param": "$limit",
+      "offset_param": "$offset",
+      "max_per_request": 50000
+    }
+  }
+}
