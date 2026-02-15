@@ -15,8 +15,8 @@
     "dataDir": "IllinoisDOT"
   },
   "columnMapping": {
-    "_description": "Maps Illinois crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Illinois data dictionary. Update as API schema is confirmed.",
+    "_description": "Maps Illinois IDOT crash data fields to CRASH LENS field codes",
+    "_note": "Yearly ArcGIS layers from 2014-2024 (e.g., 'Crashes - 2024'). FeatureServer URLs are dynamically assigned per dataset page. Download CSV to inspect exact field names. Data dictionary: IL SR 1050 Traffic Crash Report. Crash types: Type A (PDO), Type B (injury/tow).",
     "ID": "_TBD_CRASH_ID",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
@@ -130,8 +130,9 @@
     "name": "IDOT GIS Portal",
     "url": "https://gis-idot.opendata.arcgis.com",
     "apiUrl": "https://gis-idot.opendata.arcgis.com/datasets/crashes/FeatureServer/0",
-    "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See gis-idot.opendata.arcgis.com dataset metadata",
+    "_apiNote": "Yearly layers: 'Crashes - 2024', 'Crashes - 2023', etc. (2014-2024). FeatureServer URL varies per year/dataset. CSV/KML/GeoJSON/Shapefile downloads available.",
+    "fileFormat": "CSV, KML, GeoJSON, Shapefile (ArcGIS)",
+    "dataDictionary": "IL Dictionary of Data Elements - Traffic Crash Report (SR 1050): https://idot.illinois.gov/content/dam/soi/en/web/idot/documents/transportation-system/reports/safety/itrcc/il-data-dictionary-march-2011.pdf",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

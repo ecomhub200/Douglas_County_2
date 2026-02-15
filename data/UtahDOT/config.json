@@ -15,13 +15,13 @@
     "dataDir": "UtahDOT"
   },
   "columnMapping": {
-    "_description": "Maps Utah crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Utah data dictionary. Update as API schema is confirmed.",
-    "ID": "_TBD_CRASH_ID",
+    "_description": "Maps Utah UDOT Crash_Locations MapServer fields to CRASH LENS field codes",
+    "_note": "Data from UDOT Crash_Locations MapServer (2017-present, nightly refresh). Spatial Reference: 26912 (NAD83 UTM Zone 12N). Three data tables: Crashes, Vehicle, People. Uses Numetric for querying. Exact ArcGIS field names require FeatureServer metadata query.",
+    "ID": "_LIKELY_CRASH_ID",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
-    "LAT": "_TBD_LATITUDE",
-    "LON": "_TBD_LONGITUDE",
+    "LAT": "_DERIVED_FROM_GEOMETRY",
+    "LON": "_DERIVED_FROM_GEOMETRY",
     "SEVERITY": "_TBD_SEVERITY",
     "JURISDICTION": "_TBD_COUNTY",
     "ROUTE": "_TBD_ROAD_NAME",
@@ -33,11 +33,12 @@
     "HITRUN": "_TBD_HIT_AND_RUN"
   },
   "derivedFields": {
-    "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
+    "_description": "Fields computed from raw data during Stage 1 (CONVERT)",
+    "_data_note": "UDOT uses Numetric 'rollups' for crash data querying. Three data tables (Crashes, Vehicle, People) joined by Crash ID + Vehicle Number + Person ID. Exact field names TBD from MapServer metadata.",
     "SEVERITY": {
       "method": "direct_or_derived",
       "source": "_TBD",
-      "_note": "Update with Utah-specific severity derivation method"
+      "_note": "Utah severity field and KABCO mapping TBD from MapServer metadata"
     },
     "YEAR": {
       "method": "extract_year",
@@ -45,10 +46,7 @@
     },
     "NODE": {
       "method": "concatenate",
-      "sources": [
-        "_TBD_ROAD1",
-        "_TBD_ROAD2"
-      ],
+      "sources": ["_TBD_ROAD1", "_TBD_ROAD2"],
       "separator": " & "
     }
   },
@@ -129,9 +127,12 @@
   "dataSource": {
     "name": "UDOT GIS Portal",
     "url": "https://data-uplan.opendata.arcgis.com",
-    "apiUrl": "https://data-uplan.opendata.arcgis.com/datasets/crashes/FeatureServer/0",
-    "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See data-uplan.opendata.arcgis.com dataset metadata",
+    "apiUrl": "https://maps.udot.utah.gov/central/rest/services/TrafficAndSafety/Crash_Locations/MapServer",
+    "_safetyIndex": "https://maps.udot.utah.gov/arcgis/rest/services/Safety_SafetyIndex/MapServer",
+    "fileFormat": "GeoJSON/CSV (ArcGIS MapServer)",
+    "dataDictionary": "UDOT Crash Data Fields: https://support.numetric.com/en/articles/4730297-udot-crash-data-fields-by-data-table, Codes: https://support.numetric.com/numetric-roads/udot-roads-documentation/crash-data-fields-codes",
+    "_dataRange": "2017-present, refreshed nightly",
+    "_contacts": "Jeff Lewis (jefflewis@utah.gov) for data, Jonathan Harman (jharman@utah.gov) for maps",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

@@ -15,41 +15,45 @@
     "dataDir": "DelawareDOT"
   },
   "columnMapping": {
-    "_description": "Maps Delaware crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Delaware data dictionary. Update as API schema is confirmed.",
-    "ID": "_TBD_CRASH_ID",
-    "DATE": "_TBD_CRASH_DATE",
-    "TIME": "_TBD_CRASH_TIME",
-    "LAT": "_TBD_LATITUDE",
-    "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "_TBD_SEVERITY",
-    "JURISDICTION": "_TBD_COUNTY",
-    "ROUTE": "_TBD_ROAD_NAME",
-    "COLLISION": "_TBD_COLLISION_TYPE",
-    "WEATHER": "_TBD_WEATHER",
-    "LIGHT": "_TBD_LIGHTING",
-    "SURFACE_CONDITION": "_TBD_SURFACE",
-    "JUNCTION": "_TBD_JUNCTION_TYPE",
-    "HITRUN": "_TBD_HIT_AND_RUN"
+    "_description": "Maps Delaware crash data fields (Socrata 827n-m6xc) to CRASH LENS field codes",
+    "_note": "Column names from data.delaware.gov Crash Data dataset. NO crash ID field available — use row index or composite key. NO route/road name field available.",
+    "ID": "_NO_CRASH_ID_FIELD",
+    "DATE": "crash_datetime",
+    "TIME": "_DERIVED_FROM_DATETIME",
+    "LAT": "latitude",
+    "LON": "longitude",
+    "SEVERITY": "crash_classification_description",
+    "JURISDICTION": "county_name",
+    "ROUTE": "_NOT_IN_DATASET",
+    "COLLISION": "manner_of_impact_description",
+    "WEATHER": "weather_1_description",
+    "LIGHT": "lighting_condition_description",
+    "SURFACE_CONDITION": "road_surface_description",
+    "JUNCTION": "_NOT_IN_DATASET",
+    "HITRUN": "_NOT_IN_DATASET",
+    "PED": "pedestrian_involved",
+    "BIKE": "bicycled_involved"
   },
   "derivedFields": {
     "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
     "SEVERITY": {
-      "method": "direct_or_derived",
-      "source": "_TBD",
-      "_note": "Update with Delaware-specific severity derivation method"
+      "method": "text_to_kabco",
+      "source": "crash_classification_description",
+      "_note": "Delaware provides crash_classification_description as text (e.g., 'Fatal Crash', 'Personal Injury Crash', 'Property Damage Crash'). Map to KABCO."
     },
     "YEAR": {
       "method": "extract_year",
-      "source": "_TBD_CRASH_DATE"
+      "source": "crash_datetime"
+    },
+    "ID": {
+      "method": "composite_key",
+      "sources": ["crash_datetime", "latitude", "longitude"],
+      "_note": "No crash ID field in dataset. Generate composite key from datetime + coordinates."
     },
     "NODE": {
-      "method": "concatenate",
-      "sources": [
-        "_TBD_ROAD1",
-        "_TBD_ROAD2"
-      ],
-      "separator": " & "
+      "method": "not_available",
+      "sources": [],
+      "_note": "No route/road name fields in dataset. Node/intersection identification not possible from this dataset alone."
     }
   },
   "roadSystems": {
@@ -131,7 +135,7 @@
     "url": "https://data.delaware.gov",
     "apiUrl": "https://data.delaware.gov/resource/827n-m6xc.json",
     "fileFormat": "JSON/CSV (Socrata SODA API)",
-    "dataDictionary": "See data.delaware.gov dataset metadata",
+    "dataDictionary": "See data.delaware.gov dataset 827n-m6xc metadata. Limited fields: no crash ID, no road/route name.",
     "resourceId": "827n-m6xc",
     "pagination": {
       "method": "offset",

@@ -15,41 +15,47 @@
     "dataDir": "NewYorkDOT"
   },
   "columnMapping": {
-    "_description": "Maps New York crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from New York data dictionary. Update as API schema is confirmed.",
-    "ID": "_TBD_CRASH_ID",
-    "DATE": "_TBD_CRASH_DATE",
-    "TIME": "_TBD_CRASH_TIME",
-    "LAT": "_TBD_LATITUDE",
-    "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "_TBD_SEVERITY",
-    "JURISDICTION": "_TBD_COUNTY",
-    "ROUTE": "_TBD_ROAD_NAME",
-    "COLLISION": "_TBD_COLLISION_TYPE",
-    "WEATHER": "_TBD_WEATHER",
-    "LIGHT": "_TBD_LIGHTING",
-    "SURFACE_CONDITION": "_TBD_SURFACE",
-    "JUNCTION": "_TBD_JUNCTION_TYPE",
-    "HITRUN": "_TBD_HIT_AND_RUN"
+    "_description": "Maps NYSDOT Motor Vehicle Crashes (Socrata e8ky-4vqe) to CRASH LENS field codes",
+    "_note": "18 columns available. CRITICAL LIMITATION: NO latitude/longitude fields and NO crash ID field. Dataset is aggregate crash-level with county, date, and descriptors only.",
+    "ID": "_NO_CRASH_ID_FIELD",
+    "DATE": "date",
+    "TIME": "time",
+    "LAT": "_NOT_IN_DATASET",
+    "LON": "_NOT_IN_DATASET",
+    "SEVERITY": "crash_descriptor",
+    "JURISDICTION": "county_name",
+    "ROUTE": "_NOT_IN_DATASET",
+    "COLLISION": "collision_type_descriptor",
+    "WEATHER": "weather_conditions",
+    "LIGHT": "lighting_conditions",
+    "SURFACE_CONDITION": "road_surface_conditions",
+    "JUNCTION": "_NOT_IN_DATASET",
+    "HITRUN": "_NOT_IN_DATASET",
+    "YEAR": "year",
+    "EVENT_DESCRIPTOR": "event_descriptor",
+    "NUM_KILLED": "number_of_persons_killed",
+    "NUM_INJURED": "number_of_persons_injured",
+    "NUM_MOTORISTS_KILLED": "number_of_motorists_killed",
+    "NUM_MOTORISTS_INJURED": "number_of_motorists_injured"
   },
   "derivedFields": {
     "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
     "SEVERITY": {
-      "method": "direct_or_derived",
-      "source": "_TBD",
-      "_note": "Update with New York-specific severity derivation method"
+      "method": "text_to_kabco",
+      "source": "crash_descriptor",
+      "_note": "NY provides crash_descriptor as text (e.g., 'Fatal Collision', 'Injury Collision', 'Property Damage Collision'). Map to KABCO. Also number_of_persons_killed/injured available for validation."
     },
     "YEAR": {
-      "method": "extract_year",
-      "source": "_TBD_CRASH_DATE"
+      "method": "direct",
+      "source": "year"
     },
     "NODE": {
-      "method": "concatenate",
-      "sources": [
-        "_TBD_ROAD1",
-        "_TBD_ROAD2"
-      ],
-      "separator": " & "
+      "method": "not_available",
+      "sources": [],
+      "_note": "No route/road name or intersection fields. Location-based analysis requires geocoding from county only."
+    },
+    "_LIMITATION": {
+      "_note": "This dataset lacks lat/lon coordinates. Map-based visualization and hotspot analysis are NOT possible with this dataset alone. Consider supplementing with NYSDOT's GIS crash data if available."
     }
   },
   "roadSystems": {
@@ -131,7 +137,7 @@
     "url": "https://data.ny.gov",
     "apiUrl": "https://data.ny.gov/resource/e8ky-4vqe.json",
     "fileFormat": "JSON/CSV (Socrata SODA API)",
-    "dataDictionary": "See data.ny.gov dataset metadata",
+    "dataDictionary": "See data.ny.gov dataset e8ky-4vqe metadata. LIMITATION: No lat/lon or crash ID. 18 columns with county-level crash descriptors.",
     "resourceId": "e8ky-4vqe",
     "pagination": {
       "method": "offset",

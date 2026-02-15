@@ -15,8 +15,8 @@
     "dataDir": "SouthCarolinaDOT"
   },
   "columnMapping": {
-    "_description": "Maps South Carolina crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from South Carolina data dictionary. Update as API schema is confirmed.",
+    "_description": "Maps South Carolina SCCATTS/SCDPS crash data fields to CRASH LENS field codes",
+    "_note": "SCDPS portal primarily has FATALITY data only (TrafficFatalityCount, VictimFatalityCount by year). Full crash data via SCCATTS (SC Collision and Ticket Tracking System) using TR-310 forms. Broader 2017-2021 collision data may be at scdps-gis-and-mapping-scdps.hub.arcgis.com. Also check fatalities-scdps.opendata.arcgis.com for downloadable CSV.",
     "ID": "_TBD_CRASH_ID",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
@@ -129,9 +129,13 @@
   "dataSource": {
     "name": "SCDOT GIS Portal",
     "url": "https://fatality-count-scdps.hub.arcgis.com",
-    "apiUrl": "https://fatality-count-scdps.hub.arcgis.com/datasets/crashes/FeatureServer/0",
+    "apiUrl": "https://fatality-count-scdps.hub.arcgis.com",
+    "_fatalitiesOpenData": "https://fatalities-scdps.opendata.arcgis.com/",
+    "_collisionData": "https://scdps-gis-and-mapping-scdps.hub.arcgis.com/",
+    "_additionalData": "https://fatality-count-scdps.hub.arcgis.com/pages/additional-data",
     "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See fatality-count-scdps.hub.arcgis.com dataset metadata",
+    "dataDictionary": "SCCATTS TR-310 Uniform Traffic Collision Report. Dashboard layers: TrafficFatalityCount, VictimFatalityCount (2019-2021).",
+    "_dataLimitation": "Primary portal is fatalities only. Broader collision data (2017-2021) may be at SCDPS GIS and Mapping hub.",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

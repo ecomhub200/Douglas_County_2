@@ -15,41 +15,45 @@
     "dataDir": "OregonDOT"
   },
   "columnMapping": {
-    "_description": "Maps Oregon crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Oregon data dictionary. Update as API schema is confirmed.",
-    "ID": "_TBD_CRASH_ID",
-    "DATE": "_TBD_CRASH_DATE",
-    "TIME": "_TBD_CRASH_TIME",
-    "LAT": "_TBD_LATITUDE",
-    "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "_TBD_SEVERITY",
-    "JURISDICTION": "_TBD_COUNTY",
-    "ROUTE": "_TBD_ROAD_NAME",
+    "_description": "Maps Oregon OTSDE Crash MapServer fields to CRASH LENS field codes",
+    "_note": "Column names from ODOT OTSDE_Crash MapServer/0 (2018-2023). Max Record Count: 10,000. Renderer uses KABCO unique values.",
+    "ID": "CRASH_ID",
+    "DATE": "CRASH_DT",
+    "TIME": "CRASH_HR_LONG_DESC",
+    "LAT": "LAT_DD",
+    "LON": "LONGTD_DD",
+    "SEVERITY": "KABCO",
+    "SEVERITY_CODE": "CRASH_SVRTY_CD",
+    "SEVERITY_DESC": "CRASH_SVRTY_LONG_DESC",
+    "JURISDICTION": "CNTY_NM",
+    "ROUTE": "RTE_NM",
+    "HIGHWAY_NUMBER": "HWY_NO",
+    "MILEPOINT": "MP_NO",
     "COLLISION": "_TBD_COLLISION_TYPE",
-    "WEATHER": "_TBD_WEATHER",
-    "LIGHT": "_TBD_LIGHTING",
-    "SURFACE_CONDITION": "_TBD_SURFACE",
+    "WEATHER": "WTHR_COND_LONG_DESC",
+    "LIGHT": "_TBD_LIGHT_CONDITION",
+    "SURFACE_CONDITION": "_TBD_SURFACE_CONDITION",
     "JUNCTION": "_TBD_JUNCTION_TYPE",
-    "HITRUN": "_TBD_HIT_AND_RUN"
+    "HITRUN": "CRASH_HIT_RUN_FLG",
+    "ALCOHOL": "ALCHL_INVLV_FLG",
+    "DRUG": "DRUG_INVLV_FLG",
+    "SPEED": "CRASH_SPEED_INVLV_FLG"
   },
   "derivedFields": {
-    "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
+    "_description": "Fields computed from raw data during Stage 1 (CONVERT)",
     "SEVERITY": {
-      "method": "direct_or_derived",
-      "source": "_TBD",
-      "_note": "Update with Oregon-specific severity derivation method"
+      "method": "direct_kabco",
+      "source": "KABCO",
+      "_note": "Oregon provides KABCO directly: K=Fatal, A=Injury A, B=Injury B, C=Injury C, O=PDO. Also CRASH_SVRTY_CD (single char) and CRASH_SVRTY_LONG_DESC (full text)."
     },
     "YEAR": {
       "method": "extract_year",
-      "source": "_TBD_CRASH_DATE"
+      "source": "CRASH_DT"
     },
     "NODE": {
-      "method": "concatenate",
-      "sources": [
-        "_TBD_ROAD1",
-        "_TBD_ROAD2"
-      ],
-      "separator": " & "
+      "method": "route_milepoint",
+      "sources": ["RTE_NM", "MP_NO"],
+      "_note": "Oregon uses route name + milepoint instead of intersection. Format: 'ROUTE @ MP xxx.xx'"
     }
   },
   "roadSystems": {
@@ -127,14 +131,15 @@
     }
   },
   "dataSource": {
-    "name": "ODOT GIS Portal",
-    "url": "https://oregon.gov/odot",
-    "apiUrl": "https://gis.odot.state.or.us/arcgis/rest/services/CrashData/FeatureServer/0",
-    "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See oregon.gov/odot dataset metadata",
+    "name": "ODOT TransGIS / OTSDE Crash Data",
+    "url": "https://gis.odot.state.or.us/transgis/",
+    "apiUrl": "https://gis.odot.state.or.us/arcgis1006/rest/services/agol/OTSDE_Crash/MapServer/0",
+    "fileFormat": "GeoJSON/CSV (ArcGIS MapServer)",
+    "dataDictionary": "CDS Code Manual: https://www.oregon.gov/ODOT/Data/documents/CDS_Code_Manual.pdf, OTSDE User Guide: https://www.oregon.gov/ODOT/Data/Documents/OTSDE_UserGuide.pdf",
+    "_dataRange": "2018-2023, updated periodically as new years are finalized",
     "pagination": {
       "method": "offset",
-      "maxPerRequest": 2000,
+      "maxPerRequest": 10000,
       "paramOffset": "resultOffset",
       "paramCount": "resultRecordCount"
     }

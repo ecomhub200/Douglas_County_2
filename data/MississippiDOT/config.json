@@ -5,7 +5,8 @@
     "fips": "28",
     "dotName": "MDOT",
     "dotFullName": "Mississippi Department of Transportation",
-    "dataPortalUrl": "https://gis-mdot.opendata.arcgis.com",
+    "dataPortalUrl": "https://mdot.ms.gov",
+    "_incorrectPortal": "gis-mdot.opendata.arcgis.com is MICHIGAN DOT, not Mississippi",
     "coordinateBounds": {
       "latMin": 30.17,
       "latMax": 34.99,
@@ -15,8 +16,8 @@
     "dataDir": "MississippiDOT"
   },
   "columnMapping": {
-    "_description": "Maps Mississippi crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Mississippi data dictionary. Update as API schema is confirmed.",
+    "_description": "Maps Mississippi crash data fields to CRASH LENS field codes",
+    "_note": "CRITICAL: gis-mdot.opendata.arcgis.com is actually MICHIGAN DOT, not Mississippi. Mississippi uses mdot.ms.gov. No public ArcGIS crash data FeatureServer found. Crash data via Mississippi DPS at dps.ms.gov/public-safety-planning/highway-safety/crash-data-reports. Geospatial catalog at opendata.gis.ms.gov.",
     "ID": "_TBD_CRASH_ID",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
@@ -129,9 +130,10 @@
   "dataSource": {
     "name": "MDOT GIS Portal",
     "url": "https://gis-mdot.opendata.arcgis.com",
-    "apiUrl": "https://gis-mdot.opendata.arcgis.com/datasets/crashes/FeatureServer/0",
-    "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See gis-mdot.opendata.arcgis.com dataset metadata",
+    "apiUrl": "_NO_PUBLIC_CRASH_ENDPOINT",
+    "_apiNote": "gis-mdot.opendata.arcgis.com is MICHIGAN DOT. Mississippi crash data not available via public ArcGIS. Try opendata.gis.ms.gov for Mississippi geospatial data.",
+    "fileFormat": "Unknown - contact Mississippi DPS",
+    "dataDictionary": "Mississippi DPS Crash Reports: https://www.dps.ms.gov/public-safety-planning/highway-safety/crash-data-reports",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

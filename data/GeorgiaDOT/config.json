@@ -15,8 +15,8 @@
     "dataDir": "GeorgiaDOT"
   },
   "columnMapping": {
-    "_description": "Maps Georgia crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Georgia data dictionary. Update as API schema is confirmed.",
+    "_description": "Maps Georgia GEARS crash data fields to CRASH LENS field codes",
+    "_note": "RESTRICTED ACCESS: gdot.aashtowaresafety.com requires login. Georgia uses GEARS (Georgia Electronic Accident Reporting System) by LexisNexis. Contact GDOT Crash Reporting Unit at (404) 635-2850 for data access.",
     "ID": "_TBD_CRASH_ID",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
@@ -129,9 +129,10 @@
   "dataSource": {
     "name": "GDOT GIS Portal",
     "url": "https://gdot.aashtowaresafety.net",
-    "apiUrl": "https://gdot.aashtowaresafety.net/arcgis/rest/services/CrashData/FeatureServer/0",
-    "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See gdot.aashtowaresafety.net dataset metadata",
+    "apiUrl": "https://gdot.aashtowaresafety.com/signin",
+    "_accessRestriction": "REQUIRES LOGIN. AASHTOWare Safety platform behind authentication.",
+    "fileFormat": "GeoJSON/CSV (ArcGIS - authenticated)",
+    "dataDictionary": "GDOT Crash Manual: https://crashmanual.dot.ga.gov/data, Request Form: https://www.dot.ga.gov/PartnerSmart/permits/Documents/Request_for_Crash_Data.pdf",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

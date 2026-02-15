@@ -15,40 +15,45 @@
     "dataDir": "AlaskaDOT"
   },
   "columnMapping": {
-    "_description": "Maps Alaska crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Alaska data dictionary. Update as API schema is confirmed.",
-    "ID": "_TBD_CRASH_ID",
+    "_description": "Maps Alaska DOT&PF CrashData FeatureServer fields to CRASH LENS field codes",
+    "_note": "Fields from CrashData_test FeatureServer (may be test/dev endpoint). CrashData_Details is a Table (non-spatial, no geometry). Max Record Count: 2,000. Additional fields likely available in production service.",
+    "ID": "DOCUMENT_NBR",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
     "LAT": "_TBD_LATITUDE",
     "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "_TBD_SEVERITY",
-    "JURISDICTION": "_TBD_COUNTY",
+    "SEVERITY": "CRASH_SEVERITY",
+    "JURISDICTION": "_TBD_BOROUGH_OR_AREA",
     "ROUTE": "_TBD_ROAD_NAME",
-    "COLLISION": "_TBD_COLLISION_TYPE",
+    "COLLISION": "MOST_HARMFUL_CRASH_EVENT_CD",
+    "FIRST_EVENT": "FIRST_CRASH_EVENT_CD",
+    "SECOND_EVENT": "SECOND_CRASH_EVENT_CD",
+    "THIRD_EVENT": "THIRD_CRASH_EVENT_CD",
+    "FOURTH_EVENT": "FOURTH_CRASH_EVENT_CD",
     "WEATHER": "_TBD_WEATHER",
     "LIGHT": "_TBD_LIGHTING",
     "SURFACE_CONDITION": "_TBD_SURFACE",
     "JUNCTION": "_TBD_JUNCTION_TYPE",
-    "HITRUN": "_TBD_HIT_AND_RUN"
+    "HITRUN": "_TBD_HIT_AND_RUN",
+    "YEAR": "CRASH_YEAR",
+    "DIRECTION": "DIRECTION_OF_TRAVEL_CD",
+    "IMPACT_AREA": "INITIAL_VEH_IMPACT_AREA_CD"
   },
   "derivedFields": {
-    "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
+    "_description": "Fields computed from raw data during Stage 1 (CONVERT)",
+    "_data_warning": "CrashData_test appears to be a development/test service. Production endpoint may differ. Alaska uses boroughs instead of counties.",
     "SEVERITY": {
-      "method": "direct_or_derived",
-      "source": "_TBD",
-      "_note": "Update with Alaska-specific severity derivation method"
+      "method": "coded_abc",
+      "source": "CRASH_SEVERITY",
+      "_note": "Alaska CRASH_SEVERITY uses single-char codes: A=Severe Injury, B=Visible Injury, C=Nonvisible Injury. Fatal/PDO codes TBD. May not include K or O directly."
     },
     "YEAR": {
-      "method": "extract_year",
-      "source": "_TBD_CRASH_DATE"
+      "method": "direct",
+      "source": "CRASH_YEAR"
     },
     "NODE": {
-      "method": "concatenate",
-      "sources": [
-        "_TBD_ROAD1",
-        "_TBD_ROAD2"
-      ],
+      "method": "not_confirmed",
+      "sources": ["_TBD_ROAD1", "_TBD_ROAD2"],
       "separator": " & "
     }
   },
@@ -129,9 +134,11 @@
   "dataSource": {
     "name": "AKDOT&PF GIS Portal",
     "url": "https://data-soa-akdot.opendata.arcgis.com",
-    "apiUrl": "https://data-soa-akdot.opendata.arcgis.com/datasets/crash-data/FeatureServer/0",
+    "apiUrl": "https://services.arcgis.com/p5v98VHDX9Atv3l7/ArcGIS/rest/services/CrashData_test/FeatureServer",
+    "_apiUrlNote": "This appears to be a test/development service. Production endpoint TBD. Layer 1 = CrashData_Details (Table, non-spatial).",
     "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See data-soa-akdot.opendata.arcgis.com dataset metadata",
+    "dataDictionary": "See data-soa-akdot.opendata.arcgis.com and egis-akdot.hub.arcgis.com",
+    "_alternatePortal": "https://egis-akdot.hub.arcgis.com/",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

@@ -15,40 +15,61 @@
     "dataDir": "IdahoDOT"
   },
   "columnMapping": {
-    "_description": "Maps Idaho crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Idaho data dictionary. Update as API schema is confirmed.",
-    "ID": "_TBD_CRASH_ID",
-    "DATE": "_TBD_CRASH_DATE",
-    "TIME": "_TBD_CRASH_TIME",
-    "LAT": "_TBD_LATITUDE",
-    "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "_TBD_SEVERITY",
-    "JURISDICTION": "_TBD_COUNTY",
-    "ROUTE": "_TBD_ROAD_NAME",
+    "_description": "Maps Idaho ITD Crash Data (2005-present) fields to CRASH LENS field codes",
+    "_note": "Column names from IPLAN ArcGIS FeatureServer. CIRCA database (law enforcement investigated only). Serial_Number format: 2-digit year + 7 digits ('C' as 3rd char if electronic).",
+    "ID": "Serial_Number",
+    "DATE": "_DERIVED_FROM_YEAR_MONTH",
+    "TIME": "Accident_Hour_Time",
+    "TIME_ALT": "Accident_Time",
+    "LAT": "Latitude",
+    "LON": "Longitude",
+    "SEVERITY": "Severity",
+    "JURISDICTION": "County",
+    "CITY": "City",
+    "IN_CITY_LIMITS": "In_City_Limits",
+    "ROUTE": "Street1",
+    "CROSS_STREET": "Street2",
+    "REFERENCE_STREET": "Reference_Street",
+    "MILEPOINT": "Mile_Point",
     "COLLISION": "_TBD_COLLISION_TYPE",
-    "WEATHER": "_TBD_WEATHER",
-    "LIGHT": "_TBD_LIGHTING",
-    "SURFACE_CONDITION": "_TBD_SURFACE",
-    "JUNCTION": "_TBD_JUNCTION_TYPE",
-    "HITRUN": "_TBD_HIT_AND_RUN"
+    "WEATHER": "Weather_Condition_1",
+    "WEATHER_2": "Weather_Condition_2",
+    "LIGHT": "Light_Condition",
+    "SURFACE_CONDITION": "Road_Surface_Condition",
+    "ROAD_SURFACE_TYPE": "Road_Surface",
+    "JUNCTION": "IntersectionRelated",
+    "HITRUN": "_TBD_HIT_AND_RUN",
+    "YEAR": "Accident_Year",
+    "MONTH": "Accident_Month",
+    "DAY_OF_WEEK": "Day_Of_Week",
+    "FATAL_COUNT": "Number_Of_Fatalities",
+    "INJURY_COUNT": "Number_Of_Injuries",
+    "PERSON_COUNT": "Number_Of_Persons",
+    "UNIT_COUNT": "Number_Of_Units",
+    "ROAD_TYPE": "Road_Type",
+    "FUNCTIONAL_CLASS": "Functional_Class",
+    "SPEED_LIMIT_1": "Speed_Limit_Street_1",
+    "SPEED_LIMIT_2": "Speed_Limit_Street_2",
+    "TRAFFIC_CONTROL": "Traffic_Control_Device",
+    "NUM_LANES": "Number_of_Lanes",
+    "SEGMENT_CODE": "Segment_Code",
+    "DIST_FROM_INTERSECTION": "Dist_From_Intersection",
+    "DIR_FROM_INTERSECTION": "Dir_From_Intersection"
   },
   "derivedFields": {
-    "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
+    "_description": "Fields computed from raw data during Stage 1 (CONVERT)",
     "SEVERITY": {
-      "method": "direct_or_derived",
-      "source": "_TBD",
-      "_note": "Update with Idaho-specific severity derivation method"
+      "method": "text_to_kabco",
+      "source": "Severity",
+      "_note": "Idaho provides text severity: 'Fatal'→K, 'Type A'→A (Suspected Serious), 'Type B'→B (Suspected Minor), 'Type C'→C (Possible), 'PDO'→O"
     },
     "YEAR": {
-      "method": "extract_year",
-      "source": "_TBD_CRASH_DATE"
+      "method": "direct",
+      "source": "Accident_Year"
     },
     "NODE": {
       "method": "concatenate",
-      "sources": [
-        "_TBD_ROAD1",
-        "_TBD_ROAD2"
-      ],
+      "sources": ["Street1", "Street2"],
       "separator": " & "
     }
   },
@@ -127,11 +148,13 @@
     }
   },
   "dataSource": {
-    "name": "ITD GIS Portal",
+    "name": "ITD IPLAN / Idaho GIS Hub",
     "url": "https://data-iplan.opendata.arcgis.com",
-    "apiUrl": "https://data-iplan.opendata.arcgis.com/datasets/crashes/FeatureServer/0",
+    "apiUrl": "https://data-iplan.opendata.arcgis.com/datasets/0b2144204ade4595997c592c625ca2c2",
+    "_apiUrlAlt": "https://gis-idaho.hub.arcgis.com/datasets/IPLAN::crash-data-2005-present/about",
     "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See data-iplan.opendata.arcgis.com dataset metadata",
+    "dataDictionary": "ITD Data Dictionary on Numetric: https://support.numetric.com/en/articles/8715919-itd-data-dictionary",
+    "_dataRange": "2005-present, CIRCA database (law enforcement investigated crashes only)",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

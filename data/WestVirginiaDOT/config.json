@@ -15,8 +15,8 @@
     "dataDir": "WestVirginiaDOT"
   },
   "columnMapping": {
-    "_description": "Maps West Virginia crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from West Virginia data dictionary. Update as API schema is confirmed.",
+    "_description": "Maps West Virginia crash data fields to CRASH LENS field codes",
+    "_note": "NOT PUBLICLY AVAILABLE. WVDOT open data portal has route/boundary/asset data only, no crash layers. ArcGIS REST at gis.transportation.wv.gov has no indexed crash layer. Crash reports use DOH Form 17-C. Contact WVDOT at DOTSupport@wv.gov for data access.",
     "ID": "_TBD_CRASH_ID",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
@@ -129,9 +129,11 @@
   "dataSource": {
     "name": "WVDOT GIS Portal",
     "url": "https://data-wvdot.opendata.arcgis.com",
-    "apiUrl": "https://data-wvdot.opendata.arcgis.com/datasets/crashes/FeatureServer/0",
-    "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See data-wvdot.opendata.arcgis.com dataset metadata",
+    "apiUrl": "_NO_PUBLIC_CRASH_ENDPOINT",
+    "_apiNote": "No public crash FeatureServer found. Check gis.transportation.wv.gov/arcgis/rest/services/ for internal layers.",
+    "_performancePortal": "https://performanceconnect-wvdot.hub.arcgis.com/pages/download-data",
+    "fileFormat": "GeoJSON/CSV (ArcGIS - NOT available publicly)",
+    "dataDictionary": "DOH Form 17-C crash report. See transportation.wv.gov/highways/traffic/Pages/Traffic-Accident-Data.aspx. Contact DOTSupport@wv.gov.",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

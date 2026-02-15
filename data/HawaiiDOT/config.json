@@ -5,7 +5,7 @@
     "fips": "15",
     "dotName": "HDOT",
     "dotFullName": "Hawaii Department of Transportation",
-    "dataPortalUrl": "https://data.hawaii.gov",
+    "dataPortalUrl": "https://highways.hidot.hawaii.gov",
     "coordinateBounds": {
       "latMin": 18.91,
       "latMax": 22.24,
@@ -15,18 +15,18 @@
     "dataDir": "HawaiiDOT"
   },
   "columnMapping": {
-    "_description": "Maps Hawaii crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Hawaii data dictionary. Update as API schema is confirmed.",
-    "ID": "_TBD_CRASH_ID",
+    "_description": "Maps HDOT crash data fields to CRASH LENS field codes",
+    "_note": "CRITICAL: data.hawaii.gov is NO LONGER the correct portal. Use highways.hidot.hawaii.gov (Socrata). Limited datasets: u3kh-tzq9 (State Jurisdiction Accidents 2015-2017), b6fq-udep (crash-related). Exact column names require API query to confirm. Fields below are from Hawaii MVAR form (DOT-1-174).",
+    "ID": "_TBD_REPORT_NUMBER",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
     "LAT": "_TBD_LATITUDE",
     "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "_TBD_SEVERITY",
+    "SEVERITY": "_TBD_INJURY_SEVERITY",
     "JURISDICTION": "_TBD_COUNTY",
     "ROUTE": "_TBD_ROAD_NAME",
     "COLLISION": "_TBD_COLLISION_TYPE",
-    "WEATHER": "_TBD_WEATHER",
+    "WEATHER": "_TBD_WEATHER_CONDITIONS",
     "LIGHT": "_TBD_LIGHTING",
     "SURFACE_CONDITION": "_TBD_SURFACE",
     "JUNCTION": "_TBD_JUNCTION_TYPE",
@@ -34,10 +34,11 @@
   },
   "derivedFields": {
     "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
+    "_portal_warning": "Hawaii's Socrata portal moved from data.hawaii.gov to highways.hidot.hawaii.gov. Crash data coverage is LIMITED (2015-2017 for state jurisdiction roads). The CARTO-based Safety Analytics Tool at safety-tool-hidot.hawaii.gov may have more comprehensive data but uses a proprietary API.",
     "SEVERITY": {
-      "method": "direct_or_derived",
-      "source": "_TBD",
-      "_note": "Update with Hawaii-specific severity derivation method"
+      "method": "kabco_from_mvar",
+      "source": "_TBD_INJURY_SEVERITY",
+      "_note": "Hawaii MVAR uses KABCO: K=Fatal, A=Suspected Serious Injury, B=Suspected Minor Injury, C=Possible Injury, O=No Apparent Injury"
     },
     "YEAR": {
       "method": "extract_year",
@@ -127,12 +128,15 @@
     }
   },
   "dataSource": {
-    "name": "HDOT Open Data Portal",
-    "url": "https://data.hawaii.gov",
-    "apiUrl": "https://data.hawaii.gov/resource/a393-uawk.json",
+    "name": "HDOT Highways Division Portal",
+    "url": "https://highways.hidot.hawaii.gov",
+    "apiUrl": "https://highways.hidot.hawaii.gov/resource/u3kh-tzq9.json",
+    "_apiUrlAlternate": "https://highways.hidot.hawaii.gov/resource/b6fq-udep.json",
     "fileFormat": "JSON/CSV (Socrata SODA API)",
-    "dataDictionary": "See data.hawaii.gov dataset metadata",
-    "resourceId": "a393-uawk",
+    "dataDictionary": "Hawaii MVAR Form DOT-1-174 (NHTSA). See also HDOT Safety Analytics Tool at safety-tool-hidot.hawaii.gov",
+    "resourceId": "u3kh-tzq9",
+    "_resourceIdAlternate": "b6fq-udep",
+    "_dataLimitation": "State Jurisdiction Accidents dataset covers 2015-2017 only for state roads. Not a comprehensive statewide crash database.",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 50000,

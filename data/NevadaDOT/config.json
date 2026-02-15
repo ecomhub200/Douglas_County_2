@@ -15,15 +15,15 @@
     "dataDir": "NevadaDOT"
   },
   "columnMapping": {
-    "_description": "Maps Nevada crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Nevada data dictionary. Update as API schema is confirmed.",
-    "ID": "_TBD_CRASH_ID",
-    "DATE": "_TBD_CRASH_DATE",
+    "_description": "Maps Nevada NDOT CrashData OpenData fields to CRASH LENS field codes",
+    "_note": "Inferred field names from NCATS (Nevada Citation and Accident Tracking System). Exact field names require FeatureServer metadata query. Data covers state-maintained roads (vehicles, pedestrians, bicycles, wildlife).",
+    "ID": "_LIKELY_CRASHID",
+    "DATE": "_LIKELY_CRASH_DT",
     "TIME": "_TBD_CRASH_TIME",
-    "LAT": "_TBD_LATITUDE",
-    "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "_TBD_SEVERITY",
-    "JURISDICTION": "_TBD_COUNTY",
+    "LAT": "_DERIVED_FROM_GEOMETRY",
+    "LON": "_DERIVED_FROM_GEOMETRY",
+    "SEVERITY": "_LIKELY_INJSEV",
+    "JURISDICTION": "_LIKELY_CNTYNAME",
     "ROUTE": "_TBD_ROAD_NAME",
     "COLLISION": "_TBD_COLLISION_TYPE",
     "WEATHER": "_TBD_WEATHER",
@@ -34,21 +34,19 @@
   },
   "derivedFields": {
     "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
+    "_data_note": "Field names are INFERRED from NCATS system and CLV (City of Las Vegas) crash data patterns. Confirm by querying FeatureServer metadata.",
     "SEVERITY": {
       "method": "direct_or_derived",
-      "source": "_TBD",
-      "_note": "Update with Nevada-specific severity derivation method"
+      "source": "_LIKELY_INJSEV",
+      "_note": "Nevada uses NCATS (Nevada Citation and Accident Tracking System). Severity field and coding TBD."
     },
     "YEAR": {
       "method": "extract_year",
-      "source": "_TBD_CRASH_DATE"
+      "source": "_LIKELY_CRASH_DT"
     },
     "NODE": {
       "method": "concatenate",
-      "sources": [
-        "_TBD_ROAD1",
-        "_TBD_ROAD2"
-      ],
+      "sources": ["_TBD_ROAD1", "_TBD_ROAD2"],
       "separator": " & "
     }
   },
@@ -129,9 +127,11 @@
   "dataSource": {
     "name": "NDOT GIS Portal",
     "url": "https://data-ndot.opendata.arcgis.com",
-    "apiUrl": "https://data-ndot.opendata.arcgis.com/datasets/crashes/FeatureServer/0",
+    "apiUrl": "https://geohub-ndot.hub.arcgis.com/datasets/crashdata-opendata",
+    "_apiUrlAlt": "https://geohub-ndot.hub.arcgis.com/datasets/NDOT::trafficsafety-crash-data/about",
     "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See data-ndot.opendata.arcgis.com dataset metadata",
+    "dataDictionary": "NDOT TSE Crash Data Request Form: https://survey123.arcgis.com/share/2361c89935aa497183387106ec46e18d",
+    "_dataNote": "Data geo-located by NDOT Traffic Safety Engineering division from NCATS. State-maintained roads only.",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

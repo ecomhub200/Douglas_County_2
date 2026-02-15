@@ -15,8 +15,8 @@
     "dataDir": "OklahomaDOT"
   },
   "columnMapping": {
-    "_description": "Maps Oklahoma crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Oklahoma data dictionary. Update as API schema is confirmed.",
+    "_description": "Maps Oklahoma crash data fields to CRASH LENS field codes",
+    "_note": "Oklahoma uses Numetric for crash data querying (not public ArcGIS FeatureServer). Open data portal has roadway/bridge data only. GRIP (intranet-only) has crash statistics. Contact OKDOT for direct data access.",
     "ID": "_TBD_CRASH_ID",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
@@ -129,9 +129,12 @@
   "dataSource": {
     "name": "OKDOT GIS Portal",
     "url": "https://gis-okdot.opendata.arcgis.com",
-    "apiUrl": "https://gis-okdot.opendata.arcgis.com/datasets/crashes/FeatureServer/0",
-    "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See gis-okdot.opendata.arcgis.com dataset metadata",
+    "apiUrl": "_NO_PUBLIC_CRASH_FEATURESERVER",
+    "_numetricCrashQuery": "https://support.numetric.com/en/articles/6150044-odot-crash-query-overview",
+    "_numetricFilterGuide": "https://support.numetric.com/en/articles/9375621-oklahoma-dot-crash-query-filter-guide",
+    "_spotlightHub": "https://spotlight-okdot.hub.arcgis.com",
+    "fileFormat": "GeoJSON/CSV (Numetric - not public ArcGIS)",
+    "dataDictionary": "OKDOT Numetric Crash Query. Portal has roadway data only. GRIP is intranet-only.",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

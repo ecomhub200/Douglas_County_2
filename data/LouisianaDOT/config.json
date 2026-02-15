@@ -15,8 +15,8 @@
     "dataDir": "LouisianaDOT"
   },
   "columnMapping": {
-    "_description": "Maps Louisiana crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Louisiana data dictionary. Update as API schema is confirmed.",
+    "_description": "Maps Louisiana crash data fields to CRASH LENS field codes",
+    "_note": "NOT PUBLICLY AVAILABLE on LADOTD open data portal (roadway infrastructure only). Louisiana crash data managed by CARTS (Crash Analysis Research & Technical Support) at LSU: carts.lsu.edu. Uses Louisiana parishes (not counties). Contact CARTS or Louisiana Highway Safety Commission for access.",
     "ID": "_TBD_CRASH_ID",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
@@ -129,9 +129,10 @@
   "dataSource": {
     "name": "LADOTD GIS Portal",
     "url": "https://data-ladotd.opendata.arcgis.com",
-    "apiUrl": "https://data-ladotd.opendata.arcgis.com/datasets/crash-data/FeatureServer/0",
-    "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See data-ladotd.opendata.arcgis.com dataset metadata",
+    "apiUrl": "_NO_PUBLIC_CRASH_ENDPOINT",
+    "_apiNote": "LADOTD open data portal has roadway infrastructure only, NO crash data. ArcGIS REST at maps.dotd.la.gov/road/rest/services/ has roadway data only.",
+    "fileFormat": "GeoJSON/CSV (ArcGIS - NOT available publicly)",
+    "dataDictionary": "Contact CARTS at LSU: https://carts.lsu.edu/projects/gis/ or Louisiana Highway Safety Commission",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,

@@ -15,8 +15,8 @@
     "dataDir": "MontanaDOT"
   },
   "columnMapping": {
-    "_description": "Maps Montana crash data fields to internal CRASH LENS field codes",
-    "_note": "Column names sourced from Montana data dictionary. Update as API schema is confirmed.",
+    "_description": "Maps Montana MDT crash data fields to CRASH LENS field codes",
+    "_note": "No dedicated public crash FeatureServer found. Public Crash Information Map (ArcGIS web viewer) shows 2020-2024 data but FeatureServer URL must be captured from browser dev tools. Open data portal has traffic count/route/speed data only. Severity info may not be in all download formats. See mdt.mt.gov/publications/datastats/crashdata.aspx.",
     "ID": "_TBD_CRASH_ID",
     "DATE": "_TBD_CRASH_DATE",
     "TIME": "_TBD_CRASH_TIME",
@@ -129,9 +129,11 @@
   "dataSource": {
     "name": "MDT GIS Portal",
     "url": "https://gis-mdt.opendata.arcgis.com",
-    "apiUrl": "https://gis-mdt.opendata.arcgis.com/datasets/crashes/FeatureServer/0",
-    "fileFormat": "GeoJSON/CSV (ArcGIS)",
-    "dataDictionary": "See gis-mdt.opendata.arcgis.com dataset metadata",
+    "apiUrl": "_TBD_FROM_WEB_MAP",
+    "_webMap": "https://mdt.maps.arcgis.com/apps/webappviewer/index.html?id=237b766a07074259ad7a6eec66d699b7",
+    "_apiNote": "No public FeatureServer indexed. Crash data web map (2020-2024) available; use browser dev tools to capture underlying service URL. ArcGIS REST at app.mdt.mt.gov/arcgis/rest/services/ has traffic count data only.",
+    "fileFormat": "GeoJSON/CSV (ArcGIS - limited public access)",
+    "dataDictionary": "See mdt.mt.gov/publications/datastats/crashdata.aspx. Severity info may not be in all formats - contact MDT directly for detailed data.",
     "pagination": {
       "method": "offset",
       "maxPerRequest": 2000,
