@@ -22,28 +22,35 @@
     "TIME": "_TBD_CRASH_TIME",
     "LAT": "_TBD_LATITUDE",
     "LON": "_TBD_LONGITUDE",
-    "SEVERITY": "CRSHSVR",
+    "SEVERITY": "CRASH_SEVERITY",
     "JURISDICTION": "CNTYNAME",
     "ROUTE": "_TBD_ROAD_NAME",
-    "COLLISION": "_TBD_COLLISION_TYPE",
+    "COLLISION": "MOST_HARMFUL_CRASH_EVENT_CD",
+    "FIRST_EVENT": "FIRST_CRASH_EVENT_CD",
     "WEATHER": "_TBD_WEATHER",
     "LIGHT": "_TBD_LIGHTING",
     "SURFACE_CONDITION": "_TBD_SURFACE",
-    "JUNCTION": "_TBD_JUNCTION_TYPE",
-    "HITRUN": "_TBD_HIT_AND_RUN",
+    "JUNCTION": "RLTNJNIC",
+    "JUNCTION_LOCATION": "RLTNJNLC",
+    "ROADWAY_RELATION": "RLTNRDWY",
+    "HITRUN": "HITRUN",
     "CONSTRUCTION_ZONE": "CONSZONE",
-    "REGION": "REGION"
+    "REGION": "REGION",
+    "FUNCTIONAL_CLASS": "FUNCLASS",
+    "HIGHWAY_CLASS": "HWYCLASS",
+    "IMPAIRED": "IMPAIRED",
+    "DIRECTION_OF_TRAVEL": "DIRECTION_OF_TRAVEL_CD"
   },
   "derivedFields": {
     "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
     "SEVERITY": {
-      "method": "direct_or_derived",
-      "source": "_TBD",
-      "_note": "Update with Wisconsin-specific severity derivation method"
+      "method": "direct_kabco",
+      "source": "CRASH_SEVERITY",
+      "_note": "Wisconsin uses direct KABCO codes: K=Fatal, A=Suspected Serious Injury, B=Suspected Minor Injury, C=Possible Injury, O=No Apparent Injury"
     },
     "YEAR": {
-      "method": "extract_year",
-      "source": "_TBD_CRASH_DATE"
+      "method": "direct",
+      "source": "CRASH_YEAR"
     },
     "NODE": {
       "method": "concatenate",
