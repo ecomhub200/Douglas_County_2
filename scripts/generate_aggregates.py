@@ -26,6 +26,9 @@ Usage:
   # Specify custom data directory
   python scripts/generate_aggregates.py --state colorado --data-dir ./data/CDOT
 
+  # Generate federal-level cross-state aggregates (combines all state aggregates)
+  python scripts/generate_aggregates.py --federal
+
 Prerequisites:
   pip install pandas
 """
@@ -434,15 +437,104 @@ def write_output(output_dir, relative_path, data, dry_run=False):
     print(f"  [WRITE] {out_path} ({size:,} bytes)")
 
 
+def generate_federal_aggregates(output_dir, states=None, dry_run=False):
+    """
+    Generate federal-level cross-state aggregates by combining statewide aggregates.
+
+    Reads existing {state}/_statewide/aggregates.json files for all states
+    and produces _federal/aggregates.json + _federal/state_summary.json.
+    """
+    if states is None:
+        states = ['colorado', 'virginia']
+
+    output_base = Path(output_dir)
+    state_aggregates = {}
+
+    for state_key in states:
+        # Look for statewide aggregates in the output directory structure
+        candidates = [
+            output_base / state_key / '_statewide' / 'aggregates.json',
+            output_base.parent / state_key / '_statewide' / 'aggregates.json',
+            PROJECT_ROOT / 'data' / state_key / '_statewide' / 'aggregates.json',
+        ]
+        for path in candidates:
+            if path.exists():
+                with open(path) as f:
+                    state_aggregates[state_key] = json.load(f)
+                print(f"  Loaded statewide aggregates for {state_key}: {path}")
+                break
+        else:
+            print(f"  [WARN] No statewide aggregates found for {state_key}")
+
+    if not state_aggregates:
+        print("[WARN] No state aggregates found — skipping federal generation")
+        return
+
+    # Combine statewide totals across all states
+    fed_totals = {'total': 0, 'K': 0, 'A': 0, 'B': 0, 'C': 0, 'O': 0, 'epdo': 0,
+                  'pedCrashes': 0, 'bikeCrashes': 0, 'speedCrashes': 0, 'alcoholCrashes': 0}
+    for state_key, agg in state_aggregates.items():
+        for field in fed_totals:
+            fed_totals[field] += agg.get(field, 0)
+
+    federal_agg = {
+        'tier': 'federal',
+        'generated': datetime.now(timezone.utc).isoformat(),
+        'statesIncluded': list(state_aggregates.keys()),
+        **fed_totals
+    }
+    write_output(str(output_base), '_federal/aggregates.json', federal_agg, dry_run)
+
+    # State summary (ranking table)
+    state_summary = {
+        'tier': 'federal',
+        'generated': datetime.now(timezone.utc).isoformat(),
+        'states': {}
+    }
+    ranked = sorted(state_aggregates.items(), key=lambda x: -x[1].get('epdo', 0))
+    for rank, (state_key, agg) in enumerate(ranked, 1):
+        state_summary['states'][state_key] = {
+            'name': agg.get('stateName', state_key),
+            'rank': rank,
+            'total': agg.get('total', 0),
+            'K': agg.get('K', 0), 'A': agg.get('A', 0),
+            'B': agg.get('B', 0), 'C': agg.get('C', 0), 'O': agg.get('O', 0),
+            'epdo': agg.get('epdo', 0),
+            'pedCrashes': agg.get('pedCrashes', 0),
+            'bikeCrashes': agg.get('bikeCrashes', 0),
+            'countiesIncluded': agg.get('countiesIncluded', 0)
+        }
+    write_output(str(output_base), '_federal/state_summary.json', state_summary, dry_run)
+
+    print(f"  Federal aggregates: {len(state_aggregates)} states, {fed_totals['total']:,} total crashes")
+
+
 def main():
     parser = argparse.ArgumentParser(description='Generate aggregate JSONs for CRASH LENS multi-tier views')
-    parser.add_argument('--state', required=True, help='State key (colorado, virginia)')
+    parser.add_argument('--state', help='State key (colorado, virginia). Required unless --federal is used.')
+    parser.add_argument('--federal', action='store_true',
+                        help='Generate federal-level cross-state aggregates from existing statewide aggregates')
     parser.add_argument('--data-dir', help='Directory containing county CSVs')
-    parser.add_argument('--output-dir', help='Output directory (default: data/{STATE})')
+    parser.add_argument('--output-dir', help='Output directory (default: data/{STATE} or data/ for --federal)')
     parser.add_argument('--road-type', default='all_roads', choices=['all_roads', 'county_roads', 'no_interstate'],
                         help='Road type variant to aggregate (default: all_roads)')
     parser.add_argument('--dry-run', action='store_true', help='Preview output paths without writing')
     args = parser.parse_args()
+
+    # Federal mode: generate cross-state aggregates and exit
+    if args.federal:
+        output_dir = args.output_dir or str(PROJECT_ROOT / 'data')
+        print(f"\n{'='*60}")
+        print(f"CRASH LENS — Federal Aggregate Generator")
+        print(f"{'='*60}\n")
+        generate_federal_aggregates(output_dir, dry_run=args.dry_run)
+        print(f"\n{'='*60}")
+        print(f"Federal aggregate generation {'(DRY RUN) ' if args.dry_run else ''}complete!")
+        print(f"{'='*60}\n")
+        return
+
+    if not args.state:
+        parser.error("--state is required unless --federal is used")
 
     state_key = args.state.lower()
     print(f"\n{'='*60}")

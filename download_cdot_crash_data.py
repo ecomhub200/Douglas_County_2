@@ -1879,6 +1879,12 @@ Examples:
     )
 
     parser.add_argument(
+        '--save-statewide-gzip',
+        action='store_true',
+        help='After downloading, merge all year CSVs into a single gzipped statewide file'
+    )
+
+    parser.add_argument(
         '--data-dir', '-d',
         type=str,
         default=None,
@@ -1993,9 +1999,65 @@ def main():
                                    force=args.force)
         results.append(year_result)
 
-    # Print summary
+    # Stage 1.5: Assemble statewide gzip from all downloaded year CSVs
     successes = [(y, p) for y, ok, p in results if ok]
     failures = [(y, e) for y, ok, e in results if not ok]
+
+    if args.save_statewide_gzip and successes:
+        try:
+            logger.info("")
+            logger.info("=" * 60)
+            logger.info("STAGE 1.5: Assembling statewide gzip from per-year CSVs")
+            logger.info("=" * 60)
+
+            import gzip
+            import shutil
+
+            year_dfs = []
+            for year, path in successes:
+                if os.path.isfile(path):
+                    logger.info(f"  Reading {year}: {path}")
+                    year_df = pd.read_csv(path, dtype=str)
+                    year_dfs.append(year_df)
+
+            if year_dfs:
+                combined = pd.concat(year_dfs, ignore_index=True)
+                total_records = len(combined)
+
+                # Deduplicate by CUID if column exists
+                cuid_col = None
+                for col in combined.columns:
+                    if col.upper() == 'CUID':
+                        cuid_col = col
+                        break
+                if cuid_col:
+                    before_dedup = len(combined)
+                    combined = combined.drop_duplicates(subset=[cuid_col], keep='first')
+                    deduped = before_dedup - len(combined)
+                    if deduped > 0:
+                        logger.info(f"  Deduplicated: removed {deduped:,} duplicate CUIDs")
+
+                statewide_path = os.path.join(str(data_dir), "colorado_statewide_all_roads.csv")
+                combined.to_csv(statewide_path, index=False)
+                logger.info(f"  Statewide CSV: {statewide_path} ({len(combined):,} records, {os.path.getsize(statewide_path):,} bytes)")
+
+                # Gzip compress
+                gz_path = f"{statewide_path}.gz"
+                with open(statewide_path, 'rb') as f_in:
+                    with gzip.open(gz_path, 'wb', compresslevel=6) as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                uncompressed_size = os.path.getsize(statewide_path)
+                compressed_size = os.path.getsize(gz_path)
+                os.remove(statewide_path)  # Keep only gzipped version
+                ratio = uncompressed_size / compressed_size if compressed_size > 0 else 0
+                logger.info(f"  Statewide gzip: {gz_path} ({compressed_size:,} bytes, {ratio:.1f}x compression)")
+            else:
+                logger.warning("  No year CSVs available for statewide assembly")
+
+        except Exception as e:
+            logger.warning(f"  Statewide gzip assembly failed (non-fatal): {e}")
+
+    # Print summary
 
     logger.info("")
     logger.info("=" * 60)

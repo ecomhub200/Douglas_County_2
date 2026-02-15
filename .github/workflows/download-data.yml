@@ -239,9 +239,9 @@ jobs:
           echo "Download started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
 
-          # Download County/City Roads Only
-          echo ">>> Downloading County/City Roads Only..."
-          python download_crash_data.py --jurisdiction "$JURISDICTION" --filter countyOnly --output "data/${JURISDICTION}_county_roads.csv"
+          # Download County/City Roads Only (also save statewide gzip at Stage 1.5)
+          echo ">>> Downloading County/City Roads Only (+ statewide gzip)..."
+          python download_crash_data.py --jurisdiction "$JURISDICTION" --filter countyOnly --output "data/${JURISDICTION}_county_roads.csv" --save-statewide
 
           # Download All Roads (No Interstate)
           echo ">>> Downloading All Roads (No Interstate)..."
@@ -406,6 +406,20 @@ jobs:
           r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
           r2_public_url: ${{ vars.R2_PUBLIC_URL }}
 
+      # Stage 4.5: Upload statewide gzip to R2 (if saved at Stage 1.5)
+      - name: Upload statewide gzip to R2 (Stage 4.5)
+        if: ${{ hashFiles('data/virginia_statewide_all_roads.csv.gz') != '' }}
+        uses: ./.github/actions/upload-r2
+        with:
+          files_json: |
+            [
+              {"local_path": "data/virginia_statewide_all_roads.csv.gz", "r2_key": "${{ env.R2_STATE_PREFIX || 'virginia' }}/_state/statewide_all_roads.csv.gz"}
+            ]
+          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          r2_public_url: ${{ vars.R2_PUBLIC_URL }}
+
       # Stage 5: PREDICT — Generate forecasts
       - name: Generate crash forecasts (Stage 5)
         env:
@@ -459,6 +473,86 @@ jobs:
           r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
           r2_public_url: ${{ vars.R2_PUBLIC_URL }}
+
+      # Stage 6.5: Generate region/MPO aggregates from county CSVs (bottom-up)
+      - name: Generate region/MPO aggregates (Stage 6.5)
+        run: |
+          STATE="${{ env.R2_STATE_PREFIX || 'virginia' }}"
+          echo "=========================================="
+          echo "Stage 6.5: Generating aggregates (bottom-up from county CSVs)"
+          echo "=========================================="
+
+          # Generate statewide + region + MPO aggregates from available county CSVs
+          python scripts/generate_aggregates.py --state "$STATE" --data-dir data --output-dir data || {
+            echo "WARNING: Aggregate generation failed (non-fatal)"
+          }
+
+          # Generate federal-level cross-state aggregates
+          python scripts/generate_aggregates.py --federal --output-dir data || {
+            echo "WARNING: Federal aggregate generation failed (non-fatal)"
+          }
+
+          # Find and list generated aggregate JSON files
+          echo "Generated aggregate files:"
+          find data -name "aggregates.json" -o -name "county_summary.json" -o -name "mpo_summary.json" -o -name "hotspots.json" -o -name "state_summary.json" 2>/dev/null | sort
+        continue-on-error: true
+
+      - name: Build aggregate upload manifest (Stage 6.5)
+        id: build-aggregate-manifest
+        run: |
+          STATE="${{ env.R2_STATE_PREFIX || 'virginia' }}"
+          # Build JSON array of {local_path, r2_key} pairs from generated aggregate files
+          python3 -c "
+          import json, os, glob
+
+          state = '$STATE'
+          files = []
+
+          # Statewide aggregates
+          for name in ['aggregates.json', 'county_summary.json', 'mpo_summary.json']:
+              path = f'data/{state}/_statewide/{name}'
+              if os.path.isfile(path):
+                  files.append({'local_path': path, 'r2_key': f'{state}/_statewide/{name}'})
+
+          # Region aggregates
+          for agg in glob.glob(f'data/{state}/_region/*/aggregates.json'):
+              region_id = agg.split('/')[-2]
+              files.append({'local_path': agg, 'r2_key': f'{state}/_region/{region_id}/aggregates.json'})
+          for hs in glob.glob(f'data/{state}/_region/*/hotspots.json'):
+              region_id = hs.split('/')[-2]
+              files.append({'local_path': hs, 'r2_key': f'{state}/_region/{region_id}/hotspots.json'})
+
+          # MPO aggregates
+          for agg in glob.glob(f'data/{state}/_mpo/*/aggregates.json'):
+              mpo_id = agg.split('/')[-2]
+              files.append({'local_path': agg, 'r2_key': f'{state}/_mpo/{mpo_id}/aggregates.json'})
+          for hs in glob.glob(f'data/{state}/_mpo/*/hotspots.json'):
+              mpo_id = hs.split('/')[-2]
+              files.append({'local_path': hs, 'r2_key': f'{state}/_mpo/{mpo_id}/hotspots.json'})
+
+          # Federal aggregates
+          for name in ['aggregates.json', 'state_summary.json']:
+              path = f'data/_federal/{name}'
+              if os.path.isfile(path):
+                  files.append({'local_path': path, 'r2_key': f'_federal/{name}'})
+
+          print(f'Found {len(files)} aggregate files to upload')
+          with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+              f.write(f'files_json={json.dumps(files)}\n')
+          "
+        continue-on-error: true
+
+      - name: Upload aggregate JSONs to R2 (Stage 6.5)
+        if: steps.build-aggregate-manifest.outputs.files_json != '[]'
+        uses: ./.github/actions/upload-r2
+        with:
+          files_json: |
+            ${{ steps.build-aggregate-manifest.outputs.files_json || '[]' }}
+          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          r2_public_url: ${{ vars.R2_PUBLIC_URL }}
+        continue-on-error: true
 
       - name: Commit manifest, geocode cache, and validation data
         run: |

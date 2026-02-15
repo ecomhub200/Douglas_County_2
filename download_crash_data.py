@@ -694,6 +694,12 @@ Examples:
         help='Merge new data with existing validated dataset instead of replacing it'
     )
 
+    parser.add_argument(
+        '--save-statewide',
+        action='store_true',
+        help='Save a gzipped copy of the full statewide dataset before jurisdiction filtering'
+    )
+
     return parser.parse_args()
 
 
@@ -750,6 +756,30 @@ def main():
     try:
         logger.info("Downloading from Virginia Roads CSV (primary source)...")
         df = download_from_fallback(config)
+
+        # Stage 1.5: Save statewide copy as gzip before jurisdiction filtering
+        if args.save_statewide and df is not None and not df.empty:
+            try:
+                statewide_path = os.path.join(OUTPUT_DIR, "virginia_statewide_all_roads.csv")
+                logger.info(f"Saving statewide dataset ({len(df):,} records) before filtering...")
+                df_statewide = standardize_columns(df.copy())
+                df_statewide.to_csv(statewide_path, index=False)
+                logger.info(f"Statewide CSV saved: {statewide_path} ({os.path.getsize(statewide_path):,} bytes)")
+
+                # Gzip the statewide CSV
+                import gzip
+                import shutil
+                gz_path = f"{statewide_path}.gz"
+                with open(statewide_path, 'rb') as f_in:
+                    with gzip.open(gz_path, 'wb', compresslevel=6) as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                uncompressed_size = os.path.getsize(statewide_path)
+                compressed_size = os.path.getsize(gz_path)
+                os.remove(statewide_path)  # Keep only gzipped version
+                ratio = uncompressed_size / compressed_size if compressed_size > 0 else 0
+                logger.info(f"Statewide gzip saved: {gz_path} ({compressed_size:,} bytes, {ratio:.1f}x compression)")
+            except Exception as e:
+                logger.warning(f"Failed to save statewide copy (non-fatal): {e}")
 
         # Filter by jurisdiction
         logger.info("Filtering by jurisdiction...")

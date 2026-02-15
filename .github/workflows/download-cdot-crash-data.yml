@@ -121,7 +121,7 @@ jobs:
           echo "Downloading CDOT Crash Data"
           echo "Started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
-          python download_cdot_crash_data.py ${{ steps.build-args.outputs.args }}
+          python download_cdot_crash_data.py ${{ steps.build-args.outputs.args }} --save-statewide-gzip
           echo "=========================================="
           echo "Download complete at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
@@ -189,6 +189,20 @@ jobs:
           aws s3 ls "s3://crash-lens-data/${R2_STATE_PREFIX}/${JURISDICTION}/raw/" \
             --endpoint-url "$R2_ENDPOINT" 2>/dev/null || echo "  Could not list R2 bucket (check credentials)"
           echo "=========================================="
+
+      # Stage 2a.5: Upload statewide gzip to R2 (if generated at Stage 1.5)
+      - name: Upload statewide gzip to R2 (Stage 2a.5)
+        if: ${{ hashFiles('data/CDOT/colorado_statewide_all_roads.csv.gz') != '' }}
+        uses: ./.github/actions/upload-r2
+        with:
+          files_json: |
+            [
+              {"local_path": "data/CDOT/colorado_statewide_all_roads.csv.gz", "r2_key": "${{ env.R2_STATE_PREFIX }}/_state/statewide_all_roads.csv.gz"}
+            ]
+          cf_account_id: ${{ secrets.CF_ACCOUNT_ID }}
+          r2_access_key_id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          r2_secret_access_key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          r2_public_url: ${{ vars.R2_PUBLIC_URL }}
 
       - name: Commit manifest and metadata
         run: |
