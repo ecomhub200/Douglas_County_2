@@ -298,16 +298,26 @@ After the first batch run, the state will have:
 ```
 crash-lens-data/
   texas/
-    _state/statewide_all_roads.csv.gz    # Full state gzip
+    _state/
+      dot_roads.csv, non_dot_roads.csv, statewide_all_roads.csv
+      forecasts_dot_roads.json, forecasts_non_dot_roads.json, forecasts_statewide_all_roads.json
     _statewide/aggregates.json           # Bottom-up aggregates
     _statewide/county_summary.json
-    _region/{id}/aggregates.json         # Per-region aggregates
-    _mpo/{id}/aggregates.json            # Per-MPO aggregates
-    harris/all_roads.csv                 # County-level data (×254 counties)
-    harris/county_roads.csv
-    harris/no_interstate.csv
-    dallas/all_roads.csv
-    ...
+    _region/{id}/
+      dot_roads.csv, non_dot_roads.csv, all_roads.csv
+      forecasts_dot_roads.json, forecasts_non_dot_roads.json, forecasts_all_roads.json
+      aggregates.json
+    _mpo/{id}/
+      county_roads.csv, no_interstate.csv, all_roads.csv
+      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
+      aggregates.json
+    harris/
+      county_roads.csv, no_interstate.csv, all_roads.csv
+      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
+    dallas/
+      county_roads.csv, no_interstate.csv, all_roads.csv
+      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
+    ...  (×254 counties)
 ```
 
 ---
@@ -344,7 +354,7 @@ Only column renaming via `standardize_columns()` is needed before splitting.
 |----------|---------|---------|
 | **1. Manifest lookup** | Exact match in `r2-manifest.json` `localPathMapping` | `data/henrico_all_roads.csv` → `virginia/henrico/all_roads.csv` |
 | **2. Dynamic construction** | `{r2Prefix}/{jurisdiction}/{filter}.{ext}` | `data/CDOT/douglas_all_roads.csv` → `colorado/douglas/all_roads.csv` |
-| **3. Tier path passthrough** | Direct R2 key for `_state/`, `_statewide/`, `_region/`, `_mpo/`, `_federal/` paths | `colorado/_state/statewide_all_roads.csv.gz` → R2 URL directly |
+| **3. Tier path passthrough** | Direct R2 key for `_state/`, `_statewide/`, `_region/`, `_mpo/`, `_federal/`, `_national/` paths | `colorado/_state/dot_roads.csv` → R2 URL directly |
 
 **Strategy 2** is critical for multi-jurisdiction: it dynamically constructs R2 URLs
 from the state's `r2Prefix` + jurisdiction ID + filename, so **any jurisdiction works
@@ -355,12 +365,15 @@ will find it.
 
 | Tier | Data Source | Loading Mechanism |
 |------|-------------|-------------------|
-| **County** | `{state}/{jurisdiction}/all_roads.csv` | `autoLoadCrashData()` → `fetch(resolveDataUrl(path))` → `Papa.parse()` → `processRow()` |
+| **County** | `{state}/{jurisdiction}/{road_type}.csv` | `autoLoadCrashData()` → `getDataFilePath()` → `resolveDataUrl()` → `fetch()` → `Papa.parse()` |
 | **State** | Aggregates: `{state}/_statewide/aggregates.json` | `AggregateLoader.loadStatewide(stateKey)` → `_fetch()` → JSON |
-| **State** | Raw CSV: `{state}/_state/statewide_all_roads.csv.gz` | `AggregateLoader.loadStatewideCSV(stateKey)` → `fetch()` → browser auto-decompresses gzip → `Papa.parse()` |
-| **Region** | `{state}/_region/{id}/aggregates.json` | `AggregateLoader.loadRegion(stateKey, regionId)` |
-| **MPO** | `{state}/_mpo/{id}/aggregates.json` | `AggregateLoader.loadMPO(stateKey, mpoId)` |
-| **Federal** | `_federal/aggregates.json` | `AggregateLoader.loadNational()` |
+| **State** | CSV: `{state}/_state/{dot_roads\|non_dot_roads\|statewide_all_roads}.csv` | `autoLoadCrashData()` → `getDataFilePath()` → `resolveDataUrl()` Strategy 3 → `fetch()` → `Papa.parse()` |
+| **Region** | Aggregates: `{state}/_region/{id}/aggregates.json` | `AggregateLoader.loadRegion(stateKey, regionId)` |
+| **Region** | CSV: `{state}/_region/{id}/{road_type}.csv` | `autoLoadCrashData()` → `getDataFilePath()` → `resolveDataUrl()` Strategy 3 → `fetch()` |
+| **MPO** | Aggregates: `{state}/_mpo/{id}/aggregates.json` | `AggregateLoader.loadMPO(stateKey, mpoId)` |
+| **MPO** | CSV: `{state}/_mpo/{id}/{road_type}.csv` | `autoLoadCrashData()` → `getDataFilePath()` → `resolveDataUrl()` Strategy 3 → `fetch()` |
+| **Federal** | Aggregates: `_national/aggregates.json` | `AggregateLoader.loadNational()` |
+| **Federal** | CSV: `_national/{dot_roads\|non_dot_roads\|all_roads}.csv` | `autoLoadCrashData()` → `getDataFilePath()` → `resolveDataUrl()` Strategy 3 → `fetch()` |
 
 ### Jurisdiction Switching in the Frontend
 
@@ -383,11 +396,13 @@ by the browser** when fetched via `fetch()`. No frontend decompression library (
 
 | Function | Purpose | File |
 |----------|---------|------|
-| `resolveDataUrl(localPath)` | Maps local/tier paths to R2 URLs | `app/index.html` |
-| `getDataFilePath()` | Returns the data path for the current tier + jurisdiction | `app/index.html` |
-| `AggregateLoader.loadStatewideCSV(stateKey)` | Fetches + caches statewide gzip CSV from R2 | `app/index.html` |
-| `loadStatewideCSVForTier(stateKey)` | Parses statewide CSV into `crashState` for tabs | `app/index.html` |
-| `handleTierChange(tier)` | Orchestrates tier switch: boundary, aggregates, CSV | `app/index.html` |
+| `resolveDataUrl(localPath)` | Maps local/tier paths to R2 URLs (6 tier prefixes) | `app/index.html` |
+| `getDataFilePath()` | Returns tier-aware R2 path (federal/state/region/mpo/county) | `app/index.html` |
+| `getActiveRoadTypeSuffix(tier)` | Maps radio filter value to road type file suffix per tier | `app/index.html` |
+| `updateRoadTypeLabels(tier)` | Dynamically updates road type radio labels per tier | `app/index.html` |
+| `AggregateLoader.loadStatewideCSV(stateKey, roadType)` | Fetches + caches statewide CSV from R2 | `app/index.html` |
+| `handleTierChange(tier)` | Orchestrates tier switch: labels, boundary, aggregates, CSV | `app/index.html` |
+| `getPredictionForecastFile()` | Returns tier-aware forecast filename | `app/index.html` |
 
 ---
 
@@ -462,54 +477,125 @@ Stage 8: Commit metadata
 
 ---
 
+## Uniform Naming Convention
+
+### Road Type File Names Per View Level
+
+| View Level | Road Type 1 | Road Type 2 | Road Type 3 |
+|-----------|-------------|-------------|-------------|
+| **Federal** | `dot_roads.csv` | `non_dot_roads.csv` | `all_roads.csv` |
+| **State** | `dot_roads.csv` | `non_dot_roads.csv` | `statewide_all_roads.csv` |
+| **Region** | `dot_roads.csv` | `non_dot_roads.csv` | `all_roads.csv` |
+| **MPO** | `county_roads.csv` | `no_interstate.csv` | `all_roads.csv` |
+| **County** | `county_roads.csv` | `no_interstate.csv` | `all_roads.csv` |
+
+### Forecast File Names (same pattern with `forecasts_` prefix)
+
+| View Level | Forecast 1 | Forecast 2 | Forecast 3 |
+|-----------|-----------|-----------|-----------|
+| **Federal** | `forecasts_dot_roads.json` | `forecasts_non_dot_roads.json` | `forecasts_all_roads.json` |
+| **State** | `forecasts_dot_roads.json` | `forecasts_non_dot_roads.json` | `forecasts_statewide_all_roads.json` |
+| **Region** | `forecasts_dot_roads.json` | `forecasts_non_dot_roads.json` | `forecasts_all_roads.json` |
+| **MPO** | `forecasts_county_roads.json` | `forecasts_no_interstate.json` | `forecasts_all_roads.json` |
+| **County** | `forecasts_county_roads.json` | `forecasts_no_interstate.json` | `forecasts_all_roads.json` |
+
+### UI Label Mapping
+
+| View Level | Radio 1 Label | Radio 2 Label | Radio 3 Label |
+|-----------|---------------|---------------|---------------|
+| **Federal/State/Region** | DOT Roads Only | Non-DOT Roads | All Roads / Statewide All Roads |
+| **MPO/County** | County/City Roads Only | All Roads (No Interstate) | All Roads |
+
+### R2 Path Patterns
+
+| View Level | R2 Path Pattern |
+|-----------|----------------|
+| **Federal** | `_national/{road_type}.csv` |
+| **State** | `{state}/_state/{road_type}.csv` |
+| **Region** | `{state}/_region/{region_key}/{road_type}.csv` |
+| **MPO** | `{state}/_mpo/{mpo_key}/{road_type}.csv` |
+| **County** | `{state}/{county_key}/{road_type}.csv` |
+
+---
+
 ## R2 Storage Layout (Full Scale)
 
 ```
 crash-lens-data/
-  _federal/                                    # Cross-state aggregation
-    aggregates.json                            #   national totals
-    state_summary.json                         #   per-state ranking
+  _national/                                   # Cross-state (Federal tier)
+    dot_roads.csv                              #   DOT-maintained roads nationwide
+    non_dot_roads.csv                          #   Non-DOT roads nationwide
+    all_roads.csv                              #   All roads combined
+    forecasts_dot_roads.json                   #   Forecast: DOT roads
+    forecasts_non_dot_roads.json               #   Forecast: Non-DOT roads
+    forecasts_all_roads.json                   #   Forecast: All roads
+    aggregates.json                            #   National totals
+    state_summary.json                         #   Per-state ranking
 
   virginia/                                    # 133 jurisdictions
     _state/
-      statewide_all_roads.csv.gz               #   ~50 MB compressed
+      dot_roads.csv                            #   VDOT-maintained roads statewide
+      non_dot_roads.csv                        #   Non-VDOT roads statewide
+      statewide_all_roads.csv                  #   All roads combined
+      forecasts_dot_roads.json
+      forecasts_non_dot_roads.json
+      forecasts_statewide_all_roads.json
     _statewide/
       aggregates.json, county_summary.json, mpo_summary.json
     _region/{district_id}/
+      dot_roads.csv, non_dot_roads.csv, all_roads.csv
+      forecasts_dot_roads.json, forecasts_non_dot_roads.json, forecasts_all_roads.json
       aggregates.json, hotspots.json           #   9 VDOT districts
     _mpo/{mpo_id}/
+      county_roads.csv, no_interstate.csv, all_roads.csv
+      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
       aggregates.json, hotspots.json           #   8 MPOs
     accomack/
       county_roads.csv, no_interstate.csv, all_roads.csv
-    albemarle/
-      county_roads.csv, no_interstate.csv, all_roads.csv
+      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
     ...
     henrico/
-      county_roads.csv, no_interstate.csv, all_roads.csv, forecasts_*.json
+      county_roads.csv, no_interstate.csv, all_roads.csv
+      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
     ...
     winchester_city/
       county_roads.csv, no_interstate.csv, all_roads.csv
+      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
 
   colorado/                                    # 64 counties
     _state/
-      statewide_all_roads.csv.gz               #   ~15 MB compressed
+      dot_roads.csv                            #   CDOT-maintained roads statewide
+      non_dot_roads.csv                        #   Non-CDOT roads statewide
+      statewide_all_roads.csv                  #   All roads combined
+      forecasts_dot_roads.json
+      forecasts_non_dot_roads.json
+      forecasts_statewide_all_roads.json
     _statewide/
       aggregates.json, county_summary.json, mpo_summary.json
     _region/{region_id}/
+      dot_roads.csv, non_dot_roads.csv, all_roads.csv
+      forecasts_dot_roads.json, forecasts_non_dot_roads.json, forecasts_all_roads.json
       aggregates.json, hotspots.json           #   5 engineering regions
     _mpo/{mpo_id}/
+      county_roads.csv, no_interstate.csv, all_roads.csv
+      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
       aggregates.json, hotspots.json           #   9 MPOs/TPRs
     adams/
       county_roads.csv, no_interstate.csv, all_roads.csv
+      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
     ...
     douglas/
-      county_roads.csv, no_interstate.csv, all_roads.csv, forecasts_*.json
+      county_roads.csv, no_interstate.csv, all_roads.csv
+      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
     ...
     yuma/
       county_roads.csv, no_interstate.csv, all_roads.csv
+      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
 ```
 
-**Total R2 objects**: ~700 CSVs + ~80 JSONs + 2 gzips ≈ **~800 objects, ~600 MB**
+**Total R2 objects per state**: ~(jurisdictions × 6 files) + (regions × 8 files) + (MPOs × 8 files) + (state-level × 9 files)
+**Virginia**: 133×6 + 9×8 + 8×8 = 798 + 72 + 64 + 9 = **943 objects**
+**Colorado**: 64×6 + 5×8 + 9×8 = 384 + 40 + 72 + 9 = **505 objects**
 
 ---
 
@@ -593,8 +679,8 @@ crash-lens-data/
 
 ## Decisions
 
-1. **Federal view**: Cross-state aggregation from statewide aggregate JSONs
-2. **Region/MPO storage**: Aggregate JSONs only — no raw CSV subsets
+1. **Federal view**: Cross-state aggregation from statewide aggregate JSONs + 3 road-type CSVs + forecasts
+2. **Region/MPO storage**: Aggregate JSONs + 3 road-type CSVs + 3 forecast JSONs per region/MPO
 3. **Injection point**: Stage 1.5 (post-download, pre-validate) for statewide save
 4. **Non-VA processing**: Full CONVERT + VALIDATE + GEOCODE pipeline (same as county)
 5. **VA processing**: standardize_columns() only (already in standard format)
