@@ -304,8 +304,8 @@ crash-lens-data/
     _statewide/aggregates.json           # Bottom-up aggregates
     _statewide/county_summary.json
     _region/{id}/
-      county_roads.csv, no_interstate.csv, all_roads.csv
-      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
+      dot_roads.csv, non_dot_roads.csv, all_roads.csv
+      forecasts_dot_roads.json, forecasts_non_dot_roads.json, forecasts_all_roads.json
       aggregates.json
     _mpo/{id}/
       county_roads.csv, no_interstate.csv, all_roads.csv
@@ -485,7 +485,7 @@ Stage 8: Commit metadata
 |-----------|-------------|-------------|-------------|
 | **Federal** | `dot_roads.csv` | `non_dot_roads.csv` | `all_roads.csv` |
 | **State** | `dot_roads.csv` | `non_dot_roads.csv` | `statewide_all_roads.csv` |
-| **Region** | `county_roads.csv` | `no_interstate.csv` | `all_roads.csv` |
+| **Region** | `dot_roads.csv` | `non_dot_roads.csv` | `all_roads.csv` |
 | **MPO** | `county_roads.csv` | `no_interstate.csv` | `all_roads.csv` |
 | **County** | `county_roads.csv` | `no_interstate.csv` | `all_roads.csv` |
 
@@ -495,7 +495,7 @@ Stage 8: Commit metadata
 |-----------|-----------|-----------|-----------|
 | **Federal** | `forecasts_dot_roads.json` | `forecasts_non_dot_roads.json` | `forecasts_all_roads.json` |
 | **State** | `forecasts_dot_roads.json` | `forecasts_non_dot_roads.json` | `forecasts_statewide_all_roads.json` |
-| **Region** | `forecasts_county_roads.json` | `forecasts_no_interstate.json` | `forecasts_all_roads.json` |
+| **Region** | `forecasts_dot_roads.json` | `forecasts_non_dot_roads.json` | `forecasts_all_roads.json` |
 | **MPO** | `forecasts_county_roads.json` | `forecasts_no_interstate.json` | `forecasts_all_roads.json` |
 | **County** | `forecasts_county_roads.json` | `forecasts_no_interstate.json` | `forecasts_all_roads.json` |
 
@@ -503,8 +503,8 @@ Stage 8: Commit metadata
 
 | View Level | Radio 1 Label | Radio 2 Label | Radio 3 Label |
 |-----------|---------------|---------------|---------------|
-| **Federal/State** | DOT Roads Only | Non-DOT Roads | All Roads / Statewide All Roads |
-| **Region/MPO/County** | County/City Roads Only | All Roads (No Interstate) | All Roads |
+| **Federal/State/Region** | DOT Roads Only | Non-DOT Roads | All Roads / Statewide All Roads |
+| **MPO/County** | County/City Roads Only | All Roads (No Interstate) | All Roads |
 
 ### R2 Path Patterns
 
@@ -543,8 +543,8 @@ crash-lens-data/
     _statewide/
       aggregates.json, county_summary.json, mpo_summary.json
     _region/{district_id}/
-      county_roads.csv, no_interstate.csv, all_roads.csv
-      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
+      dot_roads.csv, non_dot_roads.csv, all_roads.csv
+      forecasts_dot_roads.json, forecasts_non_dot_roads.json, forecasts_all_roads.json
       aggregates.json, hotspots.json           #   9 VDOT districts
     _mpo/{mpo_id}/
       county_roads.csv, no_interstate.csv, all_roads.csv
@@ -573,8 +573,8 @@ crash-lens-data/
     _statewide/
       aggregates.json, county_summary.json, mpo_summary.json
     _region/{region_id}/
-      county_roads.csv, no_interstate.csv, all_roads.csv
-      forecasts_county_roads.json, forecasts_no_interstate.json, forecasts_all_roads.json
+      dot_roads.csv, non_dot_roads.csv, all_roads.csv
+      forecasts_dot_roads.json, forecasts_non_dot_roads.json, forecasts_all_roads.json
       aggregates.json, hotspots.json           #   5 engineering regions
     _mpo/{mpo_id}/
       county_roads.csv, no_interstate.csv, all_roads.csv
