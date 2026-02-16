@@ -1,10 +1,12 @@
 # Overture Maps STAC Integration Plan for Douglas County
 
-**Date:** 2026-02-16
+**Date:** 2026-02-16 (Updated: Real-Time PMTiles Approach)
 **STAC Catalog:** https://stac.overturemaps.org
 **Latest Release:** 2026-01-21.0 (Schema v1.15.0)
+**PMTiles:** https://overturemaps-tiles-us-west-2-beta.s3.amazonaws.com/{RELEASE_DATE}/{THEME}.pmtiles
 **License:** ODbL (transportation, buildings, base), CDLA Permissive 2.0 (places)
 **Douglas County Bbox:** [-105.0543, 39.1298, -104.6014, 39.5624]
+**Implementation:** Real-time fetch via PMTiles (no pre-saved files, no Python pipeline needed)
 
 ---
 
@@ -215,35 +217,31 @@ if (overtureState.loaded && overtureState.segmentsByName.size > 0) {
 
 ---
 
-## 7. Implementation Architecture
+## 7. Implementation Architecture (UPDATED: Real-Time PMTiles)
 
-### 7a. Data Flow
+### 7a. Data Flow (No Pre-Saved Files)
 
 ```
-[Overture Maps S3 GeoParquet]
-        |  (Python CLI: overturemaps download --bbox)
+[Overture Maps PMTiles on S3]       <-- Official cloud-hosted vector tiles
+        |  (HTTP range requests — only tiles for jurisdiction viewport)
         v
-[download_overture_data.py]          <-- New Python script
-        |  (extract, filter, simplify, flatten properties)
+[pmtiles.js library]                <-- Loaded via CDN in browser
+        |  (fetches specific z/x/y tiles for bbox)
         v
-[data/overture/]                     <-- New data directory
-  ├── segments.geojson               (~3-8 MB for Douglas County)
-  ├── connectors.geojson             (~0.5-1 MB)
-  ├── infrastructure.geojson         (~0.5-2 MB, crosswalks + barriers only)
-  ├── places.geojson                 (~1-3 MB, 13 safety categories)
-  └── metadata.json                  (release, bbox, counts, date)
-        |  (uploaded to R2 CDN)
+[OvertureVTDecoder]                 <-- Inline MVT protobuf decoder
+        |  (decode vector tiles → GeoJSON features)
         v
-[app/index.html]                     <-- Browser loads GeoJSON
-  ├── overtureState                  (new state object)
-  ├── Overture Map Layers            (new section in Asset Panel)
-  ├── Crash-to-Road Snapping         (turf.nearestPointOnLine)
-  ├── Crash Tree Speed Enrichment    (risk factor accuracy)
-  ├── Enhanced Segment Analysis      (replace OSM Overpass)
-  ├── Enhanced Hotspot Analysis      (crashes/mile)
-  ├── POI Proximity Analysis         (turf.buffer + pointsWithinPolygon)
-  └── AI/CMF Context Enrichment      (speed + class + nearby POIs)
+[app/index.html]                    <-- Real-time display, same as BTS layers
+  ├── OVERTURE_ENDPOINTS config      (3 layer definitions)
+  ├── builtInLayersState entries     (per-jurisdiction caching)
+  ├── Asset Panel checkboxes         ("Overture Maps Data" section)
+  ├── L.geoJSON display              (interactive popups, boundary clipping)
+  └── Jurisdiction-change auto-reload
 ```
+
+**Key change from original plan:** No Python pipeline, no pre-saved GeoJSON files,
+no R2 storage needed. Data is fetched real-time from Overture's S3 PMTiles via
+HTTP range requests when the user enables a layer. Cached per jurisdiction in memory.
 
 ### 7b. New State Object: `overtureState`
 
