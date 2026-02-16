@@ -13,7 +13,8 @@ RUN apk add --no-cache nginx supervisor curl
 # ------------------------------------------------------------
 
 # Copy static site files to Nginx html directory
-COPY index.html /usr/share/nginx/html/
+# Copy all root-level HTML files (index, features, pricing, resources, contact, 404, etc.)
+COPY *.html /usr/share/nginx/html/
 COPY config.json /usr/share/nginx/html/
 COPY manifest.json /usr/share/nginx/html/
 
