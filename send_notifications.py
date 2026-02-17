@@ -1,43 +1,104 @@
 #!/usr/bin/env python3
 """
 CRASH LENS Email Notification System
-Sends scheduled reports and grant alerts via AWS SES
+Sends scheduled reports and grant alerts via Brevo (recommended) or AWS SES.
+
+Supports two email providers:
+  - brevo:   Free tier 300 emails/day. Set BREVO_API_KEY env var.
+  - aws-ses: Pay-per-use ($0.10/1k). Set AWS_SES_* env vars.
+
+The provider is auto-detected from available environment variables,
+or can be forced with --provider brevo|aws-ses.
 
 Usage:
     python send_notifications.py --type reports     # Send scheduled reports
     python send_notifications.py --type grants      # Send grant alerts
     python send_notifications.py --type digest      # Send weekly digest
     python send_notifications.py --type test --email user@example.com  # Test email
+    python send_notifications.py --type test --email user@example.com --provider brevo
 """
 
 import os
 import sys
 import json
 import argparse
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from pathlib import Path
-import boto3
-from botocore.exceptions import ClientError
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
-AWS_REGION = os.environ.get('AWS_SES_REGION', 'us-east-1')
+# Provider detection: brevo takes priority (cheaper), falls back to aws-ses
+EMAIL_PROVIDER = os.environ.get('EMAIL_PROVIDER', '').lower()  # 'brevo' or 'aws-ses'
 FROM_EMAIL = os.environ.get('NOTIFICATION_FROM_EMAIL')
 CHARSET = 'UTF-8'
 
+# Brevo configuration
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
+BREVO_SMTP_SERVER = 'smtp-relay.brevo.com'
+BREVO_SMTP_PORT = 587
+BREVO_SMTP_LOGIN = os.environ.get('BREVO_SMTP_LOGIN')  # Your Brevo account email
+BREVO_SMTP_PASSWORD = os.environ.get('BREVO_SMTP_PASSWORD')  # Brevo SMTP key
+
+# AWS SES configuration (legacy / fallback)
+AWS_REGION = os.environ.get('AWS_SES_REGION', 'us-east-1')
+
+def detect_provider():
+    """Auto-detect email provider from available environment variables."""
+    global EMAIL_PROVIDER
+    if EMAIL_PROVIDER in ('brevo', 'aws-ses'):
+        return EMAIL_PROVIDER
+
+    # Prefer Brevo (cheaper, includes marketing features)
+    if BREVO_API_KEY or (BREVO_SMTP_LOGIN and BREVO_SMTP_PASSWORD):
+        EMAIL_PROVIDER = 'brevo'
+        return 'brevo'
+
+    # Fall back to AWS SES
+    if os.environ.get('AWS_SES_ACCESS_KEY_ID'):
+        EMAIL_PROVIDER = 'aws-ses'
+        return 'aws-ses'
+
+    return None
+
 def validate_config():
     """Validate required configuration before sending emails."""
+    provider = detect_provider()
+
     if not FROM_EMAIL:
         print("[ERROR] NOTIFICATION_FROM_EMAIL environment variable not set")
-        print("Please set this to your verified SES sender address (e.g., notifications@aicreatesai.com)")
+        print("  Set this to your verified sender address (e.g., notifications@crashlens.aicreatesai.com)")
         sys.exit(1)
-    if not os.environ.get('AWS_SES_ACCESS_KEY_ID'):
-        print("[ERROR] AWS_SES_ACCESS_KEY_ID environment variable not set")
+
+    if provider == 'brevo':
+        # Brevo can use either API key or SMTP credentials
+        if BREVO_API_KEY:
+            print(f"[CONFIG] Provider: Brevo (API mode)")
+            return
+        if BREVO_SMTP_LOGIN and BREVO_SMTP_PASSWORD:
+            print(f"[CONFIG] Provider: Brevo (SMTP mode)")
+            return
+        print("[ERROR] Brevo requires either:")
+        print("  - BREVO_API_KEY (for API mode), or")
+        print("  - BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD (for SMTP mode)")
         sys.exit(1)
-    if not os.environ.get('AWS_SES_SECRET_ACCESS_KEY'):
-        print("[ERROR] AWS_SES_SECRET_ACCESS_KEY environment variable not set")
+
+    elif provider == 'aws-ses':
+        print(f"[CONFIG] Provider: AWS SES ({AWS_REGION})")
+        if not os.environ.get('AWS_SES_ACCESS_KEY_ID'):
+            print("[ERROR] AWS_SES_ACCESS_KEY_ID environment variable not set")
+            sys.exit(1)
+        if not os.environ.get('AWS_SES_SECRET_ACCESS_KEY'):
+            print("[ERROR] AWS_SES_SECRET_ACCESS_KEY environment variable not set")
+            sys.exit(1)
+    else:
+        print("[ERROR] No email provider configured. Set one of:")
+        print("  Brevo (recommended, free tier):  BREVO_API_KEY or BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD")
+        print("  AWS SES (pay-per-use):           AWS_SES_ACCESS_KEY_ID + AWS_SES_SECRET_ACCESS_KEY")
         sys.exit(1)
 
 # Paths
@@ -47,17 +108,125 @@ GRANTS_FILE = BASE_DIR / 'data' / 'grants.csv'
 CRASHES_FILE = BASE_DIR / 'data' / 'CDOT' / 'crashes.csv'
 
 # =============================================================================
-# AWS SES CLIENT
+# EMAIL PROVIDER CLIENTS
 # =============================================================================
 
 def get_ses_client():
     """Create AWS SES client with credentials from environment."""
+    import boto3
     return boto3.client(
         'ses',
         region_name=AWS_REGION,
         aws_access_key_id=os.environ.get('AWS_SES_ACCESS_KEY_ID'),
         aws_secret_access_key=os.environ.get('AWS_SES_SECRET_ACCESS_KEY')
     )
+
+def send_via_brevo_api(to_email, subject, html_body, text_body):
+    """Send email via Brevo HTTP API (uses sib-api-v3-sdk or raw requests)."""
+    import urllib.request
+    import urllib.error
+
+    payload = json.dumps({
+        "sender": {"email": FROM_EMAIL, "name": "CRASH LENS"},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_body,
+        "textContent": text_body,
+        "tags": ["crash-lens", "transactional"]
+    })
+
+    req = urllib.request.Request(
+        'https://api.brevo.com/v3/smtp/email',
+        data=payload.encode('utf-8'),
+        headers={
+            'accept': 'application/json',
+            'content-type': 'application/json',
+            'api-key': BREVO_API_KEY
+        },
+        method='POST'
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode())
+            msg_id = result.get('messageId', 'unknown')
+            print(f"[SUCCESS] Email sent to {to_email} via Brevo API (MessageId: {msg_id})")
+            return True
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        print(f"[ERROR] Brevo API error for {to_email}: {e.code} - {error_body}")
+        return False
+    except Exception as e:
+        print(f"[ERROR] Failed to send via Brevo API to {to_email}: {e}")
+        return False
+
+def send_via_brevo_smtp(to_email, subject, html_body, text_body):
+    """Send email via Brevo SMTP relay."""
+    msg = MIMEMultipart('alternative')
+    msg['From'] = f"CRASH LENS <{FROM_EMAIL}>"
+    msg['To'] = to_email
+    msg['Subject'] = subject
+    msg['X-Mailer'] = 'CRASH-LENS-Notifications/1.0'
+
+    msg.attach(MIMEText(text_body, 'plain', CHARSET))
+    msg.attach(MIMEText(html_body, 'html', CHARSET))
+
+    try:
+        with smtplib.SMTP(BREVO_SMTP_SERVER, BREVO_SMTP_PORT) as server:
+            server.starttls()
+            server.login(BREVO_SMTP_LOGIN, BREVO_SMTP_PASSWORD)
+            server.send_message(msg)
+        print(f"[SUCCESS] Email sent to {to_email} via Brevo SMTP")
+        return True
+    except smtplib.SMTPException as e:
+        print(f"[ERROR] Brevo SMTP error for {to_email}: {e}")
+        return False
+    except Exception as e:
+        print(f"[ERROR] Failed to send via Brevo SMTP to {to_email}: {e}")
+        return False
+
+def send_via_ses(to_email, subject, html_body, text_body):
+    """Send email via AWS SES."""
+    from botocore.exceptions import ClientError
+    ses = get_ses_client()
+
+    try:
+        response = ses.send_email(
+            Source=FROM_EMAIL,
+            Destination={'ToAddresses': [to_email]},
+            Message={
+                'Subject': {'Charset': CHARSET, 'Data': subject},
+                'Body': {
+                    'Html': {'Charset': CHARSET, 'Data': html_body},
+                    'Text': {'Charset': CHARSET, 'Data': text_body}
+                }
+            }
+        )
+        print(f"[SUCCESS] Email sent to {to_email} via SES (MessageId: {response['MessageId']})")
+        return True
+    except ClientError as e:
+        print(f"[ERROR] SES error for {to_email}: {e.response['Error']['Message']}")
+        return False
+
+# =============================================================================
+# UNIFIED SEND FUNCTION
+# =============================================================================
+
+def send_email(to_email, subject, html_body, text_body):
+    """Send email via the configured provider."""
+    provider = EMAIL_PROVIDER or detect_provider()
+
+    if provider == 'brevo':
+        # Prefer API mode, fall back to SMTP
+        if BREVO_API_KEY:
+            return send_via_brevo_api(to_email, subject, html_body, text_body)
+        else:
+            return send_via_brevo_smtp(to_email, subject, html_body, text_body)
+    elif provider == 'aws-ses':
+        return send_via_ses(to_email, subject, html_body, text_body)
+    else:
+        print(f"[ERROR] Unknown email provider: {provider}")
+        return False
 
 # =============================================================================
 # SUBSCRIBER MANAGEMENT
@@ -519,6 +688,9 @@ def generate_weekly_digest_email(subscriber, crash_summary, upcoming_grants):
 
 def generate_test_email(email):
     """Generate test email."""
+    provider = EMAIL_PROVIDER or detect_provider() or 'unknown'
+    provider_info = f"Brevo" if provider == 'brevo' else f"AWS SES ({AWS_REGION})"
+
     return {
         'subject': "[CRASH LENS] Test Notification - Configuration Verified",
         'html': f"""
@@ -532,7 +704,7 @@ def generate_test_email(email):
                 <p>Your CRASH LENS email notifications are configured correctly.</p>
                 <p><strong>Email:</strong> {email}</p>
                 <p><strong>Timestamp:</strong> {datetime.now().isoformat()}</p>
-                <p><strong>Server:</strong> AWS SES ({AWS_REGION})</p>
+                <p><strong>Provider:</strong> {provider_info}</p>
             </div>
             <div style="background:#f8fafc;padding:15px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;text-align:center;font-size:12px;color:#64748b;">
                 CRASH LENS - Virginia Crash Analysis Tool
@@ -540,34 +712,8 @@ def generate_test_email(email):
         </body>
         </html>
         """,
-        'text': f"Test email successful!\nEmail: {email}\nTimestamp: {datetime.now().isoformat()}"
+        'text': f"Test email successful!\nEmail: {email}\nTimestamp: {datetime.now().isoformat()}\nProvider: {provider_info}"
     }
-
-# =============================================================================
-# EMAIL SENDING
-# =============================================================================
-
-def send_email(to_email, subject, html_body, text_body):
-    """Send email via AWS SES."""
-    ses = get_ses_client()
-
-    try:
-        response = ses.send_email(
-            Source=FROM_EMAIL,
-            Destination={'ToAddresses': [to_email]},
-            Message={
-                'Subject': {'Charset': CHARSET, 'Data': subject},
-                'Body': {
-                    'Html': {'Charset': CHARSET, 'Data': html_body},
-                    'Text': {'Charset': CHARSET, 'Data': text_body}
-                }
-            }
-        )
-        print(f"[SUCCESS] Email sent to {to_email} (MessageId: {response['MessageId']})")
-        return True
-    except ClientError as e:
-        print(f"[ERROR] Failed to send to {to_email}: {e.response['Error']['Message']}")
-        return False
 
 # =============================================================================
 # MAIN FUNCTIONS
@@ -681,7 +827,7 @@ def send_test(email):
                  email_content['html'], email_content['text']):
         print("\nTest email sent successfully!")
     else:
-        print("\nFailed to send test email. Check your AWS SES configuration.")
+        print("\nFailed to send test email. Check your email provider configuration.")
         sys.exit(1)
 
 # =============================================================================
@@ -693,11 +839,16 @@ def main():
         description='CRASH LENS Email Notification System',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Providers (auto-detected from env vars, or set EMAIL_PROVIDER):
+  brevo     Free tier: 300 emails/day. Set BREVO_API_KEY or BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD
+  aws-ses   Pay-per-use. Set AWS_SES_ACCESS_KEY_ID + AWS_SES_SECRET_ACCESS_KEY
+
 Examples:
   python send_notifications.py --type reports     Send scheduled reports
   python send_notifications.py --type grants      Send grant deadline alerts
   python send_notifications.py --type digest      Send weekly digest
   python send_notifications.py --type test --email user@example.com
+  python send_notifications.py --type test --email user@example.com --provider brevo
         """
     )
 
@@ -706,10 +857,18 @@ Examples:
                        help='Type of notification to send')
     parser.add_argument('--email', '-e',
                        help='Email address (required for test)')
+    parser.add_argument('--provider', '-p',
+                       choices=['brevo', 'aws-ses'],
+                       help='Force email provider (default: auto-detect)')
 
     args = parser.parse_args()
 
-    # Validate configuration (AWS credentials and FROM_EMAIL)
+    # Override provider if specified
+    if args.provider:
+        global EMAIL_PROVIDER
+        EMAIL_PROVIDER = args.provider
+
+    # Validate configuration
     validate_config()
 
     # Execute based on type

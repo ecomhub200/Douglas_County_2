@@ -32,12 +32,19 @@
     }
   ],
   "configuration": {
-    "emailProvider": "aws-ses",
+    "emailProvider": "brevo",
+    "fallbackProvider": "aws-ses",
     "region": "us-east-1",
-    "fromEmail": "notifications@youragency.gov",
-    "replyToEmail": "support@youragency.gov",
-    "unsubscribeUrl": "https://yourdomain.com/unsubscribe",
-    "preferencesUrl": "https://yourdomain.com/preferences"
+    "fromEmail": "notifications@crashlens.aicreatesai.com",
+    "replyToEmail": "support@crashlens.aicreatesai.com",
+    "unsubscribeUrl": "https://crashlens.aicreatesai.com/unsubscribe",
+    "preferencesUrl": "https://crashlens.aicreatesai.com/preferences",
+    "brevo": {
+      "note": "Set BREVO_API_KEY in GitHub secrets. Get key from Brevo Dashboard > SMTP & API > API Keys",
+      "smtpServer": "smtp-relay.brevo.com",
+      "smtpPort": 587,
+      "freeTierLimit": "300 emails/day (9,000/month)"
+    }
   },
   "templates": {
     "reports": {

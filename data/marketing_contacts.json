@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-02-17T00:00:00Z",
+  "description": "CRASH LENS marketing contact list for government agency outreach. Add contacts manually or via Brevo dashboard.",
+  "contacts": [
+    {
+      "email": "example@agency.gov",
+      "name": "Traffic Safety Director",
+      "agency": "Example County DOT",
+      "role": "decision-maker",
+      "source": "manual",
+      "addedAt": "2026-02-17T00:00:00Z",
+      "tags": ["government", "virginia", "dot"]
+    }
+  ],
+  "segments": {
+    "decision-makers": {
+      "description": "Agency directors and managers who approve tool purchases",
+      "filter": {"role": "decision-maker"}
+    },
+    "engineers": {
+      "description": "Traffic safety engineers who use the tool daily",
+      "filter": {"role": "engineer"}
+    },
+    "grant-writers": {
+      "description": "Staff who prepare grant applications",
+      "filter": {"role": "grant-writer"}
+    }
+  },
+  "notes": {
+    "roles": ["decision-maker", "engineer", "grant-writer", "planner", "analyst"],
+    "sources": ["manual", "website-signup", "demo-request", "conference", "referral"],
+    "gdpr": "Ensure all contacts have opted in to marketing communications before adding them here."
+  }
+}
