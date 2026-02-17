@@ -48,31 +48,36 @@ def validate_config():
         print("  Example: notifications@crashlens.aicreatesai.com")
         sys.exit(1)
 
-    if BREVO_API_KEY:
-        # Validate key format
-        key = BREVO_API_KEY.strip()
-        if not key.startswith('xkeysib-'):
-            print("[WARN] BREVO_API_KEY should start with 'xkeysib-'")
-            print("  Your key starts with: " + key[:8] + "...")
-            print("  Get your API key from: Brevo Dashboard > SMTP & API > API Keys")
-        print(f"[CONFIG] Provider: Brevo (API mode)")
-        print(f"[CONFIG] From: {FROM_EMAIL}")
-        print(f"[CONFIG] API Key: {key[:12]}...{key[-4:]}")
-        return
-
+    # Prefer SMTP mode if credentials are available (most reliable)
     if BREVO_SMTP_LOGIN and BREVO_SMTP_PASSWORD:
         print(f"[CONFIG] Provider: Brevo (SMTP mode)")
         print(f"[CONFIG] From: {FROM_EMAIL}")
         print(f"[CONFIG] SMTP Login: {BREVO_SMTP_LOGIN}")
         return
 
+    if BREVO_API_KEY:
+        key = BREVO_API_KEY.strip()
+        if not key.startswith('xkeysib-'):
+            print("[WARN] BREVO_API_KEY does not start with 'xkeysib-'")
+            print(f"  Your key starts with: {key[:8]}...")
+            print("  This looks like an SMTP password, NOT an API key.")
+            print("  If you have SMTP credentials, use BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD instead.")
+            print("  For the v3 API key: Brevo > profile icon (top-right) > SMTP & API > API Keys > Generate")
+        print(f"[CONFIG] Provider: Brevo (API mode)")
+        print(f"[CONFIG] From: {FROM_EMAIL}")
+        print(f"[CONFIG] API Key: {key[:8]}...{key[-4:]}")
+        return
+
     print("[ERROR] No Brevo credentials configured. Set one of:")
-    print("  Option 1 (recommended): BREVO_API_KEY")
-    print("    - Get from: Brevo Dashboard > SMTP & API > API Keys")
-    print("    - Key format: xkeysib-xxxxxxxx...")
     print("")
-    print("  Option 2 (SMTP fallback): BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD")
-    print("    - Get from: Brevo Dashboard > SMTP & API > SMTP")
+    print("  Option 1 (easiest): BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD")
+    print("    - Get from: Brevo Dashboard > SMTP & API > SMTP tab")
+    print("    - BREVO_SMTP_LOGIN = your login email (e.g. 8xxxx@smtp-brevo.com)")
+    print("    - BREVO_SMTP_PASSWORD = the SMTP key shown on that page")
+    print("")
+    print("  Option 2 (API mode): BREVO_API_KEY")
+    print("    - Get from: Brevo > profile icon (top-right) > SMTP & API > API Keys")
+    print("    - Key starts with: xkeysib-")
     sys.exit(1)
 
 # Paths
@@ -161,11 +166,14 @@ def send_via_brevo_smtp(to_email, subject, html_body, text_body):
         return False
 
 def send_email(to_email, subject, html_body, text_body):
-    """Send email via Brevo. Prefers API mode, falls back to SMTP."""
-    if BREVO_API_KEY:
+    """Send email via Brevo. Prefers SMTP mode (most reliable), falls back to API."""
+    if BREVO_SMTP_LOGIN and BREVO_SMTP_PASSWORD:
+        return send_via_brevo_smtp(to_email, subject, html_body, text_body)
+    elif BREVO_API_KEY:
         return send_via_brevo_api(to_email, subject, html_body, text_body)
     else:
-        return send_via_brevo_smtp(to_email, subject, html_body, text_body)
+        print("[ERROR] No Brevo credentials available")
+        return False
 
 # =============================================================================
 # SUBSCRIBER MANAGEMENT

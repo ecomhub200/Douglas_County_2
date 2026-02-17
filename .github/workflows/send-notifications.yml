@@ -28,6 +28,13 @@ jobs:
   send-notifications:
     runs-on: ubuntu-latest
 
+    # Brevo credentials - set EITHER API key OR SMTP login+password
+    env:
+      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+      BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+      BREVO_SMTP_PASSWORD: ${{ secrets.BREVO_SMTP_PASSWORD }}
+      NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -70,9 +77,6 @@ jobs:
 
       - name: Send scheduled reports
         if: steps.determine-type.outputs.type == 'reports'
-        env:
-          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
         run: |
           set -e
           echo "Sending scheduled reports..."
@@ -80,9 +84,6 @@ jobs:
 
       - name: Send grant alerts
         if: steps.determine-type.outputs.type == 'grants'
-        env:
-          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
         run: |
           set -e
           echo "Sending grant deadline alerts..."
@@ -90,9 +91,6 @@ jobs:
 
       - name: Send weekly digest
         if: steps.determine-type.outputs.type == 'digest'
-        env:
-          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
         run: |
           set -e
           echo "Sending weekly digest..."
@@ -100,9 +98,6 @@ jobs:
 
       - name: Send test email
         if: steps.determine-type.outputs.type == 'test'
-        env:
-          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
         run: |
           set -e
           if [ -z "${{ steps.determine-type.outputs.test_email }}" ]; then
