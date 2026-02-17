@@ -12,6 +12,7 @@ standardized CSV files that the validation system can then process.
 Supported states:
   - Virginia (TREDS) - passthrough, already in internal format
   - Colorado (CDOT) - full column mapping + severity derivation
+  - Maryland (ACRS) - MoCo county portal + statewide portal normalization
 
 Adding a new state:
   1. Create states/{state}/config.json with columnMapping + derivedFields
@@ -48,6 +49,18 @@ STATE_SIGNATURES = {
         'optional': ['K_People', 'A_People', 'Node', 'Physical Juris Name'],
         'display_name': 'Virginia (TREDS)',
         'config_dir': 'virginia'
+    },
+    'maryland': {
+        'required': ['report_number', 'acrs_report_type', 'road_name'],
+        'optional': ['crash_date_time', 'collision_type', 'municipality', 'weather', 'light'],
+        'display_name': 'Maryland (ACRS - MoCo)',
+        'config_dir': 'maryland'
+    },
+    'maryland_statewide': {
+        'required': ['report_no', 'acrs_report_type', 'road_name', 'county_desc'],
+        'optional': ['acc_date', 'collision_type_desc', 'weather_desc', 'light_desc'],
+        'display_name': 'Maryland (ACRS - Statewide)',
+        'config_dir': 'maryland'
     }
 }
 
@@ -899,10 +912,317 @@ class ColoradoNormalizer(BaseNormalizer):
         return ''
 
 
+class MarylandNormalizer(BaseNormalizer):
+    """Maryland ACRS data normalizer — converts to Virginia-compatible VDOT format.
+
+    Handles both MoCo county portal fields (report_number, crash_date_time,
+    collision_type) and statewide portal fields (report_no, acc_date,
+    collision_type_desc). Auto-detects which field names are present.
+    """
+
+    # Collision Type → VDOT numbered format
+    COLLISION_VDOT_MAP = {
+        # MoCo portal values
+        'Same Dir Rear End': '1. Rear End',
+        'SAME DIR REAR END': '1. Rear End',
+        'SAME DIRECTION REAR END': '1. Rear End',
+        'Rear End': '1. Rear End',
+        'Angle': '2. Angle',
+        'ANGLE': '2. Angle',
+        'Angle Meets Left Head On': '2. Angle',
+        'Angle Meets Left Turn': '2. Angle',
+        'Angle Meets Right Turn': '2. Angle',
+        'Head On': '3. Head On',
+        'HEAD ON': '3. Head On',
+        'Head On Left Turn': '3. Head On',
+        'HEAD ON LEFT TURN': '3. Head On',
+        'Opposite Direction Both Left Turn': '3. Head On',
+        'Same Direction Sideswipe': '4. Sideswipe - Same Direction',
+        'SAME DIRECTION SIDESWIPE': '4. Sideswipe - Same Direction',
+        'Same Direction Both Left Turn': '4. Sideswipe - Same Direction',
+        'Same Direction Both Right Turn': '4. Sideswipe - Same Direction',
+        'Same Direction Left Turn': '4. Sideswipe - Same Direction',
+        'Same Direction Right Turn': '4. Sideswipe - Same Direction',
+        'Opposite Direction Sideswipe': '5. Sideswipe - Opposite Direction',
+        'OPPOSITE DIRECTION SIDESWIPE': '5. Sideswipe - Opposite Direction',
+        'Single Vehicle': '14. Fixed Object',
+        'SINGLE VEHICLE': '14. Fixed Object',
+        'Other': '16. Other',
+        'OTHER': '16. Other',
+        'UNKNOWN': '16. Other',
+    }
+
+    # Weather → VDOT numbered format
+    WEATHER_VDOT_MAP = {
+        'Clear': '1. No Adverse Condition (Clear/Cloudy)',
+        'CLEAR': '1. No Adverse Condition (Clear/Cloudy)',
+        'Cloudy': '1. No Adverse Condition (Clear/Cloudy)',
+        'CLOUDY': '1. No Adverse Condition (Clear/Cloudy)',
+        'Raining': '5. Rain',
+        'RAINING': '5. Rain',
+        'Foggy': '3. Fog/Smog/Smoke',
+        'FOGGY': '3. Fog/Smog/Smoke',
+        'Snow': '4. Snow',
+        'SNOW': '4. Snow',
+        'Blowing Snow': '4. Snow',
+        'BLOWING SNOW': '4. Snow',
+        'Sleet': '6. Sleet/Hail/Freezing',
+        'SLEET': '6. Sleet/Hail/Freezing',
+        'Blowing Sand/Dirt/Snow': '7. Blowing Sand/Dust',
+        'Blowing Sand, Soil, Dirt': '7. Blowing Sand/Dust',
+        'Severe Crosswinds': '8. Severe Crosswinds',
+        'SEVERE CROSSWINDS': '8. Severe Crosswinds',
+    }
+
+    # Light → VDOT numbered format
+    LIGHT_VDOT_MAP = {
+        'Daylight': '2. Daylight',
+        'DAYLIGHT': '2. Daylight',
+        'Dark Lights On': '4. Darkness - Road Lighted',
+        'Dark-Lights On': '4. Darkness - Road Lighted',
+        'DARK LIGHTS ON': '4. Darkness - Road Lighted',
+        'DARK-LIGHTS ON': '4. Darkness - Road Lighted',
+        'Dark No Lights': '5. Darkness - Road Not Lighted',
+        'Dark-No Lights': '5. Darkness - Road Not Lighted',
+        'DARK NO LIGHTS': '5. Darkness - Road Not Lighted',
+        'DARK-NO LIGHTS': '5. Darkness - Road Not Lighted',
+        'Dawn': '1. Dawn',
+        'DAWN': '1. Dawn',
+        'Dusk': '3. Dusk',
+        'DUSK': '3. Dusk',
+        'Dark - Unknown Lighting': '6. Dark - Unknown',
+        'Dark -- Unknown Lighting': '6. Dark - Unknown',
+        'DARK -- UNKNOWN LIGHTING': '6. Dark - Unknown',
+    }
+
+    # Surface Condition → VDOT numbered format
+    SURFACE_VDOT_MAP = {
+        'Dry': '1. Dry', 'DRY': '1. Dry',
+        'Wet': '2. Wet', 'WET': '2. Wet',
+        'Snow': '3. Snow', 'SNOW': '3. Snow',
+        'Slush': '4. Slush', 'SLUSH': '4. Slush',
+        'Ice': '5. Ice', 'ICE': '5. Ice',
+        'Mud, Dirt, Gravel': '6. Sand/Mud/Dirt/Oil/Gravel',
+        'Sand': '6. Sand/Mud/Dirt/Oil/Gravel',
+        'Oil': '6. Sand/Mud/Dirt/Oil/Gravel',
+        'Water (Standing, Moving)': '7. Water',
+    }
+
+    # Route Type → Road System classification
+    ROAD_SYSTEM_MAP = {
+        'Interstate': 'Interstate',
+        'US Route': 'Primary',
+        'US (State)': 'Primary',
+        'Maryland (State)': 'Primary',
+        'State Route': 'Primary',
+        'County': 'NonVDOT secondary',
+        'Municipality': 'NonVDOT secondary',
+        'Other Public Roadway': 'NonVDOT secondary',
+        'Government': 'NonVDOT secondary',
+        'Service Road': 'Secondary',
+        'Ramp': 'Secondary',
+    }
+
+    # Severity: 3-tier ACRS crash-level classification
+    SEVERITY_MAP = {
+        'Fatal Crash': 'K',
+        'FATAL CRASH': 'K',
+        'Injury Crash': 'B',
+        'INJURY CRASH': 'B',
+        'Property Damage Crash': 'O',
+        'PROPERTY DAMAGE CRASH': 'O',
+    }
+
+    DARKNESS_VALUES = {
+        'Dark Lights On', 'Dark-Lights On', 'Dark No Lights', 'Dark-No Lights',
+        'Dark - Unknown Lighting', 'Dark -- Unknown Lighting',
+        'DARK LIGHTS ON', 'DARK-LIGHTS ON', 'DARK NO LIGHTS', 'DARK-NO LIGHTS',
+        'DARK -- UNKNOWN LIGHTING',
+    }
+
+    def _get(self, row: Dict[str, str], primary: str, alt: str = '') -> str:
+        """Get field value trying primary name first, then alternate."""
+        val = row.get(primary, '').strip()
+        if not val and alt:
+            val = row.get(alt, '').strip()
+        return val
+
+    def normalize_row(self, row: Dict[str, str]) -> Dict[str, str]:
+        n = {}
+
+        # --- ID ---
+        n['Document Nbr'] = self._get(row, 'report_number', 'report_no')
+
+        # --- Date/Time ---
+        # MoCo: crash_date_time (ISO 8601: 2023-01-15T14:30:00.000)
+        # Statewide: acc_date (calendar_date type)
+        raw_datetime = self._get(row, 'crash_date_time', 'acc_date')
+        date_part = ''
+        time_part = ''
+        year_part = ''
+        if 'T' in raw_datetime:
+            # ISO format: 2023-01-15T14:30:00.000
+            parts = raw_datetime.split('T')
+            date_part = parts[0]
+            time_str = parts[1].split('.')[0] if len(parts) > 1 else ''
+            time_part = time_str.replace(':', '')[:4]
+            year_part = date_part[:4] if len(date_part) >= 4 else ''
+        elif raw_datetime:
+            # Fallback: try various date formats
+            date_part = raw_datetime.split(' ')[0]
+            if '/' in date_part:
+                dparts = date_part.split('/')
+                if len(dparts) == 3:
+                    year_part = dparts[2][:4]
+            elif '-' in date_part:
+                year_part = date_part[:4]
+
+        n['Crash Date'] = date_part
+        n['Crash Year'] = year_part or self._get(row, 'year', '')
+        n['Crash Military Time'] = time_part or self._get(row, 'acc_time', '').replace(':', '')[:4]
+
+        # --- Severity ---
+        acrs_type = self._get(row, 'acrs_report_type', 'report_type')
+        severity = self.SEVERITY_MAP.get(acrs_type, 'O')
+        n['Crash Severity'] = severity
+        n['K_People'] = '1' if severity == 'K' else '0'
+        n['A_People'] = '0'
+        n['B_People'] = '1' if severity == 'B' else '0'
+        n['C_People'] = '0'
+
+        # --- Collision Type ---
+        raw_collision = self._get(row, 'collision_type', 'collision_type_desc')
+        n['Collision Type'] = self.COLLISION_VDOT_MAP.get(raw_collision, raw_collision or '16. Other')
+
+        # --- Weather ---
+        raw_weather = self._get(row, 'weather', 'weather_desc')
+        n['Weather Condition'] = self.WEATHER_VDOT_MAP.get(raw_weather, raw_weather)
+
+        # --- Light ---
+        raw_light = self._get(row, 'light', 'light_desc')
+        n['Light Condition'] = self.LIGHT_VDOT_MAP.get(raw_light, raw_light)
+
+        # --- Surface Condition ---
+        raw_surface = self._get(row, 'surface_condition', 'surf_cond_desc')
+        n['Roadway Surface Condition'] = self.SURFACE_VDOT_MAP.get(raw_surface, raw_surface)
+
+        # --- Road Alignment ---
+        n['Roadway Alignment'] = '1. Straight - Level'
+
+        # --- Roadway Description ---
+        n['Roadway Description'] = ''
+
+        # --- Intersection Type ---
+        junction = self._get(row, 'junction', 'junction_desc')
+        if junction and 'intersection' in junction.lower():
+            n['Intersection Type'] = '4. Four Approaches'
+        else:
+            n['Intersection Type'] = '1. Not at Intersection'
+
+        # --- Relation to Roadway ---
+        if junction and 'intersection' in junction.lower():
+            n['Relation To Roadway'] = '9. Within Intersection'
+        else:
+            n['Relation To Roadway'] = '8. Non-Intersection'
+
+        # --- Route & Location ---
+        n['RTE Name'] = self._get(row, 'road_name', '')
+        route_type = self._get(row, 'route_type', 'route_type_desc')
+        n['SYSTEM'] = self.ROAD_SYSTEM_MAP.get(route_type, 'NonVDOT secondary')
+
+        # Node: intersection name
+        road = self._get(row, 'road_name', '')
+        cross = self._get(row, 'cross_street_name', '')
+        if road and cross:
+            roads = sorted([road, cross])
+            n['Node'] = f'{roads[0]} & {roads[1]}'
+        else:
+            n['Node'] = ''
+
+        n['RNS MP'] = ''
+
+        # --- Coordinates (x=longitude, y=latitude per Virginia convention) ---
+        n['x'] = self._get(row, 'longitude', '')
+        n['y'] = self._get(row, 'latitude', '')
+
+        # --- Jurisdiction ---
+        n['Physical Juris Name'] = (
+            self._get(row, 'municipality', '') or
+            self._get(row, 'county_desc', '') or
+            'Montgomery County'
+        )
+
+        # --- Boolean flags ---
+        # Most not available at crash level (need driver/NM dataset join)
+        n['Pedestrian?'] = 'No'
+        n['Bike?'] = 'No'
+        n['Alcohol?'] = 'No'
+        n['Speed?'] = 'No'
+        hit_run = self._get(row, 'hit_run', '')
+        n['Hitrun?'] = 'Yes' if hit_run.upper() in ('YES', 'TRUE', 'Y') else 'No'
+        n['Motorcycle?'] = 'No'
+        n['Night?'] = 'Yes' if raw_light in self.DARKNESS_VALUES else 'No'
+        n['Distracted?'] = 'No'
+        n['Drowsy?'] = 'No'
+        n['Drug Related?'] = 'No'
+        n['Young?'] = 'No'
+        n['Senior?'] = 'No'
+        n['Unrestrained?'] = 'No'
+        n['School Zone'] = 'No'
+        n['Work Zone Related'] = 'No'
+
+        # --- Safety fields (not derivable from crash-level data) ---
+        n['Animal Related?'] = 'No'
+        n['Guardrail Related?'] = 'No'
+        n['Lgtruck?'] = 'No'
+        n['RoadDeparture Type'] = 'NOT_RD'
+        n['Intersection Analysis'] = (
+            'Urban Intersection' if junction and 'intersection' in junction.lower()
+            else 'Not Intersection'
+        )
+        n['Max Speed Diff'] = ''
+
+        # --- Traffic Control ---
+        n['Traffic Control Type'] = self._get(row, 'traffic_control', 'traf_control_desc')
+        n['Traffic Control Status'] = ''
+
+        # --- Infrastructure fields ---
+        n['Functional Class'] = ''
+        n['Area Type'] = ''
+        n['Facility Type'] = ''
+        n['Ownership'] = ''
+
+        # --- First Harmful Event ---
+        n['First Harmful Event'] = ''
+        n['First Harmful Event Loc'] = ''
+
+        # --- Vehicle Count ---
+        n['Vehicle Count'] = ''
+
+        # --- Injury counts ---
+        n['Persons Injured'] = ''
+        n['Pedestrians Killed'] = '0'
+        n['Pedestrians Injured'] = '0'
+
+        # --- Source tracking ---
+        n['_source_state'] = 'maryland'
+        n['_md_report_type'] = acrs_type
+        n['_md_route_type'] = route_type
+        n['_md_municipality'] = self._get(row, 'municipality', '')
+        n['_md_cross_street'] = cross
+        n['_md_speed_limit'] = self._get(row, 'speed_limit', '')
+        n['_md_off_road'] = self._get(row, 'off_road_description', 'off_road_desc')
+        n['_md_road_condition'] = self._get(row, 'road_condition', 'rd_cond_desc')
+
+        return n
+
+
 # --- Normalizer Registry ---
 _NORMALIZERS = {
     'colorado': ColoradoNormalizer,
     'virginia': VirginiaNormalizer,
+    'maryland': MarylandNormalizer,
+    'maryland_statewide': MarylandNormalizer,
 }
 
 

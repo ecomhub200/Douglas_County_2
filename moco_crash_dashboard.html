@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Montgomery County MD — Crash Data Console</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0a0e17;--bg2:#111827;--bg3:#1a2236;--border:#253048;--text:#e2e8f0;--text2:#94a3b8;--accent:#3b82f6;--accent2:#2563eb;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--purple:#a78bfa;--cyan:#22d3ee;--body:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono','Fira Code',monospace}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh}
+
+  /* ── Header ── */
+  .hdr{background:linear-gradient(135deg,var(--bg2),#0f172a);border-bottom:1px solid var(--border);padding:18px 28px;display:flex;align-items:center;gap:16px;position:relative;flex-wrap:wrap}
+  .hdr::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--cyan),var(--green),var(--accent));background-size:200% 100%;animation:shimmer 4s ease infinite}
+  @keyframes shimmer{0%,100%{background-position:200% 0}50%{background-position:0 0}}
+  .hdr-icon{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--cyan));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .hdr h1{font-size:19px;font-weight:700;background:linear-gradient(135deg,#fff,var(--text2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hdr .sub{font-size:11px;color:var(--text2);font-family:var(--mono);margin-top:2px}
+  .badge{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--text2);background:var(--bg);padding:6px 14px;border-radius:20px;border:1px solid var(--border)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--text2);transition:all .3s}
+  .dot.ok{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.err{background:var(--red);box-shadow:0 0 8px var(--red)}
+  .dot.try{background:var(--orange);box-shadow:0 0 8px var(--orange);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* Record count badge in header */
+  .rec-badge{display:flex;align-items:center;gap:8px;font-size:12px;font-family:var(--mono);color:var(--cyan);background:var(--bg);padding:6px 14px;border-radius:20px;border:1px solid var(--border);transition:all .3s}
+  .rec-badge .rec-count{font-weight:700;font-size:14px;color:#fff}
+
+  /* ── Mobile hamburger ── */
+  .sidebar-toggle{display:none;width:40px;height:40px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:20px;cursor:pointer;align-items:center;justify-content:center;flex-shrink:0;position:relative;z-index:1001}
+
+  /* ── Layout ── */
+  .wrap{display:grid;grid-template-columns:340px 1fr;grid-template-rows:1fr auto;height:calc(100vh - 76px)}
+  .side{grid-row:1/-1;background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px;transition:transform .3s ease}
+  .pnl{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px}
+  .pnl-t{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+  .pnl-t i{width:6px;height:6px;background:var(--accent);border-radius:50%;display:inline-block}
+
+  /* ── Sidebar overlay for mobile ── */
+  .sidebar-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:999;opacity:0;transition:opacity .3s ease}
+  .sidebar-overlay.visible{opacity:1}
+
+  /* ── Datasets ── */
+  .ds{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:12px;cursor:pointer;transition:all .15s;margin-bottom:5px}
+  .ds:hover{border-color:var(--accent)}.ds.on{border-color:var(--accent);background:#1e3a5f22}
+  .ds b{flex:1;font-weight:500}.ds code{font-family:var(--mono);color:var(--text2);font-size:10px}
+
+  /* ── Form ── */
+  label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px;font-family:var(--mono)}
+  select,input[type=number]{width:100%;padding:8px 11px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:7px;font-family:var(--body);font-size:13px;outline:none;margin-bottom:9px;appearance:none}
+  select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+  select:focus,input:focus{border-color:var(--accent)}
+  .btn{width:100%;padding:10px;border:none;border-radius:8px;font-family:var(--body);font-weight:700;font-size:13px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn1{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+  .btn1:hover{filter:brightness(1.15);transform:translateY(-1px)}
+  .btn1:disabled{opacity:.5;cursor:not-allowed;transform:none;filter:none}
+  .btn2{background:var(--bg);color:var(--text);border:1px solid var(--border);margin-top:6px}
+  .btn2:hover{border-color:var(--accent)}
+
+  /* ── Stats ── */
+  .sg{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .sc{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center}
+  .sc.hl{border-color:var(--accent)}
+  .sv{font-size:22px;font-weight:700;font-family:var(--mono)}
+  .sv.t{background:linear-gradient(135deg,#fff,var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .sv.f{background:linear-gradient(135deg,var(--red),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .sv.i{background:linear-gradient(135deg,var(--orange),#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .sv.p{background:linear-gradient(135deg,var(--accent),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .sl{font-size:9px;font-family:var(--mono);text-transform:uppercase;color:var(--text2);margin-top:2px;letter-spacing:.8px}
+
+  /* ── Console ── */
+  .con{background:var(--bg);border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;font-family:var(--mono);font-size:11px;padding:10px}
+  .le{margin-bottom:3px;line-height:1.5;word-break:break-all}
+  .lt{color:var(--text2)}.lok{color:var(--green)}.lerr{color:var(--red)}.linf{color:var(--cyan)}.lwrn{color:var(--orange)}
+
+  /* ── Map container (relative for overlay) ── */
+  .map-wrap{position:relative;width:100%;height:100%}
+  #map{width:100%;height:100%;min-height:400px;background:var(--bg)}
+  .leaflet-container{background:var(--bg)!important}
+
+  /* ── Loading spinner overlay ── */
+  .map-loading{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(10,14,23,.75);display:flex;align-items:center;justify-content:center;z-index:800;opacity:0;pointer-events:none;transition:opacity .25s ease}
+  .map-loading.active{opacity:1;pointer-events:auto}
+  .map-spinner{width:52px;height:52px;border:4px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:sp .8s linear infinite}
+  .map-loading-text{position:absolute;margin-top:80px;font-family:var(--mono);font-size:12px;color:var(--text2);letter-spacing:1px}
+
+  /* ── Table ── */
+  .tbl-area{overflow:auto;border-top:1px solid var(--border);max-height:340px;background:var(--bg2)}
+  .tbl-bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:12px}
+  .tbl-bar span{color:var(--text2);font-family:var(--mono)}
+  #dtbl{width:100%;border-collapse:collapse;font-size:12px}
+  #dtbl th{position:sticky;top:37px;z-index:4;background:var(--bg3);color:var(--cyan);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.8px;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;transition:color .15s}
+  #dtbl th:hover{color:#fff}
+  #dtbl th .sort-arrow{margin-left:4px;font-size:9px;opacity:.4;transition:opacity .15s}
+  #dtbl th.sort-active .sort-arrow{opacity:1;color:var(--accent)}
+  #dtbl td{padding:6px 12px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap;font-family:var(--mono);font-size:11px}
+  #dtbl tr:hover td{background:#ffffff06}
+
+  .spin{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-family:var(--mono);font-weight:700;margin-left:6px;background:#22c55e22;color:var(--green)}
+
+  /* ── Mobile responsive ── */
+  @media(max-width:900px){
+    .wrap{grid-template-columns:1fr;grid-template-rows:1fr auto;height:auto;min-height:calc(100vh - 76px)}
+    .side{position:fixed;top:0;left:0;width:300px;height:100%;z-index:1000;transform:translateX(-100%);grid-row:auto;padding-top:70px}
+    .side.open{transform:translateX(0)}
+    .sidebar-overlay.visible{display:block}
+    .sidebar-toggle{display:flex}
+    .map-wrap{min-height:50vh}
+    #map{min-height:50vh}
+    .tbl-area{max-height:300px}
+    .hdr{padding:12px 16px;gap:10px}
+    .hdr h1{font-size:15px}
+    .hdr .sub{font-size:10px}
+    .badge{padding:4px 10px;font-size:11px}
+    .rec-badge{padding:4px 10px;font-size:11px}
+  }
+
+  @media(max-width:480px){
+    .hdr h1{font-size:13px}
+    .side{width:280px}
+    .badge{display:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">&#9776;</button>
+  <div class="hdr-icon">&#x1F980;</div>
+  <div>
+    <h1>Montgomery County MD — Crash Data Console</h1>
+    <div class="sub">data.montgomerycountymd.gov · SODA API · Public · ACRS Data</div>
+  </div>
+  <div class="rec-badge" id="recBadge" style="display:none"><span>Records:</span> <span class="rec-count" id="recCount">0</span></div>
+  <div class="badge"><div class="dot" id="cDot"></div><span id="cSt">Connecting…</span></div>
+</div>
+
+<!-- Sidebar overlay for mobile -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<div class="wrap">
+  <div class="side" id="sidebar">
+    <!-- Datasets -->
+    <div class="pnl">
+      <div class="pnl-t"><i></i>Dataset</div>
+      <div class="ds on" data-id="bhju-22kf" onclick="pickDS(this)"><span style="color:var(--accent)">&#x25CF;</span><b>Crash Incidents</b><code>bhju-22kf</code></div>
+      <div class="ds" data-id="mmzv-x632" onclick="pickDS(this)"><span style="color:var(--green)">&#x25CF;</span><b>Drivers</b><code>mmzv-x632</code></div>
+      <div class="ds" data-id="n7fk-dce5" onclick="pickDS(this)"><span style="color:var(--orange)">&#x25CF;</span><b>Non-Motorists</b><code>n7fk-dce5</code></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="pnl">
+      <div class="pnl-t"><i></i>Filters</div>
+      <label>Year</label>
+      <select id="fYr">
+        <option value="">All Years</option>
+        <option>2025</option><option>2024</option><option>2023</option><option>2022</option>
+        <option>2021</option><option>2020</option><option>2019</option><option>2018</option>
+        <option>2017</option><option>2016</option><option>2015</option>
+      </select>
+      <label>Severity</label>
+      <select id="fSev">
+        <option value="">All Severities</option>
+        <option>Fatal Crash</option>
+        <option>Injury Crash</option>
+        <option>Property Damage Crash</option>
+      </select>
+      <label>Collision Type</label>
+      <select id="fCol">
+        <option value="">All Types</option>
+        <option>Same Dir Rear End</option>
+        <option>Angle</option>
+        <option>Single Vehicle</option>
+        <option>Head On</option>
+        <option>Same Direction Sideswipe</option>
+        <option>Opposite Direction Sideswipe</option>
+        <option>Head On Left Turn</option>
+        <option>Other</option>
+      </select>
+      <label>Municipality</label>
+      <select id="fMuni">
+        <option value="">All Municipalities</option>
+        <option>Bethesda</option><option>Chevy Chase</option>
+        <option>Gaithersburg</option><option>Germantown</option>
+        <option>Olney</option><option>Rockville</option>
+        <option>Silver Spring</option><option>Wheaton</option>
+        <option>White Oak</option>
+      </select>
+      <label>Limit</label>
+      <input type="number" id="fLim" value="1000" min="1" max="50000">
+      <button class="btn btn1" id="btnQ" onclick="query()">&#x25B6; &nbsp;Run Query</button>
+      <button class="btn btn2" onclick="csv()">&#x2B07; &nbsp;Export CSV</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="pnl">
+      <div class="pnl-t"><i></i>Results</div>
+      <div class="sg">
+        <div class="sc hl"><div class="sv t" id="sT">&mdash;</div><div class="sl">Total</div></div>
+        <div class="sc"><div class="sv f" id="sF">&mdash;</div><div class="sl">Fatal</div></div>
+        <div class="sc"><div class="sv i" id="sI">&mdash;</div><div class="sl">Injury</div></div>
+        <div class="sc"><div class="sv p" id="sP">&mdash;</div><div class="sl">PDO</div></div>
+      </div>
+    </div>
+
+    <!-- Console -->
+    <div class="pnl" style="flex:1;min-height:90px">
+      <div class="pnl-t"><i></i>Console</div>
+      <div class="con" id="con"></div>
+    </div>
+  </div>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="map-loading" id="mapLoading">
+      <div class="map-spinner"></div>
+      <div class="map-loading-text">Fetching data…</div>
+    </div>
+  </div>
+
+  <div class="tbl-area">
+    <div class="tbl-bar"><span id="tInfo">No data loaded</span><span id="tTime"></span></div>
+    <table id="dtbl"><thead><tr id="tH"></tr></thead><tbody id="tB"></tbody></table>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Config — Montgomery County (PUBLIC, no auth)
+// ═══════════════════════════════════════════════════════════════
+const BASE = 'https://data.montgomerycountymd.gov/resource';
+const DS_META = {
+  'bhju-22kf': { name:'Crash Incidents', dateCol:'crash_date_time', hasSev:true, hasGeo:true },
+  'mmzv-x632': { name:'Drivers',         dateCol:'crash_date_time', hasSev:false, hasGeo:false },
+  'n7fk-dce5': { name:'Non-Motorists',   dateCol:'crash_date_time', hasSev:false, hasGeo:false },
+};
+
+let curDS = 'bhju-22kf';
+let data = [];
+let map, markers;
+
+// ── Sort state ──
+let sortCol = null;
+let sortAsc = true;
+let tableCols = [];
+
+// ── Log ──
+function log(m,l='info'){
+  const c=document.getElementById('con');
+  const t=new Date().toLocaleTimeString('en-US',{hour12:false});
+  const cls={ok:'lok',err:'lerr',info:'linf',warn:'lwrn'}[l]||'linf';
+  c.innerHTML+='<div class="le"><span class="lt">'+t+'</span> <span class="'+cls+'">'+m+'</span></div>';
+  c.scrollTop=c.scrollHeight;
+}
+
+// ── Loading overlay ──
+function showMapLoading(msg){
+  const el=document.getElementById('mapLoading');
+  if(msg){el.querySelector('.map-loading-text').textContent=msg;}
+  el.classList.add('active');
+}
+function hideMapLoading(){
+  document.getElementById('mapLoading').classList.remove('active');
+}
+
+// ── Sidebar toggle (mobile) ──
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('sidebarOverlay');
+  if(sb.classList.contains('open')){
+    closeSidebar();
+  }else{
+    sb.classList.add('open');
+    ov.style.display='block';
+    requestAnimationFrame(function(){ov.classList.add('visible');});
+  }
+}
+function closeSidebar(){
+  var sb=document.getElementById('sidebar');
+  var ov=document.getElementById('sidebarOverlay');
+  sb.classList.remove('open');
+  ov.classList.remove('visible');
+  setTimeout(function(){if(!ov.classList.contains('visible'))ov.style.display='none';},300);
+}
+
+// ── Update header record count ──
+function updateRecordCount(n){
+  var badge=document.getElementById('recBadge');
+  var countEl=document.getElementById('recCount');
+  if(n>0){
+    countEl.textContent=n.toLocaleString();
+    badge.style.display='flex';
+  }else{
+    badge.style.display='none';
+  }
+}
+
+// ── Fetch ──
+async function soda(url){
+  const ctrl=new AbortController();
+  const tm=setTimeout(function(){ctrl.abort();},20000);
+  const r=await fetch(url,{signal:ctrl.signal,headers:{'Accept':'application/json'}});
+  clearTimeout(tm);
+  if(!r.ok){const b=await r.text().catch(function(){return '';});throw new Error('HTTP '+r.status+': '+b.substring(0,120));}
+  const d=await r.json();
+  if(!Array.isArray(d))throw new Error('Response not array');
+  return d;
+}
+
+// ── Build URL ──
+function buildUrl(ds,opts){
+  opts=opts||{};
+  let u=BASE+'/'+ds+'.json?$limit='+(opts.limit||document.getElementById('fLim').value||1000);
+  if(opts.select)u+='&$select='+encodeURIComponent(opts.select);
+  const wh=[];
+
+  // Year
+  const yr=opts.year!==undefined?opts.year:document.getElementById('fYr').value;
+  if(yr){
+    wh.push("crash_date_time>='"+yr+"-01-01T00:00:00'");
+    wh.push("crash_date_time<'"+(+yr+1)+"-01-01T00:00:00'");
+  }
+
+  // Severity (only for incidents)
+  if(DS_META[ds]&&DS_META[ds].hasSev){
+    const sv=opts.sev!==undefined?opts.sev:document.getElementById('fSev').value;
+    if(sv)wh.push("acrs_report_type='"+sv+"'");
+  }
+
+  // Collision type
+  const ct=opts.col!==undefined?opts.col:document.getElementById('fCol').value;
+  if(ct)wh.push("collision_type='"+ct+"'");
+
+  // Municipality
+  const mn=opts.muni!==undefined?opts.muni:document.getElementById('fMuni').value;
+  if(mn)wh.push("municipality LIKE '%"+mn.toUpperCase()+"%'");
+
+  if(wh.length)u+='&$where='+encodeURIComponent(wh.join(' AND '));
+  if(opts.order!==false)u+='&$order=crash_date_time DESC';
+  return u;
+}
+
+// ── Connection test ──
+async function testConn(){
+  const dot=document.getElementById('cDot'),st=document.getElementById('cSt');
+  dot.className='dot try'; st.textContent='Testing\u2026';
+  log('Testing data.montgomerycountymd.gov\u2026');
+  try{
+    const u=buildUrl('bhju-22kf',{select:'count(*) as cnt',limit:1,order:false,year:'',sev:'',col:'',muni:''});
+    log('GET '+u.substring(0,100)+'\u2026');
+    const d=await soda(u);
+    if(d&&d[0]&&d[0].cnt){
+      dot.className='dot ok';
+      const n=Number(d[0].cnt).toLocaleString();
+      st.innerHTML=n+' records <span class="tag">public</span>';
+      log('\u2713 Connected \u2014 '+n+' crash incidents available','ok');
+    }else throw new Error('No count returned');
+  }catch(e){
+    dot.className='dot err';
+    st.textContent='Failed';
+    log('\u2717 '+e.message,'err');
+  }
+}
+
+// ── Dataset picker ──
+function pickDS(el){
+  document.querySelectorAll('.ds').forEach(function(d){d.classList.remove('on');});
+  el.classList.add('on');
+  curDS=el.dataset.id;
+  log('Dataset \u2192 '+DS_META[curDS].name+' ('+curDS+')');
+  // Toggle severity filter visibility
+  if(document.getElementById('fSev').closest('div')){
+    document.getElementById('fSev').style.display=DS_META[curDS].hasSev?'':'none';
+  }
+}
+
+// ── Query ──
+async function query(){
+  const btn=document.getElementById('btnQ');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span> Querying\u2026';
+  showMapLoading('Fetching data\u2026');
+  const yr=document.getElementById('fYr').value||'All';
+  const sv=document.getElementById('fSev').value||'All';
+  log('Query \u2192 '+DS_META[curDS].name+' | Year:'+yr+' | Sev:'+sv);
+  const t0=performance.now();
+  try{
+    data=await soda(buildUrl(curDS));
+    const ms=((performance.now()-t0)/1000).toFixed(2);
+    log('\u2713 '+data.length+' records in '+ms+'s','ok');
+    document.getElementById('tTime').textContent=ms+'s';
+    // Reset sort state for new query
+    sortCol=null;sortAsc=true;
+    stats(data);table(data);plotMap(data);
+    updateRecordCount(data.length);
+    // Auto-close sidebar on mobile after query
+    if(window.innerWidth<=900)closeSidebar();
+  }catch(e){log('\u2717 '+e.message,'err')}
+  finally{btn.disabled=false;btn.innerHTML='\u25B6 &nbsp;Run Query';hideMapLoading();}
+}
+
+// ── Stats ──
+function stats(d){
+  document.getElementById('sT').textContent=d.length.toLocaleString();
+  let f=0,inj=0,p=0;
+  d.forEach(function(r){
+    const s=(r.acrs_report_type||r.injury_severity||'').toUpperCase();
+    if(s.includes('FATAL'))f++;
+    else if(s.includes('INJURY'))inj++;
+    else p++;
+  });
+  document.getElementById('sF').textContent=f.toLocaleString();
+  document.getElementById('sI').textContent=inj.toLocaleString();
+  document.getElementById('sP').textContent=p.toLocaleString();
+}
+
+// ── Map ──
+function initMap(){
+  map=L.map('map',{center:[39.14,-77.15],zoom:11});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'\u00A9 OSM \u00A9 CARTO',maxZoom:19
+  }).addTo(map);
+  markers=L.layerGroup().addTo(map);
+}
+
+function plotMap(d){
+  markers.clearLayers();
+  if(!DS_META[curDS].hasGeo){log('Dataset has no lat/lng \u2014 map skipped','warn');return}
+  let n=0;const bounds=[];
+  d.forEach(function(r){
+    let lat=+r.latitude,lng=+r.longitude;
+    if(!lat||!lng)return;
+    if(lat<37||lat>40||lng<-78||lng>-76)return;
+    const sv=(r.acrs_report_type||'').toUpperCase();
+    let c,rd;
+    if(sv.includes('FATAL')){c='#ef4444';rd=7}
+    else if(sv.includes('INJURY')){c='#f59e0b';rd=5}
+    else{c='#3b82f6';rd=4}
+    const mk=L.circleMarker([lat,lng],{radius:rd,fillColor:c,color:'#000',weight:.5,fillOpacity:.8});
+    const dt=r.crash_date_time?new Date(r.crash_date_time).toLocaleString():'N/A';
+    mk.bindPopup('<div style="font-family:\'DM Sans\',sans-serif;font-size:13px;min-width:220px">'+
+      '<div style="font-weight:700;font-size:14px;margin-bottom:6px;color:'+c+'">'+(r.acrs_report_type||'Crash')+'</div>'+
+      '<b>Date:</b> '+dt+'<br>'+
+      '<b>Road:</b> '+(r.road_name||'N/A')+'<br>'+
+      (r.cross_street_name?'<b>Cross St:</b> '+r.cross_street_name+'<br>':'')+
+      '<b>Municipality:</b> '+(r.municipality||'N/A')+'<br>'+
+      '<b>Collision:</b> '+(r.collision_type||'N/A')+'<br>'+
+      '<b>Weather:</b> '+(r.weather||'N/A')+'<br>'+
+      '<b>Light:</b> '+(r.light||'N/A')+'<br>'+
+      '<b>Surface:</b> '+(r.surface_condition||'N/A')+'<br>'+
+      (r.hit_run&&r.hit_run!=='No'?'<b style="color:var(--red)">\u26A0 Hit & Run</b><br>':'')+
+      (r.report_number?'<b>Report:</b> '+r.report_number+'<br>':'')+
+      '<div style="font-size:10px;color:#999;margin-top:4px">'+lat.toFixed(5)+', '+lng.toFixed(5)+'</div>'+
+    '</div>');
+    markers.addLayer(mk);bounds.push([lat,lng]);n++;
+  });
+  if(bounds.length)map.fitBounds(bounds,{padding:[30,30],maxZoom:15});
+  log('Map: '+n+'/'+d.length+' plotted');
+}
+
+// ── Table ──
+const SHOW_COLS=['crash_date_time','acrs_report_type','road_name','cross_street_name',
+  'collision_type','municipality','weather','light','surface_condition','hit_run',
+  'latitude','longitude','report_number'];
+
+function table(d){
+  const th=document.getElementById('tH'),tb=document.getElementById('tB'),inf=document.getElementById('tInfo');
+  if(!d.length){th.innerHTML='';tb.innerHTML='<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text2)">No records</td></tr>';inf.textContent='0 records';return}
+  const k=Object.keys(d[0]);
+  tableCols=SHOW_COLS.filter(function(c){return k.includes(c);});
+  if(tableCols.length<3)tableCols=k.slice(0,10);
+  renderTableHeaders();
+  renderTableBody(d);
+  inf.textContent=d.length+' records'+(d.length>200?' (showing 200)':'');
+}
+
+function renderTableHeaders(){
+  var th=document.getElementById('tH');
+  th.innerHTML=tableCols.map(function(c){
+    var label=c.replace(/_/g,' ');
+    var arrow='';
+    var cls='';
+    if(sortCol===c){
+      cls=' class="sort-active"';
+      arrow='<span class="sort-arrow">'+(sortAsc?'\u25B2':'\u25BC')+'</span>';
+    }else{
+      arrow='<span class="sort-arrow">\u25B2</span>';
+    }
+    return '<th'+cls+' data-col="'+c+'" onclick="sortTable(\''+c+'\')">'+label+arrow+'</th>';
+  }).join('');
+}
+
+function renderTableBody(d){
+  var tb=document.getElementById('tB');
+  tb.innerHTML=d.slice(0,200).map(function(r){
+    return '<tr>'+tableCols.map(function(c){
+      var v=r[c]||'';
+      if(c==='crash_date_time'&&v){try{v=new Date(v).toLocaleString();}catch(e){}}
+      if(typeof v==='string'&&v.length>35)v=v.substring(0,35)+'\u2026';
+      return '<td>'+v+'</td>';
+    }).join('')+'</tr>';
+  }).join('');
+}
+
+function sortTable(col){
+  if(!data.length)return;
+  if(sortCol===col){
+    sortAsc=!sortAsc;
+  }else{
+    sortCol=col;
+    sortAsc=true;
+  }
+  log('Sort: '+col.replace(/_/g,' ')+' '+(sortAsc?'ASC':'DESC'));
+  // Sort the data array
+  data.sort(function(a,b){
+    var va=a[col]||'';
+    var vb=b[col]||'';
+    // Try numeric comparison
+    var na=Number(va),nb=Number(vb);
+    if(!isNaN(na)&&!isNaN(nb)&&va!==''&&vb!==''){
+      return sortAsc?(na-nb):(nb-na);
+    }
+    // Try date comparison for date columns
+    if(col.includes('date')){
+      var da=new Date(va),db=new Date(vb);
+      if(!isNaN(da)&&!isNaN(db)){
+        return sortAsc?(da-db):(db-da);
+      }
+    }
+    // String comparison
+    va=String(va).toLowerCase();
+    vb=String(vb).toLowerCase();
+    if(va<vb)return sortAsc?-1:1;
+    if(va>vb)return sortAsc?1:-1;
+    return 0;
+  });
+  renderTableHeaders();
+  renderTableBody(data);
+}
+
+// ── CSV ──
+function csv(){
+  if(!data.length){log('No data','warn');return}
+  const k=Object.keys(data[0]);
+  const out=[k.join(',')].concat(data.map(function(r){
+    return k.map(function(c){
+      var v=(r[c]||'').toString();
+      if(v.includes(',')||v.includes('"')||v.includes('\n'))v='"'+v.replace(/"/g,'""')+'"';
+      return v;
+    }).join(',');
+  })).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([out],{type:'text/csv'}));
+  const yr=document.getElementById('fYr').value||'all';
+  a.download='moco_crashes_'+curDS+'_'+yr+'.csv';
+  a.click();
+  log('\u2713 Exported '+data.length+' rows','ok');
+}
+
+// ── Init ──
+window.addEventListener('DOMContentLoaded',function(){initMap();testConn();});
+</script>
+</body>
+</html>
