@@ -65,7 +65,7 @@ BASE_URL = "https://data.montgomerycountymd.gov/resource"
 PAGE_SIZE = 1000
 MAX_RETRIES = 3
 RETRY_BACKOFF = [2, 4, 8]
-DEFAULT_YEARS = list(range(2015, 2025))
+DEFAULT_YEARS = list(range(2015, datetime.now().year + 1))
 DEFAULT_DATA_DIR = "data/MarylandDOT/montgomery"
 
 # Configure logging
@@ -81,11 +81,24 @@ log = logging.getLogger("moco_downloader")
 # Helper Functions
 # =============================================================================
 
+def _get_headers():
+    """Build request headers, including Socrata app token if available."""
+    headers = {}
+    app_token = os.environ.get("SOCRATA_APP_TOKEN", "").strip()
+    if app_token:
+        headers["X-App-Token"] = app_token
+        log.debug("Using Socrata app token from SOCRATA_APP_TOKEN env var")
+    else:
+        log.warning("No SOCRATA_APP_TOKEN set — requests may be throttled or rejected (403)")
+    return headers
+
+
 def retry_request(url, params=None, max_retries=MAX_RETRIES):
     """Make HTTP GET request with exponential backoff retry logic."""
+    headers = _get_headers()
     for attempt in range(max_retries):
         try:
-            resp = requests.get(url, params=params, timeout=120)
+            resp = requests.get(url, params=params, headers=headers, timeout=120)
             resp.raise_for_status()
             return resp
         except requests.exceptions.RequestException as e:

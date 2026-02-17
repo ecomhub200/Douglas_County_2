@@ -88,6 +88,8 @@ jobs:
           echo "Download arguments: $ARGS"
 
       - name: Download MoCo crash data
+        env:
+          SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
         run: |
           echo "=========================================="
           echo "Downloading MoCo Crash Data"
@@ -100,10 +102,9 @@ jobs:
           if [ -n "$YEAR_INPUT" ]; then
             python download_moco_crashes.py --year "$YEAR_INPUT" $ARGS
           else
-            CURRENT_YEAR="${{ steps.build-args.outputs.current_year }}"
-            PREV_YEAR="${{ steps.build-args.outputs.prev_year }}"
-            python download_moco_crashes.py --year "$PREV_YEAR" $ARGS
-            python download_moco_crashes.py --year "$CURRENT_YEAR" $ARGS
+            # Download all default years (2015 through current year).
+            # The script skips years whose files already exist unless --force is set.
+            python download_moco_crashes.py $ARGS
           fi
 
           echo "=========================================="
@@ -151,7 +152,8 @@ jobs:
           done
           echo "uploaded=$UPLOADED" >> $GITHUB_OUTPUT
           if [ "$UPLOADED" -eq 0 ]; then
-            echo "::warning::No CSV files were uploaded to R2 — download may have failed"
+            echo "::error::No CSV files were uploaded to R2 — download may have produced no data"
+            exit 1
           fi
 
       - name: Verify R2 state
