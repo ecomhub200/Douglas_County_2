@@ -1,0 +1,42 @@
+TWITTER/X POST GUIDELINES:
+
+FORMAT:
+- Maximum 280 characters per tweet
+- For threads: First tweet must hook, use numbers (1/5, 2/5, etc.)
+- Leave room for hashtags (keep core text under 240 chars)
+- Use line breaks to separate thoughts
+
+TONE:
+- Concise and punchy
+- Informative but not academic
+- Use specific numbers and data points
+- Conversational but professional
+
+SINGLE TWEET TEMPLATE:
+[Stat or insight in 1-2 sentences]
+
+[Optional CTA or link]
+
+[2-3 hashtags]
+
+THREAD TEMPLATE:
+Tweet 1: [Hook with surprising fact or question] (1/X)
+Tweet 2: [Context and explanation] (2/X)
+Tweet 3: [Data points or key findings] (3/X)
+Tweet 4: [Your tool's solution or insight] (4/X)
+Tweet 5: [CTA -- try it yourself, link, question] (5/X)
+
+TWITTER-SPECIFIC TIPS:
+- Tweets with images get 150% more retweets
+- Use 1-3 hashtags max (more reduces engagement)
+- Tag relevant accounts for visibility
+- Quote-tweet relevant industry news with your analysis
+- Numbers and statistics perform well
+- Questions drive replies
+- Threads get 10x more engagement than single tweets
+
+DO NOT:
+- Exceed 280 characters
+- Use more than 3 hashtags
+- Be overly promotional
+- Use empty buzzwords

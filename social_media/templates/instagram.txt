@@ -1,0 +1,57 @@
+INSTAGRAM POST GUIDELINES:
+
+FORMAT:
+- Maximum 2,200 characters for captions
+- Up to 30 hashtags (use 10-15 for optimal reach)
+- First line is the hook (visible before "more")
+- Use line breaks and spacing for readability
+- Reels: 15-90 seconds for maximum reach
+
+TONE:
+- Visual-first storytelling
+- Educational but engaging
+- Use analogies to make technical concepts accessible
+- Inspire action and awareness
+
+CAPTION STRUCTURE:
+[Hook line -- visible before "more" tap]
+
+[Story or insight -- 3-5 short sentences]
+
+[Data point or statistic]
+
+[CTA: "Save this post", "Tag a colleague", "Comment below"]
+
+.
+.
+.
+[Hashtag block -- separated by dots/line breaks from main text]
+
+INSTAGRAM-SPECIFIC TIPS:
+- Carousel posts (swipeable images) get highest engagement
+- Reels reach 2x more non-followers than static posts
+- Save-worthy content (tips, data, checklists) gets boosted by algorithm
+- Use Stories for behind-the-scenes and polls
+- Post consistently at the same times
+- Use location tags for local visibility
+- Alt text is REQUIRED for accessibility
+
+VISUAL CONTENT IDEAS:
+- Data visualization infographics (crash trends, hotspot maps)
+- Before/after comparisons of safety improvements
+- "Did you know?" stat cards
+- Step-by-step carousel tutorials
+- Short demo reels of CRASH LENS features
+- Quote graphics from safety leaders
+
+IMAGE ALT TEXT REQUIREMENTS (WCAG 2.1 AA):
+- Every image MUST have descriptive alt text
+- Describe what the image shows, not just "infographic"
+- Include key data points mentioned in the image
+- Example: "Bar chart showing crash severity distribution: 45% property damage only, 30% possible injury, 15% minor injury, 8% serious injury, 2% fatal"
+
+DO NOT:
+- Post without an image (Instagram is visual-first)
+- Use irrelevant hashtags for reach
+- Neglect alt text
+- Post only product promotions

@@ -1,0 +1,59 @@
+YOUTUBE VIDEO CONTENT GUIDELINES:
+
+FORMAT:
+- Title: Maximum 100 characters (aim for 60 for full display)
+- Description: Maximum 5,000 characters
+- Tags: Up to 500 characters total
+- Shorts: Under 60 seconds vertical video
+
+TITLE FORMULA:
+[Keyword] + [Benefit/Hook] + [Qualifier]
+Examples:
+- "Crash Data Analysis: How to Find Intersection Hotspots in Minutes"
+- "Traffic Safety Tools Every DOT Engineer Needs in 2026"
+- "5 Crash Countermeasures That Actually Work (Data Proof)"
+
+DESCRIPTION STRUCTURE:
+[2-3 sentence summary with keywords]
+
+[Timestamps]
+0:00 - Introduction
+1:30 - [Section 1]
+3:00 - [Section 2]
+...
+
+[Links and resources]
+Try CRASH LENS free: [website]
+Related videos: [links]
+
+[About CRASH LENS paragraph]
+
+[Hashtags -- 3-5 max]
+
+YOUTUBE-SPECIFIC TIPS:
+- First 48 hours are critical for algorithm performance
+- Thumbnail is the #1 factor for click-through rate
+- Titles should include searchable keywords
+- Ask viewers to comment with specific questions
+- Pin a comment with a CTA or summary
+- Shorts (<60s) grow subscribers faster than long-form
+- Chapters (timestamps) improve watch time and SEO
+
+VIDEO CONTENT IDEAS:
+1. Product Tutorials: "How to Use CRASH LENS CMF Analysis"
+2. Data Walkthroughs: "Analyzing 5 Years of Crash Data in Douglas County"
+3. Concept Explainers: "What is EPDO Scoring and Why It Matters"
+4. Industry Updates: "New FHWA Safety Guidelines: What You Need to Know"
+5. Shorts: "One stat that will change how you think about intersection safety"
+
+ACCESSIBILITY REQUIREMENTS:
+- All videos MUST have closed captions/subtitles
+- Use clear, high-contrast text overlays
+- Describe visual elements in narration
+- Provide transcript in description or comments
+
+DO NOT:
+- Use clickbait titles that don't match content
+- Neglect captions/subtitles
+- Make videos longer than necessary
+- Forget to include keywords in title and description

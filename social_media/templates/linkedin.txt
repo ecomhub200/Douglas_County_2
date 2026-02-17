@@ -1,0 +1,45 @@
+LINKEDIN POST GUIDELINES:
+
+FORMAT:
+- Start with a strong hook line (question, surprising stat, or bold statement)
+- Use short paragraphs (1-3 sentences each)
+- Add line breaks between paragraphs for readability
+- Use bullet points or numbered lists for data
+- End with a question or CTA to drive engagement
+- Keep under 1300 characters for optimal engagement (full limit: 3000)
+
+TONE:
+- Professional and authoritative
+- Data-driven with specific numbers
+- Thought leadership positioning
+- Address the reader directly ("As a traffic engineer, you know...")
+- Share insights, not just announcements
+
+STRUCTURE TEMPLATE:
+[Hook: Surprising stat or question]
+
+[Context: 2-3 sentences explaining the significance]
+
+[Key points: Bullet points with data]
+- Point 1
+- Point 2
+- Point 3
+
+[Insight: Your unique perspective or analysis]
+
+[CTA: Question to drive comments, or link to learn more]
+
+LINKEDIN-SPECIFIC TIPS:
+- Posts with images get 2x engagement
+- Posts asking questions get 50% more comments
+- Tag relevant organizations (@FHWA, @AASHTO, @NHTSA) when applicable
+- Use line breaks generously -- LinkedIn's feed compresses long paragraphs
+- First 2-3 lines are visible before "see more" -- make them count
+- Optimal length: 1,000-1,300 characters
+- Best posting times: Tuesday-Thursday, 8-10 AM EST
+
+DO NOT:
+- Use excessive emojis
+- Write in a salesy or promotional tone
+- Start with "I'm excited to announce..." or similar cliches
+- Use AI-sounding phrases like "In today's fast-paced world..."

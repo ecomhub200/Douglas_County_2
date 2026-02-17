@@ -1,0 +1,31 @@
+DEFAULT SOCIAL MEDIA POST GUIDELINES:
+
+FORMAT:
+- Keep within the platform's character limit
+- Use clear, scannable formatting
+- Include a call-to-action
+- Add relevant hashtags (within platform limits)
+
+TONE:
+- Professional but approachable
+- Data-driven when possible
+- Genuine and helpful
+- Not overly promotional
+
+STRUCTURE:
+[Hook: Attention-grabbing first line]
+
+[Body: 2-3 sentences of value -- insight, data, or story]
+
+[CTA: Clear next step for the reader]
+
+[Hashtags: Platform-appropriate number]
+
+UNIVERSAL RULES:
+1. Every image must have alt text (WCAG 2.1 AA)
+2. Verify all statistics before posting
+3. Never be insensitive about crash victims
+4. Maintain professional tone while being engaging
+5. Include a clear call-to-action
+6. Use data to back up claims
+7. Stay relevant to traffic safety professionals

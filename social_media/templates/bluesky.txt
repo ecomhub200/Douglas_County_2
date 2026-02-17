@@ -1,0 +1,40 @@
+BLUESKY POST GUIDELINES:
+
+FORMAT:
+- Maximum 300 characters per post
+- Supports threads (linked posts)
+- No hashtag system yet -- use keywords naturally
+- Image support with alt text
+
+TONE:
+- Tech-savvy and forward-thinking
+- More casual than LinkedIn, more substantive than Twitter
+- Community-oriented
+- Open to discussion and debate
+
+POST STRUCTURE:
+[Insight or data point in 1-2 sentences]
+
+[Optional link or image reference]
+
+BLUESKY-SPECIFIC TIPS:
+- The platform favors authentic, non-promotional content
+- Threads work well for explaining complex topics
+- The community values transparency and openness
+- Cross-post from Twitter but tailor the message
+- Engage with replies -- smaller community means higher visibility
+- No algorithmic feed manipulation -- chronological is key
+- Growing tech/policy/academic audience
+
+CONTENT APPROACH:
+- Share genuine insights from crash data analysis
+- Discuss transportation policy and safety standards
+- Engage in conversations about urban planning and Vision Zero
+- Share tool updates naturally, not as ads
+- Respond to and amplify other safety professionals
+
+DO NOT:
+- Treat as just another Twitter clone
+- Post pure marketing content
+- Ignore the community's preference for authentic engagement
+- Exceed 300 characters
