@@ -1042,9 +1042,9 @@ class MarylandNormalizer(BaseNormalizer):
 
     def _get(self, row: Dict[str, str], primary: str, alt: str = '') -> str:
         """Get field value trying primary name first, then alternate."""
-        val = row.get(primary, '').strip()
+        val = (row.get(primary) or '').strip()
         if not val and alt:
-            val = row.get(alt, '').strip()
+            val = (row.get(alt) or '').strip()
         return val
 
     def normalize_row(self, row: Dict[str, str]) -> Dict[str, str]:
@@ -1114,13 +1114,17 @@ class MarylandNormalizer(BaseNormalizer):
 
         # --- Intersection Type ---
         junction = self._get(row, 'junction', 'junction_desc')
-        if junction and 'intersection' in junction.lower():
+        jl = junction.lower()
+        is_intersection = (junction and 'intersection' in jl
+                           and 'non-intersection' not in jl
+                           and 'non intersection' not in jl)
+        if is_intersection:
             n['Intersection Type'] = '4. Four Approaches'
         else:
             n['Intersection Type'] = '1. Not at Intersection'
 
         # --- Relation to Roadway ---
-        if junction and 'intersection' in junction.lower():
+        if is_intersection:
             n['Relation To Roadway'] = '9. Within Intersection'
         else:
             n['Relation To Roadway'] = '8. Non-Intersection'
@@ -1177,7 +1181,7 @@ class MarylandNormalizer(BaseNormalizer):
         n['Lgtruck?'] = 'No'
         n['RoadDeparture Type'] = 'NOT_RD'
         n['Intersection Analysis'] = (
-            'Urban Intersection' if junction and 'intersection' in junction.lower()
+            'Urban Intersection' if is_intersection
             else 'Not Intersection'
         )
         n['Max Speed Diff'] = ''
