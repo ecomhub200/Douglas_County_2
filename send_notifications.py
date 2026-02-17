@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
 """
 CRASH LENS Email Notification System
-Sends scheduled reports and grant alerts via Brevo (recommended) or AWS SES.
+Sends scheduled reports and grant alerts via Brevo.
 
-Supports two email providers:
-  - brevo:   Free tier 300 emails/day. Set BREVO_API_KEY env var.
-  - aws-ses: Pay-per-use ($0.10/1k). Set AWS_SES_* env vars.
-
-The provider is auto-detected from available environment variables,
-or can be forced with --provider brevo|aws-ses.
+Brevo supports two modes:
+  - API mode (recommended): Set BREVO_API_KEY env var
+  - SMTP mode (fallback):   Set BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD env vars
 
 Usage:
     python send_notifications.py --type reports     # Send scheduled reports
     python send_notifications.py --type grants      # Send grant alerts
     python send_notifications.py --type digest      # Send weekly digest
     python send_notifications.py --type test --email user@example.com  # Test email
-    python send_notifications.py --type test --email user@example.com --provider brevo
 """
 
 import os
@@ -23,6 +19,8 @@ import sys
 import json
 import argparse
 import smtplib
+import urllib.request
+import urllib.error
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
@@ -32,8 +30,6 @@ from pathlib import Path
 # CONFIGURATION
 # =============================================================================
 
-# Provider detection: brevo takes priority (cheaper), falls back to aws-ses
-EMAIL_PROVIDER = os.environ.get('EMAIL_PROVIDER', '').lower()  # 'brevo' or 'aws-ses'
 FROM_EMAIL = os.environ.get('NOTIFICATION_FROM_EMAIL')
 CHARSET = 'UTF-8'
 
@@ -41,65 +37,48 @@ CHARSET = 'UTF-8'
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
 BREVO_SMTP_SERVER = 'smtp-relay.brevo.com'
 BREVO_SMTP_PORT = 587
-BREVO_SMTP_LOGIN = os.environ.get('BREVO_SMTP_LOGIN')  # Your Brevo account email
-BREVO_SMTP_PASSWORD = os.environ.get('BREVO_SMTP_PASSWORD')  # Brevo SMTP key
-
-# AWS SES configuration (legacy / fallback)
-AWS_REGION = os.environ.get('AWS_SES_REGION', 'us-east-1')
-
-def detect_provider():
-    """Auto-detect email provider from available environment variables."""
-    global EMAIL_PROVIDER
-    if EMAIL_PROVIDER in ('brevo', 'aws-ses'):
-        return EMAIL_PROVIDER
-
-    # Prefer Brevo (cheaper, includes marketing features)
-    if BREVO_API_KEY or (BREVO_SMTP_LOGIN and BREVO_SMTP_PASSWORD):
-        EMAIL_PROVIDER = 'brevo'
-        return 'brevo'
-
-    # Fall back to AWS SES
-    if os.environ.get('AWS_SES_ACCESS_KEY_ID'):
-        EMAIL_PROVIDER = 'aws-ses'
-        return 'aws-ses'
-
-    return None
+BREVO_SMTP_LOGIN = os.environ.get('BREVO_SMTP_LOGIN')
+BREVO_SMTP_PASSWORD = os.environ.get('BREVO_SMTP_PASSWORD')
 
 def validate_config():
-    """Validate required configuration before sending emails."""
-    provider = detect_provider()
-
+    """Validate required Brevo configuration before sending emails."""
     if not FROM_EMAIL:
         print("[ERROR] NOTIFICATION_FROM_EMAIL environment variable not set")
-        print("  Set this to your verified sender address (e.g., notifications@crashlens.aicreatesai.com)")
+        print("  Set this to your verified Brevo sender address")
+        print("  Example: notifications@crashlens.aicreatesai.com")
         sys.exit(1)
 
-    if provider == 'brevo':
-        # Brevo can use either API key or SMTP credentials
-        if BREVO_API_KEY:
-            print(f"[CONFIG] Provider: Brevo (API mode)")
-            return
-        if BREVO_SMTP_LOGIN and BREVO_SMTP_PASSWORD:
-            print(f"[CONFIG] Provider: Brevo (SMTP mode)")
-            return
-        print("[ERROR] Brevo requires either:")
-        print("  - BREVO_API_KEY (for API mode), or")
-        print("  - BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD (for SMTP mode)")
-        sys.exit(1)
+    # Prefer SMTP mode if credentials are available (most reliable)
+    if BREVO_SMTP_LOGIN and BREVO_SMTP_PASSWORD:
+        print(f"[CONFIG] Provider: Brevo (SMTP mode)")
+        print(f"[CONFIG] From: {FROM_EMAIL}")
+        print(f"[CONFIG] SMTP Login: {BREVO_SMTP_LOGIN}")
+        return
 
-    elif provider == 'aws-ses':
-        print(f"[CONFIG] Provider: AWS SES ({AWS_REGION})")
-        if not os.environ.get('AWS_SES_ACCESS_KEY_ID'):
-            print("[ERROR] AWS_SES_ACCESS_KEY_ID environment variable not set")
-            sys.exit(1)
-        if not os.environ.get('AWS_SES_SECRET_ACCESS_KEY'):
-            print("[ERROR] AWS_SES_SECRET_ACCESS_KEY environment variable not set")
-            sys.exit(1)
-    else:
-        print("[ERROR] No email provider configured. Set one of:")
-        print("  Brevo (recommended, free tier):  BREVO_API_KEY or BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD")
-        print("  AWS SES (pay-per-use):           AWS_SES_ACCESS_KEY_ID + AWS_SES_SECRET_ACCESS_KEY")
-        sys.exit(1)
+    if BREVO_API_KEY:
+        key = BREVO_API_KEY.strip()
+        if not key.startswith('xkeysib-'):
+            print("[WARN] BREVO_API_KEY does not start with 'xkeysib-'")
+            print(f"  Your key starts with: {key[:8]}...")
+            print("  This looks like an SMTP password, NOT an API key.")
+            print("  If you have SMTP credentials, use BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD instead.")
+            print("  For the v3 API key: Brevo > profile icon (top-right) > SMTP & API > API Keys > Generate")
+        print(f"[CONFIG] Provider: Brevo (API mode)")
+        print(f"[CONFIG] From: {FROM_EMAIL}")
+        print(f"[CONFIG] API Key: {key[:8]}...{key[-4:]}")
+        return
+
+    print("[ERROR] No Brevo credentials configured. Set one of:")
+    print("")
+    print("  Option 1 (easiest): BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD")
+    print("    - Get from: Brevo Dashboard > SMTP & API > SMTP tab")
+    print("    - BREVO_SMTP_LOGIN = your login email (e.g. 8xxxx@smtp-brevo.com)")
+    print("    - BREVO_SMTP_PASSWORD = the SMTP key shown on that page")
+    print("")
+    print("  Option 2 (API mode): BREVO_API_KEY")
+    print("    - Get from: Brevo > profile icon (top-right) > SMTP & API > API Keys")
+    print("    - Key starts with: xkeysib-")
+    sys.exit(1)
 
 # Paths
 BASE_DIR = Path(__file__).parent
@@ -108,23 +87,12 @@ GRANTS_FILE = BASE_DIR / 'data' / 'grants.csv'
 CRASHES_FILE = BASE_DIR / 'data' / 'CDOT' / 'crashes.csv'
 
 # =============================================================================
-# EMAIL PROVIDER CLIENTS
+# BREVO EMAIL SENDING
 # =============================================================================
 
-def get_ses_client():
-    """Create AWS SES client with credentials from environment."""
-    import boto3
-    return boto3.client(
-        'ses',
-        region_name=AWS_REGION,
-        aws_access_key_id=os.environ.get('AWS_SES_ACCESS_KEY_ID'),
-        aws_secret_access_key=os.environ.get('AWS_SES_SECRET_ACCESS_KEY')
-    )
-
 def send_via_brevo_api(to_email, subject, html_body, text_body):
-    """Send email via Brevo HTTP API (uses sib-api-v3-sdk or raw requests)."""
-    import urllib.request
-    import urllib.error
+    """Send email via Brevo HTTP API."""
+    api_key = BREVO_API_KEY.strip()
 
     payload = json.dumps({
         "sender": {"email": FROM_EMAIL, "name": "CRASH LENS"},
@@ -141,7 +109,7 @@ def send_via_brevo_api(to_email, subject, html_body, text_body):
         headers={
             'accept': 'application/json',
             'content-type': 'application/json',
-            'api-key': BREVO_API_KEY
+            'api-key': api_key
         },
         method='POST'
     )
@@ -150,11 +118,19 @@ def send_via_brevo_api(to_email, subject, html_body, text_body):
         with urllib.request.urlopen(req) as response:
             result = json.loads(response.read().decode())
             msg_id = result.get('messageId', 'unknown')
-            print(f"[SUCCESS] Email sent to {to_email} via Brevo API (MessageId: {msg_id})")
+            print(f"[SUCCESS] Email sent to {to_email} (MessageId: {msg_id})")
             return True
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
         print(f"[ERROR] Brevo API error for {to_email}: {e.code} - {error_body}")
+        if e.code == 401:
+            print("[HINT] 401 = Invalid API key. Check these:")
+            print("  1. Copy the FULL key from Brevo Dashboard > SMTP & API > API Keys")
+            print("  2. Key must start with 'xkeysib-'")
+            print("  3. In GitHub Secrets: no extra spaces, quotes, or line breaks")
+            print(f"  4. Your key starts with: {api_key[:12]}...")
+        elif e.code == 400:
+            print("[HINT] 400 = Bad request. Check that sender email is verified in Brevo")
         return False
     except Exception as e:
         print(f"[ERROR] Failed to send via Brevo API to {to_email}: {e}")
@@ -178,6 +154,10 @@ def send_via_brevo_smtp(to_email, subject, html_body, text_body):
             server.send_message(msg)
         print(f"[SUCCESS] Email sent to {to_email} via Brevo SMTP")
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"[ERROR] Brevo SMTP auth failed: {e}")
+        print("[HINT] Check BREVO_SMTP_LOGIN (your Brevo account email) and BREVO_SMTP_PASSWORD (SMTP key from dashboard)")
+        return False
     except smtplib.SMTPException as e:
         print(f"[ERROR] Brevo SMTP error for {to_email}: {e}")
         return False
@@ -185,47 +165,14 @@ def send_via_brevo_smtp(to_email, subject, html_body, text_body):
         print(f"[ERROR] Failed to send via Brevo SMTP to {to_email}: {e}")
         return False
 
-def send_via_ses(to_email, subject, html_body, text_body):
-    """Send email via AWS SES."""
-    from botocore.exceptions import ClientError
-    ses = get_ses_client()
-
-    try:
-        response = ses.send_email(
-            Source=FROM_EMAIL,
-            Destination={'ToAddresses': [to_email]},
-            Message={
-                'Subject': {'Charset': CHARSET, 'Data': subject},
-                'Body': {
-                    'Html': {'Charset': CHARSET, 'Data': html_body},
-                    'Text': {'Charset': CHARSET, 'Data': text_body}
-                }
-            }
-        )
-        print(f"[SUCCESS] Email sent to {to_email} via SES (MessageId: {response['MessageId']})")
-        return True
-    except ClientError as e:
-        print(f"[ERROR] SES error for {to_email}: {e.response['Error']['Message']}")
-        return False
-
-# =============================================================================
-# UNIFIED SEND FUNCTION
-# =============================================================================
-
 def send_email(to_email, subject, html_body, text_body):
-    """Send email via the configured provider."""
-    provider = EMAIL_PROVIDER or detect_provider()
-
-    if provider == 'brevo':
-        # Prefer API mode, fall back to SMTP
-        if BREVO_API_KEY:
-            return send_via_brevo_api(to_email, subject, html_body, text_body)
-        else:
-            return send_via_brevo_smtp(to_email, subject, html_body, text_body)
-    elif provider == 'aws-ses':
-        return send_via_ses(to_email, subject, html_body, text_body)
+    """Send email via Brevo. Prefers SMTP mode (most reliable), falls back to API."""
+    if BREVO_SMTP_LOGIN and BREVO_SMTP_PASSWORD:
+        return send_via_brevo_smtp(to_email, subject, html_body, text_body)
+    elif BREVO_API_KEY:
+        return send_via_brevo_api(to_email, subject, html_body, text_body)
     else:
-        print(f"[ERROR] Unknown email provider: {provider}")
+        print("[ERROR] No Brevo credentials available")
         return False
 
 # =============================================================================
@@ -250,8 +197,8 @@ def get_report_subscribers():
     return [
         s for s in data.get('subscribers', [])
         if s.get('reports', {}).get('enabled', False)
-        and s.get('verified', False)  # Only send to verified subscribers
-        and s.get('email')  # Must have valid email
+        and s.get('verified', False)
+        and s.get('email')
     ]
 
 def get_grant_subscribers():
@@ -260,8 +207,8 @@ def get_grant_subscribers():
     return [
         s for s in data.get('subscribers', [])
         if s.get('grants', {}).get('enabled', False)
-        and s.get('verified', False)  # Only send to verified subscribers
-        and s.get('email')  # Must have valid email
+        and s.get('verified', False)
+        and s.get('email')
     ]
 
 # =============================================================================
@@ -279,7 +226,6 @@ def load_crash_summary():
             reader = csv.DictReader(f)
             rows = list(reader)
 
-        # Calculate summary statistics
         total = len(rows)
         severity_counts = {'K': 0, 'A': 0, 'B': 0, 'C': 0, 'O': 0}
 
@@ -288,7 +234,6 @@ def load_crash_summary():
             if sev in severity_counts:
                 severity_counts[sev] += 1
 
-        # Calculate EPDO — load weights from config, fallback to HSM standard
         def _load_epdo_weights():
             default = {'K': 462, 'A': 62, 'B': 12, 'C': 5, 'O': 1}
             try:
@@ -335,7 +280,6 @@ def load_grants_with_deadlines():
                 continue
 
             try:
-                # Try multiple date formats
                 for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%B %d, %Y']:
                     try:
                         deadline = datetime.strptime(deadline_str, fmt).date()
@@ -347,7 +291,7 @@ def load_grants_with_deadlines():
 
                 days_until = (deadline - today).days
 
-                if 0 <= days_until <= 60:  # Within next 60 days
+                if 0 <= days_until <= 60:
                     upcoming.append({
                         'name': grant.get('name', grant.get('Name', 'Unknown Grant')),
                         'agency': grant.get('agency', grant.get('Agency', '')),
@@ -359,7 +303,6 @@ def load_grants_with_deadlines():
             except Exception:
                 continue
 
-        # Sort by days until deadline
         upcoming.sort(key=lambda x: x['days_until'])
         return upcoming
 
@@ -425,36 +368,28 @@ def generate_report_email(subscriber, crash_summary):
     </head>
     <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#1e293b;max-width:600px;margin:0 auto;padding:20px;">
 
-        <!-- Header -->
         <div style="background:linear-gradient(135deg,#1e3a5f 0%,#1e40af 100%);padding:30px;border-radius:12px 12px 0 0;text-align:center;">
             <h1 style="color:white;margin:0;font-size:24px;">CRASH LENS</h1>
             <p style="color:rgba(255,255,255,0.9);margin:5px 0 0 0;font-size:14px;">Virginia Traffic Safety Analysis</p>
         </div>
 
-        <!-- Content -->
         <div style="background:white;padding:30px;border:1px solid #e2e8f0;border-top:none;">
             <h2 style="color:#1e3a5f;margin-top:0;">Your {frequency.title()} Crash Report</h2>
-
             <p>Hello {name},</p>
-
             <p>Here is your scheduled {frequency} crash analysis summary:</p>
-
             {crash_section}
-
             <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:15px;margin:20px 0;">
                 <p style="margin:0;font-size:14px;">
                     <strong>View Full Analysis:</strong> Log in to CRASH LENS to access detailed reports,
                     interactive maps, and AI-powered insights.
                 </p>
             </div>
-
             <a href="https://ecomhub200.github.io/Virginia/"
                style="display:inline-block;background:#1e40af;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:500;margin-top:10px;">
                 Open CRASH LENS
             </a>
         </div>
 
-        <!-- Footer -->
         <div style="background:#f8fafc;padding:20px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;text-align:center;font-size:12px;color:#64748b;">
             <p style="margin:0 0 10px 0;">
                 CRASH LENS - Virginia Crash Analysis Tool<br>
@@ -500,11 +435,10 @@ def generate_grant_alert_email(subscriber, upcoming_grants):
     name = subscriber.get('name', 'Traffic Safety Professional')
     alert_days = subscriber.get('grants', {}).get('daysBeforeDeadline', [7, 14, 30])
 
-    # Filter grants by subscriber's alert preferences
     relevant_grants = [g for g in upcoming_grants if g['days_until'] in alert_days]
 
     if not relevant_grants:
-        return None  # No relevant deadlines to alert about
+        return None
 
     grants_html = ""
     for grant in relevant_grants:
@@ -533,39 +467,30 @@ def generate_grant_alert_email(subscriber, upcoming_grants):
     html_body = f"""
     <!DOCTYPE html>
     <html>
-    <head>
-        <meta charset="UTF-8">
-    </head>
+    <head><meta charset="UTF-8"></head>
     <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#1e293b;max-width:600px;margin:0 auto;padding:20px;">
 
-        <!-- Header -->
         <div style="background:linear-gradient(135deg,#059669 0%,#047857 100%);padding:30px;border-radius:12px 12px 0 0;text-align:center;">
             <h1 style="color:white;margin:0;font-size:24px;">Grant Deadline Alert</h1>
             <p style="color:rgba(255,255,255,0.9);margin:5px 0 0 0;font-size:14px;">CRASH LENS Notification</p>
         </div>
 
-        <!-- Content -->
         <div style="background:#f8fafc;padding:30px;border:1px solid #e2e8f0;border-top:none;">
             <p>Hello {name},</p>
-
             <p>The following grant deadlines are approaching:</p>
-
             {grants_html}
-
             <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:15px;margin:20px 0;">
                 <p style="margin:0;font-size:14px;color:#92400e;">
                     <strong>Tip:</strong> Use CRASH LENS to generate grant-ready location analysis
                     and AI-assisted application content.
                 </p>
             </div>
-
             <a href="https://ecomhub200.github.io/Virginia/"
                style="display:inline-block;background:#059669;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:500;">
                 Prepare Grant Application
             </a>
         </div>
 
-        <!-- Footer -->
         <div style="background:white;padding:20px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;text-align:center;font-size:12px;color:#64748b;">
             <p style="margin:0;">
                 You received this because you enabled grant deadline alerts.<br>
@@ -587,11 +512,10 @@ def generate_weekly_digest_email(subscriber, crash_summary, upcoming_grants):
     """Generate weekly digest email."""
     name = subscriber.get('name', 'Traffic Safety Professional')
 
-    # Build grants table
     grants_section = ""
     if upcoming_grants:
         grants_rows = ""
-        for g in upcoming_grants[:10]:  # Top 10
+        for g in upcoming_grants[:10]:
             urgency = "critical" if g['days_until'] <= 7 else "warning" if g['days_until'] <= 14 else "normal"
             grants_rows += f"""
             <tr>
@@ -623,7 +547,6 @@ def generate_weekly_digest_email(subscriber, crash_summary, upcoming_grants):
     else:
         grants_section = "<p style='color:#64748b;'>No upcoming grant deadlines in the next 60 days.</p>"
 
-    # Crash summary section
     crash_section = ""
     if crash_summary:
         crash_section = f"""
@@ -660,10 +583,8 @@ def generate_weekly_digest_email(subscriber, crash_summary, upcoming_grants):
         <div style="background:#f8fafc;padding:30px;border:1px solid #e2e8f0;border-top:none;">
             <p>Hello {name},</p>
             <p>Here's your weekly traffic safety digest:</p>
-
             {crash_section}
             {grants_section}
-
             <div style="margin-top:25px;text-align:center;">
                 <a href="https://ecomhub200.github.io/Virginia/"
                    style="display:inline-block;background:#667eea;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:500;">
@@ -688,9 +609,7 @@ def generate_weekly_digest_email(subscriber, crash_summary, upcoming_grants):
 
 def generate_test_email(email):
     """Generate test email."""
-    provider = EMAIL_PROVIDER or detect_provider() or 'unknown'
-    provider_info = f"Brevo" if provider == 'brevo' else f"AWS SES ({AWS_REGION})"
-
+    mode = "API" if BREVO_API_KEY else "SMTP"
     return {
         'subject': "[CRASH LENS] Test Notification - Configuration Verified",
         'html': f"""
@@ -704,7 +623,7 @@ def generate_test_email(email):
                 <p>Your CRASH LENS email notifications are configured correctly.</p>
                 <p><strong>Email:</strong> {email}</p>
                 <p><strong>Timestamp:</strong> {datetime.now().isoformat()}</p>
-                <p><strong>Provider:</strong> {provider_info}</p>
+                <p><strong>Provider:</strong> Brevo ({mode} mode)</p>
             </div>
             <div style="background:#f8fafc;padding:15px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;text-align:center;font-size:12px;color:#64748b;">
                 CRASH LENS - Virginia Crash Analysis Tool
@@ -712,7 +631,7 @@ def generate_test_email(email):
         </body>
         </html>
         """,
-        'text': f"Test email successful!\nEmail: {email}\nTimestamp: {datetime.now().isoformat()}\nProvider: {provider_info}"
+        'text': f"Test email successful!\nEmail: {email}\nTimestamp: {datetime.now().isoformat()}\nProvider: Brevo ({mode} mode)"
     }
 
 # =============================================================================
@@ -827,7 +746,7 @@ def send_test(email):
                  email_content['html'], email_content['text']):
         print("\nTest email sent successfully!")
     else:
-        print("\nFailed to send test email. Check your email provider configuration.")
+        print("\nFailed to send test email. Check your Brevo configuration.")
         sys.exit(1)
 
 # =============================================================================
@@ -836,19 +755,23 @@ def send_test(email):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='CRASH LENS Email Notification System',
+        description='CRASH LENS Email Notification System (Brevo)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Providers (auto-detected from env vars, or set EMAIL_PROVIDER):
-  brevo     Free tier: 300 emails/day. Set BREVO_API_KEY or BREVO_SMTP_LOGIN + BREVO_SMTP_PASSWORD
-  aws-ses   Pay-per-use. Set AWS_SES_ACCESS_KEY_ID + AWS_SES_SECRET_ACCESS_KEY
+Required environment variables:
+  BREVO_API_KEY              Brevo API key (starts with xkeysib-)
+  NOTIFICATION_FROM_EMAIL    Verified sender email address
+
+Alternative (SMTP mode):
+  BREVO_SMTP_LOGIN           Your Brevo account email
+  BREVO_SMTP_PASSWORD        Brevo SMTP key
+  NOTIFICATION_FROM_EMAIL    Verified sender email address
 
 Examples:
   python send_notifications.py --type reports     Send scheduled reports
   python send_notifications.py --type grants      Send grant deadline alerts
   python send_notifications.py --type digest      Send weekly digest
   python send_notifications.py --type test --email user@example.com
-  python send_notifications.py --type test --email user@example.com --provider brevo
         """
     )
 
@@ -857,21 +780,11 @@ Examples:
                        help='Type of notification to send')
     parser.add_argument('--email', '-e',
                        help='Email address (required for test)')
-    parser.add_argument('--provider', '-p',
-                       choices=['brevo', 'aws-ses'],
-                       help='Force email provider (default: auto-detect)')
 
     args = parser.parse_args()
 
-    # Override provider if specified
-    if args.provider:
-        global EMAIL_PROVIDER
-        EMAIL_PROVIDER = args.provider
-
-    # Validate configuration
     validate_config()
 
-    # Execute based on type
     if args.type == 'reports':
         send_scheduled_reports()
     elif args.type == 'grants':
