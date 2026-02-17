@@ -1129,7 +1129,14 @@
         37.3862,
         -77.1462,
         37.7234
-      ]
+      ],
+      "reportMeta": {
+        "department": "Department of Public Works",
+        "division": "Traffic Engineering Division",
+        "address": "4305 E. Parham Road",
+        "cityStateZip": "Henrico, VA 23228",
+        "shortName": "Henrico County Traffic Engineering"
+      }
     },
     "henry": {
       "name": "Henry County",
