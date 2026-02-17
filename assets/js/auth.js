@@ -110,7 +110,7 @@ const CrashLensAuth = {
   /**
    * Sign up with Email/Password
    */
-  signUpWithEmail: async function(email, password, displayName) {
+  signUpWithEmail: async function(email, password, displayName, profileData) {
     try {
       const result = await firebase.auth().createUserWithEmailAndPassword(email, password);
 
@@ -121,6 +121,9 @@ const CrashLensAuth = {
 
       // Set currentUser immediately to avoid race condition with sendVerificationEmail
       this.currentUser = result.user;
+
+      // Store profile data for ensureUserDocument to consume
+      this._pendingProfileData = profileData || null;
 
       console.log('Email sign up successful');
       return result.user;
@@ -266,6 +269,10 @@ const CrashLensAuth = {
       const now = firebase.firestore.Timestamp.now();
       const provider = user.providerData[0]?.providerId || 'unknown';
 
+      // Retrieve pending profile data from email sign-up form
+      const profile = this._pendingProfileData || {};
+      this._pendingProfileData = null;
+
       // OAuth providers (Google, Microsoft) are pre-verified
       const isOAuthProvider = provider === 'google.com' || provider === 'microsoft.com';
       const isVerified = isOAuthProvider || user.emailVerified;
@@ -306,7 +313,17 @@ const CrashLensAuth = {
         },
 
         // Organization (for team/agency)
-        organizationId: null
+        organizationId: null,
+
+        // User profile fields (organization, role, jurisdiction)
+        organizationName: profile.organizationName || '',
+        employeeType: profile.employeeType || '',
+        userState: profile.userState || '',
+        userStateName: profile.userStateName || '',
+        userJurisdiction: profile.userJurisdiction || '',
+        userJurisdictionName: profile.userJurisdictionName || '',
+        profileComplete: !!(profile.employeeType && profile.userState),
+        profileCompletedAt: (profile.employeeType && profile.userState) ? now : null
       };
 
       await userRef.set(newUser);
@@ -465,6 +482,33 @@ const CrashLensAuth = {
     };
 
     return errorMessages[error.code] || error.message || 'An error occurred. Please try again.';
+  },
+
+  /**
+   * Update user profile data (organization, role, jurisdiction)
+   * Used by the profile completion modal for OAuth users
+   */
+  updateUserProfile: async function(profileData) {
+    if (!this.currentUser) throw new Error('No user signed in');
+
+    const userRef = firebase.firestore().collection('users').doc(this.currentUser.uid);
+    const now = firebase.firestore.Timestamp.now();
+
+    const updates = {
+      organizationName: profileData.organizationName || '',
+      employeeType: profileData.employeeType || '',
+      userState: profileData.userState || '',
+      userStateName: profileData.userStateName || '',
+      userJurisdiction: profileData.userJurisdiction || '',
+      userJurisdictionName: profileData.userJurisdictionName || '',
+      profileComplete: true,
+      profileCompletedAt: now
+    };
+
+    await userRef.update(updates);
+    this.userData = await this.getUserData();
+    console.log('User profile updated');
+    return this.userData;
   },
 
   /**
