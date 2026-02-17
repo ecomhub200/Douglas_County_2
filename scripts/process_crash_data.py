@@ -42,6 +42,7 @@ Version: 1.0.0
 import argparse
 import csv
 import glob
+import gzip
 import json
 import logging
 import os
@@ -215,7 +216,12 @@ def stage_merge(config: PipelineConfig, stats: PipelineStats) -> str:
 
         for filepath in input_files:
             logger.info("  Reading: %s", filepath)
-            with open(filepath, 'r', encoding='utf-8-sig') as fin:
+            # Transparently handle both plain CSV and gzip-compressed CSV (.csv.gz)
+            if filepath.endswith('.gz'):
+                _fh = gzip.open(filepath, 'rt', encoding='utf-8-sig')
+            else:
+                _fh = open(filepath, 'r', encoding='utf-8-sig')
+            with _fh as fin:
                 reader = csv.DictReader(fin)
 
                 if headers is None:
@@ -1118,8 +1124,12 @@ def main():
         if not os.path.exists(working_file):
             logger.error("Input file not found: %s", working_file)
             sys.exit(1)
-        # Count input rows
-        with open(working_file, 'r', encoding='utf-8-sig') as f:
+        # Count input rows (handle both plain CSV and .csv.gz)
+        if working_file.endswith('.gz'):
+            _fh = gzip.open(working_file, 'rt', encoding='utf-8-sig')
+        else:
+            _fh = open(working_file, 'r', encoding='utf-8-sig')
+        with _fh as f:
             stats.total_input_rows = sum(1 for _ in f) - 1  # minus header
 
     # --- Stage 1: Convert ---

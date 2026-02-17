@@ -62,9 +62,9 @@ DATASETS = {
 }
 
 BASE_URL = "https://data.montgomerycountymd.gov/resource"
-PAGE_SIZE = 1000
-MAX_RETRIES = 3
-RETRY_BACKOFF = [2, 4, 8]
+PAGE_SIZE = 50000  # Socrata max per request — fewer API calls = less throttle risk
+MAX_RETRIES = 4
+RETRY_BACKOFF = [2, 4, 8, 16]
 DEFAULT_YEARS = list(range(2015, datetime.now().year + 1))
 DEFAULT_DATA_DIR = "data/MarylandDOT/montgomery"
 

@@ -79,6 +79,23 @@ jobs:
           echo "Downloaded files:"
           ls -lh data/MarylandDOT/montgomery/moco_crashes_*.csv* 2>/dev/null || echo "  No CSVs found"
 
+      - name: Decompress gzipped CSVs
+        run: |
+          echo "Decompressing any .csv.gz files in data/MarylandDOT/montgomery/..."
+          DECOMPRESSED=0
+          for f in data/MarylandDOT/montgomery/moco_crashes_*.csv.gz; do
+            [ -f "$f" ] || continue
+            PLAIN="${f%.gz}"
+            if [ ! -f "$PLAIN" ]; then
+              gunzip -k "$f"
+              echo "  Decompressed: $f -> $PLAIN"
+              DECOMPRESSED=$((DECOMPRESSED + 1))
+            else
+              echo "  Skipped (plain CSV exists): $PLAIN"
+            fi
+          done
+          echo "Decompressed $DECOMPRESSED file(s)"
+
       - name: Detect input files
         id: detect
         run: |
@@ -91,8 +108,18 @@ jobs:
             INPUT_PATTERN="${{ github.event.inputs.input_files }}"
             if [ -z "$INPUT_PATTERN" ]; then
               # Default: all crash CSVs (not drivers/nonmotorists — those are supplemental)
+              # Match both plain .csv and .csv.gz (prefer plain if both exist)
               for f in data/MarylandDOT/montgomery/moco_crashes_*.csv; do
                 [ -f "$f" ] && echo "$f" >> "$FILE_LIST"
+              done
+              # Also check for .csv.gz files that weren't decompressed
+              for f in data/MarylandDOT/montgomery/moco_crashes_*.csv.gz; do
+                [ -f "$f" ] || continue
+                PLAIN="${f%.gz}"
+                # Only add .csv.gz if no plain .csv version exists
+                if [ ! -f "$PLAIN" ]; then
+                  echo "$f" >> "$FILE_LIST"
+                fi
               done
             else
               for f in $INPUT_PATTERN; do
@@ -104,9 +131,17 @@ jobs:
             echo "skip_geocode=${{ github.event.inputs.skip_geocode }}" >> "$GITHUB_OUTPUT"
             echo "dry_run=${{ github.event.inputs.dry_run }}" >> "$GITHUB_OUTPUT"
           else
-            # Auto-trigger: use all crash CSVs
+            # Auto-trigger: use all crash CSVs (plain .csv, decompressed from .csv.gz)
             for f in data/MarylandDOT/montgomery/moco_crashes_*.csv; do
               [ -f "$f" ] && echo "$f" >> "$FILE_LIST"
+            done
+            # Also check for .csv.gz files that weren't decompressed
+            for f in data/MarylandDOT/montgomery/moco_crashes_*.csv.gz; do
+              [ -f "$f" ] || continue
+              PLAIN="${f%.gz}"
+              if [ ! -f "$PLAIN" ]; then
+                echo "$f" >> "$FILE_LIST"
+              fi
             done
             echo "merge=true" >> "$GITHUB_OUTPUT"
             echo "skip_geocode=false" >> "$GITHUB_OUTPUT"
