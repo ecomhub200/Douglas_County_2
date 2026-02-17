@@ -1,0 +1,62 @@
+REDDIT CONTENT GUIDELINES:
+
+FORMAT:
+- Title: Clear, descriptive, not clickbaity
+- Self-post (text): Detailed, well-formatted with markdown
+- Link post: With substantial commentary
+- Comments: Helpful, detailed, with sources
+
+TONE:
+- Genuinely helpful community member
+- Technical depth is appreciated
+- Cite sources and data
+- Humble, not promotional
+- Answer questions thoroughly
+
+SUBREDDIT TARGETS:
+- r/trafficengineering -- Core audience, technical discussions
+- r/urbanplanning -- Planning and policy context
+- r/civilengineering -- Broader engineering community
+- r/transportation -- General transportation topics
+- r/dataisbeautiful -- Data visualizations (crash maps, charts)
+
+POST STRUCTURE:
+[Clear, descriptive title -- not clickbait]
+
+[Context: Why this matters to the community]
+
+[Content: Data, analysis, or insights with proper formatting]
+
+[Sources: Links to data sources, methodology]
+
+[Discussion prompt: Open-ended question to invite comments]
+
+REDDIT-SPECIFIC RULES:
+- NEVER be overtly promotional (will get downvoted/banned)
+- Contribute value first, mention your tool only if directly relevant
+- Follow each subreddit's rules carefully
+- Use proper markdown formatting
+- Engage with comments thoughtfully
+- Build karma through helpful comments before posting
+- AMAs (Ask Me Anything) can be powerful for credibility
+
+CONTENT IDEAS:
+1. Share interesting crash data analysis (r/dataisbeautiful)
+2. Discuss safety countermeasures with data (r/trafficengineering)
+3. Answer questions about crash analysis methodology
+4. Share open-source tools or resources
+5. Discuss industry trends and policy changes
+
+CRITICAL RULES:
+- Reddit communities HATE spam and self-promotion
+- 90/10 rule: 90% helpful content, 10% self-promotion (at most)
+- Always disclose affiliation if mentioning your product
+- Build reputation through comments before making posts
+- Read and follow each subreddit's specific rules
+
+DO NOT:
+- Spam product links
+- Astroturf or use fake accounts
+- Ignore subreddit rules
+- Post without engaging in comments
+- Use marketing language

@@ -1,0 +1,206 @@
+{
+  "brand": {
+    "name": "CRASH LENS",
+    "tagline": "AI-Powered Crash Analysis for Safer Roads",
+    "website": "https://crashlens.com",
+    "handle": "@CrashLensAI",
+    "hashtags": ["#CrashLens", "#TrafficSafety", "#VisionZero", "#RoadSafety", "#TransportationEngineering", "#CrashAnalysis", "#HSIP", "#DOT"],
+    "description": "CRASH LENS is an AI-powered crash analysis SaaS tool that helps traffic engineers, DOT professionals, and safety analysts identify crash hotspots, evaluate countermeasures, and make data-driven decisions to save lives."
+  },
+  "platforms": {
+    "linkedin": {
+      "enabled": true,
+      "handle": "@CrashLensAI",
+      "max_chars": 3000,
+      "max_hashtags": 5,
+      "tone": "professional, authoritative, data-driven",
+      "content_types": ["articles", "carousels", "polls", "text_posts", "documents"],
+      "posting_schedule": {
+        "days": ["tuesday", "wednesday", "thursday"],
+        "time": "09:00",
+        "timezone": "America/New_York",
+        "posts_per_week": 4
+      }
+    },
+    "facebook": {
+      "enabled": true,
+      "handle": "@CrashLensAI",
+      "max_chars": 63206,
+      "max_hashtags": 3,
+      "tone": "professional but approachable, community-focused",
+      "content_types": ["text_posts", "images", "videos", "links", "events"],
+      "posting_schedule": {
+        "days": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        "time": "10:00",
+        "timezone": "America/New_York",
+        "posts_per_week": 4
+      }
+    },
+    "twitter": {
+      "enabled": true,
+      "handle": "@CrashLensAI",
+      "max_chars": 280,
+      "max_hashtags": 3,
+      "tone": "concise, informative, engaging",
+      "content_types": ["tweets", "threads", "polls", "images"],
+      "posting_schedule": {
+        "days": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        "time": "08:30",
+        "timezone": "America/New_York",
+        "posts_per_week": 7
+      }
+    },
+    "instagram": {
+      "enabled": true,
+      "handle": "@CrashLensAI",
+      "max_chars": 2200,
+      "max_hashtags": 15,
+      "tone": "visual, educational, inspiring",
+      "content_types": ["posts", "reels", "stories", "carousels"],
+      "posting_schedule": {
+        "days": ["tuesday", "thursday", "saturday"],
+        "time": "11:00",
+        "timezone": "America/New_York",
+        "posts_per_week": 3
+      }
+    },
+    "youtube": {
+      "enabled": true,
+      "handle": "@CrashLensAI",
+      "max_title_chars": 100,
+      "max_description_chars": 5000,
+      "max_hashtags": 15,
+      "tone": "educational, tutorial-style, professional",
+      "content_types": ["tutorials", "demos", "shorts", "webinars"],
+      "posting_schedule": {
+        "days": ["wednesday"],
+        "time": "14:00",
+        "timezone": "America/New_York",
+        "posts_per_week": 1
+      }
+    },
+    "tiktok": {
+      "enabled": true,
+      "handle": "@CrashLensAI",
+      "max_chars": 2200,
+      "max_hashtags": 5,
+      "tone": "engaging, surprising, educational-but-fun",
+      "content_types": ["short_videos", "duets", "educational"],
+      "posting_schedule": {
+        "days": ["tuesday", "thursday"],
+        "time": "18:00",
+        "timezone": "America/New_York",
+        "posts_per_week": 2
+      }
+    },
+    "bluesky": {
+      "enabled": true,
+      "handle": "@crashlens.bsky.social",
+      "max_chars": 300,
+      "max_hashtags": 3,
+      "tone": "concise, tech-savvy, informative",
+      "content_types": ["posts", "threads", "images"],
+      "posting_schedule": {
+        "days": ["monday", "wednesday", "friday"],
+        "time": "09:00",
+        "timezone": "America/New_York",
+        "posts_per_week": 3
+      }
+    },
+    "reddit": {
+      "enabled": true,
+      "subreddits": ["r/trafficengineering", "r/urbanplanning", "r/civilengineering", "r/transportation"],
+      "tone": "helpful, technical, community-member (not promotional)",
+      "content_types": ["text_posts", "comments", "AMAs"],
+      "posting_schedule": {
+        "days": ["wednesday"],
+        "time": "10:00",
+        "timezone": "America/New_York",
+        "posts_per_week": 1
+      }
+    }
+  },
+  "content_pillars": {
+    "safety_statistics": {
+      "weight": 0.25,
+      "description": "Weekly crash data insights, national/state trends, data visualizations",
+      "example_topics": [
+        "Weekly crash trend analysis",
+        "State-by-state comparison",
+        "Seasonal crash patterns",
+        "Pedestrian/bicycle safety stats"
+      ]
+    },
+    "product_features": {
+      "weight": 0.20,
+      "description": "Feature spotlights, new releases, how-to guides, product tips",
+      "example_topics": [
+        "CMF analysis walkthrough",
+        "Signal warrant assessment demo",
+        "New AI assistant capabilities",
+        "Hotspot detection tutorial"
+      ]
+    },
+    "industry_news": {
+      "weight": 0.20,
+      "description": "FHWA updates, MUTCD changes, HSIP funding, policy changes",
+      "example_topics": [
+        "New FHWA guidelines",
+        "HSIP funding opportunities",
+        "MUTCD updates",
+        "State DOT announcements"
+      ]
+    },
+    "success_stories": {
+      "weight": 0.15,
+      "description": "How agencies use CRASH LENS, case studies, testimonials",
+      "example_topics": [
+        "County safety improvement case study",
+        "Before/after analysis results",
+        "User testimonials",
+        "Agency partnership announcements"
+      ]
+    },
+    "educational": {
+      "weight": 0.15,
+      "description": "Traffic engineering concepts, countermeasure explanations, safety principles",
+      "example_topics": [
+        "What is EPDO scoring?",
+        "Understanding crash severity levels",
+        "How CMFs work",
+        "Vision Zero explained"
+      ]
+    },
+    "behind_the_scenes": {
+      "weight": 0.05,
+      "description": "Development updates, team insights, roadmap previews",
+      "example_topics": [
+        "New feature in development",
+        "Team spotlight",
+        "Development process insights",
+        "Roadmap preview"
+      ]
+    }
+  },
+  "automation": {
+    "claude_model": "claude-sonnet-4-5-20250929",
+    "generation_schedule": "weekly",
+    "review_required": true,
+    "review_method": "github_pr",
+    "posts_per_batch": 20,
+    "output_format": "json",
+    "output_directory": "social_media/output"
+  },
+  "self_hosting": {
+    "postiz": {
+      "docker_image": "ghcr.io/gitroomhq/postiz-app:latest",
+      "port": 4200,
+      "requires": "4GB RAM, 2 vCPUs minimum"
+    },
+    "n8n": {
+      "docker_image": "docker.n8n.io/n8nio/n8n:latest",
+      "port": 5678,
+      "requires": "2GB RAM, 1 vCPU minimum"
+    }
+  }
+}
