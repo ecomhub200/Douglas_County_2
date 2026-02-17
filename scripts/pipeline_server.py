@@ -38,6 +38,11 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 STATES_DIR = PROJECT_ROOT / 'states'
 DATA_DIR = PROJECT_ROOT / 'data'
 
+# Maximum upload size: 5 GB
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
+# Stream to disk in 8 MB chunks to keep memory usage low
+UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger('pipeline-server')
 
@@ -332,6 +337,15 @@ class PipelineHandler(BaseHTTPRequestHandler):
             }, 409)
             return
 
+        # Reject requests that exceed the max upload size early via Content-Length
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length > MAX_UPLOAD_BYTES:
+            self._json_response({
+                'error': f'File too large. Maximum upload size is {MAX_UPLOAD_BYTES / (1024**3):.0f} GB',
+                'maxBytes': MAX_UPLOAD_BYTES,
+            }, 413)
+            return
+
         # Parse multipart form data
         content_type = self.headers.get('Content-Type', '')
         if 'multipart/form-data' not in content_type:
@@ -369,7 +383,6 @@ class PipelineHandler(BaseHTTPRequestHandler):
             dot_dir.mkdir(parents=True, exist_ok=True)
 
             # Build a descriptive filename for the saved raw CSV
-            # Use original filename if it looks reasonable, otherwise generate one
             orig_name = file_item.filename
             safe_name = _build_save_filename(orig_name, jurisdiction)
             save_path = str(dot_dir / safe_name)
@@ -379,12 +392,25 @@ class PipelineHandler(BaseHTTPRequestHandler):
                 base, ext = os.path.splitext(safe_name)
                 save_path = str(dot_dir / f"{base}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{ext}")
 
-            # Write uploaded file to the DOT data directory
-            file_data = file_item.file.read()
+            # Stream uploaded file to disk in chunks (avoids loading GBs into RAM)
+            total_written = 0
             with open(save_path, 'wb') as out_f:
-                out_f.write(file_data)
+                while True:
+                    chunk = file_item.file.read(UPLOAD_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    total_written += len(chunk)
+                    if total_written > MAX_UPLOAD_BYTES:
+                        out_f.close()
+                        os.remove(save_path)
+                        self._json_response({
+                            'error': f'File too large. Maximum upload size is {MAX_UPLOAD_BYTES / (1024**3):.0f} GB',
+                            'maxBytes': MAX_UPLOAD_BYTES,
+                        }, 413)
+                        return
+                    out_f.write(chunk)
 
-            file_size_mb = round(len(file_data) / (1024 * 1024), 2)
+            file_size_mb = round(total_written / (1024 * 1024), 2)
             logger.info("Saved: %s (%.2f MB) -> %s", orig_name, file_size_mb, save_path)
             logger.info("Received: file=%s, state=%s, jurisdiction=%s, dotFolder=%s",
                          orig_name, state_key, jurisdiction, dot_name)
@@ -405,6 +431,7 @@ class PipelineHandler(BaseHTTPRequestHandler):
                 'status': 'started',
                 'message': f'Pipeline started for {state_key}/{jurisdiction}',
                 'savedAs': str(Path(save_path).relative_to(PROJECT_ROOT)),
+                'fileSizeMB': file_size_mb,
                 'outputDir': f'data/{dot_name}/',
                 'merging': will_merge,
                 'rawFileCount': len(existing_raw),
