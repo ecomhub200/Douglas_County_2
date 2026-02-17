@@ -23,6 +23,14 @@ on:
       test_email:
         description: 'Email address for test (only for test type)'
         required: false
+      email_provider:
+        description: 'Email provider override (default: auto-detect)'
+        required: false
+        type: choice
+        options:
+          - auto
+          - brevo
+          - aws-ses
 
 jobs:
   send-notifications:
@@ -40,7 +48,8 @@ jobs:
       - name: Install dependencies
         run: |
           set -e
-          pip install boto3
+          # boto3 only needed if using AWS SES provider
+          pip install boto3 || true
 
       - name: Determine notification type
         id: determine-type
@@ -50,6 +59,10 @@ jobs:
             # Manual trigger - use the input directly
             echo "type=${{ github.event.inputs.notification_type }}" >> $GITHUB_OUTPUT
             echo "test_email=${{ github.event.inputs.test_email }}" >> $GITHUB_OUTPUT
+            PROVIDER="${{ github.event.inputs.email_provider }}"
+            if [ "$PROVIDER" != "auto" ] && [ -n "$PROVIDER" ]; then
+              echo "provider=$PROVIDER" >> $GITHUB_OUTPUT
+            fi
             echo "Manually triggered: ${{ github.event.inputs.notification_type }}"
           else
             # Scheduled trigger - use github.event.schedule to determine which cron fired
@@ -80,10 +93,17 @@ jobs:
       - name: Send scheduled reports
         if: steps.determine-type.outputs.type == 'reports'
         env:
+          # Brevo (preferred - free tier)
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_PASSWORD: ${{ secrets.BREVO_SMTP_PASSWORD }}
+          # AWS SES (fallback)
           AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
           AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
           AWS_SES_REGION: ${{ vars.AWS_SES_REGION || 'us-east-1' }}
+          # Common
           NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
+          EMAIL_PROVIDER: ${{ steps.determine-type.outputs.provider }}
         run: |
           set -e
           echo "Sending scheduled reports..."
@@ -92,10 +112,14 @@ jobs:
       - name: Send grant alerts
         if: steps.determine-type.outputs.type == 'grants'
         env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_PASSWORD: ${{ secrets.BREVO_SMTP_PASSWORD }}
           AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
           AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
           AWS_SES_REGION: ${{ vars.AWS_SES_REGION || 'us-east-1' }}
           NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
+          EMAIL_PROVIDER: ${{ steps.determine-type.outputs.provider }}
         run: |
           set -e
           echo "Sending grant deadline alerts..."
@@ -104,10 +128,14 @@ jobs:
       - name: Send weekly digest
         if: steps.determine-type.outputs.type == 'digest'
         env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_PASSWORD: ${{ secrets.BREVO_SMTP_PASSWORD }}
           AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
           AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
           AWS_SES_REGION: ${{ vars.AWS_SES_REGION || 'us-east-1' }}
           NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
+          EMAIL_PROVIDER: ${{ steps.determine-type.outputs.provider }}
         run: |
           set -e
           echo "Sending weekly digest..."
@@ -116,10 +144,14 @@ jobs:
       - name: Send test email
         if: steps.determine-type.outputs.type == 'test'
         env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_SMTP_LOGIN: ${{ secrets.BREVO_SMTP_LOGIN }}
+          BREVO_SMTP_PASSWORD: ${{ secrets.BREVO_SMTP_PASSWORD }}
           AWS_SES_ACCESS_KEY_ID: ${{ secrets.AWS_SES_ACCESS_KEY_ID }}
           AWS_SES_SECRET_ACCESS_KEY: ${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}
           AWS_SES_REGION: ${{ vars.AWS_SES_REGION || 'us-east-1' }}
           NOTIFICATION_FROM_EMAIL: ${{ secrets.NOTIFICATION_FROM_EMAIL }}
+          EMAIL_PROVIDER: ${{ steps.determine-type.outputs.provider }}
         run: |
           set -e
           if [ -z "${{ steps.determine-type.outputs.test_email }}" ]; then
