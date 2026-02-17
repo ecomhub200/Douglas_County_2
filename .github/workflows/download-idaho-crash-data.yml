@@ -4,8 +4,8 @@ name: Download Idaho Crash Data
 # Modeled after download-cdot-crash-data.yml
 
 on:
-  schedule:
-    - cron: '0 11 1 * *'
+  # schedule:
+    # - cron: '0 11 1 * *'     # DISABLED — re-enable when pipeline is ready (see data/cdot/github_action_activation_plan.md)
   workflow_dispatch:
     inputs:
       jurisdiction:
