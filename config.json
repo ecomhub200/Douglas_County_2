@@ -3371,6 +3371,16 @@
       "dataDir": "CDOT",
       "r2Prefix": "colorado",
       "appSubtitle": "Colorado Crash Analysis Tool"
+    },
+    "maryland": {
+      "fips": "24",
+      "name": "Maryland",
+      "abbreviation": "MD",
+      "dotName": "MarylandDOT",
+      "defaultJurisdiction": "montgomery",
+      "dataDir": "MarylandDOT",
+      "r2Prefix": "maryland",
+      "appSubtitle": "Maryland Crash Analysis Tool"
     }
   },
   "defaultState": "colorado",
@@ -3398,6 +3408,13 @@
       "url": "https://www.codot.gov/safety/traffic-safety/crash-data",
       "downloadMethod": "playwright",
       "description": "Colorado DOT crash data via OnBase web portal"
+    },
+    "maryland": {
+      "name": "Montgomery County Open Data Portal",
+      "url": "https://data.montgomerycountymd.gov",
+      "apiUrl": "https://data.montgomerycountymd.gov/resource/bhju-22kf.json",
+      "downloadMethod": "socrata",
+      "description": "Montgomery County MD crash data via Socrata SODA API"
     }
   },
   "transitStops": {

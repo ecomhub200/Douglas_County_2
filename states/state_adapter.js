@@ -34,10 +34,19 @@ const StateAdapter = (() => {
             optionalColumns: ['K_People', 'A_People', 'Node', 'Physical Juris Name'],
             displayName: 'Virginia (TREDS)',
             configPath: 'states/virginia/config.json'
+        },
+        maryland: {
+            requiredColumns: ['report_number', 'acrs_report_type', 'road_name'],
+            optionalColumns: ['crash_date_time', 'collision_type', 'municipality', 'weather', 'light'],
+            displayName: 'Maryland (ACRS - MoCo)',
+            configPath: 'states/maryland/config.json'
+        },
+        maryland_statewide: {
+            requiredColumns: ['report_no', 'acrs_report_type', 'road_name', 'county_desc'],
+            optionalColumns: ['acc_date', 'collision_type_desc', 'weather_desc', 'light_desc'],
+            displayName: 'Maryland (ACRS - Statewide)',
+            configPath: 'states/maryland/config.json'
         }
-        // Add more states here:
-        // texas: { requiredColumns: [...], ... }
-        // california: { requiredColumns: [...], ... }
     };
 
     // ─── Current state ───
@@ -533,10 +542,215 @@ const StateAdapter = (() => {
         }
     };
 
+    // ─── Maryland Normalizer ───
+    // Transforms Maryland ACRS data (MoCo or statewide) into Virginia-compatible format
+    const MARYLAND_NORMALIZER = {
+        // Collision mapping
+        _COLLISION_MAP: {
+            'Same Dir Rear End': '1. Rear End', 'SAME DIR REAR END': '1. Rear End',
+            'SAME DIRECTION REAR END': '1. Rear End', 'Rear End': '1. Rear End',
+            'Angle': '2. Angle', 'ANGLE': '2. Angle',
+            'Angle Meets Left Head On': '2. Angle', 'Angle Meets Left Turn': '2. Angle',
+            'Head On': '3. Head On', 'HEAD ON': '3. Head On',
+            'Head On Left Turn': '3. Head On', 'HEAD ON LEFT TURN': '3. Head On',
+            'Same Direction Sideswipe': '4. Sideswipe - Same Direction',
+            'SAME DIRECTION SIDESWIPE': '4. Sideswipe - Same Direction',
+            'Opposite Direction Sideswipe': '5. Sideswipe - Opposite Direction',
+            'OPPOSITE DIRECTION SIDESWIPE': '5. Sideswipe - Opposite Direction',
+            'Single Vehicle': '14. Fixed Object', 'SINGLE VEHICLE': '14. Fixed Object',
+            'Other': '16. Other', 'OTHER': '16. Other', 'UNKNOWN': '16. Other'
+        },
+        // Weather mapping
+        _WEATHER_MAP: {
+            'Clear': '1. No Adverse Condition (Clear/Cloudy)', 'CLEAR': '1. No Adverse Condition (Clear/Cloudy)',
+            'Cloudy': '1. No Adverse Condition (Clear/Cloudy)', 'CLOUDY': '1. No Adverse Condition (Clear/Cloudy)',
+            'Raining': '5. Rain', 'RAINING': '5. Rain',
+            'Foggy': '3. Fog/Smog/Smoke', 'FOGGY': '3. Fog/Smog/Smoke',
+            'Snow': '4. Snow', 'SNOW': '4. Snow', 'Blowing Snow': '4. Snow',
+            'Sleet': '6. Sleet/Hail/Freezing', 'SLEET': '6. Sleet/Hail/Freezing',
+            'Severe Crosswinds': '8. Severe Crosswinds'
+        },
+        // Light mapping
+        _LIGHT_MAP: {
+            'Daylight': '2. Daylight', 'DAYLIGHT': '2. Daylight',
+            'Dark Lights On': '4. Darkness - Road Lighted', 'Dark-Lights On': '4. Darkness - Road Lighted',
+            'DARK LIGHTS ON': '4. Darkness - Road Lighted',
+            'Dark No Lights': '5. Darkness - Road Not Lighted', 'Dark-No Lights': '5. Darkness - Road Not Lighted',
+            'DARK NO LIGHTS': '5. Darkness - Road Not Lighted',
+            'Dawn': '1. Dawn', 'DAWN': '1. Dawn',
+            'Dusk': '3. Dusk', 'DUSK': '3. Dusk',
+            'Dark - Unknown Lighting': '6. Dark - Unknown', 'Dark -- Unknown Lighting': '6. Dark - Unknown'
+        },
+        // Surface mapping
+        _SURFACE_MAP: {
+            'Dry': '1. Dry', 'DRY': '1. Dry',
+            'Wet': '2. Wet', 'WET': '2. Wet',
+            'Snow': '3. Snow', 'SNOW': '3. Snow',
+            'Ice': '5. Ice', 'ICE': '5. Ice'
+        },
+        // Road system mapping
+        _ROAD_SYSTEM_MAP: {
+            'Interstate': 'Interstate',
+            'US Route': 'Primary', 'US (State)': 'Primary',
+            'Maryland (State)': 'Primary', 'State Route': 'Primary',
+            'County': 'NonVDOT secondary', 'Municipality': 'NonVDOT secondary',
+            'Other Public Roadway': 'NonVDOT secondary'
+        },
+        // Severity mapping (ACRS 3-tier)
+        _SEVERITY_MAP: {
+            'Fatal Crash': 'K', 'FATAL CRASH': 'K',
+            'Injury Crash': 'B', 'INJURY CRASH': 'B',
+            'Property Damage Crash': 'O', 'PROPERTY DAMAGE CRASH': 'O'
+        },
+        _DARKNESS: new Set([
+            'Dark Lights On', 'Dark-Lights On', 'Dark No Lights', 'Dark-No Lights',
+            'Dark - Unknown Lighting', 'Dark -- Unknown Lighting',
+            'DARK LIGHTS ON', 'DARK-LIGHTS ON', 'DARK NO LIGHTS', 'DARK-NO LIGHTS',
+            'DARK -- UNKNOWN LIGHTING'
+        ]),
+
+        // Helper: get field value from primary or alternate column name
+        _get(row, primary, alt) {
+            const val = (row[primary] || '').trim();
+            if (val) return val;
+            if (alt) return (row[alt] || '').trim();
+            return '';
+        },
+
+        normalizeRow(row) {
+            const n = {};
+
+            // ── ID ──
+            n['Document Nbr'] = this._get(row, 'report_number', 'report_no');
+
+            // ── Date/Time ──
+            const rawDt = this._get(row, 'crash_date_time', 'acc_date');
+            let datePart = '', timePart = '', yearPart = '';
+            if (rawDt.includes('T')) {
+                const parts = rawDt.split('T');
+                datePart = parts[0];
+                const timeStr = parts[1] ? parts[1].split('.')[0] : '';
+                timePart = timeStr.replace(/:/g, '').substring(0, 4);
+                yearPart = datePart.substring(0, 4);
+            } else if (rawDt) {
+                datePart = rawDt.split(' ')[0];
+                if (datePart.includes('/')) {
+                    const dp = datePart.split('/');
+                    if (dp.length === 3) yearPart = dp[2].substring(0, 4);
+                } else if (datePart.includes('-')) {
+                    yearPart = datePart.substring(0, 4);
+                }
+            }
+            n['Crash Date'] = datePart;
+            n['Crash Year'] = yearPart;
+            n['Crash Military Time'] = timePart || this._get(row, 'acc_time', '').replace(/:/g, '').substring(0, 4);
+
+            // ── Severity ──
+            const acrsType = this._get(row, 'acrs_report_type', 'report_type');
+            const severity = this._SEVERITY_MAP[acrsType] || 'O';
+            n['Crash Severity'] = severity;
+            n['K_People'] = severity === 'K' ? 1 : 0;
+            n['A_People'] = 0;
+            n['B_People'] = severity === 'B' ? 1 : 0;
+            n['C_People'] = 0;
+
+            // ── Collision Type ──
+            const rawCollision = this._get(row, 'collision_type', 'collision_type_desc');
+            n['Collision Type'] = this._COLLISION_MAP[rawCollision] || rawCollision || '16. Other';
+
+            // ── Conditions ──
+            const rawWeather = this._get(row, 'weather', 'weather_desc');
+            n['Weather Condition'] = this._WEATHER_MAP[rawWeather] || rawWeather;
+            const rawLight = this._get(row, 'light', 'light_desc');
+            n['Light Condition'] = this._LIGHT_MAP[rawLight] || rawLight;
+            const rawSurface = this._get(row, 'surface_condition', 'surf_cond_desc');
+            n['Roadway Surface Condition'] = this._SURFACE_MAP[rawSurface] || rawSurface;
+            n['Roadway Alignment'] = '1. Straight - Level';
+
+            // ── Roadway Description / Intersection ──
+            n['Roadway Description'] = '';
+            const junction = this._get(row, 'junction', 'junction_desc');
+            const jl = junction.toLowerCase();
+            const isIntersection = junction && jl.includes('intersection') && !jl.includes('non-intersection') && !jl.includes('non intersection');
+            n['Intersection Type'] = isIntersection ? '4. Four Approaches' : '1. Not at Intersection';
+
+            // ── Route & Location ──
+            n['RTE Name'] = this._get(row, 'road_name', '');
+            const routeType = this._get(row, 'route_type', 'route_type_desc');
+            n['SYSTEM'] = this._ROAD_SYSTEM_MAP[routeType] || 'NonVDOT secondary';
+
+            // Node: intersection name from road + cross street
+            const road = this._get(row, 'road_name', '');
+            const cross = this._get(row, 'cross_street_name', '');
+            if (road && cross) {
+                const roads = [road, cross].sort();
+                n['Node'] = `${roads[0]} & ${roads[1]}`;
+            } else {
+                n['Node'] = '';
+            }
+            n['RNS MP'] = '';
+
+            // ── Coordinates ──
+            n['x'] = parseFloat(row['longitude']) || 0;
+            n['y'] = parseFloat(row['latitude']) || 0;
+
+            // ── Jurisdiction ──
+            n['Physical Juris Name'] = this._get(row, 'municipality', '') || this._get(row, 'county_desc', '') || 'Montgomery County';
+
+            // ── Boolean flags ──
+            n['Pedestrian?'] = 'No';
+            n['Bike?'] = 'No';
+            n['Alcohol?'] = 'No';
+            n['Speed?'] = 'No';
+            const hitRun = this._get(row, 'hit_run', '');
+            n['Hitrun?'] = ['YES', 'TRUE', 'Y'].includes(hitRun.toUpperCase()) ? 'Yes' : 'No';
+            n['Motorcycle?'] = 'No';
+            n['Night?'] = this._DARKNESS.has(rawLight) ? 'Yes' : 'No';
+            n['Distracted?'] = 'No';
+            n['Drowsy?'] = 'No';
+            n['Drug Related?'] = 'No';
+            n['Young?'] = 'No';
+            n['Senior?'] = 'No';
+            n['Unrestrained?'] = 'No';
+            n['School Zone'] = 'No';
+            n['Work Zone Related'] = 'No';
+
+            // ── Safety fields ──
+            n['Animal Related?'] = 'No';
+            n['Guardrail Related?'] = 'No';
+            n['Lgtruck?'] = 'No';
+            n['RoadDeparture Type'] = 'NOT_RD';
+            n['Max Speed Diff'] = '';
+
+            // ── Traffic Control ──
+            n['Traffic Control Type'] = this._get(row, 'traffic_control', 'traf_control_desc');
+            n['Traffic Control Status'] = '';
+
+            // ── Infrastructure ──
+            n['Functional Class'] = '';
+            n['Area Type'] = '';
+            n['Facility Type'] = '';
+            n['Ownership'] = '';
+            n['First Harmful Event'] = '';
+            n['First Harmful Event Loc'] = '';
+
+            // ── Keep original MD fields ──
+            n['_md_report_type'] = acrsType;
+            n['_md_route_type'] = routeType;
+            n['_md_municipality'] = this._get(row, 'municipality', '');
+            n['_md_cross_street'] = cross;
+            n['_md_speed_limit'] = this._get(row, 'speed_limit', '');
+
+            return n;
+        }
+    };
+
     // ─── Normalizer Registry ───
     const NORMALIZERS = {
         colorado: COLORADO_NORMALIZER,
-        virginia: VIRGINIA_NORMALIZER
+        virginia: VIRGINIA_NORMALIZER,
+        maryland: MARYLAND_NORMALIZER,
+        maryland_statewide: MARYLAND_NORMALIZER
     };
 
     // ─── Public API ───
@@ -665,9 +879,9 @@ const StateAdapter = (() => {
                 }));
             }
             return Object.entries(STATE_SIGNATURES).map(([key, sig]) => ({
-                fips: key === 'colorado' ? '08' : key === 'virginia' ? '51' : '',
+                fips: key === 'colorado' ? '08' : key === 'virginia' ? '51' : key === 'maryland' ? '24' : '',
                 name: sig.displayName,
-                abbr: key === 'colorado' ? 'CO' : key === 'virginia' ? 'VA' : ''
+                abbr: key === 'colorado' ? 'CO' : key === 'virginia' ? 'VA' : key === 'maryland' ? 'MD' : ''
             }));
         },
 
@@ -707,7 +921,7 @@ const StateAdapter = (() => {
             }
 
             // Check if this maps to a known normalizer state (config-driven)
-            let fipsToKey = { '08': 'colorado', '51': 'virginia' }; // fallback
+            let fipsToKey = { '08': 'colorado', '51': 'virginia', '24': 'maryland' }; // fallback
             if (typeof appConfig !== 'undefined' && appConfig?.states) {
                 fipsToKey = {};
                 for (const [key, st] of Object.entries(appConfig.states)) {
@@ -935,11 +1149,11 @@ const StateAdapter = (() => {
                 }
             }
             // Fallback to hardcoded mapping for backward compatibility
-            const STATE_DATA_DIRS = { 'colorado': 'CDOT' };
+            const STATE_DATA_DIRS = { 'colorado': 'CDOT', 'maryland': 'MarylandDOT', 'maryland_statewide': 'MarylandDOT' };
             if (detectedState && STATE_DATA_DIRS[detectedState]) {
                 return STATE_DATA_DIRS[detectedState];
             }
-            const fipsToKey = { '08': 'colorado' };
+            const fipsToKey = { '08': 'colorado', '24': 'maryland' };
             if (manualStateFips && fipsToKey[manualStateFips]) {
                 return STATE_DATA_DIRS[fipsToKey[manualStateFips]] || null;
             }
