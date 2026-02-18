@@ -228,7 +228,8 @@ const CrashLensAuth = {
         emailVerified: true,
         emailVerifiedAt: now,
         trialEndsAt: trialEndsAt,
-        trialStartedAt: now
+        trialStartedAt: now,
+        subscriptionStatus: 'active'
       });
 
       // Update local userData
