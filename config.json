@@ -93,7 +93,8 @@
         37.2918,
         -75.2429,
         38.0274
-      ]
+      ],
+      "state": "VA"
     },
     "albemarle": {
       "name": "Albemarle County",
@@ -119,7 +120,8 @@
         37.7273,
         -78.2637,
         38.3034
-      ]
+      ],
+      "state": "VA"
     },
     "alleghany": {
       "name": "Alleghany County",
@@ -145,7 +147,8 @@
         37.5672,
         -79.6473,
         38.0134
-      ]
+      ],
+      "state": "VA"
     },
     "amelia": {
       "name": "Amelia County",
@@ -167,7 +170,8 @@
         37.1458,
         -77.6553,
         37.4678
-      ]
+      ],
+      "state": "VA"
     },
     "amherst": {
       "name": "Amherst County",
@@ -193,7 +197,8 @@
         37.3962,
         -78.8591,
         37.806
-      ]
+      ],
+      "state": "VA"
     },
     "appomattox": {
       "name": "Appomattox County",
@@ -219,7 +224,8 @@
         37.2061,
         -78.5716,
         37.5494
-      ]
+      ],
+      "state": "VA"
     },
     "arlington": {
       "name": "Arlington County",
@@ -245,7 +251,8 @@
         38.8275,
         -77.032,
         38.9341
-      ]
+      ],
+      "state": "VA"
     },
     "augusta": {
       "name": "Augusta County",
@@ -271,7 +278,8 @@
         37.8873,
         -78.8617,
         38.4767
-      ]
+      ],
+      "state": "VA"
     },
     "bath": {
       "name": "Bath County",
@@ -293,7 +301,8 @@
         37.8573,
         -79.4479,
         38.3947
-      ]
+      ],
+      "state": "VA"
     },
     "bedford_county": {
       "name": "Bedford County",
@@ -319,7 +328,8 @@
         37.0341,
         -79.2507,
         37.513
-      ]
+      ],
+      "state": "VA"
     },
     "bland": {
       "name": "Bland County",
@@ -341,7 +351,8 @@
         36.9649,
         -80.8546,
         37.2462
-      ]
+      ],
+      "state": "VA"
     },
     "botetourt": {
       "name": "Botetourt County",
@@ -363,7 +374,8 @@
         37.2621,
         -79.5384,
         37.7892
-      ]
+      ],
+      "state": "VA"
     },
     "brunswick": {
       "name": "Brunswick County",
@@ -385,7 +397,8 @@
         36.5437,
         -77.3991,
         36.9601
-      ]
+      ],
+      "state": "VA"
     },
     "buchanan": {
       "name": "Buchanan County",
@@ -407,7 +420,8 @@
         37.0199,
         -81.7292,
         37.5137
-      ]
+      ],
+      "state": "VA"
     },
     "buckingham": {
       "name": "Buckingham County",
@@ -429,7 +443,8 @@
         37.3051,
         -78.2554,
         37.7318
-      ]
+      ],
+      "state": "VA"
     },
     "campbell": {
       "name": "Campbell County",
@@ -451,7 +466,8 @@
         36.9684,
         -78.9035,
         37.4249
-      ]
+      ],
+      "state": "VA"
     },
     "caroline": {
       "name": "Caroline County",
@@ -477,7 +493,8 @@
         37.7538,
         -76.9722,
         38.241
-      ]
+      ],
+      "state": "VA"
     },
     "carroll": {
       "name": "Carroll County",
@@ -499,7 +516,8 @@
         36.5454,
         -80.4409,
         36.9417
-      ]
+      ],
+      "state": "VA"
     },
     "charles_city": {
       "name": "Charles City County",
@@ -525,7 +543,8 @@
         37.2247,
         -76.8551,
         37.4756
-      ]
+      ],
+      "state": "VA"
     },
     "charlotte": {
       "name": "Charlotte County",
@@ -551,7 +570,8 @@
         36.8483,
         -78.4394,
         37.241
-      ]
+      ],
+      "state": "VA"
     },
     "chesterfield": {
       "name": "Chesterfield County",
@@ -577,7 +597,8 @@
         37.1524,
         -77.3744,
         37.5559
-      ]
+      ],
+      "state": "VA"
     },
     "clarke": {
       "name": "Clarke County",
@@ -599,7 +620,8 @@
         39.0059,
         -77.8276,
         39.2321
-      ]
+      ],
+      "state": "VA"
     },
     "craig": {
       "name": "Craig County",
@@ -621,7 +643,8 @@
         37.2311,
         -79.9754,
         37.5958
-      ]
+      ],
+      "state": "VA"
     },
     "culpeper": {
       "name": "Culpeper County",
@@ -647,7 +670,8 @@
         38.2803,
         -77.6158,
         38.7127
-      ]
+      ],
+      "state": "VA"
     },
     "cumberland": {
       "name": "Cumberland County",
@@ -669,7 +693,8 @@
         37.2972,
         -78.0659,
         37.6791
-      ]
+      ],
+      "state": "VA"
     },
     "dickenson": {
       "name": "Dickenson County",
@@ -691,7 +716,8 @@
         36.963,
         -82.0936,
         37.3028
-      ]
+      ],
+      "state": "VA"
     },
     "dinwiddie": {
       "name": "Dinwiddie County",
@@ -717,7 +743,8 @@
         36.8633,
         -77.3139,
         37.2789
-      ]
+      ],
+      "state": "VA"
     },
     "essex": {
       "name": "Essex County",
@@ -743,7 +770,8 @@
         37.7641,
         -76.708,
         38.0844
-      ]
+      ],
+      "state": "VA"
     },
     "fairfax_county": {
       "name": "Fairfax County",
@@ -769,7 +797,8 @@
         38.5943,
         -77.0492,
         39.0003
-      ]
+      ],
+      "state": "VA"
     },
     "fauquier": {
       "name": "Fauquier County",
@@ -795,7 +824,8 @@
         38.4541,
         -77.5286,
         38.9303
-      ]
+      ],
+      "state": "VA"
     },
     "floyd": {
       "name": "Floyd County",
@@ -821,7 +851,8 @@
         36.7413,
         -80.1345,
         37.1089
-      ]
+      ],
+      "state": "VA"
     },
     "fluvanna": {
       "name": "Fluvanna County",
@@ -847,7 +878,8 @@
         37.7032,
         -78.1074,
         38.0281
-      ]
+      ],
+      "state": "VA"
     },
     "franklin_county": {
       "name": "Franklin County",
@@ -873,7 +905,8 @@
         36.742,
         -79.5912,
         37.1818
-      ]
+      ],
+      "state": "VA"
     },
     "frederick": {
       "name": "Frederick County",
@@ -899,7 +932,8 @@
         39.0585,
         -78.0039,
         39.466
-      ]
+      ],
+      "state": "VA"
     },
     "giles": {
       "name": "Giles County",
@@ -925,7 +959,8 @@
         37.1159,
         -80.359,
         37.4871
-      ]
+      ],
+      "state": "VA"
     },
     "gloucester": {
       "name": "Gloucester County",
@@ -951,7 +986,8 @@
         37.2188,
         -76.3505,
         37.5575
-      ]
+      ],
+      "state": "VA"
     },
     "goochland": {
       "name": "Goochland County",
@@ -977,7 +1013,8 @@
         37.5484,
         -77.6555,
         37.898
-      ]
+      ],
+      "state": "VA"
     },
     "grayson": {
       "name": "Grayson County",
@@ -1003,7 +1040,8 @@
         36.538,
         -80.9013,
         36.8579
-      ]
+      ],
+      "state": "VA"
     },
     "greene": {
       "name": "Greene County",
@@ -1029,7 +1067,8 @@
         38.1407,
         -78.3229,
         38.4529
-      ]
+      ],
+      "state": "VA"
     },
     "greensville": {
       "name": "Greensville County",
@@ -1055,7 +1094,8 @@
         36.5443,
         -77.3553,
         36.8526
-      ]
+      ],
+      "state": "VA"
     },
     "halifax": {
       "name": "Halifax County",
@@ -1081,7 +1121,8 @@
         36.5413,
         -78.6479,
         37.0302
-      ]
+      ],
+      "state": "VA"
     },
     "hanover": {
       "name": "Hanover County",
@@ -1103,7 +1144,8 @@
         37.5679,
         -77.1941,
         37.9853
-      ]
+      ],
+      "state": "VA"
     },
     "henrico": {
       "name": "Henrico County",
@@ -1129,7 +1171,8 @@
         37.3862,
         -77.1462,
         37.7234
-      ]
+      ],
+      "state": "VA"
     },
     "henry": {
       "name": "Henry County",
@@ -1151,7 +1194,8 @@
         36.5407,
         -79.5969,
         36.9396
-      ]
+      ],
+      "state": "VA"
     },
     "highland": {
       "name": "Highland County",
@@ -1173,7 +1217,8 @@
         38.1456,
         -79.3181,
         38.666
-      ]
+      ],
+      "state": "VA"
     },
     "isle_of_wight": {
       "name": "Isle of Wight County",
@@ -1195,7 +1240,8 @@
         36.7049,
         -76.431,
         37.1191
-      ]
+      ],
+      "state": "VA"
     },
     "james_city": {
       "name": "James City County",
@@ -1217,7 +1263,8 @@
         37.1685,
         -76.5451,
         37.4485
-      ]
+      ],
+      "state": "VA"
     },
     "king_and_queen": {
       "name": "King and Queen County",
@@ -1243,7 +1290,8 @@
         37.5453,
         -76.7006,
         37.9027
-      ]
+      ],
+      "state": "VA"
     },
     "king_george": {
       "name": "King George County",
@@ -1269,7 +1317,8 @@
         38.1634,
         -76.9934,
         38.4512
-      ]
+      ],
+      "state": "VA"
     },
     "king_william": {
       "name": "King William County",
@@ -1295,7 +1344,8 @@
         37.5423,
         -76.8961,
         37.901
-      ]
+      ],
+      "state": "VA"
     },
     "lancaster": {
       "name": "Lancaster County",
@@ -1321,7 +1371,8 @@
         37.5893,
         -76.2782,
         37.8506
-      ]
+      ],
+      "state": "VA"
     },
     "lee": {
       "name": "Lee County",
@@ -1347,7 +1398,8 @@
         36.5404,
         -82.7318,
         36.8935
-      ]
+      ],
+      "state": "VA"
     },
     "loudoun": {
       "name": "Loudoun County",
@@ -1373,7 +1425,8 @@
         38.8416,
         -77.3253,
         39.3218
-      ]
+      ],
+      "state": "VA"
     },
     "louisa": {
       "name": "Louisa County",
@@ -1399,7 +1452,8 @@
         37.7918,
         -77.6586,
         38.1958
-      ]
+      ],
+      "state": "VA"
     },
     "lunenburg": {
       "name": "Lunenburg County",
@@ -1425,7 +1479,8 @@
         36.7891,
         -78.0337,
         37.1497
-      ]
+      ],
+      "state": "VA"
     },
     "madison": {
       "name": "Madison County",
@@ -1451,7 +1506,8 @@
         38.2169,
         -78.1528,
         38.5316
-      ]
+      ],
+      "state": "VA"
     },
     "mathews": {
       "name": "Mathews County",
@@ -1477,7 +1533,8 @@
         37.2818,
         -76.2155,
         37.5237
-      ]
+      ],
+      "state": "VA"
     },
     "mecklenburg": {
       "name": "Mecklenburg County",
@@ -1503,7 +1560,8 @@
         36.5414,
         -78.0275,
         36.9606
-      ]
+      ],
+      "state": "VA"
     },
     "middlesex": {
       "name": "Middlesex County",
@@ -1529,7 +1587,8 @@
         37.4643,
         -76.2919,
         37.7337
-      ]
+      ],
+      "state": "VA"
     },
     "montgomery": {
       "name": "Montgomery County",
@@ -1555,7 +1614,8 @@
         36.9718,
         -80.1184,
         37.3914
-      ]
+      ],
+      "state": "VA"
     },
     "nelson": {
       "name": "Nelson County",
@@ -1581,7 +1641,8 @@
         37.5678,
         -78.6433,
         37.9992
-      ]
+      ],
+      "state": "VA"
     },
     "new_kent": {
       "name": "New Kent County",
@@ -1603,7 +1664,8 @@
         37.3288,
         -76.7552,
         37.6295
-      ]
+      ],
+      "state": "VA"
     },
     "northampton": {
       "name": "Northampton County",
@@ -1625,7 +1687,8 @@
         37.0541,
         -75.7659,
         37.4714
-      ]
+      ],
+      "state": "VA"
     },
     "northumberland": {
       "name": "Northumberland County",
@@ -1647,7 +1710,8 @@
         37.764,
         -76.2527,
         38.0688
-      ]
+      ],
+      "state": "VA"
     },
     "nottoway": {
       "name": "Nottoway County",
@@ -1669,7 +1733,8 @@
         36.947,
         -77.8561,
         37.2634
-      ]
+      ],
+      "state": "VA"
     },
     "orange": {
       "name": "Orange County",
@@ -1691,7 +1756,8 @@
         38.074,
         -77.8684,
         38.4453
-      ]
+      ],
+      "state": "VA"
     },
     "page": {
       "name": "Page County",
@@ -1713,7 +1779,8 @@
         38.4416,
         -78.2908,
         38.8225
-      ]
+      ],
+      "state": "VA"
     },
     "patrick": {
       "name": "Patrick County",
@@ -1735,7 +1802,8 @@
         36.5407,
         -79.9991,
         36.8503
-      ]
+      ],
+      "state": "VA"
     },
     "pittsylvania": {
       "name": "Pittsylvania County",
@@ -1757,7 +1825,8 @@
         36.5413,
         -79.0905,
         37.0725
-      ]
+      ],
+      "state": "VA"
     },
     "powhatan": {
       "name": "Powhatan County",
@@ -1779,7 +1848,8 @@
         37.3789,
         -77.6353,
         37.6749
-      ]
+      ],
+      "state": "VA"
     },
     "prince_edward": {
       "name": "Prince Edward County",
@@ -1801,7 +1871,8 @@
         36.9928,
         -78.2324,
         37.3519
-      ]
+      ],
+      "state": "VA"
     },
     "prince_george": {
       "name": "Prince George County",
@@ -1823,7 +1894,8 @@
         36.9881,
         -76.9171,
         37.3412
-      ]
+      ],
+      "state": "VA"
     },
     "prince_william": {
       "name": "Prince William County",
@@ -1849,7 +1921,8 @@
         38.5193,
         -77.285,
         38.8824
-      ]
+      ],
+      "state": "VA"
     },
     "pulaski": {
       "name": "Pulaski County",
@@ -1871,7 +1944,8 @@
         36.9352,
         -80.4493,
         37.2352
-      ]
+      ],
+      "state": "VA"
     },
     "rappahannock": {
       "name": "Rappahannock County",
@@ -1893,7 +1967,8 @@
         38.4816,
         -77.9796,
         38.8102
-      ]
+      ],
+      "state": "VA"
     },
     "richmond_county": {
       "name": "Richmond County",
@@ -1915,7 +1990,8 @@
         37.7959,
         -76.6448,
         38.0986
-      ]
+      ],
+      "state": "VA"
     },
     "roanoke_county": {
       "name": "Roanoke County",
@@ -1937,7 +2013,8 @@
         37.0999,
         -79.7768,
         37.4247
-      ]
+      ],
+      "state": "VA"
     },
     "rockbridge": {
       "name": "Rockbridge County",
@@ -1959,7 +2036,8 @@
         37.5341,
         -79.25,
         38.0142
-      ]
+      ],
+      "state": "VA"
     },
     "rockingham": {
       "name": "Rockingham County",
@@ -1985,7 +2063,8 @@
         38.2024,
         -78.6603,
         38.8128
-      ]
+      ],
+      "state": "VA"
     },
     "russell": {
       "name": "Russell County",
@@ -2007,7 +2086,8 @@
         36.7946,
         -81.7422,
         37.1537
-      ]
+      ],
+      "state": "VA"
     },
     "scott": {
       "name": "Scott County",
@@ -2029,7 +2109,8 @@
         36.5944,
         -82.4581,
         36.9024
-      ]
+      ],
+      "state": "VA"
     },
     "shenandoah": {
       "name": "Shenandoah County",
@@ -2051,7 +2132,8 @@
         38.6566,
         -78.4681,
         39.1178
-      ]
+      ],
+      "state": "VA"
     },
     "smyth": {
       "name": "Smyth County",
@@ -2073,7 +2155,8 @@
         36.7056,
         -81.2617,
         37.0053
-      ]
+      ],
+      "state": "VA"
     },
     "southampton": {
       "name": "Southampton County",
@@ -2095,7 +2178,8 @@
         36.5449,
         -76.7696,
         36.9574
-      ]
+      ],
+      "state": "VA"
     },
     "spotsylvania": {
       "name": "Spotsylvania County",
@@ -2117,7 +2201,8 @@
         37.979,
         -77.366,
         38.3904
-      ]
+      ],
+      "state": "VA"
     },
     "stafford": {
       "name": "Stafford County",
@@ -2139,7 +2224,8 @@
         38.2602,
         -77.2842,
         38.559
-      ]
+      ],
+      "state": "VA"
     },
     "surry": {
       "name": "Surry County",
@@ -2161,7 +2247,8 @@
         36.8979,
         -76.6375,
         37.2714
-      ]
+      ],
+      "state": "VA"
     },
     "sussex": {
       "name": "Sussex County",
@@ -2183,7 +2270,8 @@
         36.7085,
         -76.9319,
         37.1173
-      ]
+      ],
+      "state": "VA"
     },
     "tazewell": {
       "name": "Tazewell County",
@@ -2205,7 +2293,8 @@
         36.8786,
         -81.2139,
         37.3024
-      ]
+      ],
+      "state": "VA"
     },
     "warren": {
       "name": "Warren County",
@@ -2227,7 +2316,8 @@
         38.8102,
         -78.0468,
         39.1127
-      ]
+      ],
+      "state": "VA"
     },
     "washington": {
       "name": "Washington County",
@@ -2249,7 +2339,8 @@
         36.5943,
         -81.6462,
         37.0133
-      ]
+      ],
+      "state": "VA"
     },
     "westmoreland": {
       "name": "Westmoreland County",
@@ -2271,7 +2362,8 @@
         37.9651,
         -76.5167,
         38.2655
-      ]
+      ],
+      "state": "VA"
     },
     "wise": {
       "name": "Wise County",
@@ -2293,7 +2385,8 @@
         36.8541,
         -82.3498,
         37.1872
-      ]
+      ],
+      "state": "VA"
     },
     "wythe": {
       "name": "Wythe County",
@@ -2315,7 +2408,8 @@
         36.7544,
         -80.855,
         37.1051
-      ]
+      ],
+      "state": "VA"
     },
     "york": {
       "name": "York County",
@@ -2337,7 +2431,8 @@
         37.1009,
         -76.3817,
         37.4154
-      ]
+      ],
+      "state": "VA"
     },
     "alexandria": {
       "name": "Alexandria City",
@@ -2363,7 +2458,8 @@
         38.7852,
         -77.0381,
         38.8452
-      ]
+      ],
+      "state": "VA"
     },
     "bristol": {
       "name": "Bristol City",
@@ -2385,7 +2481,8 @@
         36.5612,
         -82.1109,
         36.6338
-      ]
+      ],
+      "state": "VA"
     },
     "buena_vista": {
       "name": "Buena Vista City",
@@ -2411,7 +2508,8 @@
         37.7062,
         -79.332,
         37.7573
-      ]
+      ],
+      "state": "VA"
     },
     "charlottesville": {
       "name": "Charlottesville City",
@@ -2433,7 +2531,8 @@
         38.0007,
         -78.4475,
         38.0653
-      ]
+      ],
+      "state": "VA"
     },
     "chesapeake": {
       "name": "Chesapeake City",
@@ -2459,7 +2558,8 @@
         36.5413,
         -76.1332,
         36.866
-      ]
+      ],
+      "state": "VA"
     },
     "colonial_heights": {
       "name": "Colonial Heights City",
@@ -2485,7 +2585,8 @@
         37.2245,
         -77.3666,
         37.2819
-      ]
+      ],
+      "state": "VA"
     },
     "covington": {
       "name": "Covington City",
@@ -2507,7 +2608,8 @@
         37.7633,
         -79.9567,
         37.8078
-      ]
+      ],
+      "state": "VA"
     },
     "danville": {
       "name": "Danville City",
@@ -2533,7 +2635,8 @@
         36.5556,
         -79.3358,
         36.6404
-      ]
+      ],
+      "state": "VA"
     },
     "emporia": {
       "name": "Emporia City",
@@ -2555,7 +2658,8 @@
         36.6739,
         -77.511,
         36.7185
-      ]
+      ],
+      "state": "VA"
     },
     "fairfax_city": {
       "name": "Fairfax City",
@@ -2581,7 +2685,8 @@
         38.8274,
         -77.2672,
         38.8726
-      ]
+      ],
+      "state": "VA"
     },
     "falls_church": {
       "name": "Falls Church City",
@@ -2603,7 +2708,8 @@
         38.8631,
         -77.1561,
         38.892
-      ]
+      ],
+      "state": "VA"
     },
     "franklin_city": {
       "name": "Franklin City",
@@ -2629,7 +2735,8 @@
         36.6545,
         -76.895,
         36.7002
-      ]
+      ],
+      "state": "VA"
     },
     "fredericksburg": {
       "name": "Fredericksburg City",
@@ -2655,7 +2762,8 @@
         38.2803,
         -77.423,
         38.3383
-      ]
+      ],
+      "state": "VA"
     },
     "galax": {
       "name": "Galax City",
@@ -2677,7 +2785,8 @@
         36.6389,
         -80.8871,
         36.6839
-      ]
+      ],
+      "state": "VA"
     },
     "hampton": {
       "name": "Hampton City",
@@ -2703,7 +2812,8 @@
         36.9745,
         -76.2597,
         37.1414
-      ]
+      ],
+      "state": "VA"
     },
     "harrisonburg": {
       "name": "Harrisonburg City",
@@ -2725,7 +2835,8 @@
         38.3979,
         -78.8248,
         38.4806
-      ]
+      ],
+      "state": "VA"
     },
     "hopewell": {
       "name": "Hopewell City",
@@ -2747,7 +2858,8 @@
         37.2658,
         -77.2607,
         37.3307
-      ]
+      ],
+      "state": "VA"
     },
     "lexington": {
       "name": "Lexington City",
@@ -2769,7 +2881,8 @@
         37.7657,
         -79.4266,
         37.7994
-      ]
+      ],
+      "state": "VA"
     },
     "lynchburg": {
       "name": "Lynchburg City",
@@ -2795,7 +2908,8 @@
         37.3505,
         -79.0831,
         37.4679
-      ]
+      ],
+      "state": "VA"
     },
     "manassas": {
       "name": "Manassas City",
@@ -2817,7 +2931,8 @@
         38.7218,
         -77.4456,
         38.7816
-      ]
+      ],
+      "state": "VA"
     },
     "manassas_park": {
       "name": "Manassas Park City",
@@ -2839,7 +2954,8 @@
         38.7588,
         -77.4382,
         38.7885
-      ]
+      ],
+      "state": "VA"
     },
     "martinsville": {
       "name": "Martinsville City",
@@ -2861,7 +2977,8 @@
         36.6526,
         -79.8296,
         36.7211
-      ]
+      ],
+      "state": "VA"
     },
     "newport_news": {
       "name": "Newport News City",
@@ -2887,7 +3004,8 @@
         36.9597,
         -76.3351,
         37.22
-      ]
+      ],
+      "state": "VA"
     },
     "norfolk": {
       "name": "Norfolk City",
@@ -2913,7 +3031,8 @@
         36.82,
         -76.18,
         36.97
-      ]
+      ],
+      "state": "VA"
     },
     "norton": {
       "name": "Norton City",
@@ -2935,7 +3054,8 @@
         36.907,
         -82.6036,
         36.9498
-      ]
+      ],
+      "state": "VA"
     },
     "petersburg": {
       "name": "Petersburg City",
@@ -2957,7 +3077,8 @@
         37.1879,
         -77.3481,
         37.252
-      ]
+      ],
+      "state": "VA"
     },
     "poquoson": {
       "name": "Poquoson City",
@@ -2979,7 +3100,8 @@
         37.0959,
         -76.2816,
         37.1781
-      ]
+      ],
+      "state": "VA"
     },
     "portsmouth": {
       "name": "Portsmouth City",
@@ -3005,7 +3127,8 @@
         36.7879,
         -76.2931,
         36.8918
-      ]
+      ],
+      "state": "VA"
     },
     "radford": {
       "name": "Radford City",
@@ -3027,7 +3150,8 @@
         37.1063,
         -80.5225,
         37.1633
-      ]
+      ],
+      "state": "VA"
     },
     "richmond_city": {
       "name": "Richmond City",
@@ -3053,7 +3177,8 @@
         37.4464,
         -77.3853,
         37.6011
-      ]
+      ],
+      "state": "VA"
     },
     "roanoke_city": {
       "name": "Roanoke City",
@@ -3075,7 +3200,8 @@
         37.2259,
         -79.8797,
         37.3246
-      ]
+      ],
+      "state": "VA"
     },
     "salem": {
       "name": "Salem City",
@@ -3097,7 +3223,8 @@
         37.2579,
         -80.0053,
         37.3285
-      ]
+      ],
+      "state": "VA"
     },
     "staunton": {
       "name": "Staunton City",
@@ -3119,7 +3246,8 @@
         38.1097,
         -79.02,
         38.1839
-      ]
+      ],
+      "state": "VA"
     },
     "suffolk": {
       "name": "Suffolk City",
@@ -3141,7 +3269,8 @@
         36.5453,
         -76.4038,
         36.9384
-      ]
+      ],
+      "state": "VA"
     },
     "virginia_beach": {
       "name": "Virginia Beach City",
@@ -3167,7 +3296,8 @@
         36.5516,
         -75.8589,
         36.933
-      ]
+      ],
+      "state": "VA"
     },
     "waynesboro": {
       "name": "Waynesboro City",
@@ -3193,7 +3323,8 @@
         38.0412,
         -78.8546,
         38.1003
-      ]
+      ],
+      "state": "VA"
     },
     "williamsburg": {
       "name": "Williamsburg City",
@@ -3215,7 +3346,8 @@
         37.2498,
         -76.683,
         37.2972
-      ]
+      ],
+      "state": "VA"
     },
     "winchester": {
       "name": "Winchester City",
@@ -3237,73 +3369,1134 @@
         39.1383,
         -78.1252,
         39.213
-      ]
+      ],
+      "state": "VA"
     },
     "_colorado_separator": "--- Colorado Counties (64) ---",
-    "co_adams": {"name":"Adams County","type":"county","fips":"001","state":"CO","namePatterns":["ADAMS","Adams","Adams County"],"mapCenter":[39.8737,-104.7624],"mapZoom":10,"maintainsOwnRoads":true,"bbox":[-105.0534,39.7404,-104.461,40.0015]},
-    "co_alamosa": {"name":"Alamosa County","type":"county","fips":"003","state":"CO","namePatterns":["ALAMOSA","Alamosa","Alamosa County"],"mapCenter":[37.57,-105.79],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_arapahoe": {"name":"Arapahoe County","type":"county","fips":"005","state":"CO","namePatterns":["ARAPAHOE","Arapahoe","Arapahoe County"],"mapCenter":[39.6498,-104.3389],"mapZoom":10,"maintainsOwnRoads":true,"bbox":[-105.0534,39.5638,-103.7064,39.7404]},
-    "co_archuleta": {"name":"Archuleta County","type":"county","fips":"007","state":"CO","namePatterns":["ARCHULETA","Archuleta","Archuleta County"],"mapCenter":[37.19,-107.05],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_baca": {"name":"Baca County","type":"county","fips":"009","state":"CO","namePatterns":["BACA","Baca","Baca County"],"mapCenter":[37.32,-102.56],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_bent": {"name":"Bent County","type":"county","fips":"011","state":"CO","namePatterns":["BENT","Bent","Bent County"],"mapCenter":[38.07,-103.01],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_boulder": {"name":"Boulder County","type":"county","fips":"013","state":"CO","namePatterns":["BOULDER","Boulder","Boulder County"],"mapCenter":[40.09,-105.36],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_broomfield": {"name":"Broomfield County (City and County)","type":"county","fips":"014","state":"CO","namePatterns":["BROOMFIELD","Broomfield","Broomfield County"],"mapCenter":[39.92,-105.09],"mapZoom":12,"maintainsOwnRoads":false},
-    "co_chaffee": {"name":"Chaffee County","type":"county","fips":"015","state":"CO","namePatterns":["CHAFFEE","Chaffee","Chaffee County"],"mapCenter":[38.75,-106.19],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_cheyenne": {"name":"Cheyenne County","type":"county","fips":"017","state":"CO","namePatterns":["CHEYENNE","Cheyenne","Cheyenne County"],"mapCenter":[38.83,-102.6],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_clear_creek": {"name":"Clear Creek County","type":"county","fips":"019","state":"CO","namePatterns":["CLEAR CREEK","Clear Creek","Clear Creek County"],"mapCenter":[39.69,-105.68],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_conejos": {"name":"Conejos County","type":"county","fips":"021","state":"CO","namePatterns":["CONEJOS","Conejos","Conejos County"],"mapCenter":[37.15,-106.02],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_costilla": {"name":"Costilla County","type":"county","fips":"023","state":"CO","namePatterns":["COSTILLA","Costilla","Costilla County"],"mapCenter":[37.18,-105.43],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_crowley": {"name":"Crowley County","type":"county","fips":"025","state":"CO","namePatterns":["CROWLEY","Crowley","Crowley County"],"mapCenter":[38.3,-103.79],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_custer": {"name":"Custer County","type":"county","fips":"027","state":"CO","namePatterns":["CUSTER","Custer","Custer County"],"mapCenter":[38.11,-105.37],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_delta": {"name":"Delta County","type":"county","fips":"029","state":"CO","namePatterns":["DELTA","Delta","Delta County"],"mapCenter":[38.86,-107.86],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_denver": {"name":"Denver County (City and County)","type":"county","fips":"031","state":"CO","namePatterns":["DENVER","Denver","Denver County"],"mapCenter":[39.7392,-104.9903],"mapZoom":12,"maintainsOwnRoads":true,"bbox":[-105.1098,39.6144,-104.5996,39.9142]},
-    "co_dolores": {"name":"Dolores County","type":"county","fips":"033","state":"CO","namePatterns":["DOLORES","Dolores","Dolores County"],"mapCenter":[37.75,-108.51],"mapZoom":10,"maintainsOwnRoads":false},
-    "douglas": {"name":"Douglas County","type":"county","fips":"035","state":"CO","namePatterns":["DOUGLAS","Douglas","Douglas County"],"mapCenter":[39.3298,-104.9253],"mapZoom":11,"maintainsOwnRoads":true,"bbox":[-105.0543,39.1298,-104.6014,39.5624]},
-    "co_eagle": {"name":"Eagle County","type":"county","fips":"037","state":"CO","namePatterns":["EAGLE","Eagle","Eagle County"],"mapCenter":[39.63,-106.83],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_elbert": {"name":"Elbert County","type":"county","fips":"039","state":"CO","namePatterns":["ELBERT","Elbert","Elbert County"],"mapCenter":[39.29,-104.14],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_el_paso": {"name":"El Paso County","type":"county","fips":"041","state":"CO","namePatterns":["EL PASO","El Paso","El Paso County"],"mapCenter":[38.8339,-104.7581],"mapZoom":10,"maintainsOwnRoads":true,"bbox":[-105.0286,38.5157,-104.0534,39.1298]},
-    "co_fremont": {"name":"Fremont County","type":"county","fips":"043","state":"CO","namePatterns":["FREMONT","Fremont","Fremont County"],"mapCenter":[38.47,-105.34],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_garfield": {"name":"Garfield County","type":"county","fips":"045","state":"CO","namePatterns":["GARFIELD","Garfield","Garfield County"],"mapCenter":[39.6,-107.32],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_gilpin": {"name":"Gilpin County","type":"county","fips":"047","state":"CO","namePatterns":["GILPIN","Gilpin","Gilpin County"],"mapCenter":[39.86,-105.52],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_grand": {"name":"Grand County","type":"county","fips":"049","state":"CO","namePatterns":["GRAND","Grand","Grand County"],"mapCenter":[40.09,-105.99],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_gunnison": {"name":"Gunnison County","type":"county","fips":"051","state":"CO","namePatterns":["GUNNISON","Gunnison","Gunnison County"],"mapCenter":[38.66,-106.85],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_hinsdale": {"name":"Hinsdale County","type":"county","fips":"053","state":"CO","namePatterns":["HINSDALE","Hinsdale","Hinsdale County"],"mapCenter":[37.82,-107.3],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_huerfano": {"name":"Huerfano County","type":"county","fips":"055","state":"CO","namePatterns":["HUERFANO","Huerfano","Huerfano County"],"mapCenter":[37.68,-105],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_jackson": {"name":"Jackson County","type":"county","fips":"057","state":"CO","namePatterns":["JACKSON","Jackson","Jackson County"],"mapCenter":[40.67,-106.34],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_jefferson": {"name":"Jefferson County","type":"county","fips":"059","state":"CO","namePatterns":["JEFFERSON","Jefferson","Jefferson County"],"mapCenter":[39.5866,-105.2508],"mapZoom":10,"maintainsOwnRoads":true,"bbox":[-105.6798,39.3677,-105.0534,39.8282]},
-    "co_kiowa": {"name":"Kiowa County","type":"county","fips":"061","state":"CO","namePatterns":["KIOWA","Kiowa","Kiowa County"],"mapCenter":[38.36,-102.74],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_kit_carson": {"name":"Kit Carson County","type":"county","fips":"063","state":"CO","namePatterns":["KIT CARSON","Kit Carson","Kit Carson County"],"mapCenter":[39.08,-102.6],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_lake": {"name":"Lake County","type":"county","fips":"065","state":"CO","namePatterns":["LAKE","Lake","Lake County"],"mapCenter":[39.22,-106.34],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_la_plata": {"name":"La Plata County","type":"county","fips":"067","state":"CO","namePatterns":["LA PLATA","La Plata","La Plata County"],"mapCenter":[37.29,-107.84],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_larimer": {"name":"Larimer County","type":"county","fips":"069","state":"CO","namePatterns":["LARIMER","Larimer","Larimer County"],"mapCenter":[40.66,-105.46],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_las_animas": {"name":"Las Animas County","type":"county","fips":"071","state":"CO","namePatterns":["LAS ANIMAS","Las Animas","Las Animas County"],"mapCenter":[37.31,-104.04],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_lincoln": {"name":"Lincoln County","type":"county","fips":"073","state":"CO","namePatterns":["LINCOLN","Lincoln","Lincoln County"],"mapCenter":[39.04,-103.52],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_logan": {"name":"Logan County","type":"county","fips":"075","state":"CO","namePatterns":["LOGAN","Logan","Logan County"],"mapCenter":[40.66,-103.11],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_mesa": {"name":"Mesa County","type":"county","fips":"077","state":"CO","namePatterns":["MESA","Mesa","Mesa County"],"mapCenter":[39.02,-108.46],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_mineral": {"name":"Mineral County","type":"county","fips":"079","state":"CO","namePatterns":["MINERAL","Mineral","Mineral County"],"mapCenter":[37.77,-106.93],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_moffat": {"name":"Moffat County","type":"county","fips":"081","state":"CO","namePatterns":["MOFFAT","Moffat","Moffat County"],"mapCenter":[40.62,-108.21],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_montezuma": {"name":"Montezuma County","type":"county","fips":"083","state":"CO","namePatterns":["MONTEZUMA","Montezuma","Montezuma County"],"mapCenter":[37.34,-108.59],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_montrose": {"name":"Montrose County","type":"county","fips":"085","state":"CO","namePatterns":["MONTROSE","Montrose","Montrose County"],"mapCenter":[38.4,-107.88],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_morgan": {"name":"Morgan County","type":"county","fips":"087","state":"CO","namePatterns":["MORGAN","Morgan","Morgan County"],"mapCenter":[40.26,-103.81],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_otero": {"name":"Otero County","type":"county","fips":"089","state":"CO","namePatterns":["OTERO","Otero","Otero County"],"mapCenter":[38,-103.72],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_ouray": {"name":"Ouray County","type":"county","fips":"091","state":"CO","namePatterns":["OURAY","Ouray","Ouray County"],"mapCenter":[38.15,-107.77],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_park": {"name":"Park County","type":"county","fips":"093","state":"CO","namePatterns":["PARK","Park","Park County"],"mapCenter":[39.12,-105.78],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_phillips": {"name":"Phillips County","type":"county","fips":"095","state":"CO","namePatterns":["PHILLIPS","Phillips","Phillips County"],"mapCenter":[40.6,-102.36],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_pitkin": {"name":"Pitkin County","type":"county","fips":"097","state":"CO","namePatterns":["PITKIN","Pitkin","Pitkin County"],"mapCenter":[39.22,-106.95],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_prowers": {"name":"Prowers County","type":"county","fips":"099","state":"CO","namePatterns":["PROWERS","Prowers","Prowers County"],"mapCenter":[37.96,-102.39],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_pueblo": {"name":"Pueblo County","type":"county","fips":"101","state":"CO","namePatterns":["PUEBLO","Pueblo","Pueblo County"],"mapCenter":[38.28,-104.61],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_rio_blanco": {"name":"Rio Blanco County","type":"county","fips":"103","state":"CO","namePatterns":["RIO BLANCO","Rio Blanco","Rio Blanco County"],"mapCenter":[40.07,-108.37],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_rio_grande": {"name":"Rio Grande County","type":"county","fips":"105","state":"CO","namePatterns":["RIO GRANDE","Rio Grande","Rio Grande County"],"mapCenter":[37.57,-106.38],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_routt": {"name":"Routt County","type":"county","fips":"107","state":"CO","namePatterns":["ROUTT","Routt","Routt County"],"mapCenter":[40.49,-106.83],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_saguache": {"name":"Saguache County","type":"county","fips":"109","state":"CO","namePatterns":["SAGUACHE","Saguache","Saguache County"],"mapCenter":[38.08,-106.28],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_san_juan": {"name":"San Juan County","type":"county","fips":"111","state":"CO","namePatterns":["SAN JUAN","San Juan","San Juan County"],"mapCenter":[37.77,-107.68],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_san_miguel": {"name":"San Miguel County","type":"county","fips":"113","state":"CO","namePatterns":["SAN MIGUEL","San Miguel","San Miguel County"],"mapCenter":[37.93,-108.43],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_sedgwick": {"name":"Sedgwick County","type":"county","fips":"115","state":"CO","namePatterns":["SEDGWICK","Sedgwick","Sedgwick County"],"mapCenter":[40.88,-102.35],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_summit": {"name":"Summit County","type":"county","fips":"117","state":"CO","namePatterns":["SUMMIT","Summit","Summit County"],"mapCenter":[39.63,-106.12],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_teller": {"name":"Teller County","type":"county","fips":"119","state":"CO","namePatterns":["TELLER","Teller","Teller County"],"mapCenter":[38.88,-105.16],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_washington": {"name":"Washington County","type":"county","fips":"121","state":"CO","namePatterns":["WASHINGTON","Washington","Washington County"],"mapCenter":[39.97,-103.2],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_weld": {"name":"Weld County","type":"county","fips":"123","state":"CO","namePatterns":["WELD","Weld","Weld County"],"mapCenter":[40.55,-104.39],"mapZoom":10,"maintainsOwnRoads":false},
-    "co_yuma": {"name":"Yuma County","type":"county","fips":"125","state":"CO","namePatterns":["YUMA","Yuma","Yuma County"],"mapCenter":[40,-102.43],"mapZoom":10,"maintainsOwnRoads":false}
+    "co_adams": {
+      "name": "Adams County",
+      "type": "county",
+      "fips": "001",
+      "state": "CO",
+      "namePatterns": [
+        "ADAMS",
+        "Adams",
+        "Adams County"
+      ],
+      "mapCenter": [
+        39.8737,
+        -104.7624
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": true,
+      "bbox": [
+        -105.0534,
+        39.7404,
+        -104.461,
+        40.0015
+      ]
+    },
+    "co_alamosa": {
+      "name": "Alamosa County",
+      "type": "county",
+      "fips": "003",
+      "state": "CO",
+      "namePatterns": [
+        "ALAMOSA",
+        "Alamosa",
+        "Alamosa County"
+      ],
+      "mapCenter": [
+        37.57,
+        -105.79
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_arapahoe": {
+      "name": "Arapahoe County",
+      "type": "county",
+      "fips": "005",
+      "state": "CO",
+      "namePatterns": [
+        "ARAPAHOE",
+        "Arapahoe",
+        "Arapahoe County"
+      ],
+      "mapCenter": [
+        39.6498,
+        -104.3389
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": true,
+      "bbox": [
+        -105.0534,
+        39.5638,
+        -103.7064,
+        39.7404
+      ]
+    },
+    "co_archuleta": {
+      "name": "Archuleta County",
+      "type": "county",
+      "fips": "007",
+      "state": "CO",
+      "namePatterns": [
+        "ARCHULETA",
+        "Archuleta",
+        "Archuleta County"
+      ],
+      "mapCenter": [
+        37.19,
+        -107.05
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_baca": {
+      "name": "Baca County",
+      "type": "county",
+      "fips": "009",
+      "state": "CO",
+      "namePatterns": [
+        "BACA",
+        "Baca",
+        "Baca County"
+      ],
+      "mapCenter": [
+        37.32,
+        -102.56
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_bent": {
+      "name": "Bent County",
+      "type": "county",
+      "fips": "011",
+      "state": "CO",
+      "namePatterns": [
+        "BENT",
+        "Bent",
+        "Bent County"
+      ],
+      "mapCenter": [
+        38.07,
+        -103.01
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_boulder": {
+      "name": "Boulder County",
+      "type": "county",
+      "fips": "013",
+      "state": "CO",
+      "namePatterns": [
+        "BOULDER",
+        "Boulder",
+        "Boulder County"
+      ],
+      "mapCenter": [
+        40.09,
+        -105.36
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_broomfield": {
+      "name": "Broomfield County (City and County)",
+      "type": "county",
+      "fips": "014",
+      "state": "CO",
+      "namePatterns": [
+        "BROOMFIELD",
+        "Broomfield",
+        "Broomfield County"
+      ],
+      "mapCenter": [
+        39.92,
+        -105.09
+      ],
+      "mapZoom": 12,
+      "maintainsOwnRoads": false
+    },
+    "co_chaffee": {
+      "name": "Chaffee County",
+      "type": "county",
+      "fips": "015",
+      "state": "CO",
+      "namePatterns": [
+        "CHAFFEE",
+        "Chaffee",
+        "Chaffee County"
+      ],
+      "mapCenter": [
+        38.75,
+        -106.19
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_cheyenne": {
+      "name": "Cheyenne County",
+      "type": "county",
+      "fips": "017",
+      "state": "CO",
+      "namePatterns": [
+        "CHEYENNE",
+        "Cheyenne",
+        "Cheyenne County"
+      ],
+      "mapCenter": [
+        38.83,
+        -102.6
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_clear_creek": {
+      "name": "Clear Creek County",
+      "type": "county",
+      "fips": "019",
+      "state": "CO",
+      "namePatterns": [
+        "CLEAR CREEK",
+        "Clear Creek",
+        "Clear Creek County"
+      ],
+      "mapCenter": [
+        39.69,
+        -105.68
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_conejos": {
+      "name": "Conejos County",
+      "type": "county",
+      "fips": "021",
+      "state": "CO",
+      "namePatterns": [
+        "CONEJOS",
+        "Conejos",
+        "Conejos County"
+      ],
+      "mapCenter": [
+        37.15,
+        -106.02
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_costilla": {
+      "name": "Costilla County",
+      "type": "county",
+      "fips": "023",
+      "state": "CO",
+      "namePatterns": [
+        "COSTILLA",
+        "Costilla",
+        "Costilla County"
+      ],
+      "mapCenter": [
+        37.18,
+        -105.43
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_crowley": {
+      "name": "Crowley County",
+      "type": "county",
+      "fips": "025",
+      "state": "CO",
+      "namePatterns": [
+        "CROWLEY",
+        "Crowley",
+        "Crowley County"
+      ],
+      "mapCenter": [
+        38.3,
+        -103.79
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_custer": {
+      "name": "Custer County",
+      "type": "county",
+      "fips": "027",
+      "state": "CO",
+      "namePatterns": [
+        "CUSTER",
+        "Custer",
+        "Custer County"
+      ],
+      "mapCenter": [
+        38.11,
+        -105.37
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_delta": {
+      "name": "Delta County",
+      "type": "county",
+      "fips": "029",
+      "state": "CO",
+      "namePatterns": [
+        "DELTA",
+        "Delta",
+        "Delta County"
+      ],
+      "mapCenter": [
+        38.86,
+        -107.86
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_denver": {
+      "name": "Denver County (City and County)",
+      "type": "county",
+      "fips": "031",
+      "state": "CO",
+      "namePatterns": [
+        "DENVER",
+        "Denver",
+        "Denver County"
+      ],
+      "mapCenter": [
+        39.7392,
+        -104.9903
+      ],
+      "mapZoom": 12,
+      "maintainsOwnRoads": true,
+      "bbox": [
+        -105.1098,
+        39.6144,
+        -104.5996,
+        39.9142
+      ]
+    },
+    "co_dolores": {
+      "name": "Dolores County",
+      "type": "county",
+      "fips": "033",
+      "state": "CO",
+      "namePatterns": [
+        "DOLORES",
+        "Dolores",
+        "Dolores County"
+      ],
+      "mapCenter": [
+        37.75,
+        -108.51
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "douglas": {
+      "name": "Douglas County",
+      "type": "county",
+      "fips": "035",
+      "state": "CO",
+      "namePatterns": [
+        "DOUGLAS",
+        "Douglas",
+        "Douglas County"
+      ],
+      "mapCenter": [
+        39.3298,
+        -104.9253
+      ],
+      "mapZoom": 11,
+      "maintainsOwnRoads": true,
+      "bbox": [
+        -105.0543,
+        39.1298,
+        -104.6014,
+        39.5624
+      ]
+    },
+    "co_eagle": {
+      "name": "Eagle County",
+      "type": "county",
+      "fips": "037",
+      "state": "CO",
+      "namePatterns": [
+        "EAGLE",
+        "Eagle",
+        "Eagle County"
+      ],
+      "mapCenter": [
+        39.63,
+        -106.83
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_elbert": {
+      "name": "Elbert County",
+      "type": "county",
+      "fips": "039",
+      "state": "CO",
+      "namePatterns": [
+        "ELBERT",
+        "Elbert",
+        "Elbert County"
+      ],
+      "mapCenter": [
+        39.29,
+        -104.14
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_el_paso": {
+      "name": "El Paso County",
+      "type": "county",
+      "fips": "041",
+      "state": "CO",
+      "namePatterns": [
+        "EL PASO",
+        "El Paso",
+        "El Paso County"
+      ],
+      "mapCenter": [
+        38.8339,
+        -104.7581
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": true,
+      "bbox": [
+        -105.0286,
+        38.5157,
+        -104.0534,
+        39.1298
+      ]
+    },
+    "co_fremont": {
+      "name": "Fremont County",
+      "type": "county",
+      "fips": "043",
+      "state": "CO",
+      "namePatterns": [
+        "FREMONT",
+        "Fremont",
+        "Fremont County"
+      ],
+      "mapCenter": [
+        38.47,
+        -105.34
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_garfield": {
+      "name": "Garfield County",
+      "type": "county",
+      "fips": "045",
+      "state": "CO",
+      "namePatterns": [
+        "GARFIELD",
+        "Garfield",
+        "Garfield County"
+      ],
+      "mapCenter": [
+        39.6,
+        -107.32
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_gilpin": {
+      "name": "Gilpin County",
+      "type": "county",
+      "fips": "047",
+      "state": "CO",
+      "namePatterns": [
+        "GILPIN",
+        "Gilpin",
+        "Gilpin County"
+      ],
+      "mapCenter": [
+        39.86,
+        -105.52
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_grand": {
+      "name": "Grand County",
+      "type": "county",
+      "fips": "049",
+      "state": "CO",
+      "namePatterns": [
+        "GRAND",
+        "Grand",
+        "Grand County"
+      ],
+      "mapCenter": [
+        40.09,
+        -105.99
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_gunnison": {
+      "name": "Gunnison County",
+      "type": "county",
+      "fips": "051",
+      "state": "CO",
+      "namePatterns": [
+        "GUNNISON",
+        "Gunnison",
+        "Gunnison County"
+      ],
+      "mapCenter": [
+        38.66,
+        -106.85
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_hinsdale": {
+      "name": "Hinsdale County",
+      "type": "county",
+      "fips": "053",
+      "state": "CO",
+      "namePatterns": [
+        "HINSDALE",
+        "Hinsdale",
+        "Hinsdale County"
+      ],
+      "mapCenter": [
+        37.82,
+        -107.3
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_huerfano": {
+      "name": "Huerfano County",
+      "type": "county",
+      "fips": "055",
+      "state": "CO",
+      "namePatterns": [
+        "HUERFANO",
+        "Huerfano",
+        "Huerfano County"
+      ],
+      "mapCenter": [
+        37.68,
+        -105
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_jackson": {
+      "name": "Jackson County",
+      "type": "county",
+      "fips": "057",
+      "state": "CO",
+      "namePatterns": [
+        "JACKSON",
+        "Jackson",
+        "Jackson County"
+      ],
+      "mapCenter": [
+        40.67,
+        -106.34
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_jefferson": {
+      "name": "Jefferson County",
+      "type": "county",
+      "fips": "059",
+      "state": "CO",
+      "namePatterns": [
+        "JEFFERSON",
+        "Jefferson",
+        "Jefferson County"
+      ],
+      "mapCenter": [
+        39.5866,
+        -105.2508
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": true,
+      "bbox": [
+        -105.6798,
+        39.3677,
+        -105.0534,
+        39.8282
+      ]
+    },
+    "co_kiowa": {
+      "name": "Kiowa County",
+      "type": "county",
+      "fips": "061",
+      "state": "CO",
+      "namePatterns": [
+        "KIOWA",
+        "Kiowa",
+        "Kiowa County"
+      ],
+      "mapCenter": [
+        38.36,
+        -102.74
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_kit_carson": {
+      "name": "Kit Carson County",
+      "type": "county",
+      "fips": "063",
+      "state": "CO",
+      "namePatterns": [
+        "KIT CARSON",
+        "Kit Carson",
+        "Kit Carson County"
+      ],
+      "mapCenter": [
+        39.08,
+        -102.6
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_lake": {
+      "name": "Lake County",
+      "type": "county",
+      "fips": "065",
+      "state": "CO",
+      "namePatterns": [
+        "LAKE",
+        "Lake",
+        "Lake County"
+      ],
+      "mapCenter": [
+        39.22,
+        -106.34
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_la_plata": {
+      "name": "La Plata County",
+      "type": "county",
+      "fips": "067",
+      "state": "CO",
+      "namePatterns": [
+        "LA PLATA",
+        "La Plata",
+        "La Plata County"
+      ],
+      "mapCenter": [
+        37.29,
+        -107.84
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_larimer": {
+      "name": "Larimer County",
+      "type": "county",
+      "fips": "069",
+      "state": "CO",
+      "namePatterns": [
+        "LARIMER",
+        "Larimer",
+        "Larimer County"
+      ],
+      "mapCenter": [
+        40.66,
+        -105.46
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_las_animas": {
+      "name": "Las Animas County",
+      "type": "county",
+      "fips": "071",
+      "state": "CO",
+      "namePatterns": [
+        "LAS ANIMAS",
+        "Las Animas",
+        "Las Animas County"
+      ],
+      "mapCenter": [
+        37.31,
+        -104.04
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_lincoln": {
+      "name": "Lincoln County",
+      "type": "county",
+      "fips": "073",
+      "state": "CO",
+      "namePatterns": [
+        "LINCOLN",
+        "Lincoln",
+        "Lincoln County"
+      ],
+      "mapCenter": [
+        39.04,
+        -103.52
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_logan": {
+      "name": "Logan County",
+      "type": "county",
+      "fips": "075",
+      "state": "CO",
+      "namePatterns": [
+        "LOGAN",
+        "Logan",
+        "Logan County"
+      ],
+      "mapCenter": [
+        40.66,
+        -103.11
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_mesa": {
+      "name": "Mesa County",
+      "type": "county",
+      "fips": "077",
+      "state": "CO",
+      "namePatterns": [
+        "MESA",
+        "Mesa",
+        "Mesa County"
+      ],
+      "mapCenter": [
+        39.02,
+        -108.46
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_mineral": {
+      "name": "Mineral County",
+      "type": "county",
+      "fips": "079",
+      "state": "CO",
+      "namePatterns": [
+        "MINERAL",
+        "Mineral",
+        "Mineral County"
+      ],
+      "mapCenter": [
+        37.77,
+        -106.93
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_moffat": {
+      "name": "Moffat County",
+      "type": "county",
+      "fips": "081",
+      "state": "CO",
+      "namePatterns": [
+        "MOFFAT",
+        "Moffat",
+        "Moffat County"
+      ],
+      "mapCenter": [
+        40.62,
+        -108.21
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_montezuma": {
+      "name": "Montezuma County",
+      "type": "county",
+      "fips": "083",
+      "state": "CO",
+      "namePatterns": [
+        "MONTEZUMA",
+        "Montezuma",
+        "Montezuma County"
+      ],
+      "mapCenter": [
+        37.34,
+        -108.59
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_montrose": {
+      "name": "Montrose County",
+      "type": "county",
+      "fips": "085",
+      "state": "CO",
+      "namePatterns": [
+        "MONTROSE",
+        "Montrose",
+        "Montrose County"
+      ],
+      "mapCenter": [
+        38.4,
+        -107.88
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_morgan": {
+      "name": "Morgan County",
+      "type": "county",
+      "fips": "087",
+      "state": "CO",
+      "namePatterns": [
+        "MORGAN",
+        "Morgan",
+        "Morgan County"
+      ],
+      "mapCenter": [
+        40.26,
+        -103.81
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_otero": {
+      "name": "Otero County",
+      "type": "county",
+      "fips": "089",
+      "state": "CO",
+      "namePatterns": [
+        "OTERO",
+        "Otero",
+        "Otero County"
+      ],
+      "mapCenter": [
+        38,
+        -103.72
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_ouray": {
+      "name": "Ouray County",
+      "type": "county",
+      "fips": "091",
+      "state": "CO",
+      "namePatterns": [
+        "OURAY",
+        "Ouray",
+        "Ouray County"
+      ],
+      "mapCenter": [
+        38.15,
+        -107.77
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_park": {
+      "name": "Park County",
+      "type": "county",
+      "fips": "093",
+      "state": "CO",
+      "namePatterns": [
+        "PARK",
+        "Park",
+        "Park County"
+      ],
+      "mapCenter": [
+        39.12,
+        -105.78
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_phillips": {
+      "name": "Phillips County",
+      "type": "county",
+      "fips": "095",
+      "state": "CO",
+      "namePatterns": [
+        "PHILLIPS",
+        "Phillips",
+        "Phillips County"
+      ],
+      "mapCenter": [
+        40.6,
+        -102.36
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_pitkin": {
+      "name": "Pitkin County",
+      "type": "county",
+      "fips": "097",
+      "state": "CO",
+      "namePatterns": [
+        "PITKIN",
+        "Pitkin",
+        "Pitkin County"
+      ],
+      "mapCenter": [
+        39.22,
+        -106.95
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_prowers": {
+      "name": "Prowers County",
+      "type": "county",
+      "fips": "099",
+      "state": "CO",
+      "namePatterns": [
+        "PROWERS",
+        "Prowers",
+        "Prowers County"
+      ],
+      "mapCenter": [
+        37.96,
+        -102.39
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_pueblo": {
+      "name": "Pueblo County",
+      "type": "county",
+      "fips": "101",
+      "state": "CO",
+      "namePatterns": [
+        "PUEBLO",
+        "Pueblo",
+        "Pueblo County"
+      ],
+      "mapCenter": [
+        38.28,
+        -104.61
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_rio_blanco": {
+      "name": "Rio Blanco County",
+      "type": "county",
+      "fips": "103",
+      "state": "CO",
+      "namePatterns": [
+        "RIO BLANCO",
+        "Rio Blanco",
+        "Rio Blanco County"
+      ],
+      "mapCenter": [
+        40.07,
+        -108.37
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_rio_grande": {
+      "name": "Rio Grande County",
+      "type": "county",
+      "fips": "105",
+      "state": "CO",
+      "namePatterns": [
+        "RIO GRANDE",
+        "Rio Grande",
+        "Rio Grande County"
+      ],
+      "mapCenter": [
+        37.57,
+        -106.38
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_routt": {
+      "name": "Routt County",
+      "type": "county",
+      "fips": "107",
+      "state": "CO",
+      "namePatterns": [
+        "ROUTT",
+        "Routt",
+        "Routt County"
+      ],
+      "mapCenter": [
+        40.49,
+        -106.83
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_saguache": {
+      "name": "Saguache County",
+      "type": "county",
+      "fips": "109",
+      "state": "CO",
+      "namePatterns": [
+        "SAGUACHE",
+        "Saguache",
+        "Saguache County"
+      ],
+      "mapCenter": [
+        38.08,
+        -106.28
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_san_juan": {
+      "name": "San Juan County",
+      "type": "county",
+      "fips": "111",
+      "state": "CO",
+      "namePatterns": [
+        "SAN JUAN",
+        "San Juan",
+        "San Juan County"
+      ],
+      "mapCenter": [
+        37.77,
+        -107.68
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_san_miguel": {
+      "name": "San Miguel County",
+      "type": "county",
+      "fips": "113",
+      "state": "CO",
+      "namePatterns": [
+        "SAN MIGUEL",
+        "San Miguel",
+        "San Miguel County"
+      ],
+      "mapCenter": [
+        37.93,
+        -108.43
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_sedgwick": {
+      "name": "Sedgwick County",
+      "type": "county",
+      "fips": "115",
+      "state": "CO",
+      "namePatterns": [
+        "SEDGWICK",
+        "Sedgwick",
+        "Sedgwick County"
+      ],
+      "mapCenter": [
+        40.88,
+        -102.35
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_summit": {
+      "name": "Summit County",
+      "type": "county",
+      "fips": "117",
+      "state": "CO",
+      "namePatterns": [
+        "SUMMIT",
+        "Summit",
+        "Summit County"
+      ],
+      "mapCenter": [
+        39.63,
+        -106.12
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_teller": {
+      "name": "Teller County",
+      "type": "county",
+      "fips": "119",
+      "state": "CO",
+      "namePatterns": [
+        "TELLER",
+        "Teller",
+        "Teller County"
+      ],
+      "mapCenter": [
+        38.88,
+        -105.16
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_washington": {
+      "name": "Washington County",
+      "type": "county",
+      "fips": "121",
+      "state": "CO",
+      "namePatterns": [
+        "WASHINGTON",
+        "Washington",
+        "Washington County"
+      ],
+      "mapCenter": [
+        39.97,
+        -103.2
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_weld": {
+      "name": "Weld County",
+      "type": "county",
+      "fips": "123",
+      "state": "CO",
+      "namePatterns": [
+        "WELD",
+        "Weld",
+        "Weld County"
+      ],
+      "mapCenter": [
+        40.55,
+        -104.39
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "co_yuma": {
+      "name": "Yuma County",
+      "type": "county",
+      "fips": "125",
+      "state": "CO",
+      "namePatterns": [
+        "YUMA",
+        "Yuma",
+        "Yuma County"
+      ],
+      "mapCenter": [
+        40,
+        -102.43
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    }
   },
   "filterProfiles": {
     "countyOnly": {
@@ -3352,15 +4545,55 @@
   },
   "states": {
     "_comment": "Registry of supported states. Each key maps to a states/{key}/config.json with column mappings, jurisdictions, and road system definitions.",
-    "virginia": {
-      "fips": "51",
-      "name": "Virginia",
-      "abbreviation": "VA",
-      "dotName": "VDOT",
-      "defaultJurisdiction": "henrico",
+    "alabama": {
+      "fips": "01",
+      "name": "Alabama",
+      "abbreviation": "AL",
+      "dotName": "ALDOT",
+      "defaultJurisdiction": null,
       "dataDir": null,
-      "r2Prefix": "virginia",
-      "appSubtitle": "Virginia Crash Analysis Tool"
+      "r2Prefix": "alabama",
+      "appSubtitle": "Alabama Crash Analysis Tool"
+    },
+    "alaska": {
+      "fips": "02",
+      "name": "Alaska",
+      "abbreviation": "AK",
+      "dotName": "AKDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "alaska",
+      "appSubtitle": "Alaska Crash Analysis Tool"
+    },
+    "arizona": {
+      "fips": "04",
+      "name": "Arizona",
+      "abbreviation": "AZ",
+      "dotName": "ADOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "arizona",
+      "appSubtitle": "Arizona Crash Analysis Tool"
+    },
+    "arkansas": {
+      "fips": "05",
+      "name": "Arkansas",
+      "abbreviation": "AR",
+      "dotName": "ArDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "arkansas",
+      "appSubtitle": "Arkansas Crash Analysis Tool"
+    },
+    "california": {
+      "fips": "06",
+      "name": "California",
+      "abbreviation": "CA",
+      "dotName": "Caltrans",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "california",
+      "appSubtitle": "California Crash Analysis Tool"
     },
     "colorado": {
       "fips": "08",
@@ -3371,6 +4604,456 @@
       "dataDir": "CDOT",
       "r2Prefix": "colorado",
       "appSubtitle": "Colorado Crash Analysis Tool"
+    },
+    "connecticut": {
+      "fips": "09",
+      "name": "Connecticut",
+      "abbreviation": "CT",
+      "dotName": "CTDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "connecticut",
+      "appSubtitle": "Connecticut Crash Analysis Tool"
+    },
+    "delaware": {
+      "fips": "10",
+      "name": "Delaware",
+      "abbreviation": "DE",
+      "dotName": "DelDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "delaware",
+      "appSubtitle": "Delaware Crash Analysis Tool"
+    },
+    "district_of_columbia": {
+      "fips": "11",
+      "name": "District of Columbia",
+      "abbreviation": "DC",
+      "dotName": "DDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "district_of_columbia",
+      "appSubtitle": "District of Columbia Crash Analysis Tool"
+    },
+    "florida": {
+      "fips": "12",
+      "name": "Florida",
+      "abbreviation": "FL",
+      "dotName": "FDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "florida",
+      "appSubtitle": "Florida Crash Analysis Tool"
+    },
+    "georgia": {
+      "fips": "13",
+      "name": "Georgia",
+      "abbreviation": "GA",
+      "dotName": "GDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "georgia",
+      "appSubtitle": "Georgia Crash Analysis Tool"
+    },
+    "hawaii": {
+      "fips": "15",
+      "name": "Hawaii",
+      "abbreviation": "HI",
+      "dotName": "HDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "hawaii",
+      "appSubtitle": "Hawaii Crash Analysis Tool"
+    },
+    "idaho": {
+      "fips": "16",
+      "name": "Idaho",
+      "abbreviation": "ID",
+      "dotName": "ITD",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "idaho",
+      "appSubtitle": "Idaho Crash Analysis Tool"
+    },
+    "illinois": {
+      "fips": "17",
+      "name": "Illinois",
+      "abbreviation": "IL",
+      "dotName": "IDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "illinois",
+      "appSubtitle": "Illinois Crash Analysis Tool"
+    },
+    "indiana": {
+      "fips": "18",
+      "name": "Indiana",
+      "abbreviation": "IN",
+      "dotName": "INDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "indiana",
+      "appSubtitle": "Indiana Crash Analysis Tool"
+    },
+    "iowa": {
+      "fips": "19",
+      "name": "Iowa",
+      "abbreviation": "IA",
+      "dotName": "IowaDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "iowa",
+      "appSubtitle": "Iowa Crash Analysis Tool"
+    },
+    "kansas": {
+      "fips": "20",
+      "name": "Kansas",
+      "abbreviation": "KS",
+      "dotName": "KDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "kansas",
+      "appSubtitle": "Kansas Crash Analysis Tool"
+    },
+    "kentucky": {
+      "fips": "21",
+      "name": "Kentucky",
+      "abbreviation": "KY",
+      "dotName": "KYTC",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "kentucky",
+      "appSubtitle": "Kentucky Crash Analysis Tool"
+    },
+    "louisiana": {
+      "fips": "22",
+      "name": "Louisiana",
+      "abbreviation": "LA",
+      "dotName": "LaDOTD",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "louisiana",
+      "appSubtitle": "Louisiana Crash Analysis Tool"
+    },
+    "maine": {
+      "fips": "23",
+      "name": "Maine",
+      "abbreviation": "ME",
+      "dotName": "MaineDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "maine",
+      "appSubtitle": "Maine Crash Analysis Tool"
+    },
+    "maryland": {
+      "fips": "24",
+      "name": "Maryland",
+      "abbreviation": "MD",
+      "dotName": "MDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "maryland",
+      "appSubtitle": "Maryland Crash Analysis Tool"
+    },
+    "massachusetts": {
+      "fips": "25",
+      "name": "Massachusetts",
+      "abbreviation": "MA",
+      "dotName": "MassDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "massachusetts",
+      "appSubtitle": "Massachusetts Crash Analysis Tool"
+    },
+    "michigan": {
+      "fips": "26",
+      "name": "Michigan",
+      "abbreviation": "MI",
+      "dotName": "MDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "michigan",
+      "appSubtitle": "Michigan Crash Analysis Tool"
+    },
+    "minnesota": {
+      "fips": "27",
+      "name": "Minnesota",
+      "abbreviation": "MN",
+      "dotName": "MnDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "minnesota",
+      "appSubtitle": "Minnesota Crash Analysis Tool"
+    },
+    "mississippi": {
+      "fips": "28",
+      "name": "Mississippi",
+      "abbreviation": "MS",
+      "dotName": "MDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "mississippi",
+      "appSubtitle": "Mississippi Crash Analysis Tool"
+    },
+    "missouri": {
+      "fips": "29",
+      "name": "Missouri",
+      "abbreviation": "MO",
+      "dotName": "MoDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "missouri",
+      "appSubtitle": "Missouri Crash Analysis Tool"
+    },
+    "montana": {
+      "fips": "30",
+      "name": "Montana",
+      "abbreviation": "MT",
+      "dotName": "MDT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "montana",
+      "appSubtitle": "Montana Crash Analysis Tool"
+    },
+    "nebraska": {
+      "fips": "31",
+      "name": "Nebraska",
+      "abbreviation": "NE",
+      "dotName": "NDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "nebraska",
+      "appSubtitle": "Nebraska Crash Analysis Tool"
+    },
+    "nevada": {
+      "fips": "32",
+      "name": "Nevada",
+      "abbreviation": "NV",
+      "dotName": "NDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "nevada",
+      "appSubtitle": "Nevada Crash Analysis Tool"
+    },
+    "new_hampshire": {
+      "fips": "33",
+      "name": "New Hampshire",
+      "abbreviation": "NH",
+      "dotName": "NHDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "new_hampshire",
+      "appSubtitle": "New Hampshire Crash Analysis Tool"
+    },
+    "new_jersey": {
+      "fips": "34",
+      "name": "New Jersey",
+      "abbreviation": "NJ",
+      "dotName": "NJDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "new_jersey",
+      "appSubtitle": "New Jersey Crash Analysis Tool"
+    },
+    "new_mexico": {
+      "fips": "35",
+      "name": "New Mexico",
+      "abbreviation": "NM",
+      "dotName": "NMDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "new_mexico",
+      "appSubtitle": "New Mexico Crash Analysis Tool"
+    },
+    "new_york": {
+      "fips": "36",
+      "name": "New York",
+      "abbreviation": "NY",
+      "dotName": "NYSDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "new_york",
+      "appSubtitle": "New York Crash Analysis Tool"
+    },
+    "north_carolina": {
+      "fips": "37",
+      "name": "North Carolina",
+      "abbreviation": "NC",
+      "dotName": "NCDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "north_carolina",
+      "appSubtitle": "North Carolina Crash Analysis Tool"
+    },
+    "north_dakota": {
+      "fips": "38",
+      "name": "North Dakota",
+      "abbreviation": "ND",
+      "dotName": "NDDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "north_dakota",
+      "appSubtitle": "North Dakota Crash Analysis Tool"
+    },
+    "ohio": {
+      "fips": "39",
+      "name": "Ohio",
+      "abbreviation": "OH",
+      "dotName": "ODOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "ohio",
+      "appSubtitle": "Ohio Crash Analysis Tool"
+    },
+    "oklahoma": {
+      "fips": "40",
+      "name": "Oklahoma",
+      "abbreviation": "OK",
+      "dotName": "ODOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "oklahoma",
+      "appSubtitle": "Oklahoma Crash Analysis Tool"
+    },
+    "oregon": {
+      "fips": "41",
+      "name": "Oregon",
+      "abbreviation": "OR",
+      "dotName": "ODOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "oregon",
+      "appSubtitle": "Oregon Crash Analysis Tool"
+    },
+    "pennsylvania": {
+      "fips": "42",
+      "name": "Pennsylvania",
+      "abbreviation": "PA",
+      "dotName": "PennDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "pennsylvania",
+      "appSubtitle": "Pennsylvania Crash Analysis Tool"
+    },
+    "rhode_island": {
+      "fips": "44",
+      "name": "Rhode Island",
+      "abbreviation": "RI",
+      "dotName": "RIDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "rhode_island",
+      "appSubtitle": "Rhode Island Crash Analysis Tool"
+    },
+    "south_carolina": {
+      "fips": "45",
+      "name": "South Carolina",
+      "abbreviation": "SC",
+      "dotName": "SCDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "south_carolina",
+      "appSubtitle": "South Carolina Crash Analysis Tool"
+    },
+    "south_dakota": {
+      "fips": "46",
+      "name": "South Dakota",
+      "abbreviation": "SD",
+      "dotName": "SDDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "south_dakota",
+      "appSubtitle": "South Dakota Crash Analysis Tool"
+    },
+    "tennessee": {
+      "fips": "47",
+      "name": "Tennessee",
+      "abbreviation": "TN",
+      "dotName": "TDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "tennessee",
+      "appSubtitle": "Tennessee Crash Analysis Tool"
+    },
+    "texas": {
+      "fips": "48",
+      "name": "Texas",
+      "abbreviation": "TX",
+      "dotName": "TxDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "texas",
+      "appSubtitle": "Texas Crash Analysis Tool"
+    },
+    "utah": {
+      "fips": "49",
+      "name": "Utah",
+      "abbreviation": "UT",
+      "dotName": "UDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "utah",
+      "appSubtitle": "Utah Crash Analysis Tool"
+    },
+    "vermont": {
+      "fips": "50",
+      "name": "Vermont",
+      "abbreviation": "VT",
+      "dotName": "VTrans",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "vermont",
+      "appSubtitle": "Vermont Crash Analysis Tool"
+    },
+    "virginia": {
+      "fips": "51",
+      "name": "Virginia",
+      "abbreviation": "VA",
+      "dotName": "VDOT",
+      "defaultJurisdiction": "henrico",
+      "dataDir": null,
+      "r2Prefix": "virginia",
+      "appSubtitle": "Virginia Crash Analysis Tool"
+    },
+    "washington": {
+      "fips": "53",
+      "name": "Washington",
+      "abbreviation": "WA",
+      "dotName": "WSDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "washington",
+      "appSubtitle": "Washington Crash Analysis Tool"
+    },
+    "west_virginia": {
+      "fips": "54",
+      "name": "West Virginia",
+      "abbreviation": "WV",
+      "dotName": "WVDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "west_virginia",
+      "appSubtitle": "West Virginia Crash Analysis Tool"
+    },
+    "wisconsin": {
+      "fips": "55",
+      "name": "Wisconsin",
+      "abbreviation": "WI",
+      "dotName": "WisDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "wisconsin",
+      "appSubtitle": "Wisconsin Crash Analysis Tool"
+    },
+    "wyoming": {
+      "fips": "56",
+      "name": "Wyoming",
+      "abbreviation": "WY",
+      "dotName": "WYDOT",
+      "defaultJurisdiction": null,
+      "dataDir": null,
+      "r2Prefix": "wyoming",
+      "appSubtitle": "Wyoming Crash Analysis Tool"
     }
   },
   "defaultState": "colorado",
