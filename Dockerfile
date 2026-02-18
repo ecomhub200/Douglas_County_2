@@ -36,6 +36,9 @@ COPY docs/ /usr/share/nginx/html/docs/
 # Copy any login directory if it exists
 COPY logi[n]/ /usr/share/nginx/html/login/
 
+# Copy Firebase auth action handler (for email verification/password reset links)
+COPY __/ /usr/share/nginx/html/__/
+
 # ------------------------------------------------------------
 # Configure Nginx
 # ------------------------------------------------------------
