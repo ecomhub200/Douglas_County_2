@@ -21,6 +21,9 @@ COPY manifest.json /usr/share/nginx/html/
 # Copy app directory (main application)
 COPY app/ /usr/share/nginx/html/app/
 
+# Copy config directory (settings.json, api-keys)
+COPY config/ /usr/share/nginx/html/config/
+
 # Copy data directory
 COPY data/ /usr/share/nginx/html/data/
 
