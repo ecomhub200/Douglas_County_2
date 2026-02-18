@@ -723,7 +723,7 @@ const StateAdapter = (() => {
 
             // For the default state: use the cached config.json jurisdictions (rich data with bbox, education, jurisCode)
             // These are cached at startup in window._defaultStateConfigJurisdictions to survive state switching
-            const defaultStateFips = (typeof appConfig !== 'undefined' && appConfig?.states?.[appConfig?.defaultState]?.fips) || '51';
+            const defaultStateFips = (typeof appConfig !== 'undefined' && appConfig?.states?.[appConfig?.defaultState]?.fips) || '08';
             if (padded === defaultStateFips) {
                 const cachedJurisdictions = (typeof window !== 'undefined' && (window._defaultStateConfigJurisdictions || window._virginiaConfigJurisdictions))
                     ? (window._defaultStateConfigJurisdictions || window._virginiaConfigJurisdictions)
