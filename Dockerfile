@@ -60,6 +60,18 @@ COPY server/ /app/server/
 COPY supervisord.conf /etc/supervisord.conf
 
 # ------------------------------------------------------------
+# Environment variables (set in Coolify Dashboard)
+# ------------------------------------------------------------
+
+# Brevo email notifications (set ONE of API key or SMTP credentials)
+# BREVO_API_KEY         - Brevo v3 API key (starts with xkeysib-)
+# BREVO_SMTP_LOGIN      - Brevo SMTP login email
+# BREVO_SMTP_PASSWORD   - Brevo SMTP password
+# NOTIFICATION_FROM_EMAIL - Verified Brevo sender address
+# QDRANT_ENDPOINT       - Qdrant Cloud URL
+# QDRANT_API_KEY        - Qdrant Cloud API key
+
+# ------------------------------------------------------------
 # Expose port and start
 # ------------------------------------------------------------
 
