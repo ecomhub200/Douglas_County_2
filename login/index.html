@@ -843,8 +843,27 @@
 
       if (signupConfig?.jurisdictions) {
         const stateAbbr = stateInfo.abbr;
+        // Determine the default state abbreviation from config (jurisdictions without a 'state' field belong to this state)
+        let defaultStateAbbr = null;
+        if (signupConfig.states) {
+          // Find which state is the "original" one: look for jurisdictions without 'state' field
+          // These are Virginia jurisdictions that predate multi-state support
+          const statesEntries = Object.entries(signupConfig.states);
+          for (const [, stCfg] of statesEntries) {
+            if (stCfg.abbreviation === stateAbbr) {
+              defaultStateAbbr = stateAbbr;
+              break;
+            }
+          }
+        }
         const matching = Object.entries(signupConfig.jurisdictions)
-          .filter(([, j]) => j.state === stateAbbr)
+          .filter(([key, j]) => {
+            if (j.state === stateAbbr) return true;
+            // Jurisdictions without a 'state' field belong to Virginia (the original default state)
+            if (!j.state && stateAbbr === 'VA') return true;
+            return false;
+          })
+          .filter(([key]) => !key.startsWith('_')) // Skip separator entries like "_colorado_separator"
           .sort((a, b) => a[1].name.localeCompare(b[1].name));
 
         if (matching.length > 0) {
