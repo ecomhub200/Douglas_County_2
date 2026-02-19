@@ -51,6 +51,17 @@ const StateAdapter = (() => {
         // Normalize headers for comparison (trim whitespace)
         const normalizedHeaders = new Set(csvHeaders.map(h => h.trim()));
 
+        // Check for normalized Colorado data: _co_* prefixed columns indicate
+        // Colorado-origin data that was normalized to Virginia-compatible format.
+        // This must be checked BEFORE signature matching because normalized data
+        // will also match Virginia's required columns.
+        const hasColoradoProvenance = [...normalizedHeaders].some(h => h.startsWith('_co_'));
+        if (hasColoradoProvenance) {
+            detectedState = 'colorado';
+            console.log('[StateAdapter] Detected state: Colorado (CDOT) — normalized data with _co_* columns');
+            return 'colorado';
+        }
+
         for (const [stateKey, signature] of Object.entries(STATE_SIGNATURES)) {
             const allRequired = signature.requiredColumns.every(col => normalizedHeaders.has(col));
             if (allRequired) {
