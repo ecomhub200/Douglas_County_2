@@ -40,15 +40,30 @@ function getCorsHeaders(origin) {
 // Brevo Email Helpers
 // =============================================================================
 
-function sendViaBrevoApi(toEmail, subject, htmlBody, textBody) {
+function sendViaBrevoApi(recipients, subject, htmlBody, textBody, attachment) {
     return new Promise((resolve, reject) => {
-        const payload = JSON.stringify({
+        // recipients can be a string (single email) or array of strings/objects
+        const toList = Array.isArray(recipients)
+            ? recipients.map(r => typeof r === 'string' ? { email: r } : r)
+            : [{ email: recipients }];
+
+        const emailPayload = {
             sender: { email: NOTIFICATION_FROM_EMAIL, name: 'CRASH LENS' },
-            to: [{ email: toEmail }],
+            to: toList,
             subject: subject,
             htmlContent: htmlBody,
             textContent: textBody || ''
-        });
+        };
+
+        // Support PDF attachment: {content: base64String, name: 'report.pdf'}
+        if (attachment && attachment.content && attachment.name) {
+            emailPayload.attachment = [{
+                content: attachment.content,
+                name: attachment.name
+            }];
+        }
+
+        const payload = JSON.stringify(emailPayload);
 
         const options = {
             hostname: 'api.brevo.com',
@@ -87,10 +102,19 @@ function sendViaBrevoSmtp(toEmail, subject, htmlBody) {
     });
 }
 
-function collectBody(req) {
-    return new Promise((resolve) => {
+function collectBody(req, maxSize = 15 * 1024 * 1024) {
+    return new Promise((resolve, reject) => {
         let body = '';
-        req.on('data', chunk => { body += chunk; });
+        let size = 0;
+        req.on('data', chunk => {
+            size += chunk.length;
+            if (size > maxSize) {
+                reject(new Error('Request body too large (max 15MB)'));
+                req.destroy();
+                return;
+            }
+            body += chunk;
+        });
         req.on('end', () => resolve(body));
     });
 }
@@ -160,18 +184,19 @@ const server = http.createServer((req, res) => {
                 return;
             }
 
-            const { to, subject, html, text } = payload;
+            const { to, subject, html, text, attachment } = payload;
             if (!to || !subject || !html) {
                 res.writeHead(400, corsHeaders);
                 res.end(JSON.stringify({ error: 'Missing required fields: to, subject, html' }));
                 return;
             }
 
-            console.log(`[Brevo] Sending email to ${to}: "${subject}"`);
+            const recipientList = Array.isArray(to) ? to : [to];
+            console.log(`[Brevo] Sending email to ${recipientList.length} recipient(s): "${subject}"${attachment ? ' [+PDF attachment]' : ''}`);
 
-            sendViaBrevoApi(to, subject, html, text)
+            sendViaBrevoApi(recipientList, subject, html, text, attachment)
                 .then(result => {
-                    console.log(`[Brevo] Email sent successfully to ${to}`);
+                    console.log(`[Brevo] Email sent successfully to ${recipientList.join(', ')}`);
                     res.writeHead(200, corsHeaders);
                     res.end(JSON.stringify({ success: true, messageId: result.messageId }));
                 })

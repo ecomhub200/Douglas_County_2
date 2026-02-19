@@ -51,6 +51,17 @@ const StateAdapter = (() => {
         // Normalize headers for comparison (trim whitespace)
         const normalizedHeaders = new Set(csvHeaders.map(h => h.trim()));
 
+        // Check for normalized Colorado data: _co_* prefixed columns indicate
+        // Colorado-origin data that was normalized to Virginia-compatible format.
+        // This must be checked BEFORE signature matching because normalized data
+        // will also match Virginia's required columns.
+        const hasColoradoProvenance = [...normalizedHeaders].some(h => h.startsWith('_co_'));
+        if (hasColoradoProvenance) {
+            detectedState = 'colorado';
+            console.log('[StateAdapter] Detected state: Colorado (CDOT) — normalized data with _co_* columns');
+            return 'colorado';
+        }
+
         for (const [stateKey, signature] of Object.entries(STATE_SIGNATURES)) {
             const allRequired = signature.requiredColumns.every(col => normalizedHeaders.has(col));
             if (allRequired) {
@@ -557,7 +568,7 @@ const StateAdapter = (() => {
          * @returns {Object} Normalized row with Virginia-compatible column names
          */
         normalizeRow(row) {
-            const state = detectedState || 'virginia';
+            const state = detectedState || ((typeof appConfig !== 'undefined' && appConfig?.defaultState) || 'colorado');
             const normalizer = NORMALIZERS[state];
             if (!normalizer) {
                 console.error(`[StateAdapter] No normalizer for state: ${state}`);
@@ -603,8 +614,8 @@ const StateAdapter = (() => {
          * @returns {boolean}
          */
         hasStateOverride() {
-            const defaultState = (typeof appConfig !== 'undefined' && appConfig?.defaultState) || 'virginia';
-            const defaultFips = (typeof appConfig !== 'undefined' && appConfig?.states?.[defaultState]?.fips) || '51';
+            const defaultState = (typeof appConfig !== 'undefined' && appConfig?.defaultState) || 'colorado';
+            const defaultFips = (typeof appConfig !== 'undefined' && appConfig?.states?.[defaultState]?.fips) || '08';
             return (manualStateFips !== null && manualStateFips !== defaultFips) ||
                    (detectedState !== null && detectedState !== defaultState);
         },
@@ -723,7 +734,7 @@ const StateAdapter = (() => {
 
             // For the default state: use the cached config.json jurisdictions (rich data with bbox, education, jurisCode)
             // These are cached at startup in window._defaultStateConfigJurisdictions to survive state switching
-            const defaultStateFips = (typeof appConfig !== 'undefined' && appConfig?.states?.[appConfig?.defaultState]?.fips) || '51';
+            const defaultStateFips = (typeof appConfig !== 'undefined' && appConfig?.states?.[appConfig?.defaultState]?.fips) || '08';
             if (padded === defaultStateFips) {
                 const cachedJurisdictions = (typeof window !== 'undefined' && (window._defaultStateConfigJurisdictions || window._virginiaConfigJurisdictions))
                     ? (window._defaultStateConfigJurisdictions || window._virginiaConfigJurisdictions)
