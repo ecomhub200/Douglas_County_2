@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Download traffic safety grants from Grants.gov and include Virginia-specific grants.
+Download traffic safety grants from Grants.gov and include state-specific grants.
+Supports multiple states (Virginia, Colorado, etc.) with state-specific HSIP/402/405 programs.
 Filters for transportation category, safety-related CFDA numbers, and keywords.
 """
 
@@ -112,30 +113,33 @@ def make_request_with_retry(url, timeout=300, max_manual_retries=3):
 
     raise last_exception or Exception("Request failed after all retries")
 
-# Virginia Static Grants - always included as baseline
-VIRGINIA_STATIC_GRANTS = [
-    {
-        'grant_id': 'VA-HSIP-FY2027',
-        'title': 'Highway Safety Improvement Program (HSIP) FY2027',
-        'agency': 'VDOT',
-        'cfda_number': '20.205',
-        'program_type': 'HSIP',
-        'close_date': '2026-10-31',
-        'post_date': '2026-08-01',
-        'federal_share_pct': 90,
-        'award_ceiling': None,
-        'award_floor': None,
-        'emphasis_areas': 'Intersection|Systemic|VRU|CMF-Based',
-        'eligible_activities': 'Construction|Planning',
-        'requires_crash_data': 'Y',
-        'application_url': 'https://www.virginiadot.org/business/ted_app_pro.asp',
-        'contact_info': 'VDOT Traffic Engineering Division',
-        'status': 'Forecasted',
-        'virginia_specific': 'Y',
-        'description': 'Virginia federally-funded program for data-driven safety improvements on public roads. Requires benefit-cost analysis and CMF documentation.'
+# State-specific grant configurations
+# Each state has HSIP (via state DOT) and 402/405 (via state Highway Safety Office)
+STATE_GRANT_CONFIGS = {
+    'VA': {
+        'name': 'Virginia',
+        'dot_name': 'VDOT',
+        'dot_full': 'VDOT Traffic Engineering Division',
+        'hso_name': 'VAHSO',
+        'hso_full': 'Virginia Highway Safety Office',
+        'hsip_url': 'https://www.virginiadot.org/business/ted_app_pro.asp',
+        'hso_url': 'https://www.dmv.virginia.gov/safety/grants-management',
     },
+    'CO': {
+        'name': 'Colorado',
+        'dot_name': 'CDOT',
+        'dot_full': 'CDOT Safety & Traffic Engineering Branch',
+        'hso_name': 'CDOT OEHS',
+        'hso_full': 'Colorado Office of Transportation Safety',
+        'hsip_url': 'https://www.codot.gov/safety/traffic-safety/safety-programs-data/hsip',
+        'hso_url': 'https://www.codot.gov/safety',
+    },
+}
+
+# Federal grants (not state-specific, always included)
+FEDERAL_STATIC_GRANTS = [
     {
-        'grant_id': 'VA-SS4A-FY2026',
+        'grant_id': 'FED-SS4A-FY2026',
         'title': 'Safe Streets and Roads for All (SS4A) FY2026',
         'agency': 'USDOT',
         'cfda_number': '20.616',
@@ -152,87 +156,9 @@ VIRGINIA_STATIC_GRANTS = [
         'contact_info': 'SS4A@dot.gov',
         'status': 'Forecasted',
         'virginia_specific': 'N',
+        'state_specific': 'N',
+        'state_code': '',
         'description': 'Grants for Action Plans and Implementation projects to prevent roadway deaths and serious injuries. Focus on vulnerable road users.'
-    },
-    {
-        'grant_id': 'VA-402-FY2027',
-        'title': 'NHTSA Section 402 Highway Safety Grant FY2027',
-        'agency': 'VAHSO',
-        'cfda_number': '20.600',
-        'program_type': '402',
-        'close_date': '2026-02-28',
-        'post_date': '2025-12-01',
-        'federal_share_pct': 100,
-        'award_ceiling': None,
-        'award_floor': None,
-        'emphasis_areas': 'Speed|Distracted|Pedestrian|Impaired|Occupant Protection',
-        'eligible_activities': 'Enforcement|Education|Planning',
-        'requires_crash_data': 'Y',
-        'application_url': 'https://www.dmv.virginia.gov/safety/grants-management',
-        'contact_info': 'Virginia Highway Safety Office',
-        'status': 'Forecasted',
-        'virginia_specific': 'Y',
-        'description': 'Formula grants for highway safety programs including enforcement, education, and public awareness campaigns.'
-    },
-    {
-        'grant_id': 'VA-405B-FY2027',
-        'title': 'NHTSA Section 405b Occupant Protection FY2027',
-        'agency': 'VAHSO',
-        'cfda_number': '20.602',
-        'program_type': '405b',
-        'close_date': '2026-02-28',
-        'post_date': '2025-12-01',
-        'federal_share_pct': 100,
-        'award_ceiling': None,
-        'award_floor': None,
-        'emphasis_areas': 'Occupant Protection|Seatbelt|Child Restraint',
-        'eligible_activities': 'Enforcement|Education',
-        'requires_crash_data': 'Y',
-        'application_url': 'https://www.dmv.virginia.gov/safety/grants-management',
-        'contact_info': 'Virginia Highway Safety Office',
-        'status': 'Forecasted',
-        'virginia_specific': 'Y',
-        'description': 'Incentive grants for occupant protection programs including Click It or Ticket enforcement and child passenger safety.'
-    },
-    {
-        'grant_id': 'VA-405C-FY2027',
-        'title': 'NHTSA Section 405c Traffic Records FY2027',
-        'agency': 'VAHSO',
-        'cfda_number': '20.610',
-        'program_type': '405c',
-        'close_date': '2026-02-28',
-        'post_date': '2025-12-01',
-        'federal_share_pct': 100,
-        'award_ceiling': None,
-        'award_floor': None,
-        'emphasis_areas': 'Traffic Records|Data Quality|Crash Data',
-        'eligible_activities': 'Planning|Data Systems',
-        'requires_crash_data': 'N',
-        'application_url': 'https://www.dmv.virginia.gov/safety/grants-management',
-        'contact_info': 'Virginia Highway Safety Office',
-        'status': 'Forecasted',
-        'virginia_specific': 'Y',
-        'description': 'Grants to improve traffic records systems including crash, roadway, citation, and injury surveillance data.'
-    },
-    {
-        'grant_id': 'VA-405D-FY2027',
-        'title': 'NHTSA Section 405d Impaired Driving FY2027',
-        'agency': 'VAHSO',
-        'cfda_number': '20.601',
-        'program_type': '405d',
-        'close_date': '2026-02-28',
-        'post_date': '2025-12-01',
-        'federal_share_pct': 100,
-        'award_ceiling': None,
-        'award_floor': None,
-        'emphasis_areas': 'Impaired|DUI|Alcohol|Drugs',
-        'eligible_activities': 'Enforcement|Education|Courts',
-        'requires_crash_data': 'Y',
-        'application_url': 'https://www.dmv.virginia.gov/safety/grants-management',
-        'contact_info': 'Virginia Highway Safety Office',
-        'status': 'Forecasted',
-        'virginia_specific': 'Y',
-        'description': 'Incentive grants for impaired driving countermeasures including high-visibility enforcement and DUI courts.'
     },
     {
         'grant_id': 'FED-RAISE-FY2026',
@@ -252,6 +178,8 @@ VIRGINIA_STATIC_GRANTS = [
         'contact_info': 'RAISEgrants@dot.gov',
         'status': 'Forecasted',
         'virginia_specific': 'N',
+        'state_specific': 'N',
+        'state_code': '',
         'description': 'Discretionary grant program for surface transportation infrastructure projects with significant local or regional impact.'
     },
     {
@@ -272,9 +200,142 @@ VIRGINIA_STATIC_GRANTS = [
         'contact_info': 'INFRAgrants@dot.gov',
         'status': 'Forecasted',
         'virginia_specific': 'N',
+        'state_specific': 'N',
+        'state_code': '',
         'description': 'Infrastructure for Rebuilding America grants for highway and freight projects of national or regional significance.'
     }
 ]
+
+
+def get_state_grants(state_abbr, config):
+    """Generate state-specific grant entries for HSIP, 402, 405b, 405c, 405d."""
+    abbr = state_abbr.upper()
+    is_va = abbr == 'VA'
+    return [
+        {
+            'grant_id': f'{abbr}-HSIP-FY2027',
+            'title': 'Highway Safety Improvement Program (HSIP) FY2027',
+            'agency': config['dot_name'],
+            'cfda_number': '20.205',
+            'program_type': 'HSIP',
+            'close_date': '2026-10-31',
+            'post_date': '2026-08-01',
+            'federal_share_pct': 90,
+            'award_ceiling': None,
+            'award_floor': None,
+            'emphasis_areas': 'Intersection|Systemic|VRU|CMF-Based',
+            'eligible_activities': 'Construction|Planning',
+            'requires_crash_data': 'Y',
+            'application_url': config['hsip_url'],
+            'contact_info': config['dot_full'],
+            'status': 'Forecasted',
+            'virginia_specific': 'Y' if is_va else 'N',
+            'state_specific': 'Y',
+            'state_code': abbr,
+            'description': f"{config['name']} federally-funded program for data-driven safety improvements on public roads. Requires benefit-cost analysis and CMF documentation."
+        },
+        {
+            'grant_id': f'{abbr}-402-FY2027',
+            'title': 'NHTSA Section 402 Highway Safety Grant FY2027',
+            'agency': config['hso_name'],
+            'cfda_number': '20.600',
+            'program_type': '402',
+            'close_date': '2026-02-28',
+            'post_date': '2025-12-01',
+            'federal_share_pct': 100,
+            'award_ceiling': None,
+            'award_floor': None,
+            'emphasis_areas': 'Speed|Distracted|Pedestrian|Impaired|Occupant Protection',
+            'eligible_activities': 'Enforcement|Education|Planning',
+            'requires_crash_data': 'Y',
+            'application_url': config['hso_url'],
+            'contact_info': config['hso_full'],
+            'status': 'Forecasted',
+            'virginia_specific': 'Y' if is_va else 'N',
+            'state_specific': 'Y',
+            'state_code': abbr,
+            'description': f"Formula grants for highway safety programs including enforcement, education, and public awareness campaigns in {config['name']}."
+        },
+        {
+            'grant_id': f'{abbr}-405B-FY2027',
+            'title': 'NHTSA Section 405b Occupant Protection FY2027',
+            'agency': config['hso_name'],
+            'cfda_number': '20.602',
+            'program_type': '405b',
+            'close_date': '2026-02-28',
+            'post_date': '2025-12-01',
+            'federal_share_pct': 100,
+            'award_ceiling': None,
+            'award_floor': None,
+            'emphasis_areas': 'Occupant Protection|Seatbelt|Child Restraint',
+            'eligible_activities': 'Enforcement|Education',
+            'requires_crash_data': 'Y',
+            'application_url': config['hso_url'],
+            'contact_info': config['hso_full'],
+            'status': 'Forecasted',
+            'virginia_specific': 'Y' if is_va else 'N',
+            'state_specific': 'Y',
+            'state_code': abbr,
+            'description': f"Incentive grants for occupant protection programs in {config['name']} including Click It or Ticket enforcement and child passenger safety."
+        },
+        {
+            'grant_id': f'{abbr}-405C-FY2027',
+            'title': 'NHTSA Section 405c Traffic Records FY2027',
+            'agency': config['hso_name'],
+            'cfda_number': '20.610',
+            'program_type': '405c',
+            'close_date': '2026-02-28',
+            'post_date': '2025-12-01',
+            'federal_share_pct': 100,
+            'award_ceiling': None,
+            'award_floor': None,
+            'emphasis_areas': 'Traffic Records|Data Quality|Crash Data',
+            'eligible_activities': 'Planning|Data Systems',
+            'requires_crash_data': 'N',
+            'application_url': config['hso_url'],
+            'contact_info': config['hso_full'],
+            'status': 'Forecasted',
+            'virginia_specific': 'Y' if is_va else 'N',
+            'state_specific': 'Y',
+            'state_code': abbr,
+            'description': f"Grants to improve traffic records systems in {config['name']} including crash, roadway, citation, and injury surveillance data."
+        },
+        {
+            'grant_id': f'{abbr}-405D-FY2027',
+            'title': 'NHTSA Section 405d Impaired Driving FY2027',
+            'agency': config['hso_name'],
+            'cfda_number': '20.601',
+            'program_type': '405d',
+            'close_date': '2026-02-28',
+            'post_date': '2025-12-01',
+            'federal_share_pct': 100,
+            'award_ceiling': None,
+            'award_floor': None,
+            'emphasis_areas': 'Impaired|DUI|Alcohol|Drugs',
+            'eligible_activities': 'Enforcement|Education|Courts',
+            'requires_crash_data': 'Y',
+            'application_url': config['hso_url'],
+            'contact_info': config['hso_full'],
+            'status': 'Forecasted',
+            'virginia_specific': 'Y' if is_va else 'N',
+            'state_specific': 'Y',
+            'state_code': abbr,
+            'description': f"Incentive grants for impaired driving countermeasures in {config['name']} including high-visibility enforcement and DUI courts."
+        },
+    ]
+
+
+def get_all_static_grants():
+    """Get all static grants: state-specific for each configured state + federal."""
+    all_grants = []
+    for state_abbr, config in STATE_GRANT_CONFIGS.items():
+        all_grants.extend(get_state_grants(state_abbr, config))
+    all_grants.extend(FEDERAL_STATIC_GRANTS)
+    return all_grants
+
+
+# Legacy alias for backward compatibility
+VIRGINIA_STATIC_GRANTS = get_all_static_grants()
 
 
 def get_grants_url(target_date: datetime) -> str:
@@ -538,13 +599,17 @@ def map_to_output_columns(df: pd.DataFrame) -> pd.DataFrame:
         df_output['status'] = 'Open'
     if 'virginia_specific' not in df_output.columns:
         df_output['virginia_specific'] = 'N'
+    if 'state_specific' not in df_output.columns:
+        df_output['state_specific'] = 'N'
+    if 'state_code' not in df_output.columns:
+        df_output['state_code'] = ''
 
     return df_output
 
 
 def get_virginia_static_grants() -> pd.DataFrame:
-    """Get the static Virginia grants as a DataFrame."""
-    return pd.DataFrame(VIRGINIA_STATIC_GRANTS)
+    """Get all static grants (all states + federal) as a DataFrame."""
+    return pd.DataFrame(get_all_static_grants())
 
 
 def main():
@@ -556,9 +621,9 @@ def main():
     # Ensure output directory exists
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Start with Virginia static grants (always available)
+    # Start with all static grants (all configured states + federal)
     static_grants = get_virginia_static_grants()
-    logger.info(f"Loaded {len(static_grants)} Virginia static grants")
+    logger.info(f"Loaded {len(static_grants)} static grants ({len(STATE_GRANT_CONFIGS)} states + federal)")
 
     # Try to download federal grants from Grants.gov
     federal_grants = pd.DataFrame()
@@ -582,7 +647,7 @@ def main():
 
     except Exception as e:
         logger.warning(f"Could not download federal grants: {e}")
-        logger.info("Proceeding with Virginia static grants only")
+        logger.info("Proceeding with static grants only")
 
     # Combine static and federal grants
     if not federal_grants.empty:
@@ -592,7 +657,8 @@ def main():
             'close_date', 'post_date', 'federal_share_pct', 'award_ceiling',
             'award_floor', 'emphasis_areas', 'eligible_activities',
             'requires_crash_data', 'application_url', 'contact_info',
-            'status', 'virginia_specific', 'description'
+            'status', 'virginia_specific', 'state_specific', 'state_code',
+            'description'
         ]
 
         for col in all_columns:
@@ -624,8 +690,14 @@ def main():
     logger.info(f"Successfully processed grants data")
     logger.info(f"Output saved to: {OUTPUT_FILE}")
     logger.info(f"Total grants: {len(combined_grants)}")
-    logger.info(f"  - Virginia specific: {len(combined_grants[combined_grants['virginia_specific'] == 'Y'])}")
-    logger.info(f"  - Federal: {len(combined_grants[combined_grants['virginia_specific'] != 'Y'])}")
+    state_specific = combined_grants[combined_grants.get('state_specific', combined_grants.get('virginia_specific', '')) == 'Y']
+    logger.info(f"  - State-specific: {len(state_specific)}")
+    for state_code in combined_grants['state_code'].dropna().unique():
+        if state_code:
+            count = len(combined_grants[combined_grants['state_code'] == state_code])
+            logger.info(f"    - {state_code}: {count}")
+    federal_count = len(combined_grants) - len(state_specific)
+    logger.info(f"  - Federal: {federal_count}")
     logger.info("=" * 60)
 
     return 0
