@@ -30,10 +30,211 @@ on:
         default: '20'
         type: string
       jurisdictions:
-        description: 'Specific jurisdictions (comma-separated, empty=all)'
+        description: 'Specific jurisdiction to process (select one, or all)'
         required: false
-        default: ''
-        type: string
+        default: 'all'
+        type: choice
+        options:
+          - all
+          # --- Virginia Counties (95) ---
+          - accomack
+          - albemarle
+          - alleghany
+          - amelia
+          - amherst
+          - appomattox
+          - arlington
+          - augusta
+          - bath
+          - bedford_county
+          - bland
+          - botetourt
+          - brunswick
+          - buchanan
+          - buckingham
+          - campbell
+          - caroline
+          - carroll
+          - charles_city
+          - charlotte
+          - chesterfield
+          - clarke
+          - craig
+          - culpeper
+          - cumberland
+          - dickenson
+          - dinwiddie
+          - essex
+          - fairfax_county
+          - fauquier
+          - floyd
+          - fluvanna
+          - franklin_county
+          - frederick
+          - giles
+          - gloucester
+          - goochland
+          - grayson
+          - greene
+          - greensville
+          - halifax
+          - hanover
+          - henrico
+          - henry
+          - highland
+          - isle_of_wight
+          - james_city
+          - king_and_queen
+          - king_george
+          - king_william
+          - lancaster
+          - lee
+          - loudoun
+          - louisa
+          - lunenburg
+          - madison
+          - mathews
+          - mecklenburg
+          - middlesex
+          - montgomery
+          - nelson
+          - new_kent
+          - northampton
+          - northumberland
+          - nottoway
+          - orange
+          - page
+          - patrick
+          - pittsylvania
+          - powhatan
+          - prince_edward
+          - prince_george
+          - prince_william
+          - pulaski
+          - rappahannock
+          - richmond_county
+          - roanoke_county
+          - rockbridge
+          - rockingham
+          - russell
+          - scott
+          - shenandoah
+          - smyth
+          - southampton
+          - spotsylvania
+          - stafford
+          - surry
+          - sussex
+          - tazewell
+          - warren
+          - washington
+          - westmoreland
+          - wise
+          - wythe
+          - york
+          # --- Virginia Independent Cities (38) ---
+          - alexandria
+          - bristol
+          - buena_vista
+          - charlottesville
+          - chesapeake
+          - colonial_heights
+          - covington
+          - danville
+          - emporia
+          - fairfax_city
+          - falls_church
+          - franklin_city
+          - fredericksburg
+          - galax
+          - hampton
+          - harrisonburg
+          - hopewell
+          - lexington
+          - lynchburg
+          - manassas
+          - manassas_park
+          - martinsville
+          - newport_news
+          - norfolk
+          - norton
+          - petersburg
+          - poquoson
+          - portsmouth
+          - radford
+          - richmond_city
+          - roanoke_city
+          - salem
+          - staunton
+          - suffolk
+          - virginia_beach
+          - waynesboro
+          - williamsburg
+          - winchester
+          # --- Colorado Counties (64) ---
+          - adams
+          - alamosa
+          - arapahoe
+          - archuleta
+          - baca
+          - bent
+          - boulder
+          - broomfield
+          - chaffee
+          - cheyenne
+          - clear_creek
+          - conejos
+          - costilla
+          - crowley
+          - custer
+          - delta
+          - denver
+          - dolores
+          - douglas
+          - eagle
+          - elbert
+          - elpaso
+          - fremont
+          - garfield
+          - gilpin
+          - grand
+          - gunnison
+          - hinsdale
+          - huerfano
+          - jackson
+          - jefferson
+          - kiowa
+          - kit_carson
+          - la_plata
+          - lake
+          - larimer
+          - las_animas
+          - lincoln
+          - logan
+          - mesa
+          - mineral
+          - moffat
+          - montezuma
+          - montrose
+          - morgan
+          - otero
+          - ouray
+          - park
+          - phillips
+          - pitkin
+          - prowers
+          - pueblo
+          - rio_blanco
+          - rio_grande
+          - routt
+          - saguache
+          - san_juan
+          - san_miguel
+          - sedgwick
+          - summit
+          - teller
+          - weld
+          - yuma
       skip_validation:
         description: 'Skip validation step'
         required: false
@@ -190,10 +391,9 @@ jobs:
 
           ARGS="--state $STATE --input $STATEWIDE --output-dir $OUTPUT_DIR"
 
-          # Optional: specific jurisdictions
-          if [ -n "$JURISDICTIONS" ]; then
-            JURIS_LIST=$(echo "$JURISDICTIONS" | tr ',' ' ')
-            ARGS="$ARGS --jurisdictions $JURIS_LIST"
+          # Optional: specific jurisdiction from dropdown
+          if [ "$JURISDICTIONS" != "all" ] && [ -n "$JURISDICTIONS" ]; then
+            ARGS="$ARGS --jurisdictions $JURISDICTIONS"
           fi
 
           if [ "$DRY_RUN" = "true" ]; then
