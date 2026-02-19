@@ -235,6 +235,15 @@ data/CDOT/*_no_interstate.csv
 data/CDOT/crashes.csv
 data/CDOT/*_merged_raw.csv
 
+# Pipeline intermediate/output CSVs
+data/*_statewide_*.csv
+data/*_statewide_*.csv.gz
+data/CDOT/*_statewide_*.csv
+data/CDOT/*_statewide_*.csv.gz
+data/_federal/
+data/*/_region/
+data/*/_mpo/
+
 # Raw annual CSVs (CDOT source files)
 data/CDOT/20*.csv
 data/CDOT/*crash*.csv

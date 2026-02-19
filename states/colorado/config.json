@@ -208,5 +208,14 @@
       "bbox": [-105.0534, 39.7404, -104.4610, 40.0015],
       "maintainsOwnRoads": true
     }
+  },
+
+  "cache_config": {
+    "update_frequency": "biannual",
+    "typical_new_records_per_update": 25000,
+    "data_retention_years": 5,
+    "stale_threshold_days": 365,
+    "geocode_ttl_days": 365,
+    "max_cache_size_mb": 100
   }
 }
