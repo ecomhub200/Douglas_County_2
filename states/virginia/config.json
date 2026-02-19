@@ -180,6 +180,15 @@
     "fallbackUrl": "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0"
   },
 
+  "cache_config": {
+    "update_frequency": "daily",
+    "typical_new_records_per_update": 150,
+    "data_retention_years": 5,
+    "stale_threshold_days": 30,
+    "geocode_ttl_days": 365,
+    "max_cache_size_mb": 200
+  },
+
   "tigerweb": {
     "stateFips": "51"
   }

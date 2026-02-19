@@ -1,0 +1,207 @@
+# ==============================================================================
+# Virginia State Download Workflow
+# ==============================================================================
+# Downloads crash data from Virginia Roads ArcGIS API, converts to Virginia
+# standard format, then triggers pipeline.yml for processing.
+#
+# Scope options:
+#   - jurisdiction: Download single county (e.g., henrico)
+#   - region: Download + process a VDOT construction district (e.g., richmond)
+#   - mpo: Download + process an MPO area (e.g., hrtpo)
+#   - statewide: Download + process all 133 jurisdictions
+# ==============================================================================
+
+name: "Download: Virginia"
+
+on:
+  schedule:
+    # First Monday of each month at 11:00 UTC (6:00 AM ET)
+    - cron: '0 11 1-7 * 1'
+
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Processing scope'
+        required: true
+        type: choice
+        default: 'jurisdiction'
+        options:
+          - jurisdiction
+          - region
+          - mpo
+          - statewide
+
+      selection:
+        description: 'Jurisdiction/Region/MPO name (blank for statewide)'
+        required: false
+        default: 'henrico'
+        type: string
+
+      region:
+        description: 'Region (if scope=region)'
+        required: false
+        type: choice
+        default: ''
+        options:
+          - ''
+          - bristol
+          - culpeper
+          - fredericksburg
+          - hampton_roads
+          - lynchburg
+          - nova
+          - richmond
+          - salem
+          - staunton
+
+      mpo:
+        description: 'MPO (if scope=mpo)'
+        required: false
+        type: choice
+        default: ''
+        options:
+          - ''
+          - hrtpo
+          - nvta
+          - rvarc
+          - rvampo
+          - fampo
+          - campo
+          - sawmpo
+          - wvmpo
+
+      force_download:
+        description: 'Force re-download (skip cache)'
+        required: false
+        type: boolean
+        default: false
+
+      skip_pipeline:
+        description: 'Skip pipeline trigger (download only)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  STATE: virginia
+  DOT_NAME: VDOT
+  DATA_DIR: data
+
+jobs:
+  download:
+    name: "Download Virginia (${{ github.event.inputs.scope || 'jurisdiction' }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    outputs:
+      scope: ${{ steps.params.outputs.scope }}
+      selection: ${{ steps.params.outputs.selection }}
+      csv_path: ${{ steps.download.outputs.csv_path }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas requests openpyxl
+
+      - name: Resolve parameters
+        id: params
+        run: |
+          SCOPE="${{ github.event.inputs.scope || 'jurisdiction' }}"
+          SELECTION="${{ github.event.inputs.selection || 'henrico' }}"
+
+          # Override selection with region/mpo dropdown if those scopes selected
+          if [ "$SCOPE" = "region" ] && [ -n "${{ github.event.inputs.region }}" ]; then
+            SELECTION="${{ github.event.inputs.region }}"
+          elif [ "$SCOPE" = "mpo" ] && [ -n "${{ github.event.inputs.mpo }}" ]; then
+            SELECTION="${{ github.event.inputs.mpo }}"
+          elif [ "$SCOPE" = "statewide" ]; then
+            SELECTION=""
+          fi
+
+          echo "scope=$SCOPE" >> $GITHUB_OUTPUT
+          echo "selection=$SELECTION" >> $GITHUB_OUTPUT
+
+          # Resolve jurisdictions
+          RESOLVED=$(python scripts/resolve_scope.py \
+            --state virginia --scope "$SCOPE" --selection "$SELECTION" --json)
+          echo "Resolved: $RESOLVED"
+
+      - name: Download Virginia crash data
+        id: download
+        run: |
+          SCOPE="${{ steps.params.outputs.scope }}"
+          SELECTION="${{ steps.params.outputs.selection }}"
+          FORCE="${{ github.event.inputs.force_download }}"
+
+          # Determine download strategy
+          RESOLVED=$(python scripts/resolve_scope.py \
+            --state virginia --scope "$SCOPE" --selection "$SELECTION" --json)
+          MODE=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.load(sys.stdin)['download_mode'])")
+
+          ARGS="--output-dir ${{ env.DATA_DIR }}"
+          if [ "$FORCE" = "true" ]; then
+            ARGS="$ARGS --force-download"
+          fi
+
+          if [ "$MODE" = "statewide" ]; then
+            ARGS="$ARGS --save-statewide"
+            python download_crash_data.py $ARGS
+            CSV_PATH="${{ env.DATA_DIR }}/virginia_statewide_all_roads.csv"
+          else
+            ARGS="$ARGS --jurisdiction $SELECTION"
+            python download_crash_data.py $ARGS
+            CSV_PATH="${{ env.DATA_DIR }}/${SELECTION}_all_roads.csv"
+          fi
+
+          echo "csv_path=$CSV_PATH" >> $GITHUB_OUTPUT
+          echo "Download complete: $CSV_PATH"
+
+      - name: Commit downloaded data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add ${{ env.DATA_DIR }}/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No new data to commit"
+          else
+            git commit -m "data: virginia download (${{ steps.params.outputs.scope }}/${{ steps.params.outputs.selection || 'all' }})"
+            git push origin main
+          fi
+
+  # Trigger unified pipeline
+  trigger-pipeline:
+    name: "Trigger pipeline"
+    needs: download
+    if: github.event.inputs.skip_pipeline != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pipeline.yml',
+              ref: 'main',
+              inputs: {
+                state: 'virginia',
+                scope: '${{ needs.download.outputs.scope }}',
+                selection: '${{ needs.download.outputs.selection }}',
+                data_source: '${{ needs.download.outputs.csv_path }}',
+                skip_forecasts: 'true'
+              }
+            });
+            console.log('Pipeline triggered for Virginia');
