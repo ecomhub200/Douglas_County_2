@@ -143,6 +143,43 @@ def save_cache_stats(cache_dir, stats):
         json.dump(stats, f, indent=2)
 
 
+def update_geocode_cache_manifest(cache_dir, state, stats, total_locations):
+    """Update the state-level cache_manifest.json with geocode run stats."""
+    cache_dir_path = Path(cache_dir)
+    state_cache_dir = cache_dir_path.parent if cache_dir_path.name == 'geocode' else cache_dir_path
+    manifest_path = state_cache_dir / 'cache_manifest.json'
+
+    manifest = {}
+    if manifest_path.exists():
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            manifest = {}
+
+    now = datetime.utcnow().isoformat() + 'Z'
+    manifest['last_updated'] = now
+    manifest.setdefault('state', state)
+    manifest.setdefault('version', 1)
+
+    total_lookups = stats['total_rows'] - stats['already_had_coords']
+    hit_rate = round(stats['cache_hits'] / max(1, total_lookups), 4)
+
+    manifest['geocode'] = {
+        'last_run': now,
+        'total_locations': total_locations,
+        'api_calls_total': stats['api_calls'],
+        'api_successes': stats['api_successes'],
+        'cache_hit_rate': hit_rate,
+        'stale_refreshed': stats['stale_refreshed'],
+        'not_geocoded': stats['no_geocode']
+    }
+
+    state_cache_dir.mkdir(parents=True, exist_ok=True)
+    with open(manifest_path, 'w') as f:
+        json.dump(manifest, f, indent=2)
+
+
 def get_geocode_ttl(state):
     """Get geocode TTL from state config (default: 365 days)."""
     config_path = PROJECT_ROOT / 'states' / state / 'config.json'
@@ -348,6 +385,9 @@ def main():
         'timestamp': datetime.utcnow().isoformat() + 'Z'
     }
     save_cache_stats(cache_dir, cache_stats)
+
+    # Update cache_manifest.json (state-level cache metadata)
+    update_geocode_cache_manifest(cache_dir, state, stats, len(geo_cache))
 
     # Summary
     logger.info("=" * 60)

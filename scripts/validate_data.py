@@ -117,6 +117,43 @@ def check_cache_invalidation(cache_dir, state):
     return False
 
 
+def update_cache_manifest(cache_dir, state, stats, cached_records_count):
+    """Update the state-level cache_manifest.json with validation run stats."""
+    # cache_manifest.json lives one level up from the validation subdirectory
+    cache_dir_path = Path(cache_dir)
+    state_cache_dir = cache_dir_path.parent if cache_dir_path.name == 'validation' else cache_dir_path
+    manifest_path = state_cache_dir / 'cache_manifest.json'
+
+    manifest = {}
+    if manifest_path.exists():
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            manifest = {}
+
+    now = datetime.utcnow().isoformat() + 'Z'
+    manifest['last_updated'] = now
+    manifest.setdefault('state', state)
+    manifest.setdefault('version', 1)
+
+    total = stats.get('total', 0)
+    cached_skipped = stats.get('cached_skipped', 0)
+    hit_rate = round(cached_skipped / max(1, total), 4)
+
+    manifest['validation'] = {
+        'last_run': now,
+        'total_validated': total,
+        'cached_records': cached_records_count,
+        'errors_removed': stats.get('errors', 0),
+        'cache_hit_rate': hit_rate
+    }
+
+    state_cache_dir.mkdir(parents=True, exist_ok=True)
+    with open(manifest_path, 'w') as f:
+        json.dump(manifest, f, indent=2)
+
+
 def try_parse_date(date_str):
     """Try to parse a date string in common formats."""
     if not date_str or not date_str.strip():
@@ -301,6 +338,9 @@ def main():
     # Save cache
     save_cache(cache_dir, new_hashes)
     save_last_run(cache_dir, stats)
+
+    # Update cache_manifest.json (state-level cache metadata)
+    update_cache_manifest(cache_dir, state, stats, len(new_hashes))
 
     # Summary
     logger.info("=" * 60)
