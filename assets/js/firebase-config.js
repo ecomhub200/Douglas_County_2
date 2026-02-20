@@ -1,7 +1,10 @@
 /**
  * CRASH LENS - Firebase Configuration
  *
- * This file initializes Firebase using config from config.json
+ * This file initializes Firebase using config from config.json,
+ * with overrides from config/api-keys.json (injected by entrypoint.sh
+ * from Coolify environment variables at container startup).
+ *
  * Note: Firebase API keys are designed to be public - security is enforced via Firebase Security Rules.
  */
 
@@ -15,7 +18,21 @@
     }
 
     const config = await response.json();
-    const firebaseConfig = config?.apis?.firebase;
+    let firebaseConfig = config?.apis?.firebase;
+
+    // Try to load overrides from api-keys.json (set via Coolify env vars)
+    try {
+      const apiKeysResp = await fetch('../config/api-keys.json');
+      if (apiKeysResp.ok) {
+        const apiKeys = await apiKeysResp.json();
+        if (apiKeys?.firebase?.apiKey) {
+          firebaseConfig = { ...firebaseConfig, ...apiKeys.firebase };
+          console.log('[Firebase] Using api-keys.json overrides');
+        }
+      }
+    } catch (e) {
+      // api-keys.json doesn't exist or failed to load - that's fine, use config.json values
+    }
 
     if (!firebaseConfig || !firebaseConfig.apiKey) {
       console.warn('%c⚠️ Firebase not configured in config.json', 'color: orange; font-weight: bold;');
