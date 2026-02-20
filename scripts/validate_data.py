@@ -39,20 +39,47 @@ REQUIRED_FIELDS = ['Document Nbr', 'Crash Date', 'Crash Severity']
 VALID_SEVERITIES = {'K', 'A', 'B', 'C', 'O', 'k', 'a', 'b', 'c', 'o'}
 STANDARD_COLUMNS_COUNT = 51
 
+# 2% buffer on coordinate bounds so crashes near state/jurisdiction
+# borders aren't falsely rejected.  GPS error, boundary imprecision,
+# and border-area incidents make this necessary for accurate data
+# retention at edges.
+BOUNDARY_BUFFER_PERCENT = 0.02
+
+
+def apply_boundary_buffer(bounds, buffer_pct=BOUNDARY_BUFFER_PERCENT):
+    """Expand coordinate bounds by a percentage of their span.
+
+    A 2% buffer on Virginia (lat span ~3.0°) adds ~0.06° ≈ 4.1 miles.
+    A 2% buffer on Colorado (lat span ~4.2°) adds ~0.08° ≈ 5.8 miles.
+    This accommodates GPS drift, geocoding imprecision, and crashes
+    that legitimately occur near state/jurisdiction borders.
+    """
+    lat_span = bounds['lat_max'] - bounds['lat_min']
+    lon_span = bounds['lon_max'] - bounds['lon_min']
+    lat_buf = lat_span * buffer_pct
+    lon_buf = lon_span * buffer_pct
+    return {
+        'lat_min': bounds['lat_min'] - lat_buf,
+        'lat_max': bounds['lat_max'] + lat_buf,
+        'lon_min': bounds['lon_min'] - lon_buf,
+        'lon_max': bounds['lon_max'] + lon_buf,
+    }
+
 
 def load_state_bounds(state):
-    """Load coordinate bounds from state config."""
+    """Load coordinate bounds from state config with 2% boundary buffer."""
     config_path = PROJECT_ROOT / 'states' / state / 'config.json'
     if config_path.exists():
         with open(config_path) as f:
             config = json.load(f)
         bounds = config.get('state', {}).get('coordinateBounds', {})
-        return {
+        raw_bounds = {
             'lat_min': bounds.get('latMin', -90),
             'lat_max': bounds.get('latMax', 90),
             'lon_min': bounds.get('lonMin', -180),
             'lon_max': bounds.get('lonMax', 180),
         }
+        return apply_boundary_buffer(raw_bounds)
     return {'lat_min': -90, 'lat_max': 90, 'lon_min': -180, 'lon_max': 180}
 
 
@@ -239,7 +266,9 @@ def main():
 
     bounds = load_state_bounds(state)
     logger.info(f"[{state}] Validating: {input_path}")
-    logger.info(f"[{state}] Bounds: lat=[{bounds['lat_min']}, {bounds['lat_max']}], lon=[{bounds['lon_min']}, {bounds['lon_max']}]")
+    logger.info(f"[{state}] Bounds (with {BOUNDARY_BUFFER_PERCENT:.0%} buffer): "
+                f"lat=[{bounds['lat_min']:.4f}, {bounds['lat_max']:.4f}], "
+                f"lon=[{bounds['lon_min']:.4f}, {bounds['lon_max']:.4f}]")
 
     # Cache handling
     force = args.force_validate

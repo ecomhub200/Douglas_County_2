@@ -40,6 +40,52 @@ NOMINATIM_DELAY = 1.1  # seconds between requests (Nominatim policy)
 NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
 NOMINATIM_HEADERS = {'User-Agent': 'CrashLens/1.0 (crash-data-pipeline)'}
 
+# 2% buffer on coordinate bounds so geocoded results near
+# state/jurisdiction borders aren't falsely rejected.
+BOUNDARY_BUFFER_PERCENT = 0.02
+
+
+def apply_boundary_buffer(bounds, buffer_pct=BOUNDARY_BUFFER_PERCENT):
+    """Expand coordinate bounds by a percentage of their span.
+
+    A 2% buffer on Virginia (lat span ~3.0°) adds ~0.06° ≈ 4.1 miles.
+    A 2% buffer on Colorado (lat span ~4.2°) adds ~0.08° ≈ 5.8 miles.
+    This accommodates geocoding imprecision and border-area crashes.
+    """
+    lat_span = bounds['lat_max'] - bounds['lat_min']
+    lon_span = bounds['lon_max'] - bounds['lon_min']
+    lat_buf = lat_span * buffer_pct
+    lon_buf = lon_span * buffer_pct
+    return {
+        'lat_min': bounds['lat_min'] - lat_buf,
+        'lat_max': bounds['lat_max'] + lat_buf,
+        'lon_min': bounds['lon_min'] - lon_buf,
+        'lon_max': bounds['lon_max'] + lon_buf,
+    }
+
+
+def load_state_bounds(state):
+    """Load coordinate bounds from state config with 2% boundary buffer."""
+    config_path = PROJECT_ROOT / 'states' / state / 'config.json'
+    if config_path.exists():
+        with open(config_path) as f:
+            config = json.load(f)
+        bounds = config.get('state', {}).get('coordinateBounds', {})
+        raw_bounds = {
+            'lat_min': bounds.get('latMin', -90),
+            'lat_max': bounds.get('latMax', 90),
+            'lon_min': bounds.get('lonMin', -180),
+            'lon_max': bounds.get('lonMax', 180),
+        }
+        return apply_boundary_buffer(raw_bounds)
+    return {'lat_min': -90, 'lat_max': 90, 'lon_min': -180, 'lon_max': 180}
+
+
+def coords_within_bounds(lon, lat, bounds):
+    """Check if coordinates fall within the buffered state bounds."""
+    return (bounds['lon_min'] <= lon <= bounds['lon_max'] and
+            bounds['lat_min'] <= lat <= bounds['lat_max'])
+
 
 def build_location_key(row, col_idx):
     """Build a location key from available fields for cache lookup."""
@@ -229,9 +275,15 @@ def main():
     else:
         output_path = input_path.parent / f"{state}_statewide_validated_geocoded.csv"
 
+    # Load buffered state bounds for validating geocode results
+    state_bounds = load_state_bounds(state)
+
     logger.info(f"[{state}] Geocoding: {input_path}")
     logger.info(f"[{state}] Output: {output_path}")
     logger.info(f"[{state}] Cache TTL: {ttl_days} days")
+    logger.info(f"[{state}] Bounds (with {BOUNDARY_BUFFER_PERCENT:.0%} buffer): "
+                f"lat=[{state_bounds['lat_min']:.4f}, {state_bounds['lat_max']:.4f}], "
+                f"lon=[{state_bounds['lon_min']:.4f}, {state_bounds['lon_max']:.4f}]")
 
     # Load caches
     if args.force_geocode:
@@ -251,6 +303,7 @@ def main():
         'stale_refreshed': 0,
         'api_calls': 0,
         'api_successes': 0,
+        'geocode_rejected': 0,
         'no_geocode': 0,
     }
 
@@ -325,22 +378,29 @@ def main():
 
                     if result:
                         lon, lat = result
-                        if x_idx is not None and x_idx < len(row):
-                            row[x_idx] = str(lon)
-                        if y_idx is not None and y_idx < len(row):
-                            row[y_idx] = str(lat)
-                        stats['api_successes'] += 1
-                        geocoded = True
 
-                        # Update cache
-                        geo_cache[loc_key_hash] = {
-                            'x': lon,
-                            'y': lat,
-                            'method': 'nominatim',
-                            'confidence': 'medium',
-                            'cached_at': datetime.utcnow().isoformat() + 'Z',
-                            'location_key': loc_key
-                        }
+                        # Validate result falls within buffered state bounds
+                        if not coords_within_bounds(lon, lat, state_bounds):
+                            logger.debug(f"[{state}] Geocode rejected (out of bounds): "
+                                         f"lon={lon}, lat={lat} for '{road_name}, {jurisdiction}'")
+                            stats['geocode_rejected'] += 1
+                        else:
+                            if x_idx is not None and x_idx < len(row):
+                                row[x_idx] = str(lon)
+                            if y_idx is not None and y_idx < len(row):
+                                row[y_idx] = str(lat)
+                            stats['api_successes'] += 1
+                            geocoded = True
+
+                            # Update cache
+                            geo_cache[loc_key_hash] = {
+                                'x': lon,
+                                'y': lat,
+                                'method': 'nominatim',
+                                'confidence': 'medium',
+                                'cached_at': datetime.utcnow().isoformat() + 'Z',
+                                'location_key': loc_key
+                            }
 
             if not geocoded:
                 stats['no_geocode'] += 1
@@ -397,6 +457,7 @@ def main():
     logger.info(f"[{state}]   Cache hits:            {stats['cache_hits']:,}")
     logger.info(f"[{state}]   Stale refreshed:       {stats['stale_refreshed']:,}")
     logger.info(f"[{state}]   API calls:             {stats['api_calls']:,} ({stats['api_successes']} success)")
+    logger.info(f"[{state}]   Geocode rejected (OOB): {stats['geocode_rejected']:,}")
     logger.info(f"[{state}]   Not geocoded:          {stats['no_geocode']:,}")
     logger.info(f"[{state}]   Cache locations:        {len(geo_cache):,}")
     logger.info("=" * 60)
