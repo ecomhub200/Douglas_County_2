@@ -39,20 +39,47 @@ REQUIRED_FIELDS = ['Document Nbr', 'Crash Date', 'Crash Severity']
 VALID_SEVERITIES = {'K', 'A', 'B', 'C', 'O', 'k', 'a', 'b', 'c', 'o'}
 STANDARD_COLUMNS_COUNT = 51
 
+# 2% buffer on coordinate bounds so crashes near state/jurisdiction
+# borders aren't falsely rejected.  GPS error, boundary imprecision,
+# and border-area incidents make this necessary for accurate data
+# retention at edges.
+BOUNDARY_BUFFER_PERCENT = 0.02
+
+
+def apply_boundary_buffer(bounds, buffer_pct=BOUNDARY_BUFFER_PERCENT):
+    """Expand coordinate bounds by a percentage of their span.
+
+    A 2% buffer on Virginia (lat span ~3.0°) adds ~0.06° ≈ 4.1 miles.
+    A 2% buffer on Colorado (lat span ~4.2°) adds ~0.08° ≈ 5.8 miles.
+    This accommodates GPS drift, geocoding imprecision, and crashes
+    that legitimately occur near state/jurisdiction borders.
+    """
+    lat_span = bounds['lat_max'] - bounds['lat_min']
+    lon_span = bounds['lon_max'] - bounds['lon_min']
+    lat_buf = lat_span * buffer_pct
+    lon_buf = lon_span * buffer_pct
+    return {
+        'lat_min': bounds['lat_min'] - lat_buf,
+        'lat_max': bounds['lat_max'] + lat_buf,
+        'lon_min': bounds['lon_min'] - lon_buf,
+        'lon_max': bounds['lon_max'] + lon_buf,
+    }
+
 
 def load_state_bounds(state):
-    """Load coordinate bounds from state config."""
+    """Load coordinate bounds from state config with 2% boundary buffer."""
     config_path = PROJECT_ROOT / 'states' / state / 'config.json'
     if config_path.exists():
         with open(config_path) as f:
             config = json.load(f)
         bounds = config.get('state', {}).get('coordinateBounds', {})
-        return {
+        raw_bounds = {
             'lat_min': bounds.get('latMin', -90),
             'lat_max': bounds.get('latMax', 90),
             'lon_min': bounds.get('lonMin', -180),
             'lon_max': bounds.get('lonMax', 180),
         }
+        return apply_boundary_buffer(raw_bounds)
     return {'lat_min': -90, 'lat_max': 90, 'lon_min': -180, 'lon_max': 180}
 
 
@@ -115,6 +142,43 @@ def check_cache_invalidation(cache_dir, state):
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
     rules_hash_file.write_text(current_hash)
     return False
+
+
+def update_cache_manifest(cache_dir, state, stats, cached_records_count):
+    """Update the state-level cache_manifest.json with validation run stats."""
+    # cache_manifest.json lives one level up from the validation subdirectory
+    cache_dir_path = Path(cache_dir)
+    state_cache_dir = cache_dir_path.parent if cache_dir_path.name == 'validation' else cache_dir_path
+    manifest_path = state_cache_dir / 'cache_manifest.json'
+
+    manifest = {}
+    if manifest_path.exists():
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            manifest = {}
+
+    now = datetime.utcnow().isoformat() + 'Z'
+    manifest['last_updated'] = now
+    manifest.setdefault('state', state)
+    manifest.setdefault('version', 1)
+
+    total = stats.get('total', 0)
+    cached_skipped = stats.get('cached_skipped', 0)
+    hit_rate = round(cached_skipped / max(1, total), 4)
+
+    manifest['validation'] = {
+        'last_run': now,
+        'total_validated': total,
+        'cached_records': cached_records_count,
+        'errors_removed': stats.get('errors', 0),
+        'cache_hit_rate': hit_rate
+    }
+
+    state_cache_dir.mkdir(parents=True, exist_ok=True)
+    with open(manifest_path, 'w') as f:
+        json.dump(manifest, f, indent=2)
 
 
 def try_parse_date(date_str):
@@ -202,7 +266,9 @@ def main():
 
     bounds = load_state_bounds(state)
     logger.info(f"[{state}] Validating: {input_path}")
-    logger.info(f"[{state}] Bounds: lat=[{bounds['lat_min']}, {bounds['lat_max']}], lon=[{bounds['lon_min']}, {bounds['lon_max']}]")
+    logger.info(f"[{state}] Bounds (with {BOUNDARY_BUFFER_PERCENT:.0%} buffer): "
+                f"lat=[{bounds['lat_min']:.4f}, {bounds['lat_max']:.4f}], "
+                f"lon=[{bounds['lon_min']:.4f}, {bounds['lon_max']:.4f}]")
 
     # Cache handling
     force = args.force_validate
@@ -301,6 +367,9 @@ def main():
     # Save cache
     save_cache(cache_dir, new_hashes)
     save_last_run(cache_dir, stats)
+
+    # Update cache_manifest.json (state-level cache metadata)
+    update_cache_manifest(cache_dir, state, stats, len(new_hashes))
 
     # Summary
     logger.info("=" * 60)

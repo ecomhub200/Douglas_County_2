@@ -4,8 +4,9 @@
 # Processes Virginia-compatible CSVs through the generic pipeline.
 # Auto-triggered by state-specific download workflows.
 #
-# Stage order: Validate → Geocode → [Save Statewide CSV] → Split Jurisdiction →
-#              Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest
+# Stage order: Init Cache → Validate → Geocode → [Save Statewide CSV] →
+#              Split Jurisdiction → Split Road Type → Aggregate (CSV) →
+#              Upload → Predict → Manifest
 #
 # Scope-aware: generates region/MPO aggregate CSVs based on user selection.
 # ==============================================================================
@@ -171,6 +172,18 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pandas requests openpyxl awscli
+
+      # ── Stage 0: Initialize Cache ──
+      - name: "Stage 0: Initialize cache"
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+
+          echo "=========================================="
+          echo "Stage 0: Initialize state-isolated cache"
+          echo "State: $STATE"
+          echo "=========================================="
+
+          python scripts/init_cache.py --state "$STATE"
 
       # ── Stage 1: Validate (on full dataset) ──
       - name: "Stage 1: Validate"
@@ -478,4 +491,4 @@ jobs:
           echo "| Scope | $SCOPE ($SELECTION) |" >> $GITHUB_STEP_SUMMARY
           echo "| Jurisdictions | ${{ needs.prepare.outputs.jurisdiction_count }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Stages | Validate → Geocode → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stages | Init Cache → Validate → Geocode → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest |" >> $GITHUB_STEP_SUMMARY
