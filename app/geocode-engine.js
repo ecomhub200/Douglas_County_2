@@ -74,6 +74,40 @@ function geocodeCacheExpired(cached) {
     return (Date.now() - cached.cachedAt) / (1000 * 60 * 60 * 24) > GEOCODE_CACHE_CONSTANTS.CACHE_DAYS;
 }
 
+/**
+ * Clear all failed geocode cache entries so they can be retried.
+ * Call this after fixing geocoding issues (e.g., CORS, query format).
+ */
+async function geocodeCacheClearFailed() {
+    try {
+        const db = await geocodeCacheOpen();
+        return new Promise((resolve) => {
+            const tx = db.transaction(GEOCODE_CACHE_CONSTANTS.STORE_NAME, 'readwrite');
+            const store = tx.objectStore(GEOCODE_CACHE_CONSTANTS.STORE_NAME);
+            const request = store.openCursor();
+            let cleared = 0;
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    if (cursor.value && cursor.value.failed) {
+                        store.delete(cursor.key);
+                        cleared++;
+                    }
+                    cursor.continue();
+                }
+            };
+            tx.oncomplete = () => {
+                console.log('[Geocode Cache] Cleared ' + cleared + ' failed entries');
+                resolve(cleared);
+            };
+            tx.onerror = () => resolve(0);
+        });
+    } catch (e) {
+        console.warn('[Geocode Cache] Clear failed:', e);
+        return 0;
+    }
+}
+
 // ============================================================
 // Location Key — Deduplicates crashes by route/node/jurisdiction/milepost
 // ============================================================
@@ -118,9 +152,27 @@ function buildNodeCoordinateMap() {
 // ============================================================
 
 async function geocodeViaNominatim(routeName, jurisdictionName) {
+    // Build a geocoding query with proper state context
     let query = routeName;
-    if (jurisdictionName) query += ', ' + jurisdictionName;
-    const stateName = (typeof appConfig !== 'undefined' && appConfig?.stateName) ? appConfig.stateName : '';
+
+    // Add jurisdiction with "County" suffix if it looks like a county name
+    if (jurisdictionName) {
+        const jName = jurisdictionName.trim();
+        // Add "County" suffix if jurisdiction is a plain name (not already suffixed)
+        if (jName && !/(county|city|borough|parish)\s*$/i.test(jName)) {
+            query += ', ' + jName + ' County';
+        } else {
+            query += ', ' + jName;
+        }
+    }
+
+    // Add state name from jurisdictionContext (most reliable) or appConfig
+    let stateName = '';
+    if (typeof jurisdictionContext !== 'undefined' && jurisdictionContext.stateName) {
+        stateName = jurisdictionContext.stateName;
+    } else if (typeof appConfig !== 'undefined' && appConfig?.stateName) {
+        stateName = appConfig.stateName;
+    }
     if (stateName && !query.toLowerCase().includes(stateName.toLowerCase())) {
         query += ', ' + stateName;
     }
@@ -128,17 +180,22 @@ async function geocodeViaNominatim(routeName, jurisdictionName) {
         query += ', USA';
     }
 
+    // Build viewbox parameter for bounded search
     const gcBounds = (typeof getMapCoordinateBounds === 'function') ? getMapCoordinateBounds() : null;
-    let url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query);
+    let viewbox = '';
     if (gcBounds) {
-        url += '&viewbox=' + gcBounds.lonMin + ',' + gcBounds.latMax + ',' + gcBounds.lonMax + ',' + gcBounds.latMin + '&bounded=1';
+        viewbox = gcBounds.lonMin + ',' + gcBounds.latMax + ',' + gcBounds.lonMax + ',' + gcBounds.latMin;
     }
-    url += '&countrycodes=us';
 
-    const response = await fetch(url, {
-        headers: { 'User-Agent': 'CrashLens/1.0 (crash-lens.aicreatesai.com)' }
-    });
-    if (!response.ok) throw new Error('Nominatim: ' + response.status);
+    // Use server-side proxy to avoid CORS issues with Nominatim
+    console.log('[Geocode] Query: "' + query + '"');
+    let apiUrl = '/api/geocode?q=' + encodeURIComponent(query);
+    if (viewbox) {
+        apiUrl += '&viewbox=' + encodeURIComponent(viewbox) + '&bounded=1';
+    }
+
+    const response = await fetch(apiUrl);
+    if (!response.ok) throw new Error('Nominatim proxy: ' + response.status);
     const data = await response.json();
     if (!data || data.length === 0) return null;
 
@@ -391,7 +448,11 @@ async function startGeocoding() {
     geocodeState.failed = 0;
     geocodeState.apiCallCount = 0;
 
-    console.log('[Geocode] Starting in-browser geocoding...');
+    console.log('[Geocode] Starting geocoding...');
+
+    // Clear previously failed cache entries so they can be retried
+    // (e.g., after fixing CORS or query format issues)
+    await geocodeCacheClearFailed();
 
     // Phase 1: Identify missing-GPS crashes
     const missingIndices = [];
