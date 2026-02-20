@@ -45,20 +45,25 @@ const StateAdapter = (() => {
     let stateConfig = null;
     let manualStateFips = null;  // Set when user picks a state from the UI
     let dynamicGeoConfig = null; // Built from FIPSDatabase for non-hardcoded states
+    let isPreNormalized = false; // True when data was already normalized by the Python pipeline
 
     // ─── Detection ───
     function detect(csvHeaders) {
+        // Reset pre-normalized flag on each new detection
+        isPreNormalized = false;
+
         // Normalize headers for comparison (trim whitespace)
         const normalizedHeaders = new Set(csvHeaders.map(h => h.trim()));
 
         // Check for normalized Colorado data: _co_* prefixed columns indicate
-        // Colorado-origin data that was normalized to Virginia-compatible format.
-        // This must be checked BEFORE signature matching because normalized data
-        // will also match Virginia's required columns.
+        // Colorado-origin data that was normalized to Virginia-compatible format
+        // by the Python pipeline. This data already has Virginia-compatible column
+        // names and must NOT be re-normalized by the JavaScript adapter.
         const hasColoradoProvenance = [...normalizedHeaders].some(h => h.startsWith('_co_'));
         if (hasColoradoProvenance) {
             detectedState = 'colorado';
-            console.log('[StateAdapter] Detected state: Colorado (CDOT) — normalized data with _co_* columns');
+            isPreNormalized = true;
+            console.log('[StateAdapter] Detected state: Colorado (CDOT) — pre-normalized data (skipping JS normalization)');
             return 'colorado';
         }
 
@@ -586,6 +591,14 @@ const StateAdapter = (() => {
         },
 
         /**
+         * Check if the loaded data was pre-normalized by the Python pipeline.
+         * @returns {boolean}
+         */
+        isDataPreNormalized() {
+            return isPreNormalized;
+        },
+
+        /**
          * Get display name for detected/selected state.
          * @returns {string}
          */
@@ -600,10 +613,13 @@ const StateAdapter = (() => {
         },
 
         /**
-         * Check if data normalization is needed (i.e., not Virginia).
+         * Check if data normalization is needed.
+         * Returns false for Virginia data (already in internal format) and for
+         * pre-normalized data (processed by the Python pipeline with _co_* columns).
          * @returns {boolean}
          */
         needsNormalization() {
+            if (isPreNormalized) return false;
             return detectedState !== null && detectedState !== 'virginia';
         },
 
