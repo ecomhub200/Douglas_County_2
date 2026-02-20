@@ -24,51 +24,35 @@ if [ -n "$HAS_CLIENT_KEYS" ]; then
 
     mkdir -p "$API_KEYS_DIR"
 
-    # Resolve env vars (default to empty string if unset)
-    MAPBOX_TOKEN="${MAPBOX_ACCESS_TOKEN:-}"
-    GOOGLE_KEY="${GOOGLE_MAPS_API_KEY:-}"
-    MAPILLARY_TOKEN="${MAPILLARY_ACCESS_TOKEN:-}"
-
-    FB_API_KEY="${FIREBASE_API_KEY:-}"
-    FB_AUTH_DOMAIN="${FIREBASE_AUTH_DOMAIN:-}"
-    FB_PROJECT_ID="${FIREBASE_PROJECT_ID:-}"
-    FB_STORAGE_BUCKET="${FIREBASE_STORAGE_BUCKET:-}"
-    FB_MESSAGING_SENDER_ID="${FIREBASE_MESSAGING_SENDER_ID:-}"
-    FB_APP_ID="${FIREBASE_APP_ID:-}"
-
-    cat > "$API_KEYS_FILE" <<JSONEOF
-{
-  "mapbox": {
-    "accessToken": "${MAPBOX_TOKEN}"
-  },
-  "google": {
-    "mapsApiKey": "${GOOGLE_KEY}"
-  },
-  "mapillary": {
-    "accessToken": "${MAPILLARY_TOKEN}"
-  },
-  "firebase": {
-    "apiKey": "${FB_API_KEY}",
-    "authDomain": "${FB_AUTH_DOMAIN}",
-    "projectId": "${FB_PROJECT_ID}",
-    "storageBucket": "${FB_STORAGE_BUCKET}",
-    "messagingSenderId": "${FB_MESSAGING_SENDER_ID}",
-    "appId": "${FB_APP_ID}"
-  }
-}
-JSONEOF
+    # Use jq for safe JSON generation (handles special characters in tokens)
+    jq -n \
+      --arg mb "${MAPBOX_ACCESS_TOKEN:-}" \
+      --arg gm "${GOOGLE_MAPS_API_KEY:-}" \
+      --arg ml "${MAPILLARY_ACCESS_TOKEN:-}" \
+      --arg fk "${FIREBASE_API_KEY:-}" \
+      --arg fd "${FIREBASE_AUTH_DOMAIN:-}" \
+      --arg fp "${FIREBASE_PROJECT_ID:-}" \
+      --arg fs "${FIREBASE_STORAGE_BUCKET:-}" \
+      --arg fm "${FIREBASE_MESSAGING_SENDER_ID:-}" \
+      --arg fa "${FIREBASE_APP_ID:-}" \
+      '{
+        mapbox:    { accessToken: $mb },
+        google:    { mapsApiKey: $gm },
+        mapillary: { accessToken: $ml },
+        firebase:  { apiKey: $fk, authDomain: $fd, projectId: $fp, storageBucket: $fs, messagingSenderId: $fm, appId: $fa }
+      }' > "$API_KEYS_FILE"
 
     echo "[Entrypoint] api-keys.json written successfully"
-    # Log which keys were injected (without revealing values)
-    [ -n "$MAPBOX_TOKEN" ] && echo "[Entrypoint]   - MAPBOX_ACCESS_TOKEN: set (${#MAPBOX_TOKEN} chars)"
-    [ -n "$GOOGLE_KEY" ] && echo "[Entrypoint]   - GOOGLE_MAPS_API_KEY: set (${#GOOGLE_KEY} chars)"
-    [ -n "$MAPILLARY_TOKEN" ] && echo "[Entrypoint]   - MAPILLARY_ACCESS_TOKEN: set (${#MAPILLARY_TOKEN} chars)"
-    [ -n "$FB_API_KEY" ] && echo "[Entrypoint]   - FIREBASE_API_KEY: set (${#FB_API_KEY} chars)"
-    [ -n "$FB_AUTH_DOMAIN" ] && echo "[Entrypoint]   - FIREBASE_AUTH_DOMAIN: ${FB_AUTH_DOMAIN}"
-    [ -n "$FB_PROJECT_ID" ] && echo "[Entrypoint]   - FIREBASE_PROJECT_ID: ${FB_PROJECT_ID}"
-    [ -n "$FB_STORAGE_BUCKET" ] && echo "[Entrypoint]   - FIREBASE_STORAGE_BUCKET: ${FB_STORAGE_BUCKET}"
-    [ -n "$FB_MESSAGING_SENDER_ID" ] && echo "[Entrypoint]   - FIREBASE_MESSAGING_SENDER_ID: set"
-    [ -n "$FB_APP_ID" ] && echo "[Entrypoint]   - FIREBASE_APP_ID: set (${#FB_APP_ID} chars)"
+    # Log which keys were injected (lengths only - never log actual values)
+    [ -n "$MAPBOX_ACCESS_TOKEN" ]        && echo "[Entrypoint]   - MAPBOX_ACCESS_TOKEN: set (${#MAPBOX_ACCESS_TOKEN} chars)"
+    [ -n "$GOOGLE_MAPS_API_KEY" ]        && echo "[Entrypoint]   - GOOGLE_MAPS_API_KEY: set (${#GOOGLE_MAPS_API_KEY} chars)"
+    [ -n "$MAPILLARY_ACCESS_TOKEN" ]     && echo "[Entrypoint]   - MAPILLARY_ACCESS_TOKEN: set (${#MAPILLARY_ACCESS_TOKEN} chars)"
+    [ -n "$FIREBASE_API_KEY" ]           && echo "[Entrypoint]   - FIREBASE_API_KEY: set (${#FIREBASE_API_KEY} chars)"
+    [ -n "$FIREBASE_AUTH_DOMAIN" ]       && echo "[Entrypoint]   - FIREBASE_AUTH_DOMAIN: set (${#FIREBASE_AUTH_DOMAIN} chars)"
+    [ -n "$FIREBASE_PROJECT_ID" ]        && echo "[Entrypoint]   - FIREBASE_PROJECT_ID: set (${#FIREBASE_PROJECT_ID} chars)"
+    [ -n "$FIREBASE_STORAGE_BUCKET" ]    && echo "[Entrypoint]   - FIREBASE_STORAGE_BUCKET: set (${#FIREBASE_STORAGE_BUCKET} chars)"
+    [ -n "$FIREBASE_MESSAGING_SENDER_ID" ] && echo "[Entrypoint]   - FIREBASE_MESSAGING_SENDER_ID: set (${#FIREBASE_MESSAGING_SENDER_ID} chars)"
+    [ -n "$FIREBASE_APP_ID" ]            && echo "[Entrypoint]   - FIREBASE_APP_ID: set (${#FIREBASE_APP_ID} chars)"
 else
     echo "[Entrypoint] No API key env vars detected, skipping api-keys.json generation"
 fi

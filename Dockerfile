@@ -5,8 +5,8 @@
 
 FROM node:18-alpine AS base
 
-# Install nginx, supervisord, and curl (needed for Coolify healthcheck)
-RUN apk add --no-cache nginx supervisor curl
+# Install nginx, supervisord, curl (healthcheck), and jq (safe JSON generation in entrypoint)
+RUN apk add --no-cache nginx supervisor curl jq
 
 # ------------------------------------------------------------
 # Copy application files
