@@ -313,6 +313,61 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // ---- Nominatim geocoding proxy (avoids CORS from browser) ----
+    if (req.url.startsWith('/geocode') && req.method === 'GET') {
+        const parsed = url.parse(req.url, true);
+        const q = parsed.query.q;
+        const viewbox = parsed.query.viewbox || '';
+        const bounded = parsed.query.bounded || '0';
+
+        if (!q) {
+            res.writeHead(400, corsHeaders);
+            res.end(JSON.stringify({ error: 'Missing required parameter: q' }));
+            return;
+        }
+
+        let nominatimUrl = 'https://nominatim.openstreetmap.org/search?format=json&limit=1'
+            + '&q=' + encodeURIComponent(q)
+            + '&countrycodes=us';
+        if (viewbox) {
+            nominatimUrl += '&viewbox=' + encodeURIComponent(viewbox) + '&bounded=' + bounded;
+        }
+
+        console.log(`[Geocode Proxy] ${q}`);
+
+        const options = {
+            hostname: 'nominatim.openstreetmap.org',
+            port: 443,
+            path: nominatimUrl.replace('https://nominatim.openstreetmap.org', ''),
+            method: 'GET',
+            headers: {
+                'User-Agent': 'CrashLens/1.0 (crash-lens.aicreatesai.com)',
+                'Accept': 'application/json'
+            }
+        };
+
+        const proxyReq = https.request(options, (proxyRes) => {
+            let data = '';
+            proxyRes.on('data', chunk => { data += chunk; });
+            proxyRes.on('end', () => {
+                res.writeHead(proxyRes.statusCode, {
+                    ...corsHeaders,
+                    'Content-Type': 'application/json'
+                });
+                res.end(data);
+            });
+        });
+
+        proxyReq.on('error', (err) => {
+            console.error('[Geocode Proxy] Error:', err.message);
+            res.writeHead(500, corsHeaders);
+            res.end(JSON.stringify({ error: 'Geocode proxy error', message: err.message }));
+        });
+
+        proxyReq.end();
+        return;
+    }
+
     // ---- Qdrant proxy (existing) ----
 
     // Check if Qdrant is configured
