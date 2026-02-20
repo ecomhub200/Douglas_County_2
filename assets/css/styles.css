@@ -329,13 +329,13 @@ a:hover {
 }
 
 .animate-fadeInUp {
-  animation: fadeInUp 0.6s ease-out forwards;
+  animation: fadeInUp 0.6s ease-out both;
 }
 
-.animate-delay-100 { animation-delay: 0.1s; opacity: 0; }
-.animate-delay-200 { animation-delay: 0.2s; opacity: 0; }
-.animate-delay-300 { animation-delay: 0.3s; opacity: 0; }
-.animate-delay-400 { animation-delay: 0.4s; opacity: 0; }
+.animate-delay-100 { animation-delay: 0.1s; }
+.animate-delay-200 { animation-delay: 0.2s; }
+.animate-delay-300 { animation-delay: 0.3s; }
+.animate-delay-400 { animation-delay: 0.4s; }
 
 /* Utility Classes */
 .container {
@@ -529,23 +529,23 @@ html {
 
 /* --- Animation Utility Classes --- */
 .animate-fadeInUp {
-  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-fadeInDown {
-  animation: fadeInDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-fadeInLeft {
-  animation: fadeInLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-fadeInRight {
-  animation: fadeInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-scaleIn {
-  animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-float {
@@ -561,14 +561,14 @@ html {
 }
 
 /* Staggered delay classes */
-.animate-delay-100 { animation-delay: 0.1s; opacity: 0; }
-.animate-delay-200 { animation-delay: 0.2s; opacity: 0; }
-.animate-delay-300 { animation-delay: 0.3s; opacity: 0; }
-.animate-delay-400 { animation-delay: 0.4s; opacity: 0; }
-.animate-delay-500 { animation-delay: 0.5s; opacity: 0; }
-.animate-delay-600 { animation-delay: 0.6s; opacity: 0; }
-.animate-delay-700 { animation-delay: 0.7s; opacity: 0; }
-.animate-delay-800 { animation-delay: 0.8s; opacity: 0; }
+.animate-delay-100 { animation-delay: 0.1s; }
+.animate-delay-200 { animation-delay: 0.2s; }
+.animate-delay-300 { animation-delay: 0.3s; }
+.animate-delay-400 { animation-delay: 0.4s; }
+.animate-delay-500 { animation-delay: 0.5s; }
+.animate-delay-600 { animation-delay: 0.6s; }
+.animate-delay-700 { animation-delay: 0.7s; }
+.animate-delay-800 { animation-delay: 0.8s; }
 
 /* --- Scroll-Triggered Animation Classes --- */
 .animate-on-scroll {
