@@ -4,6 +4,7 @@
  * Multi-purpose backend for CRASH LENS:
  *   - Qdrant Cloud proxy (avoids CORS from browser)
  *   - Brevo email notifications API
+ *   - R2 upload for geocoded crash data
  *
  * Usage: node server/qdrant-proxy.js
  * Listens on port 3001 by default (configurable via PROXY_PORT env var)
@@ -12,6 +13,7 @@
 const http = require('http');
 const https = require('https');
 const url = require('url');
+const { S3Client, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 
 const PORT = process.env.PROXY_PORT || 3001;
 
@@ -24,6 +26,12 @@ const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
 const BREVO_SMTP_LOGIN = process.env.BREVO_SMTP_LOGIN || '';
 const BREVO_SMTP_PASSWORD = process.env.BREVO_SMTP_PASSWORD || '';
 const NOTIFICATION_FROM_EMAIL = process.env.NOTIFICATION_FROM_EMAIL || '';
+
+// Cloudflare R2 configuration (set via environment variables in Coolify)
+const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID || '';
+const CF_R2_ACCESS_KEY_ID = process.env.CF_R2_ACCESS_KEY_ID || '';
+const CF_R2_SECRET_ACCESS_KEY = process.env.CF_R2_SECRET_ACCESS_KEY || '';
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || 'crash-lens-data';
 
 // CORS headers
 function getCorsHeaders(origin) {
@@ -209,6 +217,102 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // ---- R2 upload: status check ----
+    if (req.url === '/r2/status' && req.method === 'GET') {
+        const configured = !!(CF_ACCOUNT_ID && CF_R2_ACCESS_KEY_ID && CF_R2_SECRET_ACCESS_KEY);
+        res.writeHead(200, corsHeaders);
+        res.end(JSON.stringify({
+            configured,
+            bucket: configured ? R2_BUCKET_NAME : null
+        }));
+        return;
+    }
+
+    // ---- R2 upload: upload geocoded CSV ----
+    if (req.url === '/r2/upload-geocoded' && req.method === 'POST') {
+        if (!CF_ACCOUNT_ID || !CF_R2_ACCESS_KEY_ID || !CF_R2_SECRET_ACCESS_KEY) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({
+                error: 'R2 not configured',
+                message: 'Set CF_ACCOUNT_ID, CF_R2_ACCESS_KEY_ID, and CF_R2_SECRET_ACCESS_KEY in Coolify environment variables'
+            }));
+            return;
+        }
+
+        // Use larger body limit for CSV uploads (200MB)
+        collectBody(req, 200 * 1024 * 1024).then(body => {
+            let payload;
+            try {
+                payload = JSON.parse(body);
+            } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { r2Key, csvData } = payload;
+
+            // Validate required fields
+            if (!r2Key || !csvData) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Missing required fields: r2Key, csvData' }));
+                return;
+            }
+
+            // Validate r2Key format: {state}/{jurisdiction}/{filter}.csv
+            const keyPattern = /^[a-z_-]+\/[a-z_-]+\/[a-z_]+\.csv$/;
+            if (!keyPattern.test(r2Key)) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({
+                    error: 'Invalid r2Key format',
+                    message: 'Expected pattern: {state}/{jurisdiction}/{filter}.csv (e.g., colorado/douglas/all_roads.csv)'
+                }));
+                return;
+            }
+
+            console.log(`[R2 Upload] Uploading geocoded CSV: ${r2Key} (${(Buffer.byteLength(csvData) / 1024 / 1024).toFixed(1)} MB)`);
+
+            const s3Client = new S3Client({
+                region: 'auto',
+                endpoint: `https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+                credentials: {
+                    accessKeyId: CF_R2_ACCESS_KEY_ID,
+                    secretAccessKey: CF_R2_SECRET_ACCESS_KEY,
+                }
+            });
+
+            const putCmd = new PutObjectCommand({
+                Bucket: R2_BUCKET_NAME,
+                Key: r2Key,
+                Body: csvData,
+                ContentType: 'text/csv',
+            });
+
+            s3Client.send(putCmd)
+                .then(() => {
+                    const sizeBytes = Buffer.byteLength(csvData);
+                    console.log(`[R2 Upload] Success: ${r2Key} (${sizeBytes.toLocaleString()} bytes)`);
+                    res.writeHead(200, corsHeaders);
+                    res.end(JSON.stringify({
+                        success: true,
+                        r2Key,
+                        size: sizeBytes,
+                        uploadedAt: new Date().toISOString()
+                    }));
+                })
+                .catch(err => {
+                    console.error(`[R2 Upload] Failed: ${err.message}`);
+                    res.writeHead(500, corsHeaders);
+                    res.end(JSON.stringify({ error: 'R2 upload failed', message: err.message }));
+                });
+        }).catch(err => {
+            console.error(`[R2 Upload] Body error: ${err.message}`);
+            res.writeHead(413, corsHeaders);
+            res.end(JSON.stringify({ error: 'Request too large', message: err.message }));
+        });
+        return;
+    }
+
     // ---- Qdrant proxy (existing) ----
 
     // Check if Qdrant is configured
@@ -281,5 +385,10 @@ server.listen(PORT, '127.0.0.1', () => {
         console.log(`[Brevo] SMTP mode configured (from: ${NOTIFICATION_FROM_EMAIL || 'NOT SET'})`);
     } else {
         console.warn('[Brevo] WARNING: No credentials set - /notify endpoints will return 503');
+    }
+    if (CF_ACCOUNT_ID && CF_R2_ACCESS_KEY_ID && CF_R2_SECRET_ACCESS_KEY) {
+        console.log(`[R2] Upload configured (bucket: ${R2_BUCKET_NAME})`);
+    } else {
+        console.warn('[R2] WARNING: R2 credentials not set - /r2 endpoints will return 503');
     }
 });
