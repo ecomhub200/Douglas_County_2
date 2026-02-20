@@ -74,8 +74,15 @@ COPY supervisord.conf /etc/supervisord.conf
 # ------------------------------------------------------------
 
 # Client-side API keys (injected into config/api-keys.json by entrypoint.sh)
-# MAPBOX_ACCESS_TOKEN   - Mapbox token for satellite tiles & geocoding
-# GOOGLE_MAPS_API_KEY   - Google Maps API key for Street View
+# MAPBOX_ACCESS_TOKEN       - Mapbox token for satellite tiles & geocoding
+# GOOGLE_MAPS_API_KEY       - Google Maps API key for Street View
+# MAPILLARY_ACCESS_TOKEN    - Mapillary token for street-level imagery
+# FIREBASE_API_KEY          - Firebase API key
+# FIREBASE_AUTH_DOMAIN      - Firebase auth domain (e.g. myapp.firebaseapp.com)
+# FIREBASE_PROJECT_ID       - Firebase project ID
+# FIREBASE_STORAGE_BUCKET   - Firebase storage bucket
+# FIREBASE_MESSAGING_SENDER_ID - Firebase messaging sender ID
+# FIREBASE_APP_ID           - Firebase app ID
 #
 # Server-side secrets
 # BREVO_API_KEY         - Brevo v3 API key (starts with xkeysib-)
