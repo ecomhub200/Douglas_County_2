@@ -60,8 +60,9 @@ RUN mkdir -p /var/log/nginx /var/lib/nginx/tmp /run/nginx
 # Configure Node.js API proxy
 # ------------------------------------------------------------
 
-# Copy proxy server
+# Copy proxy server and install dependencies
 COPY server/ /app/server/
+RUN cd /app/server && npm install --production
 
 # ------------------------------------------------------------
 # Configure supervisord
@@ -91,6 +92,12 @@ COPY supervisord.conf /etc/supervisord.conf
 # NOTIFICATION_FROM_EMAIL - Verified Brevo sender address
 # QDRANT_ENDPOINT       - Qdrant Cloud URL
 # QDRANT_API_KEY        - Qdrant Cloud API key
+#
+# Cloudflare R2 (for saving geocoded crash data)
+# CF_ACCOUNT_ID             - Cloudflare Account ID
+# CF_R2_ACCESS_KEY_ID       - R2 API Access Key (write-capable)
+# CF_R2_SECRET_ACCESS_KEY   - R2 API Secret Key (write-capable)
+# R2_BUCKET_NAME            - R2 bucket name (default: crash-lens-data)
 
 # ------------------------------------------------------------
 # Expose port and start

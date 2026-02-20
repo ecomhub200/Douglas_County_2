@@ -57,5 +57,11 @@ else
     echo "[Entrypoint] No API key env vars detected, skipping api-keys.json generation"
 fi
 
+# Server-side env vars used by Node.js proxy (set in Coolify Dashboard):
+# QDRANT_ENDPOINT, QDRANT_API_KEY          - Qdrant Cloud
+# BREVO_API_KEY, NOTIFICATION_FROM_EMAIL   - Email notifications
+# CF_ACCOUNT_ID, CF_R2_ACCESS_KEY_ID,      - Cloudflare R2 (geocoded data upload)
+# CF_R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME
+
 # Hand off to supervisord (Nginx + Node.js proxy)
 exec /usr/bin/supervisord -c /etc/supervisord.conf
