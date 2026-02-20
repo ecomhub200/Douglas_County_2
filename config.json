@@ -4,14 +4,14 @@
   "version": "2.0.0",
   "apis": {
     "mapbox": {
-      "accessToken": "YOUR_MAPBOX_ACCESS_TOKEN_HERE",
+      "accessToken": "pk.eyJ1IjoibXVyYWRhbHF1cmlzaGVlIiwiYSI6ImNtazA0cnoyaTcwN20zY3EybGVlNWlmMzcifQ.VaJ4IEUf2vmFM4EexagsMg",
       "geocodingEndpoint": "https://api.mapbox.com/geocoding/v5/mapbox.places"
     },
     "google": {
-      "mapsApiKey": ""
+      "mapsApiKey": "AIzaSyAMgu9WO10fkz1yd8NcejMVX-yThL5hIe8"
     },
     "mapillary": {
-      "accessToken": "",
+      "accessToken": "MLY|25428927243443196|cf3f7b843e2e19051fd3783899db7f07",
       "enabled": true,
       "organizationId": "crash-lens",
       "graphApiUrl": "https://graph.mapillary.com",
@@ -22,12 +22,12 @@
       "tileLimitPerDay": 50000
     },
     "firebase": {
-      "apiKey": "",
-      "authDomain": "",
-      "projectId": "",
-      "storageBucket": "",
-      "messagingSenderId": "",
-      "appId": ""
+      "apiKey": "AIzaSyBg1QtvbcYxyrhbw0tmpyBiD-zzoCWbxyM",
+      "authDomain": "crash-lens-f50e7.firebaseapp.com",
+      "projectId": "crash-lens-f50e7",
+      "storageBucket": "crash-lens-f50e7.firebasestorage.app",
+      "messagingSenderId": "345091421318",
+      "appId": "1:345091421318:web:88f99469eb0ce73c734d07"
     },
     "tigerweb": {
       "enabled": true,
