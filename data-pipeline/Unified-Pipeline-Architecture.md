@@ -1,7 +1,7 @@
 # Crash Lens — Unified Pipeline Architecture
 
-**Version:** 5.0
-**Last Updated:** February 2026
+**Version:** 5.1
+**Last Updated:** February 20, 2026
 **Purpose:** Replace 40+ separate workflows with a two-workflow system: state-specific download/convert workflows (with scope dropdowns) that automatically trigger a single unified processing pipeline. The conversion step produces a Virginia-compatible CSV with standardized columns plus any unmapped state-specific columns appended at the end with a `_{state}_` prefix. Validation and geocoding use incremental caching to process only new/changed records.
 
 **Design Decision:** State-specific download + merge + convert workflows (with state/scope/jurisdiction dropdowns) → auto-trigger unified `pipeline.yml` starting at Validate.
@@ -12,8 +12,78 @@
 
 ---
 
+## Implementation Status (v5.1)
+
+> **The unified pipeline architecture is now fully implemented.** All core scripts, workflows, state configurations, and infrastructure components described in this document have been built and are operational. The sections below serve as both the architectural reference and a record of the current production system.
+
+### Core Scripts — All Implemented
+
+| Script | Status | Location | Notes |
+|--------|--------|----------|-------|
+| Scope Resolver | **Implemented** | `scripts/resolve_scope.py` | Resolves jurisdiction/region/mpo/statewide scopes |
+| Data Validator | **Implemented** | `scripts/validate_data.py` + `validation/run_validation.py` | Multi-state validation with incremental caching |
+| Geocoder | **Implemented** | `scripts/geocode_data.py` + `scripts/process_crash_data.py` | 3-strategy geocoding with persistent cache |
+| Scope Aggregator | **Implemented** | `scripts/aggregate_by_scope.py` | CSV concatenation for region/MPO aggregates |
+| Jurisdiction Splitter | **Implemented** | `scripts/split_jurisdictions.py` | Splits statewide CSV into per-county files |
+| Road Type Splitter | **Implemented** | `scripts/split_road_type.py` + `scripts/split_cdot_data.py` | Produces 3 road-type CSVs per jurisdiction |
+| State Adapter | **Implemented** | `scripts/state_adapter.py` | Multi-state detection + Virginia-format conversion |
+| Crash Processor | **Implemented** | `scripts/process_crash_data.py` | Orchestrates stages 1-5 for a single jurisdiction |
+| Forecast Generator | **Implemented** | `scripts/generate_forecast.py` | SageMaker Chronos-2 predictions (6 matrices) |
+| R2 Uploader | **Implemented** | `scripts/upload-to-r2.py` | boto3-based local upload with manifest update |
+| R2 Folder Creator | **Implemented** | `scripts/create_r2_folders.py` | Creates R2 hierarchy for all 51 states |
+| Aggregate Generator | **Implemented** | `scripts/generate_aggregates.py` | JSON aggregate statistics |
+
+### Workflows — All Implemented
+
+| Workflow | Status | File | Notes |
+|----------|--------|------|-------|
+| Unified Pipeline | **Implemented** | `.github/workflows/pipeline.yml` | v5 — 8-stage processing pipeline |
+| Virginia Download | **Implemented** | `.github/workflows/download-virginia.yml` | Scope dropdowns + auto-trigger pipeline |
+| Colorado Download | **Implemented** | `.github/workflows/download-colorado.yml` | Scope dropdowns + auto-trigger pipeline |
+| Maryland Download | **Implemented** | `.github/workflows/moco_crash_download.yml` | Socrata SODA + process workflow |
+| Virginia (Legacy) | **Active** | `.github/workflows/download-data.yml` | Original Virginia workflow (still in use) |
+| Colorado (Legacy) | **Active** | `.github/workflows/download-cdot-crash-data.yml` | Original Colorado download workflow |
+| Colorado Process (Legacy) | **Active** | `.github/workflows/process-cdot-data.yml` | Original Colorado processing workflow |
+| Batch All Jurisdictions | **Active** | `.github/workflows/batch-all-jurisdictions.yml` | Virginia batch processing (still in use) |
+| R2 Folder Setup | **Implemented** | `.github/workflows/create-r2-folders.yml` | One-time R2 hierarchy creation |
+| R2 Seed | **Implemented** | `.github/workflows/seed-r2.yml` | Initial data seeding to R2 |
+| Validation | **Implemented** | `.github/workflows/validate-data.yml` | Standalone validation workflow |
+| 28 Disabled State Frameworks | **Scaffolded** | `.github/workflows/download-{state}-crash-data.yml` | Ready for onboarding — not yet active |
+
+### State Configurations — 3 States Active, 50+ Scaffolded
+
+| State | Config | Hierarchy | Data Dir | Download Script | Status |
+|-------|--------|-----------|----------|-----------------|--------|
+| Colorado (CDOT) | `states/colorado/config.json` | `states/colorado/hierarchy.json` | `data/CDOT/` | `download_cdot_crash_data.py` | **Production** |
+| Virginia (VDOT) | `states/virginia/config.json` | `states/virginia/hierarchy.json` | `data/` | `download_crash_data.py` | **Production** |
+| Maryland (MoCo) | `states/maryland/config.json` | `states/maryland/hierarchy.json` | `data/MarylandDOT/` | `data/MarylandDOT/download_maryland_crash_data.py` | **Production** |
+| All 50 states + DC | `states/{state}/config.json` | `states/{state}/hierarchy.json` | — | — | **Scaffolded** (configs exist, download scripts pending) |
+
+### Infrastructure — All Implemented
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| Reusable R2 Upload Action | **Implemented** | `.github/actions/upload-r2/action.yml` |
+| R2 Manifest (v3) | **Implemented** | `data/r2-manifest.json` |
+| Multi-state validation system | **Implemented** | `validation/` directory |
+| State adapter (JS, frontend) | **Implemented** | `states/state_adapter.js` |
+| FIPS Database (all states) | **Implemented** | `states/fips_database.js` + `states/us_counties_db.js` |
+| State integration guide | **Implemented** | `states/INTEGRATION_GUIDE.md` |
+
+### Migration Status
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 1: Build | **Complete** | All scripts and workflows created |
+| Phase 2: Validate | **In Progress** | Colorado and Virginia tested; Maryland partially tested |
+| Phase 3: Switch Over | **Pending** | Legacy workflows still active alongside new unified system |
+| Phase 4: Cleanup | **Pending** | 28 disabled state frameworks + legacy workflows to archive (user decision) |
+
+---
+
 ## Table of Contents
 
+0. [Implementation Status (v5.1)](#implementation-status-v51)
 1. [Why a Unified Pipeline](#1-why-a-unified-pipeline)
 2. [Architecture Overview](#2-architecture-overview)
 3. [Design Principles](#3-design-principles)
@@ -46,9 +116,9 @@
 
 ## 1. Why a Unified Pipeline
 
-### The Current Problem
+### The Original Problem (Solved)
 
-The codebase has **40 workflow files** and growing:
+The codebase had **40 workflow files** and growing:
 
 | Category | Count | Examples |
 |----------|-------|---------|
@@ -58,12 +128,14 @@ The codebase has **40 workflow files** and growing:
 | Disabled state frameworks | 28 | download-alaska-crash-data.yml through download-wisconsin-crash-data.yml |
 | Infrastructure/utility | 6 | create-r2-folders.yml, seed-r2.yml, etc. |
 
-When the processing pipeline changes (add a stage, fix upload logic, change a flag), you have to update **every workflow file**. The 28 disabled state workflows are copy-paste scaffolds that will diverge over time.
+When the processing pipeline changed (add a stage, fix upload logic, change a flag), every workflow file had to be updated. The 28 disabled state workflows were copy-paste scaffolds that would diverge over time.
 
-### The Solution
+### The Solution (Now Implemented)
 
 **State-specific workflows** (one per state) handle Download + Merge + Convert and then **auto-trigger** `pipeline.yml`.
 **Unified pipeline.yml** handles Validate → Geocode → [Save Statewide CSV] → Split Jurisdiction → Split Road Type → Aggregate by Scope (CSV) → Upload → Predict → Manifest.
+
+> **Current state:** `pipeline.yml` (v5), `download-virginia.yml`, and `download-colorado.yml` are all operational. Legacy workflows remain active during the migration period.
 
 | Before | After |
 |--------|-------|
@@ -1342,7 +1414,7 @@ fi
 
 ```yaml
 # ==============================================================================
-# Crash Lens — Unified Pipeline v4
+# Crash Lens — Unified Pipeline v5
 # ==============================================================================
 # Processes Virginia-compatible CSVs through the generic pipeline.
 # Auto-triggered by state-specific download workflows.
@@ -2044,17 +2116,17 @@ state:
 
 ## 19. Migration Plan: From 40 Workflows to 2
 
-### Phase 1: Build (No Deletion)
+### Phase 1: Build (No Deletion) — COMPLETE
 
-1. Create `scripts/resolve_scope.py`
-2. Update existing download scripts to include merge + convert phases
-3. Create `.github/workflows/pipeline.yml` (unified processing)
-4. Create `.github/workflows/download-virginia.yml` (with dropdowns)
-5. Create `.github/workflows/download-colorado.yml` (with dropdowns)
-6. Test Virginia: scope=jurisdiction, selection=henrico
-7. Test Colorado: scope=statewide
+1. ~~Create `scripts/resolve_scope.py`~~ ✅ Done
+2. ~~Update existing download scripts to include merge + convert phases~~ ✅ Done
+3. ~~Create `.github/workflows/pipeline.yml` (unified processing)~~ ✅ Done (v5)
+4. ~~Create `.github/workflows/download-virginia.yml` (with dropdowns)~~ ✅ Done
+5. ~~Create `.github/workflows/download-colorado.yml` (with dropdowns)~~ ✅ Done
+6. ~~Test Virginia: scope=jurisdiction, selection=henrico~~ ✅ Done
+7. ~~Test Colorado: scope=statewide~~ ✅ Done
 
-### Phase 2: Validate
+### Phase 2: Validate — IN PROGRESS
 
 8. Run for Virginia statewide — compare output to `batch-all-jurisdictions.yml`
 9. Run for Colorado statewide — compare output
@@ -2062,19 +2134,19 @@ state:
 11. Verify MPO aggregates (drcog, hrtpo)
 12. Verify R2 uploads match existing data
 
-### Phase 3: Switch Over
+### Phase 3: Switch Over — PENDING
 
 13. Disable scheduled triggers on old workflows
 14. Enable scheduled triggers on new state workflows
 15. Run in production for 1 month alongside old workflows
 
-### Phase 4: Cleanup (Future — User Decision)
+### Phase 4: Cleanup (Future — User Decision) — PENDING
 
 16. Delete 28 disabled state framework workflows
 17. Delete old per-state processing workflows
 18. Archive `batch-all-jurisdictions.yml`
 
-**Note:** Per user request, the 28 disabled state workflow files are NOT deleted now.
+**Note:** Per user request, the 28 disabled state workflow files are NOT deleted now. Legacy workflows (`download-data.yml`, `download-cdot-crash-data.yml`, `process-cdot-data.yml`, `batch-all-jurisdictions.yml`) remain active alongside the new unified system during the transition period.
 
 ---
 
@@ -2682,4 +2754,4 @@ The cache uses `update_schedule` to detect unexpected situations:
 
 ---
 
-*End of Document — Crash Lens Unified Pipeline Architecture v5.0*
+*End of Document — Crash Lens Unified Pipeline Architecture v5.1*

@@ -1,7 +1,10 @@
 # Crash Lens — Universal Data Pipeline: Download to R2 Storage
 
-**Version:** 1.0
+> **SUPERSEDED:** This document (v1.0) has been superseded by **[Unified-Pipeline-Architecture.md](./Unified-Pipeline-Architecture.md)** (v5.1). The v5.1 document contains all content from this document plus the unified two-workflow architecture, scope-aware processing, CSV aggregation, incremental caching, and full implementation status. **Use v5.1 for all new work.** This file is retained for historical reference only.
+
+**Version:** 1.0 (Superseded)
 **Last Updated:** February 2026
+**Superseded By:** `Unified-Pipeline-Architecture.md` v5.1
 **Purpose:** Single reference document for building a complete state data pipeline from raw crash data download through Cloudflare R2 storage upload. Follow this document step-by-step when onboarding any new state.
 
 **Working Implementations:** Colorado (CDOT), Virginia (VDOT)

@@ -1,8 +1,11 @@
 # Claude Code — Implement the Unified Pipeline Architecture
 
+> **Implementation Status: CORE COMPLETE (February 2026)**
+> All core scripts, workflows, and configurations have been built. The unified pipeline (`pipeline.yml` v5) is operational for Colorado, Virginia, and Maryland. Remaining work: cache infrastructure deployment, statewide validation testing, and legacy workflow migration.
+
 ## YOUR TASK
 
-You are implementing the Crash Lens unified data pipeline. **Read the architecture plan FIRST**, then build it phase by phase.
+You are extending or maintaining the Crash Lens unified data pipeline. **Read the architecture plan FIRST** before making changes.
 
 **MANDATORY FIRST STEP:** Before writing ANY code, read the full plan:
 
@@ -10,7 +13,7 @@ You are implementing the Crash Lens unified data pipeline. **Read the architectu
 cat data-pipeline/Unified-Pipeline-Architecture.md
 ```
 
-That document is v5.0 and contains EVERYTHING — the 8-stage pipeline design, exact column specifications, YAML templates, R2 upload paths, caching architecture, scope resolver, aggregation algorithm, and state onboarding checklist. **Follow it as your blueprint.** Do NOT deviate from the plan unless you find a bug in the existing codebase that requires adaptation.
+That document is v5.1 and contains EVERYTHING — the 8-stage pipeline design, exact column specifications, YAML templates, R2 upload paths, caching architecture, scope resolver, aggregation algorithm, state onboarding checklist, and **current implementation status**. **Follow it as your blueprint.** Do NOT deviate from the plan unless you find a bug in the existing codebase that requires adaptation.
 
 ---
 
@@ -329,35 +332,45 @@ data/henrico_all_roads.csv                   →  virginia/henrico/all_roads.csv
 
 ## DELIVERABLES CHECKLIST
 
-When done, you should have created or modified:
+> **Status as of February 20, 2026:** All core deliverables are implemented. Cache infrastructure is pending deployment-level testing.
 
 **New Scripts:**
-- [ ] `scripts/resolve_scope.py` — Scope resolver (plan Section 17 has full source)
-- [ ] `scripts/validate_data.py` — Validation with incremental cache
-- [ ] `scripts/geocode_data.py` — Geocoding with incremental cache + statewide CSV save
-- [ ] `scripts/aggregate_by_scope.py` — CSV aggregation (concat county rows)
-- [ ] `scripts/split_road_type.py` — Road-type splitting (if not already in split_jurisdictions.py)
+- [x] `scripts/resolve_scope.py` — Scope resolver (implemented per plan Section 17)
+- [x] `scripts/validate_data.py` — Validation with incremental cache
+- [x] `scripts/geocode_data.py` — Geocoding with incremental cache + statewide CSV save
+- [x] `scripts/aggregate_by_scope.py` — CSV aggregation (concat county rows)
+- [x] `scripts/split_road_type.py` — Road-type splitting (standalone + in split_jurisdictions.py)
 
 **New Workflows:**
-- [ ] `.github/workflows/pipeline.yml` — Unified 8-stage processing pipeline
-- [ ] `.github/workflows/download-virginia.yml` — Virginia download + auto-trigger
-- [ ] `.github/workflows/download-colorado.yml` — Colorado download + auto-trigger
+- [x] `.github/workflows/pipeline.yml` — Unified 8-stage processing pipeline (v5)
+- [x] `.github/workflows/download-virginia.yml` — Virginia download + auto-trigger
+- [x] `.github/workflows/download-colorado.yml` — Colorado download + auto-trigger
 
 **New/Modified Configs:**
-- [ ] `states/virginia/config.json` — add `cache_config` section
-- [ ] `states/colorado/config.json` — add `cache_config` section
+- [x] `states/virginia/config.json` — state adapter configuration
+- [x] `states/colorado/config.json` — state adapter configuration
+- [x] `states/maryland/config.json` — state adapter configuration
+- [ ] Add `cache_config` section to state configs (pending full cache deployment)
 
 **Cache Infrastructure:**
-- [ ] `.cache/` directory structure with state isolation
-- [ ] `_cache_registry.json` template
+- [ ] `.cache/` directory structure with state isolation (designed, pending CI/CD deployment)
+- [ ] `_cache_registry.json` template (designed, pending CI/CD deployment)
+
+**Additional Scripts (Built Beyond Original Plan):**
+- [x] `scripts/split_cdot_data.py` — Colorado-specific road-type splitter
+- [x] `scripts/process_crash_data.py` — Multi-stage crash data orchestrator
+- [x] `scripts/generate_aggregates.py` — JSON aggregate statistics generator
+- [x] `scripts/test_multi_jurisdiction_pipeline.py` — Pipeline integration tests
+- [x] `scripts/rebuild_road_type_csvs.py` — Road-type CSV rebuild utility
+- [x] `validation/run_validation.py` — Multi-state validation runner with reporting
 
 **Verification:**
-- [ ] Colorado: validate → geocode → split → aggregate → verify CSVs
-- [ ] Virginia: validate → geocode → split → aggregate → verify CSVs
-- [ ] Scope resolver works for all 4 scope types
-- [ ] Region/MPO aggregate CSVs have same columns as county CSVs
-- [ ] R2 upload paths match the convention above
-- [ ] Running Colorado does NOT create/modify anything in `.cache/virginia/`
+- [x] Colorado: validate → geocode → split → aggregate → verify CSVs
+- [x] Virginia: validate → geocode → split → aggregate → verify CSVs
+- [x] Scope resolver works for all 4 scope types
+- [ ] Region/MPO aggregate CSVs have same columns as county CSVs (pending statewide test)
+- [x] R2 upload paths match the convention
+- [ ] Running Colorado does NOT create/modify anything in `.cache/virginia/` (pending cache deployment)
 
 ---
 
@@ -367,15 +380,35 @@ When done, you should have created or modified:
 # Step 1: Read the plan
 cat data-pipeline/Unified-Pipeline-Architecture.md
 
-# Step 2: Read existing code
-cat scripts/state_adapter.py
-cat .github/actions/upload-r2/action.yml
-cat data/r2-manifest.json
+# Step 2: Read existing code (all already implemented)
+cat scripts/state_adapter.py          # Multi-state detection + conversion engine
+cat scripts/resolve_scope.py          # Scope resolver (jurisdiction/region/mpo/statewide)
+cat scripts/validate_data.py          # Data validation with incremental cache
+cat scripts/geocode_data.py           # Geocoding with persistent cache
+cat scripts/aggregate_by_scope.py     # CSV aggregation (concat county rows)
+cat scripts/split_jurisdictions.py    # Statewide CSV → per-county files
+cat scripts/split_road_type.py        # Per-county → 3 road-type CSVs
+cat scripts/process_crash_data.py     # Orchestrates stages 1-5 for single jurisdiction
+cat .github/actions/upload-r2/action.yml  # Reusable R2 upload action
+cat data/r2-manifest.json             # Version 3 manifest
 
-# Step 3: Build Phase 1 (core scripts)
-# Start with resolve_scope.py since the plan has the full source code
+# Step 3: Verify workflows
+cat .github/workflows/pipeline.yml           # Unified 8-stage pipeline (v5)
+cat .github/workflows/download-virginia.yml  # Virginia download + auto-trigger
+cat .github/workflows/download-colorado.yml  # Colorado download + auto-trigger
 
-# Step 4: Test each script individually before building the workflow
+# Step 4: Test scope resolver
+python scripts/resolve_scope.py --state virginia --scope region --selection hampton_roads --json
+python scripts/resolve_scope.py --state colorado --scope mpo --selection drcog --json
+python scripts/resolve_scope.py --state colorado --list
 ```
 
-Good luck. The plan has everything you need.
+## REMAINING WORK
+
+The following items from the original plan are still pending:
+
+1. **Cache infrastructure deployment** — `.cache/` directory structure designed but not yet deployed in CI/CD
+2. **Statewide validation testing** — Phase 2 of migration plan (compare unified output to legacy workflows)
+3. **Legacy workflow migration** — Phase 3 (disable old scheduled triggers, enable new ones)
+4. **State onboarding** — 28 scaffolded state workflows ready for activation when download scripts are built
+5. **`cache_config` in state configs** — Add `update_frequency`, `stale_threshold_days`, `geocode_ttl_days` to `states/{state}/config.json`
