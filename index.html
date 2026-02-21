@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="data/images/apple-touch-icon.png">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#030712">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Crash Lens">
 
@@ -1740,9 +1740,8 @@
         <small>See the complete workflow: Upload → Analyze → Report</small>
       </div>
       <!-- Video will be shown when available -->
-      <video id="demoVideo" controls poster="data/images/video-poster.png">
-        <source src="data/videos/crash-lens-demo.mp4" type="video/mp4">
-        <!-- Fallback to YouTube embed if no local video -->
+      <video id="demoVideo" controls preload="none">
+        <!-- Video source will be set dynamically when available -->
       </video>
     </div>
 
@@ -2470,16 +2469,21 @@
       const container = document.getElementById('demoVideoContainer');
       const video = document.getElementById('demoVideo');
 
-      // Check if video source exists
-      if (video && video.querySelector('source').src) {
+      // Try to load video dynamically to avoid 404 on page load
+      if (video && !video.querySelector('source')) {
+        const source = document.createElement('source');
+        source.src = 'data/videos/crash-lens-demo.mp4';
+        source.type = 'video/mp4';
+        video.appendChild(source);
+        video.load();
+      }
+
+      if (video) {
         container.classList.add('playing');
-        video.play().catch(function(error) {
-          // If video fails to play (e.g., file not found), show message
-          console.log('Video not available yet. Add your demo video to: data/videos/crash-lens-demo.mp4');
+        video.play().catch(function() {
+          container.classList.remove('playing');
           alert('Demo video coming soon! Contact us for a live demo.');
         });
-      } else {
-        alert('Demo video coming soon! Contact us for a live demo.');
       }
     }
 
@@ -2774,7 +2778,14 @@
           body: JSON.stringify({ email: email })
         });
 
-        const data = await response.json();
+        // Safely parse JSON — server may return HTML on error
+        let data = {};
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          data = await response.json();
+        } else if (!response.ok) {
+          throw new Error('Server returned non-JSON response (status ' + response.status + ')');
+        }
 
         if (response.ok || response.status === 409) {
           msg.style.display = 'block';
