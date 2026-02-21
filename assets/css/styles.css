@@ -1192,20 +1192,24 @@ html {
 
 /* --- Step/Process Animation --- */
 .step {
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.step:hover {
-  transform: translateY(-5px);
-}
-
-.step:hover .step-number {
-  transform: scale(1.1);
+.step:hover .step-badge {
+  transform: scale(1.15);
   box-shadow: 0 0 30px rgba(30, 64, 175, 0.4);
 }
 
-.step-number {
+.step-badge {
   transition: all 0.3s ease;
+}
+
+.step-icon {
+  transition: transform 0.3s ease;
+}
+
+.step:hover .step-icon {
+  transform: scale(1.08);
 }
 
 /* --- Video Play Button Enhancement --- */
