@@ -217,6 +217,94 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // ---- Brevo newsletter subscription (Contacts API) ----
+    if (req.url === '/subscribe' && req.method === 'POST') {
+        if (!BREVO_API_KEY) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({
+                error: 'Newsletter not configured',
+                message: 'Set BREVO_API_KEY in environment variables'
+            }));
+            return;
+        }
+
+        collectBody(req).then(body => {
+            let payload;
+            try {
+                payload = JSON.parse(body);
+            } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { email } = payload;
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Valid email address is required' }));
+                return;
+            }
+
+            // Add contact to Brevo via Contacts API
+            const contactPayload = JSON.stringify({
+                email: email,
+                updateEnabled: true,
+                attributes: {
+                    SOURCE: 'website_newsletter',
+                    SIGNUP_DATE: new Date().toISOString().split('T')[0]
+                }
+            });
+
+            const options = {
+                hostname: 'api.brevo.com',
+                port: 443,
+                path: '/v3/contacts',
+                method: 'POST',
+                headers: {
+                    'accept': 'application/json',
+                    'api-key': BREVO_API_KEY.trim(),
+                    'content-type': 'application/json',
+                    'content-length': Buffer.byteLength(contactPayload)
+                }
+            };
+
+            const apiReq = https.request(options, (apiRes) => {
+                let data = '';
+                apiRes.on('data', chunk => { data += chunk; });
+                apiRes.on('end', () => {
+                    if (apiRes.statusCode === 201) {
+                        console.log(`[Brevo] Newsletter subscriber added: ${email}`);
+                        res.writeHead(201, corsHeaders);
+                        res.end(JSON.stringify({ success: true, message: 'Subscribed successfully' }));
+                    } else if (apiRes.statusCode === 204) {
+                        // Contact already exists, updated
+                        console.log(`[Brevo] Newsletter subscriber updated: ${email}`);
+                        res.writeHead(200, corsHeaders);
+                        res.end(JSON.stringify({ success: true, message: 'Subscription updated' }));
+                    } else if (apiRes.statusCode === 400 && data.includes('already exist')) {
+                        console.log(`[Brevo] Already subscribed: ${email}`);
+                        res.writeHead(409, corsHeaders);
+                        res.end(JSON.stringify({ success: true, message: 'Already subscribed' }));
+                    } else {
+                        console.error(`[Brevo] Subscribe error ${apiRes.statusCode}: ${data}`);
+                        res.writeHead(apiRes.statusCode >= 500 ? 502 : apiRes.statusCode, corsHeaders);
+                        res.end(JSON.stringify({ error: 'Subscription failed', message: data }));
+                    }
+                });
+            });
+
+            apiReq.on('error', (err) => {
+                console.error(`[Brevo] Subscribe request failed: ${err.message}`);
+                res.writeHead(502, corsHeaders);
+                res.end(JSON.stringify({ error: 'Service unavailable', message: err.message }));
+            });
+
+            apiReq.write(contactPayload);
+            apiReq.end();
+        });
+        return;
+    }
+
     // ---- R2 upload: status check ----
     if (req.url === '/r2/status' && req.method === 'GET') {
         const configured = !!(CF_ACCOUNT_ID && CF_R2_ACCESS_KEY_ID && CF_R2_SECRET_ACCESS_KEY);
