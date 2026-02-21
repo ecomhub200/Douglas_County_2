@@ -1,0 +1,13 @@
+{
+  "_note": "Default stub file - prevents 404 errors. Overridden by entrypoint.sh in Docker with real values from environment variables.",
+  "mapbox": {
+    "accessToken": ""
+  },
+  "google": {
+    "mapsApiKey": ""
+  },
+  "mapillary": {
+    "accessToken": ""
+  },
+  "firebase": {}
+}
