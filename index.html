@@ -361,83 +361,6 @@
       line-height: 1.6;
     }
 
-    /* Pricing Preview */
-    .pricing-preview {
-      padding: 5rem 1.5rem;
-    }
-
-    .pricing-preview-header {
-      text-align: center;
-      max-width: 700px;
-      margin: 0 auto 3rem;
-    }
-
-    .pricing-preview-header h2 {
-      font-size: 2.25rem;
-      color: var(--white);
-      margin-bottom: 1rem;
-    }
-
-    .pricing-preview-header p {
-      color: var(--text-dark);
-      font-size: 1.125rem;
-    }
-
-    .pricing-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      max-width: 1000px;
-      margin: 0 auto;
-    }
-
-    .pricing-card {
-      padding: 2rem;
-      text-align: center;
-    }
-
-    .pricing-card.featured {
-      border-color: var(--primary);
-      position: relative;
-    }
-
-    .pricing-card.featured::before {
-      content: 'Most Popular';
-      position: absolute;
-      top: -12px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--primary-gradient);
-      color: white;
-      padding: 0.25rem 1rem;
-      border-radius: 50px;
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-
-    .pricing-card h3 {
-      color: var(--white);
-      font-size: 1.25rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .pricing-card .price {
-      font-size: 2.5rem;
-      font-weight: 700;
-      color: var(--white);
-    }
-
-    .pricing-card .price span {
-      font-size: 1rem;
-      font-weight: 400;
-      color: var(--text-dark);
-    }
-
-    .pricing-card .description {
-      color: var(--text-dark);
-      margin: 1rem 0;
-      font-size: 0.95rem;
-    }
 
     /* CTA Section */
     .cta {
@@ -1551,7 +1474,6 @@
     .how-it-works,
     .roi-calculator-section,
     .stats,
-    .pricing-preview,
     .cta {
       content-visibility: auto;
       contain-intrinsic-size: auto 600px;
@@ -2312,40 +2234,6 @@
     </div>
   </section>
 
-  <!-- Pricing Preview -->
-  <section class="pricing-preview">
-    <div class="pricing-preview-header">
-      <h2>Simple <span class="gradient-text">Pricing</span></h2>
-      <p>Full access to all analysis tools. No feature limits. Optional smart assistants included.</p>
-    </div>
-
-    <div class="pricing-cards">
-      <div class="card-dark pricing-card">
-        <h3>Free Trial</h3>
-        <div class="price">$0</div>
-        <p class="description">14 days full access<br>All core features included</p>
-        <a href="./login/" class="btn btn-outline-light" style="width: 100%;">Start Free</a>
-      </div>
-
-      <div class="card-dark pricing-card featured">
-        <h3>Individual</h3>
-        <div class="price">$150<span>/mo</span></div>
-        <p class="description">1 user<br>100 smart assistant queries/mo</p>
-        <a href="./login/" class="btn btn-gradient" style="width: 100%;">Get Started</a>
-      </div>
-
-      <div class="card-dark pricing-card">
-        <h3>Team</h3>
-        <div class="price">$500<span>/mo</span></div>
-        <p class="description">Up to 5 users<br>500 smart assistant queries/mo</p>
-        <a href="./login/" class="btn btn-outline-light" style="width: 100%;">Get Started</a>
-      </div>
-    </div>
-
-    <p style="text-align: center; margin-top: 2rem;">
-      <a href="./pricing.html" class="form-link">View full pricing details →</a>
-    </p>
-  </section>
 
   <!-- CTA Section -->
   <section class="cta">
@@ -2590,9 +2478,9 @@
       // Observe elements
       const animatedElements = document.querySelectorAll(
         '.animate-on-scroll, .stagger-children, .reveal, .stagger, ' +
-        '.features-header, .pricing-preview-header, .case-studies-header, ' +
+        '.features-header, .case-studies-header, ' +
         '.how-it-works-header, .demo-video-header, .roi-calculator-header, ' +
-        '.features-grid, .pricing-cards, .case-studies-grid, .steps-container, ' +
+        '.features-grid, .case-studies-grid, .steps-container, ' +
         '.stats-grid'
       );
 
@@ -2703,7 +2591,7 @@
     // Add stagger-children class to grids
     function initStaggeredGrids() {
       const grids = document.querySelectorAll(
-        '.features-grid, .pricing-cards, .case-studies-grid, .steps-container, .trusted-logos'
+        '.features-grid, .case-studies-grid, .steps-container, .trusted-logos'
       );
       grids.forEach(grid => {
         grid.classList.add('stagger-children');
