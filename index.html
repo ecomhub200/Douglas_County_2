@@ -2099,7 +2099,7 @@
       <div class="card-dark case-study-card">
         <div class="case-study-image">
           <!-- TODO: Add screenshot showing the 60 curve locations on map -->
-          <img src="data/images/case-study-henrico.png" alt="Henrico County curve analysis heat map showing 60 identified locations" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <img src="data/images/case-study-henrico.png" alt="Henrico County curve analysis heat map showing 60 identified locations" loading="lazy" decoding="async" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
           <div class="case-study-image-placeholder">
             <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
             <span>case-study-henrico.png</span>
@@ -2134,7 +2134,7 @@
       <div class="card-dark case-study-card">
         <div class="case-study-image">
           <!-- TODO: Add screenshot showing intersection analysis map -->
-          <img src="data/images/case-study-richmond.png" alt="City of Richmond intersection analysis showing 142 signalized locations" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <img src="data/images/case-study-richmond.png" alt="City of Richmond intersection analysis showing 142 signalized locations" loading="lazy" decoding="async" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
           <div class="case-study-image-placeholder">
             <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
             <span>case-study-richmond.png</span>
@@ -2169,7 +2169,7 @@
       <div class="card-dark case-study-card">
         <div class="case-study-image">
           <!-- TODO: Add screenshot showing pedestrian crash heat map -->
-          <img src="data/images/case-study-vdot.png" alt="VDOT Route 1 pedestrian crash heat map with time-of-day analysis" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <img src="data/images/case-study-vdot.png" alt="VDOT Route 1 pedestrian crash heat map with time-of-day analysis" loading="lazy" decoding="async" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
           <div class="case-study-image-placeholder">
             <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
             <span>case-study-vdot.png</span>
@@ -2660,23 +2660,24 @@
       });
     }
 
-    // Navigation scroll effect
+    // Navigation scroll effect (throttled via rAF)
     function initNavScrollEffect() {
       const nav = document.querySelector('.nav');
       if (!nav) return;
 
-      let lastScroll = 0;
-
+      let navTicking = false;
       window.addEventListener('scroll', () => {
-        const currentScroll = window.pageYOffset;
-
-        if (currentScroll > 50) {
-          nav.classList.add('scrolled');
-        } else {
-          nav.classList.remove('scrolled');
+        if (!navTicking) {
+          navTicking = true;
+          requestAnimationFrame(() => {
+            if (window.pageYOffset > 50) {
+              nav.classList.add('scrolled');
+            } else {
+              nav.classList.remove('scrolled');
+            }
+            navTicking = false;
+          });
         }
-
-        lastScroll = currentScroll;
       }, { passive: true });
     }
 
@@ -2709,17 +2710,23 @@
       });
     }
 
-    // Scroll Progress Bar
+    // Scroll Progress Bar (throttled via rAF)
     function initScrollProgress() {
       const scrollProgress = document.getElementById('scrollProgress');
       if (!scrollProgress) return;
 
+      let progressTicking = false;
       window.addEventListener('scroll', () => {
-        const scrollTop = document.documentElement.scrollTop;
-        const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-        const progress = (scrollTop / scrollHeight) * 100;
-        scrollProgress.style.width = progress + '%';
-      });
+        if (!progressTicking) {
+          progressTicking = true;
+          requestAnimationFrame(() => {
+            const scrollTop = document.documentElement.scrollTop;
+            const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            scrollProgress.style.width = (scrollTop / scrollHeight) * 100 + '%';
+            progressTicking = false;
+          });
+        }
+      }, { passive: true });
     }
 
     // Initialize all animations on DOM ready

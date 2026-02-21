@@ -992,14 +992,20 @@
       });
     });
 
-    // Scroll Progress Bar
+    // Scroll Progress Bar (throttled via rAF)
     const scrollProgress = document.getElementById('scrollProgress');
+    let progressTicking = false;
     window.addEventListener('scroll', () => {
-      const scrollTop = document.documentElement.scrollTop;
-      const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-      const progress = (scrollTop / scrollHeight) * 100;
-      scrollProgress.style.width = progress + '%';
-    });
+      if (!progressTicking) {
+        progressTicking = true;
+        requestAnimationFrame(() => {
+          const scrollTop = document.documentElement.scrollTop;
+          const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+          scrollProgress.style.width = (scrollTop / scrollHeight) * 100 + '%';
+          progressTicking = false;
+        });
+      }
+    }, { passive: true });
 
     // Scroll-triggered animations
     const observerOptions = {
@@ -1023,15 +1029,22 @@
       observer.observe(el);
     });
 
-    // Smooth nav scroll effect
+    // Smooth nav scroll effect (throttled via rAF)
     const nav = document.querySelector('.nav');
+    let navTicking = false;
     window.addEventListener('scroll', () => {
-      if (window.scrollY > 50) {
-        nav.classList.add('scrolled');
-      } else {
-        nav.classList.remove('scrolled');
+      if (!navTicking) {
+        navTicking = true;
+        requestAnimationFrame(() => {
+          if (window.scrollY > 50) {
+            nav.classList.add('scrolled');
+          } else {
+            nav.classList.remove('scrolled');
+          }
+          navTicking = false;
+        });
       }
-    });
+    }, { passive: true });
   </script>
 </body>
 </html>
