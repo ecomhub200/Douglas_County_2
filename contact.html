@@ -6,11 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Contact Us - CRASH LENS | Get in Touch</title>
   <meta name="description" content="Contact CRASH LENS for advanced traffic crash analysis, custom solutions, and training services for transportation agencies.">
-  <style>html,body{background-color:#030712;color:#94a3b8}</style>
-  <!-- Google Fonts: Inter -->
+  <style>html,body{background-color:#030712;color:#94a3b8}
+  .faq-section,.cta-section{content-visibility:auto;contain-intrinsic-size:auto 600px}</style>
+  <!-- Google Fonts: Inter (non-blocking) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="assets/css/styles.css">
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="data/images/favicon.svg">
@@ -530,8 +532,6 @@
     <div class="particle"></div>
     <div class="particle"></div>
     <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
   </div>
 
   <!-- Navigation -->
@@ -922,14 +922,20 @@
       }
     }
 
-    // Scroll Progress Bar
+    // Scroll Progress Bar (throttled via rAF)
     const scrollProgress = document.getElementById('scrollProgress');
+    let progressTicking = false;
     window.addEventListener('scroll', () => {
-      const scrollTop = document.documentElement.scrollTop;
-      const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-      const progress = (scrollTop / scrollHeight) * 100;
-      scrollProgress.style.width = progress + '%';
-    });
+      if (!progressTicking) {
+        progressTicking = true;
+        requestAnimationFrame(() => {
+          const scrollTop = document.documentElement.scrollTop;
+          const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+          scrollProgress.style.width = (scrollTop / scrollHeight) * 100 + '%';
+          progressTicking = false;
+        });
+      }
+    }, { passive: true });
 
     // Scroll-triggered animations
     const observerOptions = {
@@ -956,15 +962,22 @@
       observer.observe(el);
     });
 
-    // Smooth nav scroll effect
+    // Smooth nav scroll effect (throttled via rAF)
     const nav = document.querySelector('.nav');
+    let navTicking = false;
     window.addEventListener('scroll', () => {
-      if (window.scrollY > 50) {
-        nav.classList.add('scrolled');
-      } else {
-        nav.classList.remove('scrolled');
+      if (!navTicking) {
+        navTicking = true;
+        requestAnimationFrame(() => {
+          if (window.scrollY > 50) {
+            nav.classList.add('scrolled');
+          } else {
+            nav.classList.remove('scrolled');
+          }
+          navTicking = false;
+        });
       }
-    });
+    }, { passive: true });
   </script>
 </body>
 </html>
