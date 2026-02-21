@@ -18,8 +18,11 @@
 .env*.local
 *.env
 
-# API Keys configuration (create these manually)
-config/api-keys.json
+# API Keys configuration
+# The default stub (with empty values) is committed to prevent 404 errors.
+# entrypoint.sh overwrites it with real values from env vars in Docker.
+# To use local overrides, edit config/api-keys.json (changes won't be staged
+# unless you force-add, since the file is tracked with default content).
 config/supabase-config.json
 config/stripe-config.json
 config/firebase-secrets.json
