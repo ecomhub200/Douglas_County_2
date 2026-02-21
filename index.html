@@ -1034,21 +1034,55 @@
     }
 
     .steps-container {
-      max-width: 1000px;
+      max-width: 1100px;
       margin: 0 auto;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 2rem;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      align-items: start;
     }
 
     .step {
       text-align: center;
       position: relative;
+      padding: 1.5rem 1rem;
+      border-radius: 16px;
+      background: rgba(30, 64, 175, 0.04);
+      border: 1px solid rgba(59, 130, 246, 0.08);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    .step-number {
-      width: 48px;
-      height: 48px;
+    .step:hover {
+      background: rgba(30, 64, 175, 0.1);
+      border-color: rgba(59, 130, 246, 0.2);
+      transform: translateY(-6px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .step-icon-wrapper {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      margin: 0 auto 1.25rem;
+    }
+
+    .step-icon {
+      width: 96px;
+      height: 96px;
+      display: block;
+      transition: transform 0.3s ease;
+    }
+
+    .step:hover .step-icon {
+      transform: scale(1.08);
+    }
+
+    .step-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 26px;
+      height: 26px;
       background: var(--primary-gradient);
       border-radius: 50%;
       display: flex;
@@ -1056,39 +1090,70 @@
       justify-content: center;
       color: white;
       font-weight: 700;
-      font-size: 1.25rem;
-      margin: 0 auto 1rem;
+      font-size: 0.8rem;
+      z-index: 2;
+      box-shadow: 0 2px 8px rgba(30, 64, 175, 0.4);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .step:hover .step-badge {
+      transform: scale(1.15);
+      box-shadow: 0 4px 16px rgba(30, 64, 175, 0.6);
+    }
+
+    .step-connector {
+      position: absolute;
+      top: 56px;
+      right: -1.25rem;
+      width: 2.5rem;
+      height: 20px;
+      z-index: 1;
+      opacity: 0.6;
+      transition: opacity 0.3s ease;
+    }
+
+    .step:hover .step-connector {
+      opacity: 1;
+    }
+
+    .step:last-child .step-connector {
+      display: none;
     }
 
     .step h3 {
       color: var(--white);
-      font-size: 1.125rem;
+      font-size: 1.1rem;
       margin-bottom: 0.5rem;
+      font-weight: 600;
     }
 
     .step p {
       color: var(--text-dark);
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       line-height: 1.6;
+      max-width: 220px;
+      margin: 0 auto;
     }
 
+    /* Remove the old ::after connector line */
     .step::after {
-      content: '';
-      position: absolute;
-      top: 24px;
-      left: calc(50% + 40px);
-      width: calc(100% - 80px);
-      height: 2px;
-      background: linear-gradient(90deg, var(--primary), transparent);
-    }
-
-    .step:last-child::after {
       display: none;
     }
 
-    @media (max-width: 768px) {
-      .step::after {
+    @media (max-width: 900px) {
+      .steps-container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+      }
+      .step-connector {
         display: none;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .steps-container {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
       }
     }
 
@@ -2206,32 +2271,126 @@
   <section class="how-it-works">
     <div class="how-it-works-header">
       <h2>How It <span class="gradient-text">Works</span></h2>
-      <p>From data upload to HSIP application in four simple steps</p>
+      <p>From crash diagnosis to proven safety outcomes in four steps</p>
     </div>
 
     <div class="steps-container">
+      <!-- Step 1: Diagnose the Problem -->
       <div class="step">
-        <div class="step-number">1</div>
-        <h3>Upload Data</h3>
-        <p>Import Virginia crash data directly from TREDS or upload your own CSV/Excel files</p>
+        <div class="step-icon-wrapper">
+          <div class="step-badge">1</div>
+          <svg class="step-icon" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Magnifying glass with crash pattern -->
+            <circle cx="34" cy="34" r="20" stroke="url(#step1grad)" stroke-width="3" fill="rgba(59,130,246,0.08)"/>
+            <line x1="48.5" y1="48.5" x2="65" y2="65" stroke="url(#step1grad)" stroke-width="3.5" stroke-linecap="round"/>
+            <!-- Crash cluster dots inside lens -->
+            <circle cx="28" cy="28" r="3" fill="#ef4444" opacity="0.9"/>
+            <circle cx="38" cy="30" r="2.5" fill="#f59e0b" opacity="0.9"/>
+            <circle cx="32" cy="38" r="2" fill="#ef4444" opacity="0.7"/>
+            <circle cx="40" cy="24" r="1.8" fill="#f59e0b" opacity="0.6"/>
+            <circle cx="25" cy="35" r="1.5" fill="#ef4444" opacity="0.5"/>
+            <!-- Pulse rings -->
+            <circle cx="28" cy="28" r="6" stroke="#ef4444" stroke-width="0.8" fill="none" opacity="0.3"/>
+            <circle cx="28" cy="28" r="10" stroke="#ef4444" stroke-width="0.5" fill="none" opacity="0.15"/>
+            <defs><linearGradient id="step1grad" x1="20" y1="20" x2="65" y2="65"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#60a5fa"/></linearGradient></defs>
+          </svg>
+        </div>
+        <div class="step-connector">
+          <svg viewBox="0 0 60 20" fill="none"><path d="M0 10 H45 L40 5 M45 10 L40 15" stroke="url(#connGrad1)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="connGrad1" x1="0" y1="10" x2="60" y2="10"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#3b82f6" stop-opacity="0.2"/></linearGradient></defs></svg>
+        </div>
+        <h3>Diagnose the Problem</h3>
+        <p>AI analyzes crash patterns, identifies high-risk locations, and uncovers contributing factors across your jurisdiction</p>
       </div>
 
+      <!-- Step 2: Find the Solution -->
       <div class="step">
-        <div class="step-number">2</div>
-        <h3>Filter & Analyze</h3>
-        <p>Apply multi-criteria filters by location, severity, collision type, and contributing factors</p>
+        <div class="step-icon-wrapper">
+          <div class="step-badge">2</div>
+          <svg class="step-icon" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Lightbulb body -->
+            <path d="M40 12 C28 12 20 22 20 32 C20 39 24 44 28 48 L28 54 L52 54 L52 48 C56 44 60 39 60 32 C60 22 52 12 40 12Z" stroke="url(#step2grad)" stroke-width="2.5" fill="rgba(59,130,246,0.08)"/>
+            <!-- Filament / brain pattern inside -->
+            <path d="M32 30 Q36 24 40 30 Q44 36 48 30" stroke="#60a5fa" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <path d="M34 38 Q38 32 42 38 Q46 44 48 38" stroke="#3b82f6" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+            <!-- Base -->
+            <rect x="30" y="56" width="20" height="3" rx="1.5" fill="#60a5fa" opacity="0.6"/>
+            <rect x="32" y="61" width="16" height="3" rx="1.5" fill="#60a5fa" opacity="0.4"/>
+            <!-- Rays -->
+            <line x1="40" y1="4" x2="40" y2="8" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+            <line x1="14" y1="32" x2="18" y2="32" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+            <line x1="62" y1="32" x2="66" y2="32" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+            <line x1="20" y1="16" x2="23" y2="19" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+            <line x1="60" y1="16" x2="57" y2="19" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+            <!-- CMF badge -->
+            <rect x="50" y="8" width="22" height="14" rx="4" fill="#1e40af" stroke="#3b82f6" stroke-width="1"/>
+            <text x="61" y="18" text-anchor="middle" fill="white" font-size="7" font-weight="700" font-family="system-ui">CMF</text>
+            <defs><linearGradient id="step2grad" x1="20" y1="12" x2="60" y2="64"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#60a5fa"/></linearGradient></defs>
+          </svg>
+        </div>
+        <div class="step-connector">
+          <svg viewBox="0 0 60 20" fill="none"><path d="M0 10 H45 L40 5 M45 10 L40 15" stroke="url(#connGrad2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="connGrad2" x1="0" y1="10" x2="60" y2="10"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#3b82f6" stop-opacity="0.2"/></linearGradient></defs></svg>
+        </div>
+        <h3>Find the Solution</h3>
+        <p>Get evidence-based countermeasure recommendations with Crash Modification Factors tailored to each location's crash profile</p>
       </div>
 
+      <!-- Step 3: Apply for Grant -->
       <div class="step">
-        <div class="step-number">3</div>
-        <h3>Identify Patterns</h3>
-        <p>Use heat maps, charts, and advanced analytics to find crash patterns and high-risk locations</p>
+        <div class="step-icon-wrapper">
+          <div class="step-badge">3</div>
+          <svg class="step-icon" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Document -->
+            <rect x="16" y="8" width="40" height="54" rx="4" stroke="url(#step3grad)" stroke-width="2.5" fill="rgba(59,130,246,0.08)"/>
+            <!-- Document lines -->
+            <line x1="24" y1="20" x2="48" y2="20" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+            <line x1="24" y1="27" x2="44" y2="27" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+            <line x1="24" y1="34" x2="46" y2="34" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+            <line x1="24" y1="41" x2="40" y2="41" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+            <!-- Dollar sign circle -->
+            <circle cx="56" cy="50" r="16" fill="#1e40af" stroke="#3b82f6" stroke-width="2"/>
+            <text x="56" y="56" text-anchor="middle" fill="white" font-size="20" font-weight="700" font-family="system-ui">$</text>
+            <!-- Checkmark on document -->
+            <path d="M28 48 L33 53 L42 44" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Sparkle -->
+            <path d="M62 24 L64 28 L68 26 L64 30 L66 34 L62 30 L58 34 L60 30 L56 26 L60 28Z" fill="#fbbf24" opacity="0.6"/>
+            <defs><linearGradient id="step3grad" x1="16" y1="8" x2="56" y2="62"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#60a5fa"/></linearGradient></defs>
+          </svg>
+        </div>
+        <div class="step-connector">
+          <svg viewBox="0 0 60 20" fill="none"><path d="M0 10 H45 L40 5 M45 10 L40 15" stroke="url(#connGrad3)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="connGrad3" x1="0" y1="10" x2="60" y2="10"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#3b82f6" stop-opacity="0.2"/></linearGradient></defs></svg>
+        </div>
+        <h3>Apply for Grant</h3>
+        <p>Generate HSIP-ready grant applications with auto-calculated benefit-cost ratios and compelling safety justification</p>
       </div>
 
+      <!-- Step 4: Before & After Study -->
       <div class="step">
-        <div class="step-number">4</div>
-        <h3>Generate Reports</h3>
-        <p>Export professional reports for HSIP applications, stakeholder meetings, and grant justification</p>
+        <div class="step-icon-wrapper">
+          <div class="step-badge">4</div>
+          <svg class="step-icon" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Chart frame -->
+            <line x1="14" y1="66" x2="14" y2="12" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+            <line x1="14" y1="66" x2="70" y2="66" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+            <!-- Before bars (red/orange, taller) -->
+            <rect x="20" y="24" width="8" height="42" rx="2" fill="#ef4444" opacity="0.7"/>
+            <rect x="32" y="32" width="8" height="34" rx="2" fill="#ef4444" opacity="0.6"/>
+            <!-- After bars (green, shorter = improvement) -->
+            <rect x="46" y="44" width="8" height="22" rx="2" fill="#22c55e" opacity="0.7"/>
+            <rect x="58" y="48" width="8" height="18" rx="2" fill="#22c55e" opacity="0.8"/>
+            <!-- Trend arrow going down (improvement) -->
+            <path d="M24 22 L62 42" stroke="url(#step4grad)" stroke-width="2" stroke-dasharray="4 2" stroke-linecap="round"/>
+            <polygon points="64,44 58,40 60,46" fill="#22c55e" opacity="0.8"/>
+            <!-- Labels -->
+            <text x="28" y="74" text-anchor="middle" fill="#94a3b8" font-size="7" font-family="system-ui">Before</text>
+            <text x="58" y="74" text-anchor="middle" fill="#94a3b8" font-size="7" font-family="system-ui">After</text>
+            <!-- Percentage badge -->
+            <rect x="44" y="8" width="28" height="16" rx="5" fill="#065f46" stroke="#22c55e" stroke-width="1"/>
+            <text x="58" y="19" text-anchor="middle" fill="#22c55e" font-size="8" font-weight="700" font-family="system-ui">-42%</text>
+            <defs><linearGradient id="step4grad" x1="24" y1="22" x2="64" y2="44"><stop stop-color="#ef4444"/><stop offset="1" stop-color="#22c55e"/></linearGradient></defs>
+          </svg>
+        </div>
+        <h3>Before & After Study</h3>
+        <p>Measure countermeasure effectiveness with statistical before-and-after analysis to validate your safety investments</p>
       </div>
     </div>
   </section>
