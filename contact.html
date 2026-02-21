@@ -1,108 +1,157 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background-color:#030712;color-scheme:dark">
 <head>
   <meta charset="UTF-8">
+  <meta name="color-scheme" content="dark">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Contact Us - CRASH LENS</title>
-  <style>html,body{background-color:#0a1a2e;color:#adbdcc}</style>
+  <title>Contact Us - CRASH LENS | Get in Touch</title>
+  <meta name="description" content="Contact CRASH LENS for AI-powered traffic crash analysis, custom solutions, and training services for Virginia transportation agencies.">
+  <style>html,body{background-color:#030712;color:#94a3b8}</style>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/styles.css">
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="data/images/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="data/images/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="data/images/apple-touch-icon.png">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1e3a5f">
+  <meta name="theme-color" content="#030712">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Crash Lens">
-  <meta name="description" content="Contact CRASH LENS for AI-powered traffic crash analysis, custom solutions, and training services.">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Contact Us - CRASH LENS">
+  <meta property="og:description" content="Contact CRASH LENS for crash analysis solutions.">
+  <meta property="og:image" content="https://crashlens.aicreatesai.com/data/images/og-image.png">
+  <meta property="og:url" content="https://crashlens.aicreatesai.com/contact.html">
   <style>
     .contact-hero {
       padding: 8rem 0 4rem;
       text-align: center;
       position: relative;
       overflow: hidden;
+      background: var(--gradient-hero);
     }
 
     .contact-hero h1 {
       font-size: 2.5rem;
-      color: var(--white);
+      font-weight: 800;
+      color: var(--text-primary);
       margin-bottom: 1rem;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
     }
 
     .contact-hero p {
       font-size: 1.125rem;
-      color: var(--text-dark);
+      color: var(--text-secondary);
       max-width: 600px;
       margin: 0 auto;
+      line-height: 1.75;
+    }
+
+    /* Contact Info Cards - 3 cards above form */
+    .contact-info-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .contact-info-cards {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+    }
+
+    .contact-info-card {
+      text-align: center;
+      padding: 2rem 1.5rem;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      border-radius: 16px;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .contact-info-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(37, 99, 235, 0.3);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 30px rgba(37, 99, 235, 0.05);
+    }
+
+    .contact-info-card-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+      transition: box-shadow 0.3s ease;
+    }
+
+    .contact-info-card:hover .contact-info-card-icon {
+      box-shadow: 0 0 20px rgba(37, 99, 235, 0.3);
+    }
+
+    .contact-info-card-icon svg {
+      width: 28px;
+      height: 28px;
+      color: white;
+    }
+
+    .contact-info-card-icon.email-icon {
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+    }
+
+    .contact-info-card-icon.hours-icon {
+      background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+    }
+
+    .contact-info-card-icon.support-icon {
+      background: linear-gradient(135deg, #06b6d4, #22d3ee);
+    }
+
+    .contact-info-card h3 {
+      color: var(--text-primary);
+      font-size: 1.125rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .contact-info-card p {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      line-height: 1.6;
+    }
+
+    .contact-info-card a {
+      color: var(--primary);
+      transition: color 0.2s ease;
+    }
+
+    .contact-info-card a:hover {
+      color: #60a5fa;
+      text-decoration: underline;
     }
 
     .contact-section {
-      max-width: 1100px;
+      max-width: 900px;
       margin: 0 auto;
-      padding: 2rem 1.5rem 4rem;
+      padding: 0 1.5rem 4rem;
     }
 
     .contact-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 3rem;
-    }
-
-    @media (max-width: 768px) {
-      .contact-grid {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-      }
-    }
-
-    /* Contact Info Card */
-    .contact-info {
-      padding: 2rem;
-      background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
-      border: 1px solid var(--border-dark);
-      border-radius: var(--radius-lg);
-    }
-
-    .contact-info h2 {
-      color: var(--white);
-      font-size: 1.5rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .contact-info-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .contact-info-item svg {
-      width: 24px;
-      height: 24px;
-      color: var(--primary);
-      flex-shrink: 0;
-      margin-top: 2px;
-    }
-
-    .contact-info-item h3 {
-      color: var(--white);
-      font-size: 1rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .contact-info-item p {
-      color: var(--text-dark);
-      font-size: 0.875rem;
-      line-height: 1.5;
-    }
-
-    .contact-info-item a {
-      color: var(--primary);
-    }
-
-    .contact-info-item a:hover {
-      text-decoration: underline;
     }
 
     /* Services Section */
@@ -130,7 +179,7 @@
     }
 
     .service-item:hover {
-      background: rgba(30, 64, 175, 0.2);
+      background: rgba(37, 99, 235, 0.15);
     }
 
     .service-item svg {
@@ -155,16 +204,34 @@
 
     /* Contact Form */
     .contact-form-container {
-      background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
-      border: 1px solid var(--border-dark);
-      border-radius: var(--radius-lg);
-      padding: 2rem;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      border-radius: 16px;
+      padding: 2.5rem;
     }
 
     .contact-form-container h2 {
-      color: var(--white);
+      color: var(--text-primary);
       font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .form-response-time {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
       margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .form-response-time svg {
+      width: 16px;
+      height: 16px;
+      color: #10b981;
+      flex-shrink: 0;
     }
 
     .form-group {
@@ -197,7 +264,7 @@
     .form-control:focus {
       outline: none;
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.2);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
     }
 
     .form-control::placeholder {
@@ -234,25 +301,27 @@
     .submit-btn {
       width: 100%;
       padding: 1rem;
-      background: var(--primary-gradient);
+      background: var(--gradient-cta, linear-gradient(135deg, #2563eb 0%, #7c3aed 100%));
       color: var(--white);
       border: none;
-      border-radius: var(--radius);
+      border-radius: 12px;
       font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
     }
 
     .submit-btn:hover {
       transform: translateY(-2px);
-      box-shadow: var(--shadow-glow);
+      box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
     }
 
     .submit-btn:disabled {
       opacity: 0.7;
       cursor: not-allowed;
       transform: none;
+      box-shadow: none;
     }
 
     .form-note {
@@ -343,7 +412,7 @@
     }
 
     .faq-item:hover {
-      border-color: rgba(30, 64, 175, 0.5);
+      border-color: rgba(37, 99, 235, 0.3);
     }
 
     .faq-question {
@@ -424,82 +493,14 @@
       transform: translateY(-2px);
     }
 
-    /* Footer */
-    .footer {
-      background: var(--bg-dark-secondary);
-      border-top: 1px solid var(--border-dark);
-      padding: 3rem 0 1.5rem;
-    }
-
-    .footer-content {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      gap: 2rem;
-      margin-bottom: 2rem;
-      max-width: 1200px;
-      margin-left: auto;
-      margin-right: auto;
-      padding: 0 1.5rem;
-    }
-
-    .footer-brand {
-      max-width: 250px;
-    }
-
-    .footer-brand h3 {
-      color: var(--white);
-      font-size: 1.25rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .footer-brand p {
-      color: var(--text-dark);
-      font-size: 0.875rem;
-    }
-
-    .footer-links h4 {
-      color: var(--white);
-      font-size: 0.875rem;
-      margin-bottom: 1rem;
-    }
-
-    .footer-links ul {
-      list-style: none;
-    }
-
-    .footer-links li {
-      margin-bottom: 0.5rem;
-    }
-
-    .footer-links a {
-      color: var(--text-dark);
-      font-size: 0.875rem;
-      transition: color 0.2s ease;
-    }
-
-    .footer-links a:hover {
-      color: var(--white);
-    }
-
-    .footer-bottom {
-      text-align: center;
-      padding-top: 1.5rem;
-      border-top: 1px solid var(--border-dark);
-      color: var(--text-dark);
-      font-size: 0.875rem;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding-left: 1.5rem;
-      padding-right: 1.5rem;
-    }
+    /* Footer styles handled by shared styles.css */
 
     /* Glow effect */
     .glow-primary {
       position: absolute;
       width: 400px;
       height: 400px;
-      background: radial-gradient(circle, rgba(30, 64, 175, 0.3) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(37, 99, 235, 0.3) 0%, transparent 70%);
       border-radius: 50%;
       pointer-events: none;
       z-index: 0;
@@ -548,13 +549,17 @@
       </div>
       <div class="nav-actions">
         <a href="./login/" class="nav-link hide-mobile">Sign In</a>
-        <a href="./login/" class="btn btn-gradient">Start Free Trial</a>
+        <a href="./login/" class="btn btn-cta" style="padding:0.625rem 1.5rem;font-size:0.875rem;">Start Free Trial</a>
       </div>
     </div>
   </nav>
 
+  <!-- Skip to content -->
+  <a href="#contact-content" class="skip-to-content">Skip to main content</a>
+
   <!-- Contact Hero -->
-  <section class="contact-hero">
+  <section class="contact-hero" id="contact-content">
+    <div class="hero-grid-pattern"></div>
     <div class="blob blob-1" style="top: -20%; left: 10%; opacity: 0.15;"></div>
     <div class="blob blob-2" style="top: 10%; right: -10%; opacity: 0.1;"></div>
     <div class="container">
@@ -564,96 +569,51 @@
     </div>
   </section>
 
+  <!-- Contact Info Cards -->
+  <section class="contact-info-cards">
+    <div class="contact-info-card reveal">
+      <div class="contact-info-card-icon email-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+          <polyline points="22,6 12,13 2,6"/>
+        </svg>
+      </div>
+      <h3>Email Us</h3>
+      <p><a href="mailto:support@crashlens.aicreatesai.com">support@crashlens.aicreatesai.com</a></p>
+    </div>
+
+    <div class="contact-info-card reveal">
+      <div class="contact-info-card-icon hours-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <h3>Business Hours</h3>
+      <p>Mon-Fri, 9AM - 5PM EST</p>
+    </div>
+
+    <div class="contact-info-card reveal">
+      <div class="contact-info-card-icon support-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+        </svg>
+      </div>
+      <h3>Technical Support</h3>
+      <p>Visit our <a href="./resources.html">Resources</a> page</p>
+    </div>
+  </section>
+
   <!-- Contact Section -->
   <section class="contact-section">
     <div class="contact-grid">
-      <!-- Contact Information -->
-      <div class="contact-info glass-card animate-on-scroll from-left">
-        <h2>Contact Information</h2>
-
-        <div class="contact-info-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-            <polyline points="22,6 12,13 2,6"/>
-          </svg>
-          <div>
-            <h3>Email Us</h3>
-            <p><a href="mailto:support@crashlens.aicreatesai.com">support@crashlens.aicreatesai.com</a></p>
-            <p>We typically respond within 24 hours</p>
-          </div>
-        </div>
-
-        <div class="contact-info-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-          <div>
-            <h3>Business Hours</h3>
-            <p>Monday - Friday</p>
-            <p>9:00 AM - 5:00 PM EST</p>
-          </div>
-        </div>
-
-        <div class="contact-info-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-          </svg>
-          <div>
-            <h3>Support</h3>
-            <p>For technical issues, check our <a href="./resources.html">Resources</a> page or email support</p>
-          </div>
-        </div>
-
-        <!-- Services Section -->
-        <div class="services-section">
-          <h3>Our Services</h3>
-
-          <div class="service-item">
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
-            </svg>
-            <div class="service-item-content">
-              <h4>AI Data Analytics</h4>
-              <p>Advanced AI-powered crash data analysis with actionable insights and recommendations.</p>
-            </div>
-          </div>
-
-          <div class="service-item">
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
-            </svg>
-            <div class="service-item-content">
-              <h4>Agency Customization</h4>
-              <p>Tailored CRASH LENS configurations for your agency's specific workflows and requirements.</p>
-            </div>
-          </div>
-
-          <div class="service-item">
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/>
-            </svg>
-            <div class="service-item-content">
-              <h4>AI Training</h4>
-              <p>Comprehensive training for your team on AI-powered crash analysis and safety tools.</p>
-            </div>
-          </div>
-
-          <div class="service-item">
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-            </svg>
-            <div class="service-item-content">
-              <h4>Custom Data Solutions</h4>
-              <p>Integration with your existing data systems and custom reporting based on your needs.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Contact Form -->
-      <div class="contact-form-container glass-card animate-on-scroll from-right">
+      <div class="contact-form-container animate-on-scroll">
         <h2>Send Us a Message</h2>
+        <p class="form-response-time">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+          We typically respond within 4 business hours
+        </p>
 
         <!-- Form with Formspree -->
         <form id="contactForm" action="https://formspree.io/f/mwveovvd" method="POST">
@@ -724,6 +684,50 @@
           <p>Your message has been received. We'll get back to you within 24 hours.</p>
           <a href="./" class="btn btn-outline-light">Back to Home</a>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Services Section -->
+  <section style="max-width: 1100px; margin: 0 auto; padding: 0 1.5rem 4rem;">
+    <h2 style="color: var(--text-primary); font-size: 1.75rem; text-align: center; margin-bottom: 0.5rem;">Our Services</h2>
+    <p style="color: var(--text-secondary); text-align: center; margin-bottom: 2rem;">Comprehensive solutions for traffic safety professionals</p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem;">
+      <div class="contact-info-card reveal">
+        <div class="contact-info-card-icon" style="background: linear-gradient(135deg, #f59e0b, #eab308);">
+          <svg viewBox="0 0 20 20" fill="currentColor" style="width:24px;height:24px;color:white;">
+            <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <h3>AI Data Analytics</h3>
+        <p>Advanced AI-powered crash data analysis with actionable insights.</p>
+      </div>
+      <div class="contact-info-card reveal">
+        <div class="contact-info-card-icon" style="background: linear-gradient(135deg, #2563eb, #3b82f6);">
+          <svg viewBox="0 0 20 20" fill="currentColor" style="width:24px;height:24px;color:white;">
+            <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <h3>Agency Customization</h3>
+        <p>Tailored configurations for your agency's specific workflows.</p>
+      </div>
+      <div class="contact-info-card reveal">
+        <div class="contact-info-card-icon" style="background: linear-gradient(135deg, #059669, #10b981);">
+          <svg viewBox="0 0 20 20" fill="currentColor" style="width:24px;height:24px;color:white;">
+            <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762z"/>
+          </svg>
+        </div>
+        <h3>AI Training</h3>
+        <p>Comprehensive training for your team on crash analysis tools.</p>
+      </div>
+      <div class="contact-info-card reveal">
+        <div class="contact-info-card-icon" style="background: linear-gradient(135deg, #7c3aed, #8b5cf6);">
+          <svg viewBox="0 0 20 20" fill="currentColor" style="width:24px;height:24px;color:white;">
+            <path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <h3>Custom Data Solutions</h3>
+        <p>Integration with your existing data systems and custom reporting.</p>
       </div>
     </div>
   </section>
@@ -814,45 +818,51 @@
       <h2>Ready to Transform Your Crash Analysis?</h2>
       <p>Start your free 14-day trial today and see how CRASH LENS can help your agency make data-driven safety decisions.</p>
       <div class="cta-buttons">
-        <a href="./login/" class="btn btn-white">Start Free Trial</a>
-        <a href="./contact-sales.html" class="btn btn-outline-light">Contact Sales</a>
+        <a href="./login/" class="btn btn-cta" style="background:white;color:#2563eb;">Start Free Trial</a>
+        <a href="./contact-sales.html" class="btn btn-ghost" style="border-color:rgba(255,255,255,0.3);color:white;">Contact Sales</a>
       </div>
     </div>
   </section>
 
   <!-- Footer -->
   <footer class="footer">
-    <div class="footer-content">
-      <div class="footer-brand">
-        <h3>CRASH LENS</h3>
-        <p>Professional crash analysis tools for Virginia transportation agencies.</p>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <h3>CRASH LENS</h3>
+          <p>AI-powered crash analysis tools for Virginia transportation agencies.</p>
+          <div class="social-icons" style="margin-top: 1rem;">
+            <a href="#" aria-label="LinkedIn"><svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+            <a href="#" aria-label="Twitter"><svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+          </div>
+        </div>
+        <div class="footer-links">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="./features.html">Features</a></li>
+            <li><a href="./pricing.html">Pricing</a></li>
+            <li><a href="./resources.html">Resources</a></li>
+          </ul>
+        </div>
+        <div class="footer-links">
+          <h4>Support</h4>
+          <ul>
+            <li><a href="./resources.html">Documentation</a></li>
+            <li><a href="./contact.html">Contact Us</a></li>
+            <li><a href="./contact-sales.html">Contact Sales</a></li>
+          </ul>
+        </div>
+        <div class="footer-links">
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="./privacy-policy.html">Privacy Policy</a></li>
+            <li><a href="./terms-of-service.html">Terms of Service</a></li>
+          </ul>
+        </div>
       </div>
-      <div class="footer-links">
-        <h4>Product</h4>
-        <ul>
-          <li><a href="./features.html">Features</a></li>
-          <li><a href="./pricing.html">Pricing</a></li>
-          <li><a href="./resources.html">Resources</a></li>
-        </ul>
+      <div class="footer-bottom">
+        <p>&copy; <script>document.write(new Date().getFullYear())</script> CRASH LENS. All rights reserved.</p>
       </div>
-      <div class="footer-links">
-        <h4>Support</h4>
-        <ul>
-          <li><a href="#">Documentation</a></li>
-          <li><a href="./contact.html">Contact Us</a></li>
-          <li><a href="./contact-sales.html">Contact Sales</a></li>
-        </ul>
-      </div>
-      <div class="footer-links">
-        <h4>Legal</h4>
-        <ul>
-          <li><a href="./privacy-policy.html">Privacy Policy</a></li>
-          <li><a href="./terms-of-service.html">Terms of Service</a></li>
-        </ul>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <p>&copy; 2025 CRASH LENS. All rights reserved.</p>
     </div>
   </footer>
 
@@ -931,11 +941,17 @@
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           entry.target.classList.add('animate-visible');
+          if (entry.target.classList.contains('reveal')) {
+            entry.target.classList.add('visible');
+          }
+          if (entry.target.classList.contains('stagger')) {
+            entry.target.classList.add('visible');
+          }
         }
       });
     }, observerOptions);
 
-    document.querySelectorAll('.animate-on-scroll').forEach(el => {
+    document.querySelectorAll('.animate-on-scroll, .reveal, .stagger').forEach(el => {
       observer.observe(el);
     });
 

@@ -1,20 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background-color:#030712;color-scheme:dark">
 <head>
   <meta charset="UTF-8">
+  <meta name="color-scheme" content="dark">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Resources - CRASH LENS</title>
-  <style>html,body{background-color:#0a1a2e;color:#adbdcc}</style>
+  <title>Resources - CRASH LENS | Guides, Templates & Downloads</title>
+  <meta name="description" content="Free traffic safety resources, crash analysis guides, HSIP templates, and checklists for Virginia transportation professionals.">
+  <style>html,body{background-color:#030712;color:#94a3b8}</style>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/styles.css">
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="data/images/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="data/images/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="data/images/apple-touch-icon.png">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1e3a5f">
+  <meta name="theme-color" content="#030712">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Crash Lens">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Resources - CRASH LENS">
+  <meta property="og:description" content="Free traffic safety resources and crash analysis guides.">
+  <meta property="og:image" content="https://crashlens.aicreatesai.com/data/images/og-image.png">
+  <meta property="og:url" content="https://crashlens.aicreatesai.com/resources.html">
   <!-- EmailJS SDK for sending emails to users -->
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script type="text/javascript">
@@ -28,25 +40,30 @@
       text-align: center;
       position: relative;
       overflow: hidden;
+      background: var(--gradient-hero);
     }
 
     .resources-hero h1 {
       font-size: 2.5rem;
-      color: var(--white);
+      font-weight: 800;
+      color: var(--text-primary);
       margin-bottom: 1rem;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
     }
 
     .resources-hero p {
       font-size: 1.125rem;
-      color: var(--text-dark);
+      color: var(--text-secondary);
       max-width: 600px;
       margin: 0 auto;
+      line-height: 1.75;
     }
 
     /* Downloads / Lead Magnets Section */
     .downloads-section {
       padding: 4rem 0;
-      background: linear-gradient(135deg, rgba(30, 64, 175, 0.1), rgba(124, 58, 237, 0.1));
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(124, 58, 237, 0.08));
     }
 
     .downloads-section h2 {
@@ -71,17 +88,20 @@
     }
 
     .download-card {
-      background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
-      border: 1px solid var(--border-dark);
-      border-radius: var(--radius-lg);
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      border-radius: 16px;
       padding: 1.5rem;
       text-align: center;
-      transition: all 0.3s ease;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .download-card:hover {
       transform: translateY(-4px);
-      border-color: rgba(30, 64, 175, 0.5);
+      border-color: rgba(37, 99, 235, 0.3);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 30px rgba(37, 99, 235, 0.05);
     }
 
     .download-icon {
@@ -167,12 +187,16 @@
     }
 
     .download-modal-content {
-      background: var(--bg-dark-card);
-      border-radius: var(--radius-lg);
-      padding: 2rem;
-      max-width: 400px;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+      border-radius: 16px;
+      padding: 2.5rem;
+      max-width: 420px;
       width: 90%;
       text-align: center;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
     }
 
     .download-modal-content h3 {
@@ -189,17 +213,19 @@
     .download-modal-content input {
       width: 100%;
       padding: 0.75rem 1rem;
-      border: 1px solid var(--border-dark);
-      border-radius: var(--radius);
-      background: var(--bg-dark-secondary);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      border-radius: 10px;
+      background: rgba(3, 7, 18, 0.6);
       color: var(--white);
       font-size: 1rem;
       margin-bottom: 1rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
     .download-modal-content input:focus {
       outline: none;
       border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
     }
 
     .download-modal-actions {
@@ -237,16 +263,19 @@
     }
 
     .resource-card {
-      background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
-      border: 1px solid var(--border-dark);
-      border-radius: var(--radius-lg);
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      border-radius: 16px;
       padding: 1.5rem;
-      transition: all 0.3s ease;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .resource-card:hover {
       transform: translateY(-4px);
-      border-color: rgba(30, 64, 175, 0.5);
+      border-color: rgba(37, 99, 235, 0.3);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 30px rgba(37, 99, 235, 0.05);
     }
 
     .resource-card-header {
@@ -259,8 +288,8 @@
     .resource-icon {
       width: 48px;
       height: 48px;
-      background: rgba(30, 64, 175, 0.2);
-      border-radius: var(--radius);
+      background: rgba(37, 99, 235, 0.15);
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -327,19 +356,22 @@
     }
 
     .external-card {
-      background: var(--bg-dark-card);
-      border: 1px solid var(--border-dark);
-      border-radius: var(--radius);
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      border-radius: 12px;
       padding: 1.25rem;
       display: flex;
       align-items: center;
       gap: 1rem;
-      transition: all 0.2s ease;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .external-card:hover {
-      border-color: var(--primary);
+      border-color: rgba(37, 99, 235, 0.3);
       transform: translateX(4px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     }
 
     .external-card h4 {
@@ -368,22 +400,36 @@
     }
 
     .support-card {
-      background: linear-gradient(135deg, var(--bg-dark-card) 0%, var(--bg-dark-secondary) 100%);
-      border: 1px solid var(--border-dark);
-      border-radius: var(--radius-lg);
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      border-radius: 16px;
       padding: 2rem;
       text-align: center;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .support-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(37, 99, 235, 0.3);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 30px rgba(37, 99, 235, 0.05);
     }
 
     .support-card-icon {
       width: 64px;
       height: 64px;
-      background: rgba(30, 64, 175, 0.2);
+      background: rgba(37, 99, 235, 0.15);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       margin: 0 auto 1rem;
+      transition: box-shadow 0.3s ease;
+    }
+
+    .support-card:hover .support-card-icon {
+      box-shadow: 0 0 20px rgba(37, 99, 235, 0.3);
     }
 
     .support-card-icon svg {
@@ -403,67 +449,7 @@
       margin-bottom: 1rem;
     }
 
-    /* Footer */
-    .footer {
-      background: var(--bg-dark-secondary);
-      border-top: 1px solid var(--border-dark);
-      padding: 3rem 0 1.5rem;
-    }
-
-    .footer-content {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      gap: 2rem;
-      margin-bottom: 2rem;
-    }
-
-    .footer-brand {
-      max-width: 250px;
-    }
-
-    .footer-brand h3 {
-      color: var(--white);
-      font-size: 1.25rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .footer-brand p {
-      color: var(--text-dark);
-      font-size: 0.875rem;
-    }
-
-    .footer-links h4 {
-      color: var(--white);
-      font-size: 0.875rem;
-      margin-bottom: 1rem;
-    }
-
-    .footer-links ul {
-      list-style: none;
-    }
-
-    .footer-links li {
-      margin-bottom: 0.5rem;
-    }
-
-    .footer-links a {
-      color: var(--text-dark);
-      font-size: 0.875rem;
-      transition: color 0.2s ease;
-    }
-
-    .footer-links a:hover {
-      color: var(--white);
-    }
-
-    .footer-bottom {
-      text-align: center;
-      padding-top: 1.5rem;
-      border-top: 1px solid var(--border-dark);
-      color: var(--text-dark);
-      font-size: 0.875rem;
-    }
+    /* Footer styles handled by shared styles.css */
 
     @media (max-width: 768px) {
       .resources-hero h1 {
@@ -504,13 +490,17 @@
       </div>
       <div class="nav-actions">
         <a href="./login/" class="nav-link hide-mobile">Sign In</a>
-        <a href="./login/" class="btn btn-gradient">Start Free Trial</a>
+        <a href="./login/" class="btn btn-cta" style="padding:0.625rem 1.5rem;font-size:0.875rem;">Start Free Trial</a>
       </div>
     </div>
   </nav>
 
+  <!-- Skip to content -->
+  <a href="#resources-content" class="skip-to-content">Skip to main content</a>
+
   <!-- Hero -->
-  <section class="resources-hero">
+  <section class="resources-hero" id="resources-content">
+    <div class="hero-grid-pattern"></div>
     <div class="blob blob-1" style="top: -20%; left: 10%; opacity: 0.15;"></div>
     <div class="blob blob-2" style="top: 10%; right: -10%; opacity: 0.1;"></div>
     <div class="container">
@@ -541,7 +531,7 @@
             <span>PDF</span>
             <span>8 pages</span>
           </div>
-          <button class="btn btn-gradient download-btn" onclick="showDownloadForm('hsip-checklist')">Download Free</button>
+          <button class="btn btn-cta download-btn" onclick="showDownloadForm('hsip-checklist')">Download Free</button>
         </div>
 
         <div class="download-card">
@@ -557,7 +547,7 @@
             <span>PDF</span>
             <span>24 pages</span>
           </div>
-          <button class="btn btn-gradient download-btn" onclick="showDownloadForm('va-field-guide')">Download Free</button>
+          <button class="btn btn-cta download-btn" onclick="showDownloadForm('va-field-guide')">Download Free</button>
         </div>
 
         <div class="download-card">
@@ -574,7 +564,7 @@
             <span>DOCX</span>
             <span>Template</span>
           </div>
-          <button class="btn btn-gradient download-btn" onclick="showDownloadForm('report-template')">Download Free</button>
+          <button class="btn btn-cta download-btn" onclick="showDownloadForm('report-template')">Download Free</button>
         </div>
 
         <div class="download-card">
@@ -590,7 +580,7 @@
             <span>PDF</span>
             <span>12 pages</span>
           </div>
-          <button class="btn btn-gradient download-btn" onclick="showDownloadForm('warrant-mistakes')">Download Free</button>
+          <button class="btn btn-cta download-btn" onclick="showDownloadForm('warrant-mistakes')">Download Free</button>
         </div>
       </div>
     </div>
@@ -810,10 +800,14 @@
   <!-- Footer -->
   <footer class="footer">
     <div class="container">
-      <div class="footer-content">
+      <div class="footer-grid">
         <div class="footer-brand">
           <h3>CRASH LENS</h3>
-          <p>Professional crash analysis tools for Virginia transportation agencies.</p>
+          <p>AI-powered crash analysis tools for Virginia transportation agencies.</p>
+          <div class="social-icons" style="margin-top: 1rem;">
+            <a href="#" aria-label="LinkedIn"><svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>
+            <a href="#" aria-label="Twitter"><svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+          </div>
         </div>
         <div class="footer-links">
           <h4>Product</h4>
@@ -826,7 +820,8 @@
         <div class="footer-links">
           <h4>Support</h4>
           <ul>
-            <li><a href="#">Documentation</a></li>
+            <li><a href="./resources.html">Documentation</a></li>
+            <li><a href="./contact.html">Contact Us</a></li>
             <li><a href="./contact-sales.html">Contact Sales</a></li>
           </ul>
         </div>
@@ -839,7 +834,7 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <p>&copy; 2025 CRASH LENS. All rights reserved.</p>
+        <p>&copy; <script>document.write(new Date().getFullYear())</script> CRASH LENS. All rights reserved.</p>
       </div>
     </div>
   </footer>
@@ -854,8 +849,8 @@
         <input type="email" id="downloadEmail" placeholder="your@email.com" required>
         <input type="text" id="downloadName" placeholder="Your name (optional)">
         <div class="download-modal-actions">
-          <button class="btn btn-outline-light" onclick="closeDownloadModal()">Cancel</button>
-          <button class="btn btn-gradient" onclick="submitDownload()">Get Download</button>
+          <button class="btn btn-ghost" onclick="closeDownloadModal()">Cancel</button>
+          <button class="btn btn-cta" onclick="submitDownload()">Get Download</button>
         </div>
         <p style="font-size: 0.7rem; color: var(--gray); margin-top: 1rem;">We respect your privacy. Unsubscribe anytime.</p>
       </div>
@@ -871,7 +866,7 @@
         <p style="margin-bottom: 0.5rem;">Your download is ready:</p>
         <p style="font-weight: 600; margin-bottom: 1rem;" id="successResourceTitle">Resource Title</p>
         <p id="emailStatusMessage" style="font-size: 0.875rem; color: var(--text-dark); margin-bottom: 1.5rem;">Your download is ready below.</p>
-        <a href="#" id="downloadLink" target="_blank" class="btn btn-gradient" style="display: block; text-decoration: none; margin-bottom: 0.75rem;">
+        <a href="#" id="downloadLink" target="_blank" class="btn btn-cta" style="display: block; text-decoration: none; margin-bottom: 0.75rem;">
           Open Resource
         </a>
         <button class="btn btn-outline-light" onclick="closeDownloadModal()" style="width: 100%;">Close</button>
@@ -1076,14 +1071,17 @@
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           entry.target.classList.add('animate-visible');
-          if (entry.target.classList.contains('stagger-children')) {
-            entry.target.classList.add('reveal');
+          if (entry.target.classList.contains('stagger-children') || entry.target.classList.contains('stagger')) {
+            entry.target.classList.add('visible');
+          }
+          if (entry.target.classList.contains('reveal')) {
+            entry.target.classList.add('visible');
           }
         }
       });
     }, observerOptions);
 
-    document.querySelectorAll('.animate-on-scroll, .stagger-children').forEach(el => {
+    document.querySelectorAll('.animate-on-scroll, .stagger-children, .reveal, .stagger').forEach(el => {
       observer.observe(el);
     });
 

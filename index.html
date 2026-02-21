@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" style="background-color:#0a1a2e;color-scheme:dark">
+<html lang="en" style="background-color:#030712;color-scheme:dark">
 <head>
   <meta charset="UTF-8">
   <meta name="color-scheme" content="dark">
@@ -13,10 +13,15 @@
   <link rel="icon" type="image/png" sizes="32x32" href="data/images/favicon-32x32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="data/images/apple-touch-icon.png">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1e3a5f">
+  <meta name="theme-color" content="#030712">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Crash Lens">
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
@@ -33,10 +38,34 @@
   <meta name="twitter:description" content="AI-powered crash analysis for Virginia transportation agencies.">
   <meta name="twitter:image" content="https://crashlens.aicreatesai.com/data/images/og-image.png">
 
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "CRASH LENS",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "description": "AI-powered crash analysis tool for Virginia transportation agencies. Analyze crash data, identify high-risk locations, and develop data-driven safety countermeasures.",
+    "url": "https://crashlens.aicreatesai.com/",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "description": "14-day free trial"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "CRASH LENS",
+      "url": "https://crashlens.aicreatesai.com/"
+    }
+  }
+  </script>
+
   <!-- Critical inline styles to prevent white flash on load -->
   <style>
     html, body {
-      background-color: #0a1a2e !important;
+      background-color: #030712 !important;
       color-scheme: dark;
     }
     /* Loading overlay - shown immediately, removed after page loads */
@@ -46,7 +75,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background-color: #0a1a2e;
+      background-color: #030712;
       z-index: 99999;
       display: flex;
       align-items: center;
@@ -83,6 +112,19 @@
       position: relative;
       overflow: hidden;
       padding-top: 80px;
+      background: var(--gradient-hero);
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(ellipse, rgba(37, 99, 235, 0.15) 0%, transparent 70%);
+      pointer-events: none;
     }
 
     .hero-content {
@@ -118,9 +160,10 @@
 
     .hero-title {
       font-size: 2.5rem;
-      font-weight: 700;
-      color: var(--white);
-      line-height: 1.2;
+      font-weight: 800;
+      color: var(--text-primary);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
       margin-bottom: 1.5rem;
     }
 
@@ -132,9 +175,9 @@
 
     .hero-description {
       font-size: 1.125rem;
-      color: var(--text-dark);
+      color: var(--text-secondary);
       margin-bottom: 2rem;
-      line-height: 1.7;
+      line-height: 1.75;
     }
 
     .hero-buttons {
@@ -149,16 +192,29 @@
     }
 
     .app-preview {
-      background: var(--bg-dark-card);
-      border-radius: var(--radius-lg);
-      padding: 1rem;
-      border: 1px solid var(--border-dark);
+      perspective: 1200px;
+    }
+
+    .app-preview-inner {
+      transform: rotateY(-5deg) rotateX(2deg);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.5), 0 0 60px rgba(37, 99, 235, 0.1);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      background: var(--bg-dark-secondary);
+    }
+
+    .app-preview-inner:hover {
+      transform: rotateY(-2deg) rotateX(1deg);
     }
 
     .app-preview-header {
       display: flex;
       gap: 0.5rem;
-      margin-bottom: 1rem;
+      padding: 0.75rem 1rem;
+      background: rgba(15, 23, 42, 0.8);
+      border-bottom: 1px solid var(--border-subtle);
     }
 
     .app-preview-dot {
@@ -169,7 +225,6 @@
 
     .app-preview-content {
       background: var(--bg-dark-secondary);
-      border-radius: var(--radius);
       height: 350px;
       display: flex;
       align-items: flex-start;
@@ -215,6 +270,34 @@
 
     .trust-item svg {
       color: #10b981;
+    }
+
+    /* Trusted By Section */
+    .trusted-by {
+      padding: 3rem 1.5rem;
+      background: var(--bg-dark-secondary);
+    }
+
+    .trusted-by-content {
+      max-width: 1000px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .trusted-by-content > p {
+      color: var(--text-muted);
+      font-size: 0.8125rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+    }
+
+    .trusted-logos {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
     }
 
     /* Features Section */
@@ -1502,8 +1585,8 @@
 
       <div class="nav-actions">
         <a href="./login/" class="btn btn-outline-light hide-mobile">Sign In</a>
-        <a href="./login/" class="btn btn-gradient">Get Started</a>
-        <button class="mobile-menu-btn hide-desktop" onclick="toggleMobileMenu()">
+        <a href="./login/" class="btn btn-cta" style="padding:0.625rem 1.5rem;font-size:0.875rem;">Get Started</a>
+        <button class="mobile-menu-btn hide-desktop" onclick="toggleMobileMenu()" aria-label="Toggle navigation menu">
           <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
@@ -1523,8 +1606,12 @@
     </div>
   </nav>
 
+  <!-- Skip to content (accessibility) -->
+  <a href="#main-content" class="skip-to-content">Skip to main content</a>
+
   <!-- Hero Section -->
-  <section class="hero">
+  <section class="hero" id="main-content">
+    <div class="hero-grid-pattern"></div>
     <div class="blob blob-1" style="top: 5%; left: -5%; opacity: 0.2;"></div>
     <div class="blob blob-2" style="bottom: 20%; right: -10%; opacity: 0.15;"></div>
 
@@ -1538,32 +1625,49 @@
           The same tool that helped Henrico County secure $2.4M in HSIP funding. Identify high-risk locations, generate MUTCD-compliant reports, and build winning grant applications.
         </p>
         <div class="hero-buttons">
-          <a href="./login/" class="btn btn-gradient">Analyze Your Data Free</a>
-          <a href="#demo-video" class="btn btn-outline-light">Watch 2-Min Demo</a>
+          <a href="./login/" class="btn btn-cta btn-cta-animated">Analyze Your Data Free</a>
+          <a href="#demo-video" class="btn btn-ghost">Watch 2-Min Demo</a>
         </div>
         <div class="hero-trust-indicators">
           <span class="trust-item"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg> No credit card required</span>
           <span class="trust-item"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg> 14-day free trial</span>
           <span class="trust-item"><svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg> Cancel anytime</span>
         </div>
+        <!-- Social Proof Bar -->
+        <div class="social-proof-bar">
+          <div class="proof-item">
+            <span class="proof-metric">12+</span>
+            <span class="proof-label">Virginia Agencies</span>
+          </div>
+          <div class="proof-divider"></div>
+          <div class="proof-item">
+            <span class="proof-metric">$10M+</span>
+            <span class="proof-label">HSIP Funding Secured</span>
+          </div>
+          <div class="proof-divider"></div>
+          <div class="proof-item">
+            <span class="proof-metric">500K+</span>
+            <span class="proof-label">Crashes Analyzed</span>
+          </div>
+        </div>
       </div>
 
       <div class="hero-image animate-fadeInUp animate-delay-200">
         <div class="app-preview">
-          <div class="app-preview-header">
-            <div class="app-preview-dot" style="background: #FF5F57;"></div>
-            <div class="app-preview-dot" style="background: #FEBC2E;"></div>
-            <div class="app-preview-dot" style="background: #28C840;"></div>
-          </div>
-          <div class="app-preview-content">
-            <!-- TODO: Replace with actual screenshot: data/images/hero-screenshot.png -->
-            <!-- Recommended: Screenshot of crash heat map with filters visible -->
-            <img src="data/images/hero-screenshot.png" alt="CRASH LENS crash heat map showing high-risk intersections in Virginia" class="hero-screenshot" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-            <div class="screenshot-placeholder">
-              <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity: 0.5;">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-              </svg>
-              <span>Add screenshot: data/images/hero-screenshot.png</span>
+          <div class="app-preview-inner">
+            <div class="app-preview-header">
+              <div class="app-preview-dot" style="background: #FF5F57;"></div>
+              <div class="app-preview-dot" style="background: #FEBC2E;"></div>
+              <div class="app-preview-dot" style="background: #28C840;"></div>
+            </div>
+            <div class="app-preview-content">
+              <img src="data/images/hero-screenshot.png" alt="CRASH LENS crash heat map showing high-risk intersections in Virginia" class="hero-screenshot" loading="eager" decoding="async" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+              <div class="screenshot-placeholder">
+                <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity: 0.5;">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                <span>Add screenshot: data/images/hero-screenshot.png</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1596,41 +1700,12 @@
     <div class="trusted-by-content">
       <p>Trusted by Virginia Transportation Professionals</p>
       <div class="trusted-logos">
-        <!-- TODO: Replace with actual agency logos if available -->
-        <div class="trusted-logo-item">
-          <img src="data/images/logos/vdot-logo.png" alt="Virginia DOT" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <span class="logo-fallback">VDOT</span>
-        </div>
-        <div class="trusted-logo-item">
-          <img src="data/images/logos/henrico-logo.png" alt="Henrico County" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <span class="logo-fallback">Henrico County</span>
-        </div>
-        <div class="trusted-logo-item">
-          <img src="data/images/logos/richmond-logo.png" alt="City of Richmond" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <span class="logo-fallback">City of Richmond</span>
-        </div>
-        <div class="trusted-logo-item">
-          <img src="data/images/logos/chesterfield-logo.png" alt="Chesterfield County" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <span class="logo-fallback">Chesterfield County</span>
-        </div>
-        <div class="trusted-logo-item">
-          <img src="data/images/logos/fhwa-logo.png" alt="FHWA HSIP" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <span class="logo-fallback">FHWA HSIP</span>
-        </div>
-      </div>
-      <div class="trust-stats">
-        <div class="trust-stat">
-          <span class="trust-stat-value">12+</span>
-          <span class="trust-stat-label">Virginia Agencies</span>
-        </div>
-        <div class="trust-stat">
-          <span class="trust-stat-value">$10M+</span>
-          <span class="trust-stat-label">HSIP Funding Supported</span>
-        </div>
-        <div class="trust-stat">
-          <span class="trust-stat-value">500K+</span>
-          <span class="trust-stat-label">Crashes Analyzed</span>
-        </div>
+        <span class="agency-badge">VDOT</span>
+        <span class="agency-badge">Henrico County</span>
+        <span class="agency-badge">City of Richmond</span>
+        <span class="agency-badge">Chesterfield County</span>
+        <span class="agency-badge">FHWA HSIP</span>
+        <span class="agency-badge">Fairfax County</span>
       </div>
     </div>
   </section>
@@ -1678,6 +1753,11 @@
         <span class="demo-feature-text">Generate HSIP report</span>
       </div>
     </div>
+    <div style="display:flex;justify-content:center;gap:1rem;margin-top:1.5rem;flex-wrap:wrap;">
+      <span class="agency-badge" style="background:rgba(37,99,235,0.1);border-color:rgba(37,99,235,0.2);color:#60a5fa;">2-Min Setup</span>
+      <span class="agency-badge" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.2);color:#34d399;">No Coding Required</span>
+      <span class="agency-badge" style="background:rgba(124,58,237,0.1);border-color:rgba(124,58,237,0.2);color:#a78bfa;">FHWA Compliant</span>
+    </div>
   </section>
 
   <!-- Features Section -->
@@ -1687,9 +1767,9 @@
       <p>Everything you need to analyze crash data and improve traffic safety</p>
     </div>
 
-    <div class="features-grid">
-      <div class="card-dark feature-card">
-        <div class="feature-icon">
+    <div class="features-grid stagger">
+      <div class="card-glass feature-card feature-card-accent" style="--card-accent-gradient:linear-gradient(135deg, #2563eb, #3b82f6);">
+        <div class="feature-icon" style="background:rgba(37,99,235,0.15);">
           <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
           </svg>
@@ -1698,8 +1778,8 @@
         <p>Comprehensive analysis of crash patterns, trends, and contributing factors with interactive visualizations.</p>
       </div>
 
-      <div class="card-dark feature-card">
-        <div class="feature-icon">
+      <div class="card-glass feature-card feature-card-accent" style="--card-accent-gradient:linear-gradient(135deg, #7c3aed, #a78bfa);">
+        <div class="feature-icon" style="background:rgba(124,58,237,0.15);">
           <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -1709,8 +1789,8 @@
         <p>Identify high-risk intersections and corridors using advanced geospatial analysis and heat mapping.</p>
       </div>
 
-      <div class="card-dark feature-card">
-        <div class="feature-icon">
+      <div class="card-glass feature-card feature-card-accent" style="--card-accent-gradient:linear-gradient(135deg, #06b6d4, #22d3ee);">
+        <div class="feature-icon" style="background:rgba(6,182,212,0.15);">
           <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
           </svg>
@@ -1719,8 +1799,8 @@
         <p>Get intelligent recommendations for safety countermeasures based on crash patterns and FHWA guidelines.</p>
       </div>
 
-      <div class="card-dark feature-card">
-        <div class="feature-icon">
+      <div class="card-glass feature-card feature-card-accent" style="--card-accent-gradient:linear-gradient(135deg, #10b981, #34d399);">
+        <div class="feature-icon" style="background:rgba(16,185,129,0.15);">
           <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
           </svg>
@@ -1729,8 +1809,8 @@
         <p>Automated MUTCD signal warrant analysis with comprehensive documentation and recommendations.</p>
       </div>
 
-      <div class="card-dark feature-card">
-        <div class="feature-icon">
+      <div class="card-glass feature-card feature-card-accent" style="--card-accent-gradient:linear-gradient(135deg, #f59e0b, #fbbf24);">
+        <div class="feature-icon" style="background:rgba(245,158,11,0.15);">
           <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
           </svg>
@@ -1739,8 +1819,8 @@
         <p>Generate professional PDF and Word reports for stakeholders, grant applications, and public meetings.</p>
       </div>
 
-      <div class="card-dark feature-card">
-        <div class="feature-icon">
+      <div class="card-glass feature-card feature-card-accent" style="--card-accent-gradient:linear-gradient(135deg, #ec4899, #f472b6);">
+        <div class="feature-icon" style="background:rgba(236,72,153,0.15);">
           <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
@@ -2116,28 +2196,75 @@
   <section class="cta">
     <h2>Ready to improve traffic safety?</h2>
     <p>Start your 14-day free trial today. No credit card required.</p>
-    <a href="./login/" class="btn btn-gradient">Get Started Free</a>
+    <a href="./login/" class="btn btn-cta">Get Started Free</a>
   </section>
 
   <!-- Footer -->
   <footer class="footer">
-    <div class="footer-content">
-      <div class="footer-logo">
-        <img src="data/images/favicon.svg" alt="CRASH LENS">
-        <span>CRASH LENS</span>
+    <div class="container">
+      <!-- Newsletter -->
+      <div class="footer-newsletter">
+        <h3>Stay Updated on Traffic Safety</h3>
+        <p>Get the latest crash analysis insights, product updates, and safety resources.</p>
+        <div class="newsletter-signup" style="margin:0 auto;">
+          <input type="email" placeholder="Enter your email" aria-label="Email for newsletter">
+          <button type="button">Subscribe</button>
+        </div>
       </div>
 
-      <div class="footer-links">
-        <a href="./features.html">Features</a>
-        <a href="./pricing.html">Pricing</a>
-        <a href="./resources.html">Resources</a>
-        <a href="./login/">Sign In</a>
-        <a href="./privacy-policy.html">Privacy Policy</a>
-        <a href="./terms-of-service.html">Terms of Service</a>
+      <!-- Footer Grid -->
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <h3 style="display:flex;align-items:center;gap:0.5rem;">
+            <img src="data/images/favicon.svg" alt="" width="28" height="28">
+            CRASH LENS
+          </h3>
+          <p>AI-powered crash analysis tools for Virginia transportation agencies. Helping engineers save lives through better data.</p>
+          <div class="social-icons">
+            <a href="#" class="social-icon" aria-label="LinkedIn">
+              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+            </a>
+            <a href="#" class="social-icon" aria-label="Twitter / X">
+              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+            <a href="#" class="social-icon" aria-label="GitHub">
+              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+            </a>
+          </div>
+        </div>
+        <div class="footer-links">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="./features.html">Features</a></li>
+            <li><a href="./pricing.html">Pricing</a></li>
+            <li><a href="./resources.html">Resources</a></li>
+            <li><a href="./login/">Sign In</a></li>
+          </ul>
+        </div>
+        <div class="footer-links">
+          <h4>Resources</h4>
+          <ul>
+            <li><a href="./resources.html">Documentation</a></li>
+            <li><a href="./contact.html">Contact Sales</a></li>
+            <li><a href="./data-instructions.html">Data Instructions</a></li>
+          </ul>
+        </div>
+        <div class="footer-links">
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="./privacy-policy.html">Privacy Policy</a></li>
+            <li><a href="./terms-of-service.html">Terms of Service</a></li>
+            <li><a href="./legal-notice.html">Legal Notice</a></li>
+          </ul>
+        </div>
       </div>
 
-      <div class="footer-copy">
-        &copy; 2025 CRASH LENS. All rights reserved.
+      <!-- Footer Bottom -->
+      <div class="footer-bottom">
+        <p>&copy; <script>document.write(new Date().getFullYear())</script> CRASH LENS. All rights reserved.</p>
+        <div class="social-icons" style="gap:0.5rem;">
+          <span style="color:var(--text-muted);font-size:0.8125rem;">Built for Virginia transportation professionals</span>
+        </div>
       </div>
     </div>
   </footer>
@@ -2274,6 +2401,11 @@
           if (entry.isIntersecting) {
             entry.target.classList.add('animate-visible');
 
+            // Handle .reveal and .stagger classes
+            if (entry.target.classList.contains('reveal') || entry.target.classList.contains('stagger')) {
+              entry.target.classList.add('visible');
+            }
+
             // Trigger count-up for stats
             if (entry.target.classList.contains('stats-grid')) {
               animateCountUp(entry.target);
@@ -2287,7 +2419,7 @@
 
       // Observe elements
       const animatedElements = document.querySelectorAll(
-        '.animate-on-scroll, .stagger-children, ' +
+        '.animate-on-scroll, .stagger-children, .reveal, .stagger, ' +
         '.features-header, .pricing-preview-header, .case-studies-header, ' +
         '.how-it-works-header, .demo-video-header, .roi-calculator-header, ' +
         '.features-grid, .pricing-cards, .case-studies-grid, .steps-container, ' +
