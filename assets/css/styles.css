@@ -1730,6 +1730,46 @@ html {
   width: 100%;
 }
 
+/* --- Nav CTA Badge Button (matches badge-pulse style) --- */
+.btn-nav-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1.25rem;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 50px;
+  color: #60a5fa;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  overflow: visible;
+}
+
+.btn-nav-badge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  animation: badgePulse 2s ease-out infinite;
+  pointer-events: none;
+}
+
+.btn-nav-badge:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: #93bbfd;
+  transform: translateY(-1px);
+}
+
+.btn-nav-badge:active {
+  transform: translateY(0) scale(0.98);
+}
+
 /* --- Badge with Pulse --- */
 .badge-pulse {
   position: relative;
