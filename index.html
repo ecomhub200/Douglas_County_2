@@ -18,10 +18,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Crash Lens">
 
-  <!-- Google Fonts: Inter -->
+  <!-- Google Fonts: Inter (non-blocking) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"></noscript>
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
@@ -1541,6 +1543,19 @@
         height: 8px;
       }
     }
+
+    /* Performance: skip rendering off-screen sections */
+    .intersection-visualization,
+    .crash-scenarios-section,
+    .case-studies,
+    .how-it-works,
+    .roi-calculator-section,
+    .stats,
+    .pricing-preview,
+    .cta {
+      content-visibility: auto;
+      contain-intrinsic-size: auto 600px;
+    }
   </style>
 </head>
 <body class="dark">
@@ -1555,12 +1570,8 @@
   <!-- Animated Background -->
   <div class="gradient-mesh"></div>
 
-  <!-- Floating Particles -->
+  <!-- Floating Particles (reduced for performance) -->
   <div class="particles">
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
-    <div class="particle"></div>
     <div class="particle"></div>
     <div class="particle"></div>
     <div class="particle"></div>
@@ -2046,7 +2057,7 @@
       <div class="crash-scenarios-visual animate-on-scroll from-right" id="crashVizWrapper">
         <!-- Animation Frame - Full Width -->
         <div class="crash-animation-frame">
-          <iframe src="assets/animations/crash-scenarios.html" title="Crash Scenarios Animation" loading="lazy" id="crashVizIframe"></iframe>
+          <iframe data-src="assets/animations/crash-scenarios.html" title="Crash Scenarios Animation" loading="lazy" id="crashVizIframe"></iframe>
         </div>
 
         <!-- Floating KABCO Legend - Bottom Center -->
@@ -2505,6 +2516,20 @@
       document.querySelectorAll('.crash-type-item').forEach((item, index) => {
         item.addEventListener('click', () => setScenario(index));
       });
+
+      // Lazy-load crash-scenarios iframe when it scrolls near the viewport
+      var crashIframe = document.getElementById('crashVizIframe');
+      if (crashIframe && crashIframe.dataset.src) {
+        var iframeObserver = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              crashIframe.src = crashIframe.dataset.src;
+              iframeObserver.disconnect();
+            }
+          });
+        }, { rootMargin: '300px' });
+        iframeObserver.observe(crashIframe);
+      }
     });
 
     // Listen for messages from iframe (scenario changes)
@@ -2776,16 +2801,36 @@
     });
   </script>
 
-  <!-- Three.js CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-  <!-- 3D Intersection Visualization Script -->
+  <!-- Three.js: Lazy-loaded when visualization scrolls into view -->
   <script>
     (function() {
       const container = document.getElementById('canvas-container');
       const insightLabel = document.getElementById('insight-label');
 
       if (!container) return;
+
+      // Track visibility for pausing rendering
+      let isVizVisible = false;
+      let threeLoaded = false;
+      let animFrameId = null;
+
+      const vizObserver = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          isVizVisible = entry.isIntersecting;
+          if (entry.isIntersecting && !threeLoaded) {
+            threeLoaded = true;
+            // Dynamically load Three.js CDN
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+            script.onload = initThreeScene;
+            document.head.appendChild(script);
+          }
+        });
+      }, { rootMargin: '200px' });
+
+      vizObserver.observe(container);
+
+      function initThreeScene() {
 
       const scene = new THREE.Scene();
 
@@ -3632,7 +3677,10 @@
       }
 
       function animate(time) {
-        requestAnimationFrame(animate);
+        animFrameId = requestAnimationFrame(animate);
+
+        // Skip rendering when section is off-screen
+        if (!isVizVisible) return;
 
         if (!startTime) {
           startTime = time;
@@ -3770,12 +3818,15 @@
       animate(0);
 
       window.addEventListener('resize', () => {
+        if (!renderer) return;
         const aspect = container.clientWidth / container.clientHeight;
         camera.left = frustumSize * aspect / -2;
         camera.right = frustumSize * aspect / 2;
         camera.updateProjectionMatrix();
         renderer.setSize(container.clientWidth, container.clientHeight);
       });
+
+      } // end initThreeScene
     })();
   </script>
 </body>
