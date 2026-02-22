@@ -378,8 +378,8 @@ const CrashLensAuth = {
       return false; // Trial expired - deny access
     }
 
-    // Check paid subscription (past_due still allows temporary access)
-    return subscriptionStatus === 'active' || subscriptionStatus === 'past_due';
+    // Check paid subscription (trialing and past_due still allow access)
+    return subscriptionStatus === 'active' || subscriptionStatus === 'trialing' || subscriptionStatus === 'past_due';
   },
 
   /**

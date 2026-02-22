@@ -84,9 +84,19 @@ function getPlanFromPriceId(priceId) {
 // AI query limits per plan
 const PLAN_QUERY_LIMITS = {
     'trial': 0,
+    'free_trial': 0,
     'individual': 100,
     'team': 500,
     'agency': 1000
+};
+
+// Seat allocation per plan
+const PLAN_SEATS = {
+    'trial': 1,
+    'free_trial': 1,
+    'individual': 1,
+    'team': 5,
+    'agency': 'unlimited'
 };
 
 // Brevo email configuration (set via environment variables in Coolify)
@@ -608,8 +618,9 @@ const server = http.createServer((req, res) => {
                 }
 
                 // Create Checkout Session
-                const session = await stripeClient.checkout.sessions.create({
+                const sessionParams = {
                     customer: customerId,
+                    client_reference_id: firebaseUid,
                     mode: 'subscription',
                     line_items: [{ price: priceId, quantity: 1 }],
                     success_url: `${APP_URL}/pricing.html?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
@@ -626,7 +637,9 @@ const server = http.createServer((req, res) => {
                         }
                     },
                     allow_promotion_codes: true
-                });
+                };
+
+                const session = await stripeClient.checkout.sessions.create(sessionParams);
 
                 console.log(`[Stripe] Checkout session created for ${email} (${plan}/${billingCycle})`);
                 res.writeHead(200, corsHeaders);
@@ -685,18 +698,49 @@ const server = http.createServer((req, res) => {
                         const plan = session.metadata?.plan || 'individual';
                         const billingCycle = session.metadata?.billingCycle || 'monthly';
                         const queryLimit = PLAN_QUERY_LIMITS[plan] || 100;
+                        const seats = PLAN_SEATS[plan] || 1;
 
-                        await db.collection('users').doc(firebaseUid).update({
+                        // Retrieve full subscription to get period details
+                        const stripeClient = getStripe();
+                        let currentPeriodEnd = null;
+                        let cancelAtPeriodEnd = false;
+                        let trialEnd = null;
+                        let subStatus = 'active';
+
+                        if (session.subscription) {
+                            try {
+                                const sub = await stripeClient.subscriptions.retrieve(session.subscription);
+                                currentPeriodEnd = sub.current_period_end
+                                    ? admin.firestore.Timestamp.fromMillis(sub.current_period_end * 1000)
+                                    : null;
+                                cancelAtPeriodEnd = sub.cancel_at_period_end || false;
+                                trialEnd = sub.trial_end
+                                    ? admin.firestore.Timestamp.fromMillis(sub.trial_end * 1000)
+                                    : null;
+                                subStatus = sub.status === 'trialing' ? 'trialing' : 'active';
+                            } catch (subErr) {
+                                console.warn('[Stripe Webhook] Could not retrieve subscription details:', subErr.message);
+                            }
+                        }
+
+                        const updateData = {
                             plan: plan,
                             billingCycle: billingCycle,
-                            subscriptionStatus: 'active',
+                            subscriptionStatus: subStatus,
                             stripeCustomerId: session.customer,
                             stripeSubscriptionId: session.subscription,
                             subscribedAt: admin.firestore.Timestamp.now(),
+                            seats: seats,
                             'ai.queriesLimit': queryLimit
-                        });
+                        };
 
-                        console.log(`[Stripe Webhook] User ${firebaseUid} subscribed to ${plan}/${billingCycle}`);
+                        if (currentPeriodEnd) updateData.currentPeriodEnd = currentPeriodEnd;
+                        if (trialEnd) updateData.trialEnd = trialEnd;
+                        updateData.cancelAtPeriodEnd = cancelAtPeriodEnd;
+
+                        await db.collection('users').doc(firebaseUid).update(updateData);
+
+                        console.log(`[Stripe Webhook] User ${firebaseUid} subscribed to ${plan}/${billingCycle} (status: ${subStatus})`);
                         break;
                     }
 
@@ -707,17 +751,34 @@ const server = http.createServer((req, res) => {
 
                         const priceId = subscription.items?.data?.[0]?.price?.id;
                         const planInfo = getPlanFromPriceId(priceId);
-                        const status = subscription.status; // active, past_due, canceled, unpaid
+                        const status = subscription.status; // active, trialing, past_due, canceled, unpaid
 
                         const updates = {
                             subscriptionStatus: status === 'active' ? 'active' :
+                                               status === 'trialing' ? 'trialing' :
                                                status === 'past_due' ? 'past_due' :
-                                               status === 'canceled' ? 'cancelled' : status
+                                               status === 'canceled' ? 'canceled' : status,
+                            cancelAtPeriodEnd: subscription.cancel_at_period_end || false
                         };
+
+                        // Update current period end
+                        if (subscription.current_period_end) {
+                            updates.currentPeriodEnd = admin.firestore.Timestamp.fromMillis(
+                                subscription.current_period_end * 1000
+                            );
+                        }
+
+                        // Update trial end if applicable
+                        if (subscription.trial_end) {
+                            updates.trialEnd = admin.firestore.Timestamp.fromMillis(
+                                subscription.trial_end * 1000
+                            );
+                        }
 
                         if (planInfo) {
                             updates.plan = planInfo.plan;
                             updates.billingCycle = planInfo.billingCycle;
+                            updates.seats = PLAN_SEATS[planInfo.plan] || 1;
                             updates['ai.queriesLimit'] = PLAN_QUERY_LIMITS[planInfo.plan] || 100;
                         }
 
@@ -731,12 +792,22 @@ const server = http.createServer((req, res) => {
                         const firebaseUid = subscription.metadata?.firebaseUid;
                         if (!firebaseUid) break;
 
-                        await db.collection('users').doc(firebaseUid).update({
-                            subscriptionStatus: 'cancelled',
+                        const cancelUpdates = {
+                            subscriptionStatus: 'canceled',
+                            cancelAtPeriodEnd: true,
                             cancelledAt: admin.firestore.Timestamp.now()
-                        });
+                        };
 
-                        console.log(`[Stripe Webhook] Subscription cancelled for ${firebaseUid}`);
+                        // Store when access actually ends
+                        if (subscription.current_period_end) {
+                            cancelUpdates.currentPeriodEnd = admin.firestore.Timestamp.fromMillis(
+                                subscription.current_period_end * 1000
+                            );
+                        }
+
+                        await db.collection('users').doc(firebaseUid).update(cancelUpdates);
+
+                        console.log(`[Stripe Webhook] Subscription canceled for ${firebaseUid}`);
                         break;
                     }
 
@@ -752,10 +823,39 @@ const server = http.createServer((req, res) => {
 
                         if (!usersSnap.empty) {
                             const userDoc = usersSnap.docs[0];
+                            const userData = userDoc.data();
                             await userDoc.ref.update({
-                                subscriptionStatus: 'past_due'
+                                subscriptionStatus: 'past_due',
+                                lastPaymentFailedAt: admin.firestore.Timestamp.now()
                             });
                             console.log(`[Stripe Webhook] Payment failed for customer ${customerId}`);
+
+                            // Send payment failure notification email via Brevo
+                            if (BREVO_API_KEY && NOTIFICATION_FROM_EMAIL && userData.email) {
+                                try {
+                                    const planName = (userData.plan || 'subscription').charAt(0).toUpperCase() + (userData.plan || 'subscription').slice(1);
+                                    await sendViaBrevoApi(
+                                        userData.email,
+                                        'CRASH LENS - Payment Failed',
+                                        `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+                                            <h2 style="color:#1e3a5f;">Payment Issue</h2>
+                                            <p>Hi${userData.displayName ? ' ' + userData.displayName : ''},</p>
+                                            <p>We were unable to process your payment for your <strong>${planName}</strong> plan.</p>
+                                            <p>Please update your payment method to avoid any disruption to your service.</p>
+                                            <p style="margin:24px 0;">
+                                                <a href="${APP_URL}/app/" style="background:#1e40af;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Update Payment Method</a>
+                                            </p>
+                                            <p style="color:#6b7280;font-size:0.875rem;">If you have any questions, please contact us at support@crashlens.aicreatesai.com</p>
+                                            <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+                                            <p style="color:#9ca3af;font-size:0.75rem;">CRASH LENS - Crash Analysis Tools for Transportation Agencies</p>
+                                        </div>`,
+                                        `Payment failed for your CRASH LENS ${planName} plan. Please update your payment method at ${APP_URL}/app/`
+                                    );
+                                    console.log(`[Stripe Webhook] Payment failure email sent to ${userData.email}`);
+                                } catch (emailErr) {
+                                    console.error(`[Stripe Webhook] Failed to send payment failure email: ${emailErr.message}`);
+                                }
+                            }
                         }
                         break;
                     }
