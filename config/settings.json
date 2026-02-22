@@ -1,5 +1,5 @@
 {
-  "selectedJurisdiction": "henrico",
+  "selectedJurisdiction": "douglas",
   "lastUpdated": "2025-12-13",
   "updatedBy": "admin",
   "notes": "This file controls which jurisdiction's data is downloaded by the weekly GitHub Actions workflow. To change the jurisdiction, update 'selectedJurisdiction' with a valid jurisdiction ID from config.json."
