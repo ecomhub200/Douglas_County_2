@@ -21,6 +21,74 @@ const PORT = process.env.PROXY_PORT || 3001;
 const QDRANT_ENDPOINT = process.env.QDRANT_ENDPOINT || '';
 const QDRANT_API_KEY = process.env.QDRANT_API_KEY || '';
 
+// Stripe configuration (set via environment variables in Coolify)
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
+const STRIPE_PRICE_INDIVIDUAL_MONTHLY = process.env.STRIPE_PRICE_INDIVIDUAL_MONTHLY || '';
+const STRIPE_PRICE_INDIVIDUAL_ANNUAL = process.env.STRIPE_PRICE_INDIVIDUAL_ANNUAL || '';
+const STRIPE_PRICE_TEAM_MONTHLY = process.env.STRIPE_PRICE_TEAM_MONTHLY || '';
+const STRIPE_PRICE_TEAM_ANNUAL = process.env.STRIPE_PRICE_TEAM_ANNUAL || '';
+const APP_URL = process.env.APP_URL || 'https://crashlens.aicreatesai.com';
+
+// Initialize Stripe (lazy - only when needed)
+let stripe = null;
+function getStripe() {
+    if (!stripe && STRIPE_SECRET_KEY) {
+        const Stripe = require('stripe');
+        stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
+    }
+    return stripe;
+}
+
+// Initialize Firebase Admin (lazy - only when needed)
+let firebaseAdmin = null;
+let firestoreDb = null;
+function getFirestore() {
+    if (!firestoreDb) {
+        const admin = require('firebase-admin');
+        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+        if (!serviceAccount) {
+            throw new Error('FIREBASE_SERVICE_ACCOUNT not configured');
+        }
+        if (!firebaseAdmin) {
+            firebaseAdmin = admin.initializeApp({
+                credential: admin.credential.cert(JSON.parse(serviceAccount))
+            });
+        }
+        firestoreDb = admin.firestore();
+    }
+    return firestoreDb;
+}
+
+// Map plan + billing cycle to Stripe Price ID
+function getStripePriceId(plan, billingCycle) {
+    const priceMap = {
+        'individual_monthly': STRIPE_PRICE_INDIVIDUAL_MONTHLY,
+        'individual_annual': STRIPE_PRICE_INDIVIDUAL_ANNUAL,
+        'team_monthly': STRIPE_PRICE_TEAM_MONTHLY,
+        'team_annual': STRIPE_PRICE_TEAM_ANNUAL
+    };
+    return priceMap[`${plan}_${billingCycle}`] || null;
+}
+
+// Map Stripe Price ID back to plan + billing cycle
+function getPlanFromPriceId(priceId) {
+    const reverseMap = {};
+    if (STRIPE_PRICE_INDIVIDUAL_MONTHLY) reverseMap[STRIPE_PRICE_INDIVIDUAL_MONTHLY] = { plan: 'individual', billingCycle: 'monthly' };
+    if (STRIPE_PRICE_INDIVIDUAL_ANNUAL) reverseMap[STRIPE_PRICE_INDIVIDUAL_ANNUAL] = { plan: 'individual', billingCycle: 'annual' };
+    if (STRIPE_PRICE_TEAM_MONTHLY) reverseMap[STRIPE_PRICE_TEAM_MONTHLY] = { plan: 'team', billingCycle: 'monthly' };
+    if (STRIPE_PRICE_TEAM_ANNUAL) reverseMap[STRIPE_PRICE_TEAM_ANNUAL] = { plan: 'team', billingCycle: 'annual' };
+    return reverseMap[priceId] || null;
+}
+
+// AI query limits per plan
+const PLAN_QUERY_LIMITS = {
+    'trial': 0,
+    'individual': 100,
+    'team': 500,
+    'agency': 1000
+};
+
 // Brevo email configuration (set via environment variables in Coolify)
 const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
 const BREVO_SMTP_LOGIN = process.env.BREVO_SMTP_LOGIN || '';
@@ -456,6 +524,303 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // ==========================================================================
+    // Stripe Payment Endpoints
+    // ==========================================================================
+
+    // ---- Stripe status check ----
+    if (req.url === '/stripe/status' && req.method === 'GET') {
+        res.writeHead(200, corsHeaders);
+        res.end(JSON.stringify({
+            configured: !!STRIPE_SECRET_KEY,
+            hasWebhookSecret: !!STRIPE_WEBHOOK_SECRET,
+            hasPrices: !!(STRIPE_PRICE_INDIVIDUAL_MONTHLY && STRIPE_PRICE_INDIVIDUAL_ANNUAL &&
+                          STRIPE_PRICE_TEAM_MONTHLY && STRIPE_PRICE_TEAM_ANNUAL)
+        }));
+        return;
+    }
+
+    // ---- Create Stripe Checkout Session ----
+    if (req.url === '/stripe/create-checkout-session' && req.method === 'POST') {
+        if (!STRIPE_SECRET_KEY) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({ error: 'Stripe not configured' }));
+            return;
+        }
+
+        collectBody(req).then(async (body) => {
+            let payload;
+            try {
+                payload = JSON.parse(body);
+            } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { plan, billingCycle, firebaseUid, email } = payload;
+
+            if (!plan || !billingCycle || !firebaseUid || !email) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Missing required fields: plan, billingCycle, firebaseUid, email' }));
+                return;
+            }
+
+            const priceId = getStripePriceId(plan, billingCycle);
+            if (!priceId) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: `Invalid plan/billing combination: ${plan}/${billingCycle}` }));
+                return;
+            }
+
+            try {
+                const stripeClient = getStripe();
+
+                // Check if user already has a Stripe customer ID in Firestore
+                let customerId = null;
+                try {
+                    const db = getFirestore();
+                    const userDoc = await db.collection('users').doc(firebaseUid).get();
+                    if (userDoc.exists && userDoc.data().stripeCustomerId) {
+                        customerId = userDoc.data().stripeCustomerId;
+                    }
+                } catch (dbErr) {
+                    console.warn('[Stripe] Could not check Firestore for existing customer:', dbErr.message);
+                }
+
+                // Create or retrieve Stripe customer
+                if (!customerId) {
+                    const customer = await stripeClient.customers.create({
+                        email: email,
+                        metadata: { firebaseUid: firebaseUid }
+                    });
+                    customerId = customer.id;
+
+                    // Save customer ID to Firestore
+                    try {
+                        const db = getFirestore();
+                        await db.collection('users').doc(firebaseUid).update({
+                            stripeCustomerId: customerId
+                        });
+                    } catch (dbErr) {
+                        console.warn('[Stripe] Could not save customer ID to Firestore:', dbErr.message);
+                    }
+                }
+
+                // Create Checkout Session
+                const session = await stripeClient.checkout.sessions.create({
+                    customer: customerId,
+                    mode: 'subscription',
+                    line_items: [{ price: priceId, quantity: 1 }],
+                    success_url: `${APP_URL}/pricing.html?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+                    cancel_url: `${APP_URL}/pricing.html?checkout=cancelled`,
+                    metadata: {
+                        firebaseUid: firebaseUid,
+                        plan: plan,
+                        billingCycle: billingCycle
+                    },
+                    subscription_data: {
+                        metadata: {
+                            firebaseUid: firebaseUid,
+                            plan: plan
+                        }
+                    },
+                    allow_promotion_codes: true
+                });
+
+                console.log(`[Stripe] Checkout session created for ${email} (${plan}/${billingCycle})`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({ url: session.url, sessionId: session.id }));
+
+            } catch (err) {
+                console.error(`[Stripe] Checkout session error: ${err.message}`);
+                res.writeHead(500, corsHeaders);
+                res.end(JSON.stringify({ error: 'Failed to create checkout session', message: err.message }));
+            }
+        });
+        return;
+    }
+
+    // ---- Stripe Webhook ----
+    if (req.url === '/stripe/webhook' && req.method === 'POST') {
+        if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({ error: 'Stripe webhook not configured' }));
+            return;
+        }
+
+        // Collect raw body for signature verification
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', async () => {
+            const rawBody = Buffer.concat(chunks);
+            const sig = req.headers['stripe-signature'];
+
+            let event;
+            try {
+                const stripeClient = getStripe();
+                event = stripeClient.webhooks.constructEvent(rawBody, sig, STRIPE_WEBHOOK_SECRET);
+            } catch (err) {
+                console.error(`[Stripe Webhook] Signature verification failed: ${err.message}`);
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Webhook signature verification failed' }));
+                return;
+            }
+
+            console.log(`[Stripe Webhook] Received event: ${event.type}`);
+
+            try {
+                const db = getFirestore();
+                const admin = require('firebase-admin');
+
+                switch (event.type) {
+                    case 'checkout.session.completed': {
+                        const session = event.data.object;
+                        const firebaseUid = session.metadata?.firebaseUid;
+                        if (!firebaseUid) {
+                            console.warn('[Stripe Webhook] No firebaseUid in session metadata');
+                            break;
+                        }
+
+                        const plan = session.metadata?.plan || 'individual';
+                        const billingCycle = session.metadata?.billingCycle || 'monthly';
+                        const queryLimit = PLAN_QUERY_LIMITS[plan] || 100;
+
+                        await db.collection('users').doc(firebaseUid).update({
+                            plan: plan,
+                            billingCycle: billingCycle,
+                            subscriptionStatus: 'active',
+                            stripeCustomerId: session.customer,
+                            stripeSubscriptionId: session.subscription,
+                            subscribedAt: admin.firestore.Timestamp.now(),
+                            'ai.queriesLimit': queryLimit
+                        });
+
+                        console.log(`[Stripe Webhook] User ${firebaseUid} subscribed to ${plan}/${billingCycle}`);
+                        break;
+                    }
+
+                    case 'customer.subscription.updated': {
+                        const subscription = event.data.object;
+                        const firebaseUid = subscription.metadata?.firebaseUid;
+                        if (!firebaseUid) break;
+
+                        const priceId = subscription.items?.data?.[0]?.price?.id;
+                        const planInfo = getPlanFromPriceId(priceId);
+                        const status = subscription.status; // active, past_due, canceled, unpaid
+
+                        const updates = {
+                            subscriptionStatus: status === 'active' ? 'active' :
+                                               status === 'past_due' ? 'past_due' :
+                                               status === 'canceled' ? 'cancelled' : status
+                        };
+
+                        if (planInfo) {
+                            updates.plan = planInfo.plan;
+                            updates.billingCycle = planInfo.billingCycle;
+                            updates['ai.queriesLimit'] = PLAN_QUERY_LIMITS[planInfo.plan] || 100;
+                        }
+
+                        await db.collection('users').doc(firebaseUid).update(updates);
+                        console.log(`[Stripe Webhook] Subscription updated for ${firebaseUid}: ${JSON.stringify(updates)}`);
+                        break;
+                    }
+
+                    case 'customer.subscription.deleted': {
+                        const subscription = event.data.object;
+                        const firebaseUid = subscription.metadata?.firebaseUid;
+                        if (!firebaseUid) break;
+
+                        await db.collection('users').doc(firebaseUid).update({
+                            subscriptionStatus: 'cancelled',
+                            cancelledAt: admin.firestore.Timestamp.now()
+                        });
+
+                        console.log(`[Stripe Webhook] Subscription cancelled for ${firebaseUid}`);
+                        break;
+                    }
+
+                    case 'invoice.payment_failed': {
+                        const invoice = event.data.object;
+                        const customerId = invoice.customer;
+
+                        // Find user by stripeCustomerId
+                        const usersSnap = await db.collection('users')
+                            .where('stripeCustomerId', '==', customerId)
+                            .limit(1)
+                            .get();
+
+                        if (!usersSnap.empty) {
+                            const userDoc = usersSnap.docs[0];
+                            await userDoc.ref.update({
+                                subscriptionStatus: 'past_due'
+                            });
+                            console.log(`[Stripe Webhook] Payment failed for customer ${customerId}`);
+                        }
+                        break;
+                    }
+
+                    default:
+                        console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ received: true }));
+
+            } catch (err) {
+                console.error(`[Stripe Webhook] Processing error: ${err.message}`);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Webhook processing failed' }));
+            }
+        });
+        return;
+    }
+
+    // ---- Create Stripe Customer Portal Session ----
+    if (req.url === '/stripe/create-portal-session' && req.method === 'POST') {
+        if (!STRIPE_SECRET_KEY) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({ error: 'Stripe not configured' }));
+            return;
+        }
+
+        collectBody(req).then(async (body) => {
+            let payload;
+            try {
+                payload = JSON.parse(body);
+            } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { stripeCustomerId } = payload;
+            if (!stripeCustomerId) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Missing stripeCustomerId' }));
+                return;
+            }
+
+            try {
+                const stripeClient = getStripe();
+                const session = await stripeClient.billingPortal.sessions.create({
+                    customer: stripeCustomerId,
+                    return_url: `${APP_URL}/app/`
+                });
+
+                console.log(`[Stripe] Portal session created for customer ${stripeCustomerId}`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({ url: session.url }));
+
+            } catch (err) {
+                console.error(`[Stripe] Portal session error: ${err.message}`);
+                res.writeHead(500, corsHeaders);
+                res.end(JSON.stringify({ error: 'Failed to create portal session', message: err.message }));
+            }
+        });
+        return;
+    }
+
     // ---- Qdrant proxy (existing) ----
 
     // Check if Qdrant is configured
@@ -533,5 +898,12 @@ server.listen(PORT, '127.0.0.1', () => {
         console.log(`[R2] Upload configured (bucket: ${R2_BUCKET_NAME})`);
     } else {
         console.warn('[R2] WARNING: R2 credentials not set - /r2 endpoints will return 503');
+    }
+    if (STRIPE_SECRET_KEY) {
+        console.log(`[Stripe] Payment processing configured`);
+        if (STRIPE_WEBHOOK_SECRET) console.log(`[Stripe] Webhook verification configured`);
+        if (STRIPE_PRICE_INDIVIDUAL_MONTHLY) console.log(`[Stripe] Price IDs configured`);
+    } else {
+        console.warn('[Stripe] WARNING: STRIPE_SECRET_KEY not set - /stripe endpoints will return 503');
     }
 });

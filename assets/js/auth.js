@@ -298,12 +298,14 @@ const CrashLensAuth = {
         emailVerifiedAt: isVerified ? now : null,
 
         // Subscription (default to trial)
+        // Plan values: 'trial', 'individual', 'team', 'agency'
         plan: 'trial',
         billingCycle: null,
         trialEndsAt: trialEndsAt,
         trialStartedAt: isVerified ? now : null,
         subscriptionStatus: isVerified ? 'active' : 'pending_verification',
         stripeCustomerId: null,
+        stripeSubscriptionId: null,
 
         // AI Assistant
         ai: {
@@ -376,8 +378,8 @@ const CrashLensAuth = {
       return false; // Trial expired - deny access
     }
 
-    // Check paid subscription
-    return subscriptionStatus === 'active';
+    // Check paid subscription (past_due still allows temporary access)
+    return subscriptionStatus === 'active' || subscriptionStatus === 'past_due';
   },
 
   /**
@@ -525,6 +527,123 @@ const CrashLensAuth = {
     }
 
     return !this.currentUser.emailVerified;
+  },
+
+  /**
+   * Check if user has a paid plan (not trial)
+   */
+  isPaidPlan: function() {
+    if (!this.userData) return false;
+    return ['individual', 'team', 'agency'].includes(this.userData.plan);
+  },
+
+  /**
+   * Check if subscription payment is past due
+   */
+  isPaymentPastDue: function() {
+    if (!this.userData) return false;
+    return this.userData.subscriptionStatus === 'past_due';
+  },
+
+  /**
+   * Get display name for current plan
+   */
+  getPlanDisplayName: function() {
+    if (!this.userData) return 'Unknown';
+    const names = {
+      'trial': 'Free Trial',
+      'individual': 'Individual',
+      'team': 'Team',
+      'agency': 'Agency'
+    };
+    return names[this.userData.plan] || this.userData.plan;
+  },
+
+  /**
+   * Initiate Stripe Checkout for a plan
+   * Redirects user to Stripe's hosted checkout page
+   * @param {string} plan - 'individual' or 'team'
+   * @param {string} billingCycle - 'monthly' or 'annual'
+   */
+  initiateCheckout: async function(plan, billingCycle) {
+    if (!this.currentUser) {
+      throw new Error('User must be signed in to checkout');
+    }
+
+    const response = await fetch(CRASH_LENS_BASE + '/api/stripe/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        plan: plan,
+        billingCycle: billingCycle,
+        firebaseUid: this.currentUser.uid,
+        email: this.currentUser.email
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Failed to create checkout session');
+    }
+
+    const { url } = await response.json();
+    window.location.href = url;
+  },
+
+  /**
+   * Open Stripe Customer Portal for subscription management
+   * User can cancel, change plan, update payment method
+   */
+  openBillingPortal: async function() {
+    if (!this.userData?.stripeCustomerId) {
+      throw new Error('No billing account found');
+    }
+
+    const response = await fetch(CRASH_LENS_BASE + '/api/stripe/create-portal-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stripeCustomerId: this.userData.stripeCustomerId
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Failed to open billing portal');
+    }
+
+    const { url } = await response.json();
+    window.location.href = url;
+  },
+
+  /**
+   * Store pending plan selection (for post-auth checkout redirect)
+   */
+  setPendingCheckout: function(plan, billingCycle) {
+    sessionStorage.setItem('pendingPlan', plan);
+    sessionStorage.setItem('pendingBilling', billingCycle);
+  },
+
+  /**
+   * Get and clear pending plan selection
+   * @returns {{ plan: string, billingCycle: string } | null}
+   */
+  getPendingCheckout: function() {
+    const plan = sessionStorage.getItem('pendingPlan');
+    const billingCycle = sessionStorage.getItem('pendingBilling');
+    if (plan && billingCycle) {
+      sessionStorage.removeItem('pendingPlan');
+      sessionStorage.removeItem('pendingBilling');
+      return { plan, billingCycle };
+    }
+    return null;
+  },
+
+  /**
+   * Check if there's a pending checkout from the pricing page
+   */
+  hasPendingCheckout: function() {
+    return !!(sessionStorage.getItem('pendingPlan') && sessionStorage.getItem('pendingBilling'));
   }
 };
 

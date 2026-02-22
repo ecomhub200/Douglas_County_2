@@ -85,7 +85,17 @@ COPY supervisord.conf /etc/supervisord.conf
 # FIREBASE_MESSAGING_SENDER_ID - Firebase messaging sender ID
 # FIREBASE_APP_ID           - Firebase app ID
 #
+# STRIPE_PUBLISHABLE_KEY          - Stripe publishable key (client-side, injected into api-keys.json)
+#
 # Server-side secrets
+# STRIPE_SECRET_KEY               - Stripe secret key (server-side only)
+# STRIPE_WEBHOOK_SECRET           - Stripe webhook signing secret
+# STRIPE_PRICE_INDIVIDUAL_MONTHLY - Stripe Price ID for Individual monthly
+# STRIPE_PRICE_INDIVIDUAL_ANNUAL  - Stripe Price ID for Individual annual
+# STRIPE_PRICE_TEAM_MONTHLY       - Stripe Price ID for Team monthly
+# STRIPE_PRICE_TEAM_ANNUAL        - Stripe Price ID for Team annual
+# APP_URL                         - Application URL for Stripe redirects
+# FIREBASE_SERVICE_ACCOUNT        - Firebase Admin SDK service account JSON
 # BREVO_API_KEY         - Brevo v3 API key (starts with xkeysib-)
 # BREVO_SMTP_LOGIN      - Brevo SMTP login email
 # BREVO_SMTP_PASSWORD   - Brevo SMTP password

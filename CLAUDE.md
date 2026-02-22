@@ -81,28 +81,92 @@ When working on this project, act as:
 ## Project-Specific Guidelines
 
 ### Architecture
-- This is a **browser-based crash analysis tool** for Virginia transportation agencies
-- Main application is in `index.html` (single-file application)
-- Configuration stored in `config.json`
+- This is a **browser-based crash analysis tool** for transportation agencies (multi-state)
+- Main application is in `app/index.html` (single-file SPA)
+- Marketing site is at root level (`index.html`, `pricing.html`, `features.html`, etc.)
+- Authentication via Firebase Auth (`assets/js/auth.js`) with Google OAuth + Email/Password
+- Payment processing via **Stripe Checkout** (redirect mode)
+- Configuration stored in `config.json` and `config/api-keys.json`
 - Data processing scripts in Python (`download_crash_data.py`, `download_grants_data.py`)
+
+### Hosting: Coolify (Docker)
+- **Docker container** running Nginx (static files, port 80) + Node.js API server (port 3001)
+- Managed by **supervisord** (`supervisord.conf`)
+- Nginx proxies `/api/*` to the Node.js server at `http://127.0.0.1:3001/`
+- Environment variables injected via **Coolify Dashboard** → `entrypoint.sh` → `config/api-keys.json`
+- Client-side API keys (Mapbox, Google Maps, Firebase, Stripe publishable key) go into `api-keys.json`
+- Server-side secrets (Stripe secret key, Firebase Admin, Brevo, Qdrant) stay as env vars
 
 ### File Structure
 ```
-henrico_crash_tool/
-├── index.html              # Main application (single-file)
-├── config.json             # Configuration
-├── data/                   # Data files
-├── config/                 # Additional config
+crash-lens/
+├── index.html              # Marketing homepage
+├── pricing.html            # Pricing page (Stripe Checkout integration)
+├── features.html           # Features page
+├── contact.html            # Contact form
+├── contact-sales.html      # Sales inquiry form
+├── app/
+│   └── index.html          # Main crash analysis application (single-file SPA)
+├── login/
+│   └── index.html          # Authentication page (sign in/sign up)
+├── assets/
+│   ├── js/
+│   │   ├── auth.js         # CrashLensAuth module (Firebase Auth + Stripe checkout helpers)
+│   │   ├── firebase-config.js  # Firebase SDK initialization
+│   │   └── firebase-config.example.js
+│   └── css/
+│       └── styles.css      # Global stylesheet
+├── server/
+│   ├── qdrant-proxy.js     # Node.js API server (Qdrant, Brevo, R2, Stripe endpoints)
+│   └── package.json        # Server dependencies (stripe, firebase-admin, @aws-sdk/client-s3)
+├── config/
+│   ├── api-keys.json       # Runtime-generated client API keys (NOT in git)
+│   ├── api-keys.example.json
+│   └── settings.json
+├── config.json             # Application configuration (state/jurisdiction data)
+├── data/                   # Crash data files and imagery
+├── states/                 # State-specific configurations
 ├── docs/                   # Documentation
-└── .github/workflows/      # CI/CD workflows
+├── .github/workflows/      # CI/CD pipelines (data download, deployment)
+├── netlify/functions/      # Netlify serverless functions (legacy, also works for Netlify deploys)
+├── Dockerfile              # Docker container definition
+├── nginx.conf              # Nginx web server configuration
+├── entrypoint.sh           # Container startup (env vars → api-keys.json)
+├── supervisord.conf        # Process manager (Nginx + Node.js)
+├── .env.example            # Environment variable documentation
+└── netlify.toml            # Netlify deployment config (secondary deploy option)
 ```
 
+### Payment Architecture (Stripe)
+
+**Server endpoints** (in `server/qdrant-proxy.js`):
+- `POST /api/stripe/create-checkout-session` — Creates Stripe Checkout session, redirects to Stripe
+- `POST /api/stripe/webhook` — Handles Stripe events, updates Firestore user documents
+- `POST /api/stripe/create-portal-session` — Creates Stripe Customer Portal session
+- `GET /api/stripe/status` — Checks Stripe configuration status
+
+**Client-side** (in `assets/js/auth.js`):
+- `CrashLensAuth.initiateCheckout(plan, billingCycle)` — Calls server, redirects to Stripe
+- `CrashLensAuth.openBillingPortal()` — Opens Stripe Customer Portal
+- `CrashLensAuth.setPendingCheckout()` / `getPendingCheckout()` — Stores plan selection across login flow
+
+**Plan values**: `'trial'`, `'individual'`, `'team'`, `'agency'`
+
+**Environment variables for Stripe**:
+- `STRIPE_SECRET_KEY` — Server-side only
+- `STRIPE_PUBLISHABLE_KEY` — Injected into `api-keys.json` for client
+- `STRIPE_WEBHOOK_SECRET` — For webhook signature verification
+- `STRIPE_PRICE_INDIVIDUAL_MONTHLY`, `STRIPE_PRICE_INDIVIDUAL_ANNUAL` — Stripe Price IDs
+- `STRIPE_PRICE_TEAM_MONTHLY`, `STRIPE_PRICE_TEAM_ANNUAL` — Stripe Price IDs
+- `FIREBASE_SERVICE_ACCOUNT` — Firebase Admin SDK JSON for server-side Firestore updates
+
 ### Before Making Changes
-1. Read relevant sections of `index.html`
+1. Read relevant sections of `app/index.html`
 2. Check `config.json` for related settings
 3. Review existing documentation in `docs/`
 4. Understand the tab-based UI structure
 5. Test changes don't break other tabs/features
+6. Check `server/qdrant-proxy.js` for backend endpoint patterns
 
 ## Pull Request Process
 
