@@ -889,11 +889,75 @@
     let resendCooldown = 0;
     let resendInterval = null;
 
+    // ═══════════════════════════════════════════════════════════════
+    // PLAN SELECTION CONTEXT (from pricing page redirect)
+    // ═══════════════════════════════════════════════════════════════
+    const PLAN_DISPLAY_NAMES = { individual: 'Individual', team: 'Team' };
+
+    function capturePlanFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const plan = urlParams.get('plan');
+      const billing = urlParams.get('billing');
+      if (plan && billing) {
+        CrashLensAuth.setPendingCheckout(plan, billing);
+        return { plan, billing };
+      }
+      return null;
+    }
+
+    function updateUiForPendingPlan() {
+      const pending = CrashLensAuth.hasPendingCheckout ? {
+        plan: sessionStorage.getItem('pendingPlan'),
+        billing: sessionStorage.getItem('pendingBilling')
+      } : null;
+
+      if (pending && pending.plan) {
+        const planName = PLAN_DISPLAY_NAMES[pending.plan] || pending.plan;
+        const subtitle = document.getElementById('formSubtitle');
+        if (subtitle && subtitle.textContent.includes('crash analysis tools')) {
+          subtitle.textContent = 'Sign in to subscribe to the ' + planName + ' plan';
+        }
+      }
+    }
+
+    /**
+     * After successful auth, redirect to checkout if a plan was selected,
+     * otherwise redirect to the app.
+     */
+    async function redirectAfterAuth() {
+      const pendingCheckout = CrashLensAuth.getPendingCheckout();
+      if (pendingCheckout) {
+        try {
+          showSuccess('Redirecting to checkout...');
+          await CrashLensAuth.initiateCheckout(pendingCheckout.plan, pendingCheckout.billingCycle);
+        } catch (err) {
+          console.error('Checkout redirect failed:', err);
+          // Fall back to app
+          window.location.href = '../app/';
+        }
+      } else {
+        const intended = sessionStorage.getItem('authRedirect');
+        sessionStorage.removeItem('authRedirect');
+        window.location.href = intended || '../app/';
+      }
+    }
+
     // Check if already authenticated
     document.addEventListener('DOMContentLoaded', function() {
       // Load config and populate state dropdown for sign-up form
       loadSignupConfig();
       populateSignupStateDropdown();
+
+      // Capture plan selection from pricing page URL params
+      const planFromUrl = capturePlanFromUrl();
+      if (planFromUrl) {
+        // Auto-show sign-up tab when coming from pricing page
+        setTimeout(() => {
+          switchTab('signup');
+          updateUiForPendingPlan();
+        }, 0);
+      }
+
       if (window.isFirebaseConfigured) {
         const urlParams = new URLSearchParams(window.location.search);
         const reason = urlParams.get('reason');
@@ -927,11 +991,12 @@
               if (CrashLensAuth.needsEmailVerification()) {
                 showVerificationPending(user.email);
               } else {
-                // Verified - redirect to app
-                const intended = sessionStorage.getItem('authRedirect');
-                sessionStorage.removeItem('authRedirect');
-                window.location.href = intended || '../app/';
+                // Verified - redirect to checkout or app
+                await redirectAfterAuth();
               }
+            } else {
+              // Not logged in - update UI for plan context
+              updateUiForPendingPlan();
             }
           });
         }
@@ -945,8 +1010,9 @@
           const verified = await CrashLensAuth.checkEmailVerification();
           if (verified) {
             showSuccess('Email verified! Starting your 14-day trial...');
-            setTimeout(() => {
-              window.location.href = '../app/';
+            setTimeout(async () => {
+              CrashLensAuth.userData = await CrashLensAuth.getUserData();
+              await redirectAfterAuth();
             }, 1500);
           } else {
             showVerificationPending(user.email);
@@ -1035,7 +1101,9 @@
       hideMessages();
       try {
         await CrashLensAuth.signInWithGoogle();
-        window.location.href = '../app/';
+        // Load user data before redirect
+        CrashLensAuth.userData = await CrashLensAuth.getUserData();
+        await redirectAfterAuth();
       } catch (error) {
         showError(CrashLensAuth.getErrorMessage(error));
       }
@@ -1073,7 +1141,9 @@
           showVerificationPending(email);
           setLoading('signinBtn', false);
         } else {
-          window.location.href = '../app/';
+          // Load user data before redirect
+          CrashLensAuth.userData = await CrashLensAuth.getUserData();
+          await redirectAfterAuth();
         }
       } catch (error) {
         showError(CrashLensAuth.getErrorMessage(error));
@@ -1202,8 +1272,9 @@
 
         if (verified) {
           showSuccess('Email verified! Starting your 14-day trial...');
-          setTimeout(() => {
-            window.location.href = '../app/';
+          setTimeout(async () => {
+            CrashLensAuth.userData = await CrashLensAuth.getUserData();
+            await redirectAfterAuth();
           }, 1500);
         } else {
           showError('Email not yet verified. Please click the link in your email.');

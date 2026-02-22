@@ -18,6 +18,7 @@ HAS_CLIENT_KEYS=""
 [ -n "$GOOGLE_MAPS_API_KEY" ] && HAS_CLIENT_KEYS="1"
 [ -n "$MAPILLARY_ACCESS_TOKEN" ] && HAS_CLIENT_KEYS="1"
 [ -n "$FIREBASE_API_KEY" ] && HAS_CLIENT_KEYS="1"
+[ -n "$STRIPE_PUBLISHABLE_KEY" ] && HAS_CLIENT_KEYS="1"
 
 if [ -n "$HAS_CLIENT_KEYS" ]; then
     echo "[Entrypoint] Generating api-keys.json from environment variables..."
@@ -35,11 +36,13 @@ if [ -n "$HAS_CLIENT_KEYS" ]; then
       --arg fs "${FIREBASE_STORAGE_BUCKET:-}" \
       --arg fm "${FIREBASE_MESSAGING_SENDER_ID:-}" \
       --arg fa "${FIREBASE_APP_ID:-}" \
+      --arg sk "${STRIPE_PUBLISHABLE_KEY:-}" \
       '{
         mapbox:    { accessToken: $mb },
         google:    { mapsApiKey: $gm },
         mapillary: { accessToken: $ml },
-        firebase:  { apiKey: $fk, authDomain: $fd, projectId: $fp, storageBucket: $fs, messagingSenderId: $fm, appId: $fa }
+        firebase:  { apiKey: $fk, authDomain: $fd, projectId: $fp, storageBucket: $fs, messagingSenderId: $fm, appId: $fa },
+        stripe:    { publishableKey: $sk }
       }' > "$API_KEYS_FILE"
 
     echo "[Entrypoint] api-keys.json written successfully"
@@ -53,6 +56,7 @@ if [ -n "$HAS_CLIENT_KEYS" ]; then
     [ -n "$FIREBASE_STORAGE_BUCKET" ]    && echo "[Entrypoint]   - FIREBASE_STORAGE_BUCKET: set (${#FIREBASE_STORAGE_BUCKET} chars)"
     [ -n "$FIREBASE_MESSAGING_SENDER_ID" ] && echo "[Entrypoint]   - FIREBASE_MESSAGING_SENDER_ID: set (${#FIREBASE_MESSAGING_SENDER_ID} chars)"
     [ -n "$FIREBASE_APP_ID" ]            && echo "[Entrypoint]   - FIREBASE_APP_ID: set (${#FIREBASE_APP_ID} chars)"
+    [ -n "$STRIPE_PUBLISHABLE_KEY" ]     && echo "[Entrypoint]   - STRIPE_PUBLISHABLE_KEY: set (${#STRIPE_PUBLISHABLE_KEY} chars)"
 else
     echo "[Entrypoint] No API key env vars detected, skipping api-keys.json generation"
 fi
