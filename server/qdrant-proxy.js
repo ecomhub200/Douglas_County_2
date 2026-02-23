@@ -859,6 +859,70 @@ const server = http.createServer((req, res) => {
                         break;
                     }
 
+                    case 'customer.subscription.trial_will_end': {
+                        const subscription = event.data.object;
+                        const customerId = subscription.customer;
+                        const trialEndTs = subscription.trial_end;
+
+                        // Find user by stripeCustomerId
+                        const trialUsersSnap = await db.collection('users')
+                            .where('stripeCustomerId', '==', customerId)
+                            .limit(1)
+                            .get();
+
+                        if (!trialUsersSnap.empty) {
+                            const trialUserDoc = trialUsersSnap.docs[0];
+                            const trialUserData = trialUserDoc.data();
+
+                            // Store when the trial-ending notification was sent
+                            await trialUserDoc.ref.update({
+                                trialEndingNotifiedAt: admin.firestore.Timestamp.now()
+                            });
+
+                            console.log(`[Stripe Webhook] Trial ending soon for customer ${customerId}`);
+
+                            // Send trial ending notification email via Brevo
+                            if (BREVO_API_KEY && NOTIFICATION_FROM_EMAIL && trialUserData.email) {
+                                try {
+                                    const trialEndDate = trialEndTs
+                                        ? new Date(trialEndTs * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                                        : 'soon';
+                                    const planName = (trialUserData.plan || 'subscription').charAt(0).toUpperCase() + (trialUserData.plan || 'subscription').slice(1);
+                                    await sendViaBrevoApi(
+                                        trialUserData.email,
+                                        'CRASH LENS - Your Trial Is Ending Soon',
+                                        `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+                                            <h2 style="color:#1e3a5f;">Your Trial Ends ${trialEndDate}</h2>
+                                            <p>Hi${trialUserData.displayName ? ' ' + trialUserData.displayName : ''},</p>
+                                            <p>Your free trial of the <strong>${planName}</strong> plan is ending on <strong>${trialEndDate}</strong>.</p>
+                                            <p>To continue using CRASH LENS without interruption, please add a payment method before your trial expires.</p>
+                                            <p>If you don't add a payment method, your subscription will be canceled and you'll lose access to premium features including:</p>
+                                            <ul style="color:#374151;line-height:1.8;">
+                                                <li>AI-powered crash analysis</li>
+                                                <li>Safety countermeasure recommendations</li>
+                                                <li>Grant application assistance</li>
+                                                <li>Advanced reporting tools</li>
+                                            </ul>
+                                            <p style="margin:24px 0;">
+                                                <a href="${APP_URL}/app/" style="background:#1e40af;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Add Payment Method</a>
+                                            </p>
+                                            <p style="color:#6b7280;font-size:0.875rem;">If you have any questions, please contact us at support@aicreatesai.com</p>
+                                            <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+                                            <p style="color:#9ca3af;font-size:0.75rem;">CRASH LENS - Crash Analysis Tools for Transportation Agencies</p>
+                                        </div>`,
+                                        `Your CRASH LENS ${planName} trial ends on ${trialEndDate}. Add a payment method at ${APP_URL}/app/ to continue using the service.`
+                                    );
+                                    console.log(`[Stripe Webhook] Trial ending email sent to ${trialUserData.email}`);
+                                } catch (emailErr) {
+                                    console.error(`[Stripe Webhook] Failed to send trial ending email: ${emailErr.message}`);
+                                }
+                            }
+                        } else {
+                            console.warn(`[Stripe Webhook] No user found for customer ${customerId} (trial_will_end)`);
+                        }
+                        break;
+                    }
+
                     case 'invoice.payment_failed': {
                         const invoice = event.data.object;
                         const customerId = invoice.customer;
