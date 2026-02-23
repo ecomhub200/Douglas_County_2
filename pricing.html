@@ -1097,6 +1097,11 @@
       }
 
       try {
+        // Wait for auth to finish initializing before checking login state
+        // This prevents a race condition where the user clicks "Get Started"
+        // before Firebase auth has resolved (e.g. navigating from the app)
+        await CrashLensAuth.waitForAuth();
+
         // Check if user is logged in
         if (CrashLensAuth.currentUser && CrashLensAuth.userData) {
           // User is logged in → go directly to Stripe Checkout

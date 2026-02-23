@@ -21,13 +21,36 @@ const CrashLensAuth = {
   currentUser: null,
   userData: null,
 
+  // Promise that resolves once the first auth state check completes
+  _authReadyResolve: null,
+  authReady: null,
+
+  /**
+   * Wait for auth to be fully initialized (first onAuthStateChanged).
+   * Returns a promise that resolves to the current user (or null).
+   */
+  waitForAuth: function() {
+    return this.authReady || Promise.resolve(null);
+  },
+
   /**
    * Initialize authentication listener
    * Call this on every page that needs auth state
    */
   init: function(callback) {
+    // Create the authReady promise (only once)
+    if (!this.authReady) {
+      this.authReady = new Promise((resolve) => {
+        this._authReadyResolve = resolve;
+      });
+    }
+
     if (!window.isFirebaseConfigured) {
       console.warn('Firebase not configured - auth disabled');
+      if (this._authReadyResolve) {
+        this._authReadyResolve(null);
+        this._authReadyResolve = null;
+      }
       if (callback) callback(null);
       return;
     }
@@ -48,6 +71,12 @@ const CrashLensAuth = {
         // User is signed out
         console.log('User signed out');
         this.userData = null;
+      }
+
+      // Resolve authReady on the first callback
+      if (this._authReadyResolve) {
+        this._authReadyResolve(user);
+        this._authReadyResolve = null;
       }
 
       if (callback) callback(user);
