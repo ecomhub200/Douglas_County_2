@@ -893,7 +893,7 @@ const server = http.createServer((req, res) => {
                                             <p style="margin:24px 0;">
                                                 <a href="${APP_URL}/app/" style="background:#1e40af;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Update Payment Method</a>
                                             </p>
-                                            <p style="color:#6b7280;font-size:0.875rem;">If you have any questions, please contact us at support@crashlens.aicreatesai.com</p>
+                                            <p style="color:#6b7280;font-size:0.875rem;">If you have any questions, please contact us at support@aicreatesai.com</p>
                                             <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
                                             <p style="color:#9ca3af;font-size:0.75rem;">CRASH LENS - Crash Analysis Tools for Transportation Agencies</p>
                                         </div>`,
