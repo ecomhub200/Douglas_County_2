@@ -705,6 +705,7 @@ const server = http.createServer((req, res) => {
     // ---- Stripe Webhook ----
     if (req.url === '/stripe/webhook' && req.method === 'POST') {
         if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET) {
+            console.error('[Stripe Webhook] Not configured — STRIPE_SECRET_KEY:', !!STRIPE_SECRET_KEY, 'STRIPE_WEBHOOK_SECRET:', !!STRIPE_WEBHOOK_SECRET);
             res.writeHead(503, corsHeaders);
             res.end(JSON.stringify({ error: 'Stripe webhook not configured' }));
             return;
@@ -717,29 +718,48 @@ const server = http.createServer((req, res) => {
             const rawBody = Buffer.concat(chunks);
             const sig = req.headers['stripe-signature'];
 
+            if (!sig) {
+                console.error('[Stripe Webhook] Missing stripe-signature header');
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing stripe-signature header' }));
+                return;
+            }
+
             let event;
             try {
                 const stripeClient = getStripe();
                 event = stripeClient.webhooks.constructEvent(rawBody, sig, STRIPE_WEBHOOK_SECRET);
             } catch (err) {
                 console.error(`[Stripe Webhook] Signature verification failed: ${err.message}`);
+                console.error(`[Stripe Webhook] Sig header: ${sig ? sig.substring(0, 30) + '...' : 'MISSING'}`);
+                console.error(`[Stripe Webhook] Raw body length: ${rawBody.length} bytes`);
                 res.writeHead(400, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Webhook signature verification failed' }));
                 return;
             }
 
-            console.log(`[Stripe Webhook] Received event: ${event.type}`);
+            console.log(`[Stripe Webhook] Received event: ${event.type} (id: ${event.id})`);
+
+            // Initialize shared dependencies
+            let db, admin;
+            try {
+                db = getFirestore();
+                admin = require('firebase-admin');
+            } catch (initErr) {
+                console.error(`[Stripe Webhook] Failed to initialize Firebase: ${initErr.message}`);
+                console.error(`[Stripe Webhook] Stack: ${initErr.stack}`);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Webhook processing failed', detail: 'Firebase initialization error' }));
+                return;
+            }
 
             try {
-                const db = getFirestore();
-                const admin = require('firebase-admin');
-
                 switch (event.type) {
                     case 'checkout.session.completed': {
                         const session = event.data.object;
                         const firebaseUid = session.metadata?.firebaseUid;
                         if (!firebaseUid) {
-                            console.warn('[Stripe Webhook] No firebaseUid in session metadata');
+                            console.warn('[Stripe Webhook] No firebaseUid in session metadata — skipping. Session ID:', session.id);
                             break;
                         }
 
@@ -747,6 +767,8 @@ const server = http.createServer((req, res) => {
                         const billingCycle = session.metadata?.billingCycle || 'monthly';
                         const queryLimit = PLAN_QUERY_LIMITS[plan] || 100;
                         const seats = PLAN_SEATS[plan] || 1;
+
+                        console.log(`[Stripe Webhook] checkout.session.completed — uid: ${firebaseUid}, plan: ${plan}, cycle: ${billingCycle}, customer: ${session.customer}, subscription: ${session.subscription}`);
 
                         // Retrieve full subscription to get period details
                         const stripeClient = getStripe();
@@ -766,8 +788,9 @@ const server = http.createServer((req, res) => {
                                     ? admin.firestore.Timestamp.fromMillis(sub.trial_end * 1000)
                                     : null;
                                 subStatus = sub.status === 'trialing' ? 'trialing' : 'active';
+                                console.log(`[Stripe Webhook] Subscription ${session.subscription} status: ${sub.status}, period_end: ${sub.current_period_end}`);
                             } catch (subErr) {
-                                console.warn('[Stripe Webhook] Could not retrieve subscription details:', subErr.message);
+                                console.error(`[Stripe Webhook] Could not retrieve subscription ${session.subscription}: ${subErr.message}`);
                             }
                         }
 
@@ -786,7 +809,8 @@ const server = http.createServer((req, res) => {
                         if (trialEnd) updateData.trialEnd = trialEnd;
                         updateData.cancelAtPeriodEnd = cancelAtPeriodEnd;
 
-                        await db.collection('users').doc(firebaseUid).update(updateData);
+                        // Use set+merge so it works even if user doc doesn't exist yet
+                        await db.collection('users').doc(firebaseUid).set(updateData, { merge: true });
 
                         console.log(`[Stripe Webhook] User ${firebaseUid} subscribed to ${plan}/${billingCycle} (status: ${subStatus})`);
                         break;
@@ -795,11 +819,16 @@ const server = http.createServer((req, res) => {
                     case 'customer.subscription.updated': {
                         const subscription = event.data.object;
                         const firebaseUid = subscription.metadata?.firebaseUid;
-                        if (!firebaseUid) break;
+                        if (!firebaseUid) {
+                            console.warn(`[Stripe Webhook] No firebaseUid in subscription.updated metadata — skipping. Sub ID: ${subscription.id}`);
+                            break;
+                        }
 
                         const priceId = subscription.items?.data?.[0]?.price?.id;
                         const planInfo = getPlanFromPriceId(priceId);
                         const status = subscription.status; // active, trialing, past_due, canceled, unpaid
+
+                        console.log(`[Stripe Webhook] subscription.updated — uid: ${firebaseUid}, status: ${status}, priceId: ${priceId}, cancelAtPeriodEnd: ${subscription.cancel_at_period_end}`);
 
                         const updates = {
                             subscriptionStatus: status === 'active' ? 'active' :
@@ -830,7 +859,8 @@ const server = http.createServer((req, res) => {
                             updates['ai.queriesLimit'] = PLAN_QUERY_LIMITS[planInfo.plan] || 100;
                         }
 
-                        await db.collection('users').doc(firebaseUid).update(updates);
+                        // Use set+merge so it works even if user doc doesn't exist yet
+                        await db.collection('users').doc(firebaseUid).set(updates, { merge: true });
                         console.log(`[Stripe Webhook] Subscription updated for ${firebaseUid}: ${JSON.stringify(updates)}`);
                         break;
                     }
@@ -838,7 +868,12 @@ const server = http.createServer((req, res) => {
                     case 'customer.subscription.deleted': {
                         const subscription = event.data.object;
                         const firebaseUid = subscription.metadata?.firebaseUid;
-                        if (!firebaseUid) break;
+                        if (!firebaseUid) {
+                            console.warn(`[Stripe Webhook] No firebaseUid in subscription.deleted metadata — skipping. Sub ID: ${subscription.id}`);
+                            break;
+                        }
+
+                        console.log(`[Stripe Webhook] subscription.deleted — uid: ${firebaseUid}, sub: ${subscription.id}`);
 
                         const cancelUpdates = {
                             subscriptionStatus: 'canceled',
@@ -853,7 +888,8 @@ const server = http.createServer((req, res) => {
                             );
                         }
 
-                        await db.collection('users').doc(firebaseUid).update(cancelUpdates);
+                        // Use set+merge so it works even if user doc doesn't exist yet
+                        await db.collection('users').doc(firebaseUid).set(cancelUpdates, { merge: true });
 
                         console.log(`[Stripe Webhook] Subscription canceled for ${firebaseUid}`);
                         break;
@@ -927,46 +963,51 @@ const server = http.createServer((req, res) => {
                         const invoice = event.data.object;
                         const customerId = invoice.customer;
 
+                        console.log(`[Stripe Webhook] invoice.payment_failed — customer: ${customerId}, invoice: ${invoice.id}`);
+
                         // Find user by stripeCustomerId
                         const usersSnap = await db.collection('users')
                             .where('stripeCustomerId', '==', customerId)
                             .limit(1)
                             .get();
 
-                        if (!usersSnap.empty) {
-                            const userDoc = usersSnap.docs[0];
-                            const userData = userDoc.data();
-                            await userDoc.ref.update({
-                                subscriptionStatus: 'past_due',
-                                lastPaymentFailedAt: admin.firestore.Timestamp.now()
-                            });
-                            console.log(`[Stripe Webhook] Payment failed for customer ${customerId}`);
+                        if (usersSnap.empty) {
+                            console.warn(`[Stripe Webhook] No user found for stripeCustomerId: ${customerId}`);
+                            break;
+                        }
 
-                            // Send payment failure notification email via Brevo
-                            if (BREVO_API_KEY && NOTIFICATION_FROM_EMAIL && userData.email) {
-                                try {
-                                    const planName = (userData.plan || 'subscription').charAt(0).toUpperCase() + (userData.plan || 'subscription').slice(1);
-                                    await sendViaBrevoApi(
-                                        userData.email,
-                                        'CRASH LENS - Payment Failed',
-                                        `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-                                            <h2 style="color:#1e3a5f;">Payment Issue</h2>
-                                            <p>Hi${userData.displayName ? ' ' + userData.displayName : ''},</p>
-                                            <p>We were unable to process your payment for your <strong>${planName}</strong> plan.</p>
-                                            <p>Please update your payment method to avoid any disruption to your service.</p>
-                                            <p style="margin:24px 0;">
-                                                <a href="${APP_URL}/app/" style="background:#1e40af;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Update Payment Method</a>
-                                            </p>
-                                            <p style="color:#6b7280;font-size:0.875rem;">If you have any questions, please contact us at support@aicreatesai.com</p>
-                                            <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
-                                            <p style="color:#9ca3af;font-size:0.75rem;">CRASH LENS - Crash Analysis Tools for Transportation Agencies</p>
-                                        </div>`,
-                                        `Payment failed for your CRASH LENS ${planName} plan. Please update your payment method at ${APP_URL}/app/`
-                                    );
-                                    console.log(`[Stripe Webhook] Payment failure email sent to ${userData.email}`);
-                                } catch (emailErr) {
-                                    console.error(`[Stripe Webhook] Failed to send payment failure email: ${emailErr.message}`);
-                                }
+                        const userDoc = usersSnap.docs[0];
+                        const userData = userDoc.data();
+                        await userDoc.ref.update({
+                            subscriptionStatus: 'past_due',
+                            lastPaymentFailedAt: admin.firestore.Timestamp.now()
+                        });
+                        console.log(`[Stripe Webhook] Payment failed — marked user ${userDoc.id} as past_due`);
+
+                        // Send payment failure notification email via Brevo
+                        if (BREVO_API_KEY && NOTIFICATION_FROM_EMAIL && userData.email) {
+                            try {
+                                const planName = (userData.plan || 'subscription').charAt(0).toUpperCase() + (userData.plan || 'subscription').slice(1);
+                                await sendViaBrevoApi(
+                                    userData.email,
+                                    'CRASH LENS - Payment Failed',
+                                    `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+                                        <h2 style="color:#1e3a5f;">Payment Issue</h2>
+                                        <p>Hi${userData.displayName ? ' ' + userData.displayName : ''},</p>
+                                        <p>We were unable to process your payment for your <strong>${planName}</strong> plan.</p>
+                                        <p>Please update your payment method to avoid any disruption to your service.</p>
+                                        <p style="margin:24px 0;">
+                                            <a href="${APP_URL}/app/" style="background:#1e40af;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Update Payment Method</a>
+                                        </p>
+                                        <p style="color:#6b7280;font-size:0.875rem;">If you have any questions, please contact us at support@aicreatesai.com</p>
+                                        <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+                                        <p style="color:#9ca3af;font-size:0.75rem;">CRASH LENS - Crash Analysis Tools for Transportation Agencies</p>
+                                    </div>`,
+                                    `Payment failed for your CRASH LENS ${planName} plan. Please update your payment method at ${APP_URL}/app/`
+                                );
+                                console.log(`[Stripe Webhook] Payment failure email sent to ${userData.email}`);
+                            } catch (emailErr) {
+                                console.error(`[Stripe Webhook] Failed to send payment failure email: ${emailErr.message}`);
                             }
                         }
                         break;
@@ -980,9 +1021,12 @@ const server = http.createServer((req, res) => {
                 res.end(JSON.stringify({ received: true }));
 
             } catch (err) {
-                console.error(`[Stripe Webhook] Processing error: ${err.message}`);
+                console.error(`[Stripe Webhook] Processing error for event ${event.type} (${event.id}):`);
+                console.error(`[Stripe Webhook] Error message: ${err.message}`);
+                console.error(`[Stripe Webhook] Error code: ${err.code || 'N/A'}`);
+                console.error(`[Stripe Webhook] Stack trace: ${err.stack}`);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Webhook processing failed' }));
+                res.end(JSON.stringify({ error: 'Webhook processing failed', detail: err.message }));
             }
         });
         return;
