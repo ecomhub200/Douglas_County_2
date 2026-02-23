@@ -13,6 +13,8 @@
 const http = require('http');
 const https = require('https');
 const url = require('url');
+const fs = require('fs');
+const path = require('path');
 const { S3Client, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 
 const PORT = process.env.PROXY_PORT || 3001;
@@ -295,17 +297,8 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // ---- Brevo newsletter subscription (Contacts API) ----
+    // ---- Brevo newsletter subscription (Contacts API) with local file fallback ----
     if (req.url === '/subscribe' && req.method === 'POST') {
-        if (!BREVO_API_KEY) {
-            res.writeHead(503, corsHeaders);
-            res.end(JSON.stringify({
-                error: 'Newsletter not configured',
-                message: 'Set BREVO_API_KEY in environment variables'
-            }));
-            return;
-        }
-
         collectBody(req).then(body => {
             let payload;
             try {
@@ -320,6 +313,51 @@ const server = http.createServer((req, res) => {
             if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                 res.writeHead(400, corsHeaders);
                 res.end(JSON.stringify({ error: 'Valid email address is required' }));
+                return;
+            }
+
+            // Helper: save subscriber to local JSON file
+            function saveToLocalFile(email) {
+                const subscribersPath = path.join(__dirname, '..', 'data', 'subscribers.json');
+                try {
+                    let fileData = { subscribers: [] };
+                    if (fs.existsSync(subscribersPath)) {
+                        fileData = JSON.parse(fs.readFileSync(subscribersPath, 'utf8'));
+                    }
+                    // Check for duplicate
+                    const existing = fileData.subscribers.find(s => s.email && s.email.toLowerCase() === email.toLowerCase());
+                    if (existing) {
+                        return { status: 409, message: 'Already subscribed' };
+                    }
+                    fileData.subscribers.push({
+                        id: `sub-${Date.now()}`,
+                        email: email,
+                        addedAt: new Date().toISOString(),
+                        source: 'website_newsletter'
+                    });
+                    fileData.lastUpdated = new Date().toISOString();
+                    fs.writeFileSync(subscribersPath, JSON.stringify(fileData, null, 2));
+                    console.log(`[Newsletter] Subscriber saved locally: ${email}`);
+                    return { status: 201, message: 'Subscribed successfully' };
+                } catch (err) {
+                    console.error(`[Newsletter] Local save failed: ${err.message}`);
+                    return { status: 500, message: 'Failed to save subscription' };
+                }
+            }
+
+            // If Brevo is not configured, fall back to local file storage
+            if (!BREVO_API_KEY) {
+                const result = saveToLocalFile(email);
+                if (result.status === 409) {
+                    res.writeHead(409, corsHeaders);
+                    res.end(JSON.stringify({ success: true, message: result.message }));
+                } else if (result.status === 201) {
+                    res.writeHead(201, corsHeaders);
+                    res.end(JSON.stringify({ success: true, message: result.message }));
+                } else {
+                    res.writeHead(result.status, corsHeaders);
+                    res.end(JSON.stringify({ error: 'Subscription failed', message: result.message }));
+                }
                 return;
             }
 
@@ -350,6 +388,9 @@ const server = http.createServer((req, res) => {
                 let data = '';
                 apiRes.on('data', chunk => { data += chunk; });
                 apiRes.on('end', () => {
+                    // Also save locally as backup
+                    saveToLocalFile(email);
+
                     if (apiRes.statusCode === 201) {
                         console.log(`[Brevo] Newsletter subscriber added: ${email}`);
                         res.writeHead(201, corsHeaders);
@@ -373,8 +414,15 @@ const server = http.createServer((req, res) => {
 
             apiReq.on('error', (err) => {
                 console.error(`[Brevo] Subscribe request failed: ${err.message}`);
-                res.writeHead(502, corsHeaders);
-                res.end(JSON.stringify({ error: 'Service unavailable', message: err.message }));
+                // Fall back to local save on Brevo error
+                const result = saveToLocalFile(email);
+                if (result.status === 201 || result.status === 409) {
+                    res.writeHead(result.status === 409 ? 409 : 201, corsHeaders);
+                    res.end(JSON.stringify({ success: true, message: result.message }));
+                } else {
+                    res.writeHead(502, corsHeaders);
+                    res.end(JSON.stringify({ error: 'Service unavailable', message: err.message }));
+                }
             });
 
             apiReq.write(contactPayload);
@@ -845,7 +893,7 @@ const server = http.createServer((req, res) => {
                                             <p style="margin:24px 0;">
                                                 <a href="${APP_URL}/app/" style="background:#1e40af;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Update Payment Method</a>
                                             </p>
-                                            <p style="color:#6b7280;font-size:0.875rem;">If you have any questions, please contact us at support@crashlens.aicreatesai.com</p>
+                                            <p style="color:#6b7280;font-size:0.875rem;">If you have any questions, please contact us at support@aicreatesai.com</p>
                                             <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
                                             <p style="color:#9ca3af;font-size:0.75rem;">CRASH LENS - Crash Analysis Tools for Transportation Agencies</p>
                                         </div>`,

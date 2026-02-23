@@ -20,4 +20,4 @@ This software is proprietary and is NOT available for reuse, modification, or di
 For permissions, licensing inquiries, or questions regarding this software, please contact:
 
 **MURAD Al Qurishee**
-Email: support@crashlens.aicreatesai.com
+Email: support@aicreatesai.com

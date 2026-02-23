@@ -79,7 +79,7 @@ You should receive a test email within 30 seconds.
 - **Hostinger email** = a mailbox for you to manually read and reply to emails (like Gmail)
 - **Brevo** = a sending platform that your code uses to deliver emails automatically
 
-You only need Hostinger email if you want a professional inbox like `support@crashlens.aicreatesai.com` for manually replying to people. For everything automated, Brevo handles it.
+You only need Hostinger email if you want a professional inbox like `support@aicreatesai.com` for manually replying to people. For everything automated, Brevo handles it.
 
 ## Firebase Auth Emails (Optional)
 
