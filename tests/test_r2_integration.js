@@ -207,7 +207,7 @@ function mockFetchInvalidJson() {
 
 const VALID_MANIFEST = {
     version: 1,
-    r2BaseUrl: 'https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev',
+    r2BaseUrl: 'https://data.aicreatesai.com',
     updated: '2026-02-13T12:00:00.000Z',
     files: {
         'colorado/douglas/all_roads.csv': {
@@ -248,7 +248,7 @@ const EMPTY_MANIFEST = {
 
 const MULTI_JURISDICTION_MANIFEST = {
     version: 1,
-    r2BaseUrl: 'https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev',
+    r2BaseUrl: 'https://data.aicreatesai.com',
     updated: '2026-02-13T12:00:00.000Z',
     files: {},
     localPathMapping: {
@@ -420,7 +420,7 @@ async function runAllTests() {
         resetR2State();
         r2State.manifest = VALID_MANIFEST;
         const result = resolveDataUrl('../data/CDOT/douglas_all_roads.csv');
-        assertEqual(result, 'https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev/colorado/douglas/all_roads.csv',
+        assertEqual(result, 'https://data.aicreatesai.com/colorado/douglas/all_roads.csv',
             '8. Strips ../ prefix and resolves to R2 URL');
     }
 
@@ -429,7 +429,7 @@ async function runAllTests() {
         resetR2State();
         r2State.manifest = VALID_MANIFEST;
         const result = resolveDataUrl('./data/CDOT/douglas_all_roads.csv');
-        assertEqual(result, 'https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev/colorado/douglas/all_roads.csv',
+        assertEqual(result, 'https://data.aicreatesai.com/colorado/douglas/all_roads.csv',
             '9. Strips ./ prefix and resolves to R2 URL');
     }
 
@@ -438,7 +438,7 @@ async function runAllTests() {
         resetR2State();
         r2State.manifest = VALID_MANIFEST;
         const result = resolveDataUrl('data/CDOT/douglas_all_roads.csv');
-        assertEqual(result, 'https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev/colorado/douglas/all_roads.csv',
+        assertEqual(result, 'https://data.aicreatesai.com/colorado/douglas/all_roads.csv',
             '10. Handles path without any prefix');
     }
 
@@ -474,7 +474,7 @@ async function runAllTests() {
         resetR2State();
         r2State.manifest = VALID_MANIFEST;
         const result = resolveDataUrl('../data/CDOT/douglas_county_roads.csv');
-        assertEqual(result, 'https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev/colorado/douglas/county_roads.csv',
+        assertEqual(result, 'https://data.aicreatesai.com/colorado/douglas/county_roads.csv',
             '13. Constructs correct R2 URL from base + key');
     }
 
@@ -483,7 +483,7 @@ async function runAllTests() {
         resetR2State();
         r2State.manifest = {
             ...VALID_MANIFEST,
-            r2BaseUrl: 'https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev/'
+            r2BaseUrl: 'https://data.aicreatesai.com/'
         };
         const result = resolveDataUrl('../data/CDOT/douglas_all_roads.csv');
         assertContains(result, 'colorado/douglas/all_roads.csv',
@@ -495,7 +495,7 @@ async function runAllTests() {
         resetR2State();
         r2State.manifest = VALID_MANIFEST;
         const result = resolveDataUrl('../data/henrico_all_roads.csv');
-        assertEqual(result, 'https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev/virginia/henrico/all_roads.csv',
+        assertEqual(result, 'https://data.aicreatesai.com/virginia/henrico/all_roads.csv',
             '15. Maps Virginia jurisdiction paths correctly');
     }
 
@@ -504,7 +504,7 @@ async function runAllTests() {
         resetR2State();
         r2State.manifest = VALID_MANIFEST;
         const result = resolveDataUrl('../data/CDOT/douglas_standardized.csv');
-        assertEqual(result, 'https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev/colorado/douglas/standardized.csv',
+        assertEqual(result, 'https://data.aicreatesai.com/colorado/douglas/standardized.csv',
             '16. Maps Colorado CDOT paths correctly');
     }
 
@@ -513,7 +513,7 @@ async function runAllTests() {
         resetR2State();
         r2State.manifest = VALID_MANIFEST;
         const result = resolveDataUrl('../data/CDOT/crashes.csv');
-        assertEqual(result, 'https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev/colorado/douglas/crashes.csv',
+        assertEqual(result, 'https://data.aicreatesai.com/colorado/douglas/crashes.csv',
             '17. Maps fallback crashes.csv correctly');
     }
 
@@ -824,8 +824,8 @@ async function runAllTests() {
         resetR2State();
         await loadR2Manifest(mockFetchSuccess(VALID_MANIFEST));
         const result = resolveDataUrl('../data/CDOT/douglas_all_roads.csv');
-        assertContains(result, 'pub-3334b656e3c74ea28eb4165b32499843.r2.dev',
-            '47. R2 URL contains expected bucket subdomain');
+        assertContains(result, 'data.aicreatesai.com',
+            '47. R2 URL contains expected custom domain');
     }
 
     // Test 48

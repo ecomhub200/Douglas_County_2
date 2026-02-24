@@ -108,7 +108,7 @@ These are shared across all states — do NOT recreate:
 | Resource | Value | Notes |
 |----------|-------|-------|
 | R2 Bucket | `crash-lens-data` | Cloudflare R2 storage |
-| R2 Public URL | `https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev` | CDN endpoint |
+| R2 Public URL | `https://data.aicreatesai.com` | CDN endpoint |
 | R2 CORS Policy | `AllowedOrigins: [*], Methods: [GET, HEAD]` | Already configured |
 | SageMaker Endpoint | `crashlens-chronos2-endpoint` | Chronos-2 forecasting |
 | Manifest File | `data/r2-manifest.json` (version 3) | Shared across all states |
@@ -840,7 +840,7 @@ After uploading files to R2, update the shared manifest file so the browser know
 ```json
 {
   "version": 3,
-  "r2BaseUrl": "https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev",
+  "r2BaseUrl": "https://data.aicreatesai.com",
   "updated": "2026-02-16T00:45:07.223028+00:00",
   "files": {
     "{state_key}/{jurisdiction}/county_roads.csv": {

@@ -1169,7 +1169,7 @@ done
 
 ### R2 Bucket Path Convention
 
-**Bucket:** `crash-lens-data` — Public CDN: `https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev`
+**Bucket:** `crash-lens-data` — Public CDN: `https://data.aicreatesai.com`
 
 The folder hierarchy is created by `scripts/create_r2_folders.py` (reads `states/{state}/hierarchy.json` for regions, MPOs, counties) and the upload uses the reusable `.github/actions/upload-r2/action.yml` action (with retry logic, MD5 hashing, content-type detection, gzip `Content-Encoding`, and automatic `data/r2-manifest.json` updates).
 
@@ -1284,7 +1284,7 @@ Forecasting runs **per county**. Region/MPO-level forecasts are not generated in
 ```json
 {
   "version": 3,
-  "r2BaseUrl": "https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev",
+  "r2BaseUrl": "https://data.aicreatesai.com",
   "updated": "2026-02-16T00:45:07.223028+00:00",
   "files": {
     "colorado/douglas/standardized.csv": {

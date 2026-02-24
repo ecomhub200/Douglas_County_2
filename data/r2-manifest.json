@@ -1,7 +1,7 @@
 {
   "version": 3,
   "_comment": "Version 3: Added gzip support (contentEncoding, uncompressedSize) for state-level datasets. Statewide CSVs stored at {state}/_state/. Aggregate JSONs at {state}/_statewide/, _region/, _mpo/, _federal/.",
-  "r2BaseUrl": "https://pub-3334b656e3c74ea28eb4165b32499843.r2.dev",
+  "r2BaseUrl": "https://data.aicreatesai.com",
   "updated": "2026-02-16T00:45:07.223028+00:00",
   "files": {
     "colorado/douglas/standardized.csv": {
