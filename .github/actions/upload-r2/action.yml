@@ -184,3 +184,52 @@ runs:
         if failed > 0:
             sys.exit(1)
         "
+
+    - name: Verify R2 public accessibility
+      shell: bash
+      env:
+        R2_PUBLIC_URL: ${{ inputs.r2_public_url }}
+        FILES_JSON: ${{ inputs.files_json }}
+      run: |
+        echo "=========================================="
+        echo "Verifying R2 public accessibility"
+        echo "=========================================="
+
+        # Verify the first uploaded file is publicly accessible via the CDN URL
+        FIRST_KEY=$(python3 -c "
+        import json, os
+        files = json.loads(os.environ['FILES_JSON'])
+        # Find the first file that actually exists on disk
+        for f in files:
+            if os.path.isfile(f['local_path']):
+                print(f['r2_key'])
+                break
+        ")
+
+        if [ -n "$FIRST_KEY" ]; then
+          URL="${R2_PUBLIC_URL}/${FIRST_KEY}"
+          echo "Testing: $URL"
+          # Allow up to 15 seconds for CDN propagation
+          for attempt in 1 2 3; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -I "$URL" 2>/dev/null || echo "000")
+            echo "  Attempt $attempt: HTTP $HTTP_CODE"
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo ""
+              echo "Public accessibility verified OK"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "  Waiting 5s for CDN propagation..."
+              sleep 5
+            fi
+          done
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo ""
+            echo "::warning::R2 file uploaded but NOT publicly accessible at $URL (HTTP $HTTP_CODE)"
+            echo "::warning::Check: 1) R2 bucket has public access enabled  2) Custom domain is configured  3) CORS policy is set"
+          fi
+        else
+          echo "No files to verify (all skipped)"
+        fi
+        echo "=========================================="
