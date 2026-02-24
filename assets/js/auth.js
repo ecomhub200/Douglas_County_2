@@ -56,6 +56,7 @@ const CrashLensAuth = {
 
   /**
    * Sign in with Microsoft
+   * Tries popup first; falls back to redirect if popup is blocked or closed.
    */
   signInWithMicrosoft: async function() {
     const provider = new firebase.auth.OAuthProvider('microsoft.com');
@@ -68,6 +69,12 @@ const CrashLensAuth = {
       console.log('Microsoft sign in successful');
       return result.user;
     } catch (error) {
+      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/popup-blocked') {
+        console.log('Popup failed, falling back to redirect for Microsoft sign in');
+        sessionStorage.setItem('oauthRedirectPending', 'true');
+        await firebase.auth().signInWithRedirect(provider);
+        return null; // Page will redirect
+      }
       console.error('Microsoft sign in error:', error);
       throw error;
     }
@@ -75,6 +82,7 @@ const CrashLensAuth = {
 
   /**
    * Sign in with Google
+   * Tries popup first; falls back to redirect if popup is blocked or closed.
    */
   signInWithGoogle: async function() {
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -84,7 +92,33 @@ const CrashLensAuth = {
       console.log('Google sign in successful');
       return result.user;
     } catch (error) {
+      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/popup-blocked') {
+        console.log('Popup failed, falling back to redirect for Google sign in');
+        sessionStorage.setItem('oauthRedirectPending', 'true');
+        await firebase.auth().signInWithRedirect(provider);
+        return null; // Page will redirect
+      }
       console.error('Google sign in error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Handle OAuth redirect result (called on page load after signInWithRedirect)
+   * Returns the user if a redirect sign-in was completed, null otherwise.
+   */
+  handleRedirectResult: async function() {
+    try {
+      const result = await firebase.auth().getRedirectResult();
+      if (result.user) {
+        console.log('Redirect sign in successful:', result.user.email);
+        sessionStorage.removeItem('oauthRedirectPending');
+        return result.user;
+      }
+      return null;
+    } catch (error) {
+      sessionStorage.removeItem('oauthRedirectPending');
+      console.error('Redirect sign in error:', error);
       throw error;
     }
   },
@@ -479,7 +513,7 @@ const CrashLensAuth = {
       'auth/weak-password': 'Password should be at least 6 characters.',
       'auth/invalid-email': 'Please enter a valid email address.',
       'auth/too-many-requests': 'Too many attempts. Please try again later.',
-      'auth/popup-closed-by-user': 'Sign in cancelled.',
+      'auth/popup-closed-by-user': 'Sign in popup was closed. Retrying...',
       'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign in method.',
       'auth/too-many-requests': 'Too many verification emails sent. Please wait before trying again.'
     };

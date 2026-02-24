@@ -943,7 +943,7 @@
     }
 
     // Check if already authenticated
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', async function() {
       // Load config and populate state dropdown for sign-up form
       loadSignupConfig();
       populateSignupStateDropdown();
@@ -959,6 +959,20 @@
       }
 
       if (window.isFirebaseConfigured) {
+        // Handle OAuth redirect result (from signInWithRedirect fallback)
+        if (sessionStorage.getItem('oauthRedirectPending')) {
+          try {
+            const redirectUser = await CrashLensAuth.handleRedirectResult();
+            if (redirectUser) {
+              CrashLensAuth.userData = await CrashLensAuth.getUserData();
+              await redirectAfterAuth();
+              return;
+            }
+          } catch (error) {
+            showError(CrashLensAuth.getErrorMessage(error));
+          }
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const reason = urlParams.get('reason');
         const emailParam = urlParams.get('email');
