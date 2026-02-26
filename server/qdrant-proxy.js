@@ -15,7 +15,7 @@ const https = require('https');
 const url = require('url');
 const fs = require('fs');
 const path = require('path');
-const { S3Client, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 
 const PORT = process.env.PROXY_PORT || 3001;
 
@@ -521,6 +521,190 @@ const server = http.createServer((req, res) => {
                 });
         }).catch(err => {
             console.error(`[R2 Upload] Body error: ${err.message}`);
+            res.writeHead(413, corsHeaders);
+            res.end(JSON.stringify({ error: 'Request too large', message: err.message }));
+        });
+        return;
+    }
+
+    // ---- R2 upload: upload corrections overlay JSON ----
+    if (req.url === '/r2/upload-corrections' && req.method === 'POST') {
+        if (!CF_ACCOUNT_ID || !CF_R2_ACCESS_KEY_ID || !CF_R2_SECRET_ACCESS_KEY) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({
+                error: 'R2 not configured',
+                message: 'Set CF_ACCOUNT_ID, CF_R2_ACCESS_KEY_ID, and CF_R2_SECRET_ACCESS_KEY in Coolify environment variables'
+            }));
+            return;
+        }
+
+        collectBody(req, 10 * 1024 * 1024).then(body => {
+            let payload;
+            try {
+                payload = JSON.parse(body);
+            } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { r2Key, jsonData } = payload;
+
+            if (!r2Key || !jsonData) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Missing required fields: r2Key, jsonData' }));
+                return;
+            }
+
+            // Validate r2Key format: {state}/{jurisdiction}/corrections*.json or corrections_log.jsonl
+            const keyPattern = /^[a-z_-]+\/[a-z_-]+\/corrections[a-z_]*\.(json|jsonl)$/;
+            if (!keyPattern.test(r2Key)) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({
+                    error: 'Invalid r2Key format',
+                    message: 'Expected pattern: {state}/{jurisdiction}/corrections.json or corrections_log.jsonl'
+                }));
+                return;
+            }
+
+            console.log(`[R2 Corrections] Uploading: ${r2Key} (${(Buffer.byteLength(jsonData) / 1024).toFixed(1)} KB)`);
+
+            const s3Client = new S3Client({
+                region: 'auto',
+                endpoint: `https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+                credentials: {
+                    accessKeyId: CF_R2_ACCESS_KEY_ID,
+                    secretAccessKey: CF_R2_SECRET_ACCESS_KEY,
+                }
+            });
+
+            const contentType = r2Key.endsWith('.jsonl') ? 'application/x-ndjson' : 'application/json';
+            const putCmd = new PutObjectCommand({
+                Bucket: R2_BUCKET_NAME,
+                Key: r2Key,
+                Body: jsonData,
+                ContentType: contentType,
+            });
+
+            s3Client.send(putCmd)
+                .then(() => {
+                    const sizeBytes = Buffer.byteLength(jsonData);
+                    console.log(`[R2 Corrections] Success: ${r2Key} (${sizeBytes.toLocaleString()} bytes)`);
+                    res.writeHead(200, corsHeaders);
+                    res.end(JSON.stringify({
+                        success: true,
+                        r2Key,
+                        size: sizeBytes,
+                        uploadedAt: new Date().toISOString()
+                    }));
+                })
+                .catch(err => {
+                    console.error(`[R2 Corrections] Failed: ${err.message}`);
+                    res.writeHead(500, corsHeaders);
+                    res.end(JSON.stringify({ error: 'R2 upload failed', message: err.message }));
+                });
+        }).catch(err => {
+            console.error(`[R2 Corrections] Body error: ${err.message}`);
+            res.writeHead(413, corsHeaders);
+            res.end(JSON.stringify({ error: 'Request too large', message: err.message }));
+        });
+        return;
+    }
+
+    // ---- R2 upload: append to corrections log (JSONL) ----
+    if (req.url === '/r2/append-corrections-log' && req.method === 'POST') {
+        if (!CF_ACCOUNT_ID || !CF_R2_ACCESS_KEY_ID || !CF_R2_SECRET_ACCESS_KEY) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({
+                error: 'R2 not configured',
+                message: 'Set CF_ACCOUNT_ID, CF_R2_ACCESS_KEY_ID, and CF_R2_SECRET_ACCESS_KEY in Coolify environment variables'
+            }));
+            return;
+        }
+
+        collectBody(req, 5 * 1024 * 1024).then(body => {
+            let payload;
+            try {
+                payload = JSON.parse(body);
+            } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { r2Key, entries } = payload;
+
+            if (!r2Key || !entries || !Array.isArray(entries) || entries.length === 0) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Missing required fields: r2Key, entries (non-empty array)' }));
+                return;
+            }
+
+            // Validate r2Key format
+            const keyPattern = /^[a-z_-]+\/[a-z_-]+\/corrections_log\.jsonl$/;
+            if (!keyPattern.test(r2Key)) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({
+                    error: 'Invalid r2Key format',
+                    message: 'Expected pattern: {state}/{jurisdiction}/corrections_log.jsonl'
+                }));
+                return;
+            }
+
+            const s3Client = new S3Client({
+                region: 'auto',
+                endpoint: `https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+                credentials: {
+                    accessKeyId: CF_R2_ACCESS_KEY_ID,
+                    secretAccessKey: CF_R2_SECRET_ACCESS_KEY,
+                }
+            });
+
+            // Read existing log, append new entries, write back
+            const getCmd = new GetObjectCommand({
+                Bucket: R2_BUCKET_NAME,
+                Key: r2Key,
+            });
+
+            let existingLog = '';
+            s3Client.send(getCmd)
+                .then(async (data) => {
+                    existingLog = await data.Body.transformToString();
+                })
+                .catch(() => {
+                    // No existing log - start fresh
+                })
+                .then(() => {
+                    const newEntries = entries.map(e => JSON.stringify(e)).join('\n');
+                    const combined = existingLog
+                        ? existingLog.trimEnd() + '\n' + newEntries + '\n'
+                        : newEntries + '\n';
+
+                    const putCmd = new PutObjectCommand({
+                        Bucket: R2_BUCKET_NAME,
+                        Key: r2Key,
+                        Body: combined,
+                        ContentType: 'application/x-ndjson',
+                    });
+
+                    return s3Client.send(putCmd).then(() => {
+                        console.log(`[R2 Corrections Log] Appended ${entries.length} entries to ${r2Key}`);
+                        res.writeHead(200, corsHeaders);
+                        res.end(JSON.stringify({
+                            success: true,
+                            r2Key,
+                            entriesAdded: entries.length,
+                            uploadedAt: new Date().toISOString()
+                        }));
+                    });
+                })
+                .catch(err => {
+                    console.error(`[R2 Corrections Log] Failed: ${err.message}`);
+                    res.writeHead(500, corsHeaders);
+                    res.end(JSON.stringify({ error: 'R2 append failed', message: err.message }));
+                });
+        }).catch(err => {
+            console.error(`[R2 Corrections Log] Body error: ${err.message}`);
             res.writeHead(413, corsHeaders);
             res.end(JSON.stringify({ error: 'Request too large', message: err.message }));
         });
