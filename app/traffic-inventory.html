@@ -13,12 +13,6 @@
         :root{--primary:#1e40af;--primary-light:#3b82f6;--primary-dark:#1e3a8a;--success:#059669;--success-bg:#d1fae5;--warning:#d97706;--warning-bg:#fef3c7;--error:#dc2626;--error-bg:#fee2e2;--bg:#f1f5f9;--card-bg:#fff;--text:#0f172a;--text-muted:#64748b;--border:#cbd5e1;--border-light:#e2e8f0;--mutcd-red:#cf2030;--mutcd-yellow:#f59e0b;--mutcd-green:#059669;--mutcd-school:#84cc16;--mutcd-orange:#ea580c}
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
-        .app-header{background:linear-gradient(135deg,var(--primary-dark),var(--primary));color:#fff;padding:0.75rem 1.5rem}
-        .header-content{max-width:1800px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem}
-        .header-title h1{font-size:1.1rem;font-weight:700}
-        .header-title p{opacity:0.9;font-size:0.75rem}
-        .header-badges{display:flex;gap:0.5rem}
-        .header-badge{background:rgba(255,255,255,0.2);padding:0.35rem 0.75rem;border-radius:6px;font-size:0.75rem}
         .container{max-width:1800px;margin:0 auto;padding:1rem}
         .grid-layout{display:grid;grid-template-columns:1fr 340px;gap:1rem}
         @media(max-width:1200px){.grid-layout{grid-template-columns:1fr}}
@@ -168,19 +162,6 @@
 </head>
 <body>
     <div class="toast-container" id="toastContainer"></div>
-    <header class="app-header">
-        <div class="header-content">
-            <div class="header-title">
-                <h1>🗺️ Traffic Inventory</h1>
-                <p>MUTCD Traffic Infrastructure Inventory</p>
-            </div>
-            <div class="header-badges">
-                <div class="header-badge">API v4</div>
-                <div class="header-badge" id="selectedCountHeader">0 selected</div>
-                <div class="header-badge" style="background:rgba(249,115,22,0.3);border:1px solid rgba(249,115,22,0.5)" id="r2HeaderBadge">R2: —</div>
-            </div>
-        </div>
-    </header>
     <!-- Download Active Warning Banner -->
     <div class="download-warning-banner" id="downloadWarningBanner" style="margin:0.75rem 1.5rem">
         <div class="download-warning-icon">⚠️</div>
@@ -585,7 +566,7 @@
         let r2Cfg = {workerUrl:'',secret:'',publicUrl:'https://data.aicreatesai.com'};
         function loadR2Config(){try{const c=localStorage.getItem('r2cfg');if(c){r2Cfg=JSON.parse(c);document.getElementById('r2WorkerUrl').value=r2Cfg.workerUrl||'';document.getElementById('r2Secret').value=r2Cfg.secret||'';document.getElementById('r2PublicUrl').value=r2Cfg.publicUrl||'https://data.aicreatesai.com';if(r2Cfg.workerUrl)document.getElementById('r2Status').textContent='Saved';}}catch(e){}}
         function saveR2Config(){r2Cfg={workerUrl:document.getElementById('r2WorkerUrl').value.trim().replace(/\/+$/,''),secret:document.getElementById('r2Secret').value.trim(),publicUrl:document.getElementById('r2PublicUrl').value.trim().replace(/\/+$/,'')};localStorage.setItem('r2cfg',JSON.stringify(r2Cfg));showToast('R2 saved','success');updateR2Path();}
-        async function testR2(){saveR2Config();if(!r2Cfg.workerUrl)return showToast('Set Worker URL','error');try{const r=await fetch(`${r2Cfg.workerUrl}/?list=1&prefix=`,{headers:{'X-Upload-Secret':r2Cfg.secret}});if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();document.getElementById('r2Status').className='badge badge-success';document.getElementById('r2Status').textContent='✓ Connected';document.getElementById('r2HeaderBadge').textContent='R2: ✓';document.getElementById('r2HeaderBadge').style.background='rgba(16,185,129,0.3)';showToast(`R2 connected! ${d.files?.length||0} objects`,'success');}catch(e){document.getElementById('r2Status').className='badge badge-warning';document.getElementById('r2Status').textContent='Failed';showToast('R2: '+e.message,'error');}}
+        async function testR2(){saveR2Config();if(!r2Cfg.workerUrl)return showToast('Set Worker URL','error');try{const r=await fetch(`${r2Cfg.workerUrl}/?list=1&prefix=`,{headers:{'X-Upload-Secret':r2Cfg.secret}});if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();document.getElementById('r2Status').className='badge badge-success';document.getElementById('r2Status').textContent='✓ Connected';const rb=document.getElementById('r2HeaderBadge');if(rb){rb.textContent='R2: ✓';rb.style.background='rgba(16,185,129,0.3)';}showToast(`R2 connected! ${d.files?.length||0} objects`,'success');}catch(e){document.getElementById('r2Status').className='badge badge-warning';document.getElementById('r2Status').textContent='Failed';showToast('R2: '+e.message,'error');}}
         function updateR2Path(){if(!r2Cfg.workerUrl||!currentJurisdiction)return;const p=document.getElementById('r2PathDisplay');p.style.display='block';document.getElementById('r2PathText').textContent=`${currentJurisdiction.state}/${currentJurisdiction.folder}/traffic-inventory.csv`;}
         async function uploadToR2(){
             if(!allFeatures.length)return showToast('No data','error');if(!r2Cfg.workerUrl||!r2Cfg.secret)return showToast('Configure R2 first','error');if(!currentJurisdiction)return showToast('No jurisdiction','error');
@@ -974,7 +955,7 @@
 
         function generateTiles(bbox,size=0.009){const[w,s,e,n]=bbox;const tiles=[];for(let lon=w;lon<e;lon+=size){for(let lat=s;lat<n;lat+=size){tiles.push([lon,lat,Math.min(lon+size,e),Math.min(lat+size,n)]);}}return tiles;}
         function switchSeries(s){document.querySelectorAll('.series-tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.series-panel').forEach(p=>p.classList.remove('active'));document.querySelector(`.series-tab.${s.toLowerCase()}-series`)?.classList.add('active');document.getElementById(`panel-${s}`)?.classList.add('active');}
-        function updateSelectedCount(){const c=document.querySelectorAll('.asset-item input:checked').length;document.getElementById('selectedCount').textContent=`${c} selected`;document.getElementById('selectedCountHeader').textContent=`${c} selected`;}
+        function updateSelectedCount(){const c=document.querySelectorAll('.asset-item input:checked').length;document.getElementById('selectedCount').textContent=`${c} selected`;const h=document.getElementById('selectedCountHeader');if(h)h.textContent=`${c} selected`;}
         function selectAllAssets(){document.querySelectorAll('.asset-item input[type="checkbox"]').forEach(cb=>{cb.checked=true;cb.closest('.asset-item').classList.add('selected');});updateSelectedCount();}
         function clearAllAssets(){document.querySelectorAll('.asset-item input[type="checkbox"]').forEach(cb=>{cb.checked=false;cb.closest('.asset-item').classList.remove('selected');});updateSelectedCount();}
         function selectSeries(s){document.querySelectorAll(`.asset-item input[data-series="${s}"]`).forEach(cb=>{cb.checked=true;cb.closest('.asset-item').classList.add('selected');});updateSelectedCount();}
