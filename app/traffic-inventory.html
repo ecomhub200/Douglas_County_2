@@ -155,6 +155,15 @@
         footer{text-align:center;padding:1rem;color:var(--text-muted);font-size:0.75rem;border-top:1px solid var(--border-light);margin-top:1rem}
         footer a{color:var(--primary);text-decoration:none}
         .speed-category-label{font-size:0.65rem;color:var(--text-muted);margin:0.4rem 0 0.2rem;font-weight:500}
+        /* Download active warning banner */
+        .download-warning-banner{display:none;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border:1px solid #f59e0b;border-radius:8px;padding:0.75rem 1rem;margin:0.75rem 0;align-items:center;gap:0.75rem;box-shadow:0 2px 8px rgba(245,158,11,0.15)}
+        .download-warning-banner.active{display:flex}
+        .download-warning-icon{font-size:1.5rem;flex-shrink:0;animation:warningPulse 2s ease-in-out infinite}
+        .download-warning-text{flex:1}
+        .download-warning-text strong{display:block;color:#92400e;font-size:0.85rem;margin-bottom:0.15rem}
+        .download-warning-text span{color:#a16207;font-size:0.75rem;line-height:1.4}
+        .download-warning-badge{background:#dc2626;color:#fff;font-size:0.65rem;font-weight:700;padding:0.3rem 0.6rem;border-radius:12px;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;animation:warningPulse 2s ease-in-out infinite}
+        @keyframes warningPulse{0%,100%{opacity:1}50%{opacity:0.7}}
     </style>
 </head>
 <body>
@@ -172,6 +181,15 @@
             </div>
         </div>
     </header>
+    <!-- Download Active Warning Banner -->
+    <div class="download-warning-banner" id="downloadWarningBanner" style="margin:0.75rem 1.5rem">
+        <div class="download-warning-icon">⚠️</div>
+        <div class="download-warning-text">
+            <strong>Download in Progress — Do Not Close This Window</strong>
+            <span>You can continue using other tabs and features while the download runs. However, closing the browser tab, refreshing the page, or logging out will permanently cancel the download and your progress cannot be resumed.</span>
+        </div>
+        <div class="download-warning-badge">Download Active</div>
+    </div>
     <div class="container">
         <div class="grid-layout">
             <div class="main-content">
@@ -1076,7 +1094,7 @@
             allFeatures=[];clearAllMarkers();
             const bb=currentJurisdiction.bbox;
             L.rectangle([[bb[1],bb[0]],[bb[3],bb[2]]],{color:"#1e40af",weight:2,fillOpacity:0.05,dashArray:'5,5'}).addTo(markersLayer);
-            let success=0,errors=0;isDownloading=true;
+            let success=0,errors=0;isDownloading=true;showDownloadWarning();
             addLog(`Start: ${currentJurisdiction.name}`,'info');
             addLog(`${tiles.length} tiles, ${objectValues.length} classes`,'info');
             for(let i=0;i<tiles.length&&isDownloading;i++){
@@ -1094,7 +1112,7 @@
                     else{addLog(`Tile ${i+1}: ${err.message}`,'error');if(errors>20)break;await sleep(500);}
                 }
             }
-            isDownloading=false;
+            isDownloading=false;hideDownloadWarning();
             document.getElementById('downloadBtn').disabled=false;
             document.getElementById('downloadBtn').innerHTML='⬇️ Start Download';
             document.getElementById('cancelBtn').style.display='none';
@@ -1108,7 +1126,7 @@
             else{showToast('No assets found','info');}
         }
 
-        function cancelDownload(){isDownloading=false;document.getElementById('downloadBtn').disabled=false;document.getElementById('downloadBtn').innerHTML='⬇️ Start Download';document.getElementById('cancelBtn').style.display='none';addLog('Cancelled','info');showToast('Cancelled','info');}
+        function cancelDownload(){isDownloading=false;hideDownloadWarning();document.getElementById('downloadBtn').disabled=false;document.getElementById('downloadBtn').innerHTML='⬇️ Start Download';document.getElementById('cancelBtn').style.display='none';addLog('Cancelled','info');showToast('Cancelled','info');}
 
         async function fetchFeatures(bbox,values){
             // Batch values to avoid URL length limit (HTTP 500)
@@ -1192,6 +1210,20 @@
         function escapeXML(s){return s?.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')||'';}
         function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
         function showToast(msg,type='info'){const c=document.getElementById('toastContainer');const t=document.createElement('div');t.className=`toast ${type}`;const icons={success:'✓',error:'✗',info:'ℹ',warn:'⚠'};t.innerHTML=`<span>${icons[type]||'ℹ'}</span> ${msg}`;c.appendChild(t);setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},3000);}
+
+        // Download warning — prevent accidental window close during active download
+        function onBeforeUnloadWarning(e){e.preventDefault();e.returnValue='';return '';}
+        function showDownloadWarning(){
+            document.getElementById('downloadWarningBanner').classList.add('active');
+            window.addEventListener('beforeunload',onBeforeUnloadWarning);
+            // Notify parent window (main app) to also guard against close
+            try{window.parent.postMessage({type:'ti-download-active',active:true},'*');}catch(e){}
+        }
+        function hideDownloadWarning(){
+            document.getElementById('downloadWarningBanner').classList.remove('active');
+            window.removeEventListener('beforeunload',onBeforeUnloadWarning);
+            try{window.parent.postMessage({type:'ti-download-active',active:false},'*');}catch(e){}
+        }
 
         // ================================================================
         // TIGER WEB BOUNDARY FILTERING (added - no existing code modified)
