@@ -882,14 +882,38 @@
             });
             initMap();populateJurisdictions();setupEventListeners();loadSavedToken();switchSeries('R');initSpeedFilterPanel();loadR2Config();
 
-            // Listen for jurisdiction sync from parent app (Upload tab selection)
+            // Listen for jurisdiction data and selection sync from parent app
             window.addEventListener('message', function(evt) {
-                if (!evt.data || evt.data.type !== 'ti-set-jurisdiction') return;
-                const key = evt.data.jurisdictionKey;
-                if (key && JURISDICTIONS[key]) {
-                    document.getElementById('jurisdiction').value = key;
-                    updateJurisdiction();
-                    console.log('[TI] Jurisdiction synced from parent:', key);
+                if (!evt.data) return;
+
+                if (evt.data.type === 'ti-set-jurisdictions') {
+                    // Parent sent all jurisdictions — replace hardcoded list
+                    const incoming = evt.data.jurisdictions;
+                    if (!incoming || typeof incoming !== 'object') return;
+                    Object.keys(JURISDICTIONS).forEach(k => delete JURISDICTIONS[k]);
+                    Object.assign(JURISDICTIONS, incoming);
+                    // Rebuild dropdown
+                    const sel = document.getElementById('jurisdiction');
+                    const curVal = sel.value;
+                    sel.innerHTML = '<option value="">-- Select --</option>';
+                    Object.entries(JURISDICTIONS).forEach(([k, v]) => {
+                        const o = document.createElement('option');
+                        o.value = k;
+                        o.textContent = v.name;
+                        sel.appendChild(o);
+                    });
+                    // Restore previous selection if still valid
+                    if (curVal && JURISDICTIONS[curVal]) sel.value = curVal;
+                    console.log('[TI] Jurisdictions populated from parent:', Object.keys(JURISDICTIONS).length);
+                }
+
+                if (evt.data.type === 'ti-set-jurisdiction') {
+                    const key = evt.data.jurisdictionKey;
+                    if (key && JURISDICTIONS[key]) {
+                        document.getElementById('jurisdiction').value = key;
+                        updateJurisdiction();
+                        console.log('[TI] Jurisdiction synced from parent:', key);
+                    }
                 }
             });
             // Signal to parent that iframe is ready to receive messages
