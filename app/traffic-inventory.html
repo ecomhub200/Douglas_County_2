@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mapillary Asset Downloader v4.3 - Virginia Traffic Infrastructure</title>
+    <title>Traffic Inventory</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -171,8 +171,8 @@
     <header class="app-header">
         <div class="header-content">
             <div class="header-title">
-                <h1>🗺️ Mapillary Asset Downloader v4.3</h1>
-                <p>MUTCD Traffic Infrastructure Inventory • Virginia</p>
+                <h1>🗺️ Traffic Inventory</h1>
+                <p>MUTCD Traffic Infrastructure Inventory</p>
             </div>
             <div class="header-badges">
                 <div class="header-badge">API v4</div>
@@ -565,7 +565,7 @@
             </div>
         </div>
     </div>
-    <footer>Mapillary Asset Downloader v4.3 | <a href="https://www.mapillary.com" target="_blank">Mapillary</a> | <a href="https://mutcd.fhwa.dot.gov/" target="_blank">MUTCD</a></footer>
+    <footer>Traffic Inventory | <a href="https://www.mapillary.com" target="_blank">Mapillary</a> | <a href="https://mutcd.fhwa.dot.gov/" target="_blank">MUTCD</a></footer>
     <script>
         let apiToken = localStorage.getItem('mapillary_token') || '';
         let isDownloading = false;
@@ -900,6 +900,19 @@
                 });
             });
             initMap();populateJurisdictions();setupEventListeners();loadSavedToken();switchSeries('R');initSpeedFilterPanel();loadR2Config();
+
+            // Listen for jurisdiction sync from parent app (Upload tab selection)
+            window.addEventListener('message', function(evt) {
+                if (!evt.data || evt.data.type !== 'ti-set-jurisdiction') return;
+                const key = evt.data.jurisdictionKey;
+                if (key && JURISDICTIONS[key]) {
+                    document.getElementById('jurisdiction').value = key;
+                    updateJurisdiction();
+                    console.log('[TI] Jurisdiction synced from parent:', key);
+                }
+            });
+            // Signal to parent that iframe is ready to receive messages
+            try { window.parent.postMessage({ type: 'ti-ready' }, '*'); } catch(e) {}
         });
 
         function initMap(){
