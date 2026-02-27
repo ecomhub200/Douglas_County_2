@@ -3207,7 +3207,7 @@ on:
       skip_forecasts:
         description: 'Skip forecast generation'
         required: false
-        default: true
+        default: false
         type: boolean
       dry_run:
         description: 'Dry run (report sizes only, no uploads)'
@@ -3691,6 +3691,55 @@ jobs:
           done
 
           echo "Forecasts generated: $SUCCESS jurisdictions"
+
+      # ── Stage 8b: Upload forecast JSONs to R2 ──
+      - name: Upload forecast JSONs to R2 (Stage 8b)
+        if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+          DATA_DIR="${{ steps.download.outputs.data_dir }}"
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+
+          echo "=========================================="
+          echo "Stage 8b: Upload forecast JSONs to R2"
+          echo "=========================================="
+
+          UPLOADED=0
+          SKIPPED=0
+
+          for f in "$DATA_DIR"/*_all_roads.csv; do
+            [ -f "$f" ] || continue
+            JURISDICTION=$(basename "$f" | sed 's/_all_roads\.csv$//')
+
+            for rt in county_roads no_interstate all_roads; do
+              FFILE="$DATA_DIR/forecasts_${rt}.json"
+              if [ ! -f "$FFILE" ]; then
+                FFILE="$DATA_DIR/${JURISDICTION}/forecasts_${rt}.json"
+              fi
+              if [ -f "$FFILE" ]; then
+                R2_KEY="${STATE}/${JURISDICTION}/forecasts_${rt}.json"
+                SIZE=$(ls -lh "$FFILE" | awk '{print $5}')
+                aws s3 cp "$FFILE" "s3://$R2_BUCKET/$R2_KEY" \
+                  --endpoint-url "$R2_ENDPOINT" \
+                  --content-type "application/json" \
+                  --only-show-errors && {
+                  echo "  Uploaded: $R2_KEY ($SIZE)"
+                  UPLOADED=$((UPLOADED + 1))
+                } || {
+                  echo "  FAIL: $R2_KEY"
+                }
+              else
+                SKIPPED=$((SKIPPED + 1))
+              fi
+            done
+          done
+
+          echo "Forecast upload: $UPLOADED uploaded, $SKIPPED skipped"
 
       # ── Stage 9: Generate aggregates ──
       - name: Generate aggregates (Stage 9)

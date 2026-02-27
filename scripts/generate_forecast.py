@@ -206,7 +206,8 @@ def load_crash_data(csv_path):
     return df
 
 
-def build_monthly_series(df, group_col=None, value_col=None, filter_func=None):
+def build_monthly_series(df, group_col=None, value_col=None, filter_func=None,
+                         full_month_range=None):
     """Build monthly time series from crash data.
 
     Args:
@@ -214,6 +215,10 @@ def build_monthly_series(df, group_col=None, value_col=None, filter_func=None):
         group_col: Column to group by (creates multiple series)
         value_col: Column to count distinct values of (default: count rows)
         filter_func: Optional function to filter df before aggregation
+        full_month_range: Optional sorted list of all Period months from the
+            parent dataset.  When provided, ensures zero-count months are
+            included in the output series (critical for sparse series like
+            bike and pedestrian crashes).
 
     Returns:
         dict: {series_id: [(month_str, count), ...]}
@@ -224,7 +229,7 @@ def build_monthly_series(df, group_col=None, value_col=None, filter_func=None):
     if group_col:
         groups = df.groupby([group_col, "month"]).size().reset_index(name="count")
         # Ensure all months present for each group
-        all_months = sorted(df["month"].unique())
+        all_months = full_month_range if full_month_range is not None else sorted(df["month"].unique())
         result = {}
         for group_name in groups[group_col].unique():
             group_data = groups[groups[group_col] == group_name]
@@ -234,7 +239,7 @@ def build_monthly_series(df, group_col=None, value_col=None, filter_func=None):
         return result
     else:
         monthly = df.groupby("month").size().reset_index(name="count")
-        all_months = sorted(df["month"].unique())
+        all_months = full_month_range if full_month_range is not None else sorted(df["month"].unique())
         month_counts = dict(zip(monthly["month"], monthly["count"]))
         series = [(str(m), month_counts.get(m, 0)) for m in all_months]
         return {"total": series}
@@ -709,13 +714,17 @@ def build_matrix_05(df, horizon, call_endpoint):
         "night": "Night?",
     }
 
+    # Get full month range from the parent dataset so that sparse factors
+    # (bike, pedestrian) include zero-count months in their time series.
+    full_month_range = sorted(df["month"].unique())
+
     all_series = {}
     factor_stats = {}
     for factor_name, col_name in factors.items():
         if col_name not in df.columns:
             continue
         factor_df = df[df[col_name].str.strip().str.upper().isin(["YES", "Y", "1", "TRUE"])]
-        series = build_monthly_series(factor_df)
+        series = build_monthly_series(factor_df, full_month_range=full_month_range)
         all_series[factor_name] = series["total"]
         factor_stats[factor_name] = {
             "total": int(len(factor_df)),

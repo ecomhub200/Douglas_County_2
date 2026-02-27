@@ -62,7 +62,7 @@ on:
       skip_forecasts:
         description: 'Skip forecast generation'
         required: false
-        default: 'true'
+        default: 'false'
         type: string
 
       dry_run:
@@ -441,6 +441,66 @@ jobs:
               else:
                   print(f'    WARNING: Forecast failed for {j} (non-fatal)')
           print(f'Forecasts: {success}/{len(jurisdictions)} jurisdictions')
+          "
+
+      # ── Stage 7b: Upload forecast JSONs to R2 ──
+      - name: "Stage 7b: Upload forecast JSONs to R2"
+        if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
+          JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+
+          echo "=========================================="
+          echo "Stage 7b: Upload forecast JSONs to R2"
+          echo "=========================================="
+
+          UPLOADED=0
+          SKIPPED=0
+
+          echo "$JURISDICTIONS" | python3 -c "
+          import json, sys, subprocess, os
+
+          jurisdictions = json.load(sys.stdin)
+          data_dir = '$DATA_DIR'
+          r2_prefix = '$R2_PREFIX'
+          endpoint = '$R2_ENDPOINT'
+          bucket = '$R2_BUCKET'
+          uploaded = 0
+          skipped = 0
+
+          for j in jurisdictions:
+              for rt in ['county_roads', 'no_interstate', 'all_roads']:
+                  local_path = os.path.join(data_dir, f'forecasts_{rt}.json')
+                  # Also check jurisdiction-prefixed path
+                  if not os.path.exists(local_path):
+                      local_path = os.path.join(data_dir, j, f'forecasts_{rt}.json')
+                  if not os.path.exists(local_path):
+                      skipped += 1
+                      continue
+
+                  r2_key = f'{r2_prefix}/{j}/forecasts_{rt}.json'
+                  try:
+                      subprocess.run([
+                          'aws', 's3', 'cp', local_path, f's3://{bucket}/{r2_key}',
+                          '--endpoint-url', endpoint,
+                          '--content-type', 'application/json',
+                          '--only-show-errors'
+                      ], check=True, capture_output=True, timeout=120)
+                      size = os.path.getsize(local_path)
+                      print(f'  Uploaded: {r2_key} ({size:,} bytes)')
+                      uploaded += 1
+                  except Exception as e:
+                      print(f'  FAIL: {r2_key}: {e}')
+
+          print(f'Forecast upload: {uploaded} uploaded, {skipped} skipped')
           "
 
       # ── Stage 8: Commit ──
