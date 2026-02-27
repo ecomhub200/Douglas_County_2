@@ -38,6 +38,8 @@ PROJECT_ROOT = Path(__file__).parent.parent
 REQUIRED_FIELDS = ['Document Nbr', 'Crash Date', 'Crash Severity']
 VALID_SEVERITIES = {'K', 'A', 'B', 'C', 'O', 'k', 'a', 'b', 'c', 'o'}
 STANDARD_COLUMNS_COUNT = 51
+DATE_YEAR_MIN = 2015
+DATE_YEAR_MAX_OFFSET = 5  # current year + this offset
 
 # 2% buffer on coordinate bounds so crashes near state/jurisdiction
 # borders aren't falsely rejected.  GPS error, boundary imprecision,
@@ -218,7 +220,7 @@ def validate_row(row, headers, col_idx, bounds, row_num):
             parsed = try_parse_date(date_str)
             if parsed is None:
                 issues.append(f"Unparseable date: '{date_str}'")
-            elif parsed.year < 2015 or parsed.year > 2030:
+            elif parsed.year < DATE_YEAR_MIN or parsed.year > datetime.now().year + DATE_YEAR_MAX_OFFSET:
                 issues.append(f"Date out of range: {date_str} (year={parsed.year})")
 
     # Coordinate checks
@@ -231,16 +233,21 @@ def validate_row(row, headers, col_idx, bounds, row_num):
             if x_str and y_str:
                 x_val = float(x_str)
                 y_val = float(y_str)
-                # Check for transposed coordinates (x should be longitude, y should be latitude)
-                if x_val != 0 and y_val != 0:
-                    if not (bounds['lon_min'] <= x_val <= bounds['lon_max']):
-                        # Check if transposed
+                # Both zero = missing data placeholder, skip bounds check
+                if x_val == 0 and y_val == 0:
+                    pass
+                else:
+                    # Check for transposed coordinates (x should be longitude, y should be latitude)
+                    if x_val != 0 and not (bounds['lon_min'] <= x_val <= bounds['lon_max']):
                         if bounds['lat_min'] <= x_val <= bounds['lat_max']:
                             issues.append(f"Likely transposed coordinates: x={x_val}, y={y_val}")
                         else:
                             issues.append(f"Longitude out of bounds: {x_val}")
-                    if not (bounds['lat_min'] <= y_val <= bounds['lat_max']):
+                    if y_val != 0 and not (bounds['lat_min'] <= y_val <= bounds['lat_max']):
                         issues.append(f"Latitude out of bounds: {y_val}")
+            elif x_str or y_str:
+                # One coordinate present but not the other — warn but don't reject
+                pass
         except (ValueError, IndexError):
             pass  # Missing coordinates are not a validation error
 
@@ -344,8 +351,10 @@ def main():
                         'doc_nbr': doc_nbr,
                         'issues': issues
                     })
-            else:
-                valid_rows.append(row)
+                # Do NOT cache invalid rows — they must be re-validated on next run
+                continue
+
+            valid_rows.append(row)
 
             # Track whether new or changed
             if doc_nbr in cached_hashes:
@@ -353,13 +362,22 @@ def main():
             else:
                 stats['new_validated'] += 1
 
-            new_hashes[doc_nbr] = row_hash
+            # Only cache rows with a Document Nbr to avoid key collisions
+            if doc_nbr:
+                new_hashes[doc_nbr] = row_hash
 
     if duplicates > 0:
         stats['warnings'].append(f"{duplicates} duplicate Document Nbr values removed")
 
-    # Write output
-    output_path = args.output or str(input_path)
+    # Write output — default to separate file to avoid overwriting input
+    if args.output:
+        output_path = args.output
+    elif str(input_path).endswith('_validated.csv'):
+        output_path = str(input_path)
+    else:
+        stem = input_path.stem
+        output_path = str(input_path.parent / f"{stem}_validated.csv")
+        logger.info(f"[{state}] No --output specified, writing to: {output_path}")
     with open(output_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerows(valid_rows)

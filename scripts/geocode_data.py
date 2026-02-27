@@ -25,6 +25,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sys
 import time
 from datetime import datetime, timedelta
@@ -39,6 +40,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 NOMINATIM_DELAY = 1.1  # seconds between requests (Nominatim policy)
 NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
 NOMINATIM_HEADERS = {'User-Agent': 'CrashLens/1.0 (crash-data-pipeline)'}
+FAILED_CACHE_TTL_DAYS = 30  # Re-try failed lookups after this many days
 
 # 2% buffer on coordinate bounds so geocoded results near
 # state/jurisdiction borders aren't falsely rejected.
@@ -117,8 +119,57 @@ def has_valid_coordinates(row, col_idx):
         return False
 
 
+# Road name normalization patterns for better Nominatim hit rates
+_ROAD_ABBREVIATIONS = [
+    (r'\bRT\b\.?\s*', 'Route '),
+    (r'\bRTE\b\.?\s*', 'Route '),
+    (r'\bI-(\d+)', r'Interstate \1'),
+    (r'\bUS\b\.?\s*(\d+)', r'US Route \1'),
+    (r'\bSR\b\.?\s*(\d+)', r'State Route \1'),
+    (r'\bST\b\.?\s*$', 'Street'),
+    (r'\bAVE\b\.?\s*$', 'Avenue'),
+    (r'\bBLVD\b\.?\s*$', 'Boulevard'),
+    (r'\bDR\b\.?\s*$', 'Drive'),
+    (r'\bLN\b\.?\s*$', 'Lane'),
+    (r'\bPKWY\b\.?\s*$', 'Parkway'),
+    (r'\bCT\b\.?\s*$', 'Court'),
+    (r'\bPL\b\.?\s*$', 'Place'),
+    (r'\bRD\b\.?\s*$', 'Road'),
+    (r'\bHWY\b\.?\s*', 'Highway '),
+    (r'\bCIR\b\.?\s*$', 'Circle'),
+    (r'\bTER\b\.?\s*$', 'Terrace'),
+    (r'\bTRPK\b\.?\s*$', 'Turnpike'),
+    (r'\bTPKE\b\.?\s*$', 'Turnpike'),
+]
+
+
+def normalize_road_name(name):
+    """Normalize road abbreviations for better Nominatim geocoding hit rate.
+
+    Examples:
+        'RT 288'     → 'Route 288'
+        'I-64'       → 'Interstate 64'
+        'US 1'       → 'US Route 1'
+        'BROAD ST'   → 'BROAD Street'
+        'SR 7'       → 'State Route 7'
+    """
+    if not name:
+        return name
+    result = name.strip()
+    for pattern, replacement in _ROAD_ABBREVIATIONS:
+        result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+    # Collapse multiple spaces
+    result = re.sub(r'\s+', ' ', result).strip()
+    return result
+
+
+# Track last API call time for rate limiting (sleep only between consecutive calls)
+_last_api_call_time = 0.0
+
+
 def geocode_nominatim(road_name, jurisdiction, state):
     """Geocode using Nominatim (OSM). Returns (lon, lat) or None."""
+    global _last_api_call_time
     try:
         import requests
     except ImportError:
@@ -127,7 +178,8 @@ def geocode_nominatim(road_name, jurisdiction, state):
     if not road_name or not jurisdiction:
         return None
 
-    query = f"{road_name}, {jurisdiction}, {state}"
+    normalized = normalize_road_name(road_name)
+    query = f"{normalized}, {jurisdiction}, {state}"
     params = {
         'q': query,
         'format': 'json',
@@ -136,7 +188,13 @@ def geocode_nominatim(road_name, jurisdiction, state):
     }
 
     try:
-        time.sleep(NOMINATIM_DELAY)
+        # Rate limit: sleep only if we've called the API recently
+        now = time.time()
+        elapsed = now - _last_api_call_time
+        if _last_api_call_time > 0 and elapsed < NOMINATIM_DELAY:
+            time.sleep(NOMINATIM_DELAY - elapsed)
+        _last_api_call_time = time.time()
+
         resp = requests.get(NOMINATIM_URL, params=params, headers=NOMINATIM_HEADERS, timeout=10)
         if resp.status_code == 200:
             results = resp.json()
@@ -217,7 +275,10 @@ def update_geocode_cache_manifest(cache_dir, state, stats, total_locations):
         'api_calls_total': stats['api_calls'],
         'api_successes': stats['api_successes'],
         'cache_hit_rate': hit_rate,
+        'node_hits': stats.get('node_hits', 0),
         'stale_refreshed': stats['stale_refreshed'],
+        'stale_reused': stats.get('stale_reused', 0),
+        'api_failures_cached': stats.get('api_failures_cached', 0),
         'not_geocoded': stats['no_geocode']
     }
 
@@ -256,7 +317,7 @@ def main():
     parser.add_argument('--output', default=None, help='Output path for geocoded CSV')
     parser.add_argument('--cache-dir', default=None, help='Cache directory (default: .cache/{state}/geocode)')
     parser.add_argument('--force-geocode', action='store_true', help='Ignore cache, re-geocode everything')
-    parser.add_argument('--max-api-calls', type=int, default=500, help='Max Nominatim API calls per run')
+    parser.add_argument('--max-api-calls', type=int, default=2500, help='Max Nominatim API calls per run')
     parser.add_argument('--save-gzip', action='store_true', help='Also save a gzipped copy')
     args = parser.parse_args()
 
@@ -301,8 +362,11 @@ def main():
         'already_had_coords': 0,
         'cache_hits': 0,
         'stale_refreshed': 0,
+        'stale_reused': 0,
+        'node_hits': 0,
         'api_calls': 0,
         'api_successes': 0,
+        'api_failures_cached': 0,
         'geocode_rejected': 0,
         'no_geocode': 0,
     }
@@ -310,6 +374,11 @@ def main():
     # Process
     output_rows = []
     api_calls_remaining = args.max_api_calls
+
+    # Node-based geocoding: build a lookup of Node → (x, y) from rows that
+    # already have valid coordinates. This fills coordinates for other rows
+    # at the same intersection without any API calls.
+    node_coords = {}  # Node value → (lon, lat)
 
     with open(input_path, 'r', newline='', encoding='utf-8', errors='replace') as f:
         reader = csv.reader(f)
@@ -324,32 +393,72 @@ def main():
         doc_idx = col_idx.get('Document Nbr')
         route_idx = col_idx.get('RTE Name')
         juris_idx = col_idx.get('Physical Juris Name')
+        node_idx = col_idx.get('Node')
 
         output_rows.append(headers)
 
-        for row in reader:
+        # Pass 1: Build node coordinate lookup from rows with valid coords
+        all_rows = list(reader)
+        for row in all_rows:
+            if node_idx is not None and node_idx < len(row) and has_valid_coordinates(row, col_idx):
+                node_val = row[node_idx].strip()
+                if node_val and node_val not in node_coords:
+                    x_val = float(row[x_idx].strip())
+                    y_val = float(row[y_idx].strip())
+                    node_coords[node_val] = (x_val, y_val)
+
+        if node_coords:
+            logger.info(f"[{state}] Node lookup built: {len(node_coords):,} unique nodes with coordinates")
+
+        # Pass 2: Process all rows
+        for row in all_rows:
             stats['total_rows'] += 1
 
             # Already has valid coordinates
             if has_valid_coordinates(row, col_idx):
                 stats['already_had_coords'] += 1
                 output_rows.append(row)
-                # Track in records cache
                 if doc_idx is not None and doc_idx < len(row):
                     doc_nbr = row[doc_idx].strip()
-                    loc_key = build_location_key(row, col_idx)
+                    loc_key_hash = hashlib.md5(build_location_key(row, col_idx).encode()).hexdigest()[:12]
                     if doc_nbr:
-                        geo_records[doc_nbr] = loc_key
+                        geo_records[doc_nbr] = loc_key_hash
                 continue
 
             # Build location key for cache lookup
             loc_key = build_location_key(row, col_idx)
             loc_key_hash = hashlib.md5(loc_key.encode()).hexdigest()[:12]
 
-            # Check cache
+            # Strategy 1: Node-based coordinate lookup
+            if node_idx is not None and node_idx < len(row):
+                node_val = row[node_idx].strip()
+                if node_val and node_val in node_coords:
+                    lon, lat = node_coords[node_val]
+                    if x_idx is not None and x_idx < len(row):
+                        row[x_idx] = str(lon)
+                    if y_idx is not None and y_idx < len(row):
+                        row[y_idx] = str(lat)
+                    stats['node_hits'] += 1
+                    output_rows.append(row)
+                    if doc_idx is not None and doc_idx < len(row):
+                        doc_nbr = row[doc_idx].strip()
+                        if doc_nbr:
+                            geo_records[doc_nbr] = loc_key_hash
+                    continue
+
+            # Strategy 2: Check geocode cache
             if loc_key_hash in geo_cache and not args.force_geocode:
                 entry = geo_cache[loc_key_hash]
-                if not is_cache_stale(entry, ttl_days):
+
+                # Check if this is a cached failure
+                if entry.get('failed'):
+                    if not is_cache_stale(entry, FAILED_CACHE_TTL_DAYS):
+                        stats['no_geocode'] += 1
+                        output_rows.append(row)
+                        continue
+                    # Stale failure — allow retry below
+
+                elif not is_cache_stale(entry, ttl_days):
                     # Cache hit — use cached coordinates
                     if x_idx is not None and x_idx < len(row):
                         row[x_idx] = str(entry.get('x', ''))
@@ -362,10 +471,11 @@ def main():
                         if doc_nbr:
                             geo_records[doc_nbr] = loc_key_hash
                     continue
-                else:
-                    stats['stale_refreshed'] += 1
 
-            # Try Nominatim geocoding (if API calls remaining)
+            # Stale entry — remember it so we can fall back if API fails
+            stale_entry = geo_cache.get(loc_key_hash) if loc_key_hash in geo_cache else None
+
+            # Strategy 3: Nominatim geocoding (if API calls remaining)
             geocoded = False
             if api_calls_remaining > 0:
                 road_name = row[route_idx].strip() if route_idx is not None and route_idx < len(row) else ''
@@ -392,7 +502,10 @@ def main():
                             stats['api_successes'] += 1
                             geocoded = True
 
-                            # Update cache
+                            if stale_entry and not stale_entry.get('failed'):
+                                stats['stale_refreshed'] += 1
+
+                            # Update cache with fresh result
                             geo_cache[loc_key_hash] = {
                                 'x': lon,
                                 'y': lat,
@@ -401,9 +514,26 @@ def main():
                                 'cached_at': datetime.utcnow().isoformat() + 'Z',
                                 'location_key': loc_key
                             }
+                    else:
+                        # Cache the failure so we don't retry on next run
+                        geo_cache[loc_key_hash] = {
+                            'failed': True,
+                            'method': 'nominatim',
+                            'cached_at': datetime.utcnow().isoformat() + 'Z',
+                            'location_key': loc_key
+                        }
+                        stats['api_failures_cached'] += 1
 
             if not geocoded:
-                stats['no_geocode'] += 1
+                # Fall back to stale entry if available (stale data > no data)
+                if stale_entry and not stale_entry.get('failed') and stale_entry.get('x') and stale_entry.get('y'):
+                    if x_idx is not None and x_idx < len(row):
+                        row[x_idx] = str(stale_entry['x'])
+                    if y_idx is not None and y_idx < len(row):
+                        row[y_idx] = str(stale_entry['y'])
+                    stats['stale_reused'] += 1
+                else:
+                    stats['no_geocode'] += 1
 
             output_rows.append(row)
             if doc_idx is not None and doc_idx < len(row):
@@ -454,9 +584,12 @@ def main():
     logger.info(f"[{state}] GEOCODING COMPLETE")
     logger.info(f"[{state}]   Total rows:           {stats['total_rows']:,}")
     logger.info(f"[{state}]   Already had coords:   {stats['already_had_coords']:,}")
+    logger.info(f"[{state}]   Node lookup hits:      {stats['node_hits']:,}")
     logger.info(f"[{state}]   Cache hits:            {stats['cache_hits']:,}")
     logger.info(f"[{state}]   Stale refreshed:       {stats['stale_refreshed']:,}")
+    logger.info(f"[{state}]   Stale reused:          {stats['stale_reused']:,}")
     logger.info(f"[{state}]   API calls:             {stats['api_calls']:,} ({stats['api_successes']} success)")
+    logger.info(f"[{state}]   API failures cached:   {stats['api_failures_cached']:,}")
     logger.info(f"[{state}]   Geocode rejected (OOB): {stats['geocode_rejected']:,}")
     logger.info(f"[{state}]   Not geocoded:          {stats['no_geocode']:,}")
     logger.info(f"[{state}]   Cache locations:        {len(geo_cache):,}")
