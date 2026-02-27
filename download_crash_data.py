@@ -673,7 +673,19 @@ Examples:
     parser.add_argument(
         '--output', '-o',
         type=str,
-        help='Output file path (default: data/CDOT/crashes.csv)'
+        help='Output file path (default: data/<jurisdiction>_all_roads.csv)'
+    )
+
+    parser.add_argument(
+        '--output-dir',
+        type=str,
+        help='Output directory (auto-generates filename from jurisdiction). Ignored if --output is set.'
+    )
+
+    parser.add_argument(
+        '--force-download',
+        action='store_true',
+        help='Force re-download even if cached data exists'
     )
 
     parser.add_argument(
@@ -736,7 +748,12 @@ def main():
     filter_profile = filter_profiles.get(filter_id, filter_profiles.get('countyOnly', {}))
 
     # Get output file
-    output_file = args.output or os.path.join(OUTPUT_DIR, "CDOT", "crashes.csv")
+    if args.output:
+        output_file = args.output
+    elif args.output_dir:
+        output_file = os.path.join(args.output_dir, f"{jurisdiction_id}_all_roads.csv")
+    else:
+        output_file = os.path.join(OUTPUT_DIR, f"{jurisdiction_id}_all_roads.csv")
 
     logger.info("=" * 60)
     logger.info(f"Starting crash data download at {datetime.now()}")
@@ -760,7 +777,8 @@ def main():
         # Stage 1.5: Save statewide copy as gzip before jurisdiction filtering
         if args.save_statewide and df is not None and not df.empty:
             try:
-                statewide_path = os.path.join(OUTPUT_DIR, "virginia_statewide_all_roads.csv")
+                statewide_dir = args.output_dir or OUTPUT_DIR
+                statewide_path = os.path.join(statewide_dir, "virginia_statewide_all_roads.csv")
                 logger.info(f"Saving statewide dataset ({len(df):,} records) before filtering...")
                 df_statewide = standardize_columns(df.copy())
                 df_statewide.to_csv(statewide_path, index=False)
