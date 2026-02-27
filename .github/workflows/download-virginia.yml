@@ -201,7 +201,7 @@ jobs:
                 scope: '${{ needs.download.outputs.scope }}',
                 selection: '${{ needs.download.outputs.selection }}',
                 data_source: '${{ needs.download.outputs.csv_path }}',
-                skip_forecasts: 'true'
+                skip_forecasts: 'false'
               }
             });
             console.log('Pipeline triggered for Virginia');
