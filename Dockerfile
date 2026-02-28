@@ -36,6 +36,9 @@ COPY assets/ /usr/share/nginx/html/assets/
 # Copy docs directory (if needed for the app)
 COPY docs/ /usr/share/nginx/html/docs/
 
+# Copy scripts directory (crash data validator, utilities)
+COPY scripts/ /usr/share/nginx/html/scripts/
+
 # Copy any login directory if it exists
 COPY logi[n]/ /usr/share/nginx/html/login/
 
