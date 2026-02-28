@@ -3136,37 +3136,35 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('message', function(evt) {
   if (!evt.data || !evt.data.type) return;
 
-  // Direct jurisdiction key match (e.g., 'co_douglas', 'va_henrico')
   if (evt.data.type === 'validator-set-jurisdiction') {
     const key = evt.data.jurisdiction;
+
+    // Try direct preset match first (e.g., 'co_douglas', 'va_henrico')
     if (key && JURISDICTIONS[key]) {
       document.getElementById('jurisdictionPreset').value = key;
       applyJurisdictionPreset();
-      console.log('[Validator] Jurisdiction set via parent:', key);
+      console.log('[Validator] Jurisdiction set via preset:', key);
+      return;
     }
-  }
 
-  // Dynamic jurisdiction config for jurisdictions not in hardcoded presets
-  if (evt.data.type === 'validator-set-jurisdiction-config') {
-    const { state, county, bounds } = evt.data;
-    if (state && county && bounds) {
-      document.getElementById('jurisdState').value = state;
-      document.getElementById('jurisdCounty').value = county;
-      APP.config.bounds = { ...bounds };
-      APP.config.r2Path = '/' + state + '/' + county + '/';
+    // Fallback: use dynamic config from parent for jurisdictions not in presets
+    const fb = evt.data.fallback;
+    if (fb && fb.state && fb.county && fb.bounds) {
+      document.getElementById('jurisdState').value = fb.state;
+      document.getElementById('jurisdCounty').value = fb.county;
+      APP.config.bounds = { ...fb.bounds };
+      APP.config.r2Path = '/' + fb.state + '/' + fb.county + '/';
       document.getElementById('r2Path').value = APP.config.r2Path;
-      const fields = { setMinLat: bounds.minLat, setMaxLat: bounds.maxLat, setMinLon: bounds.minLon, setMaxLon: bounds.maxLon };
+      const fields = { setMinLat: fb.bounds.minLat, setMaxLat: fb.bounds.maxLat, setMinLon: fb.bounds.minLon, setMaxLon: fb.bounds.maxLon };
       for (const [id, val] of Object.entries(fields)) {
         const el = document.getElementById(id);
         if (el) el.value = val;
       }
-      // Update header badge
-      const badge = document.getElementById('jurisdBadge');
-      if (badge) badge.textContent = county.charAt(0).toUpperCase() + county.slice(1) + ' County, ' + state.toUpperCase();
-      // Reset jurisdiction preset dropdown to custom
+      document.getElementById('envBadge').textContent =
+        fb.county.charAt(0).toUpperCase() + fb.county.slice(1) + ' County, ' + fb.state.toUpperCase();
       const preset = document.getElementById('jurisdictionPreset');
       if (preset) preset.value = '';
-      console.log('[Validator] Jurisdiction config set via parent:', state, county);
+      console.log('[Validator] Jurisdiction set via fallback config:', fb.state, fb.county);
     }
   }
 });
