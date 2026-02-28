@@ -1,12 +1,13 @@
 # ==============================================================================
-# Crash Lens — Unified Pipeline v5
+# Crash Lens — Unified Pipeline v6
 # ==============================================================================
 # Processes Virginia-compatible CSVs through the generic pipeline.
 # Auto-triggered by state-specific download workflows.
 #
-# Stage order: Init Cache → Validate → Geocode → [Save Statewide CSV] →
-#              Split Jurisdiction → Split Road Type → Aggregate (CSV) →
-#              Upload → Predict → Manifest
+# Stage order: Init Cache → Split Jurisdiction → Split Road Type →
+#              Aggregate (CSV) → Upload → Predict → Manifest
+#
+# NOTE: Validation and Geocoding are handled separately on Cloudflare.
 #
 # Scope-aware: generates region/MPO aggregate CSVs based on user selection.
 # ==============================================================================
@@ -45,18 +46,6 @@ on:
         description: 'Path to Virginia-compatible CSV (leave blank for default location)'
         required: false
         default: ''
-        type: string
-
-      skip_validation:
-        description: 'Skip validation step'
-        required: false
-        default: 'false'
-        type: string
-
-      skip_geocode:
-        description: 'Skip geocoding step'
-        required: false
-        default: 'false'
         type: string
 
       skip_forecasts:
@@ -154,7 +143,7 @@ jobs:
           fi
 
   # ============================================================
-  # JOB 2: Process (Stages 1-8)
+  # JOB 2: Process (Stages 0-6)
   # ============================================================
   process:
     name: "Process (${{ needs.prepare.outputs.state }})"
@@ -185,59 +174,10 @@ jobs:
 
           python scripts/init_cache.py --state "$STATE"
 
-      # ── Stage 1: Validate (on full dataset) ──
-      - name: "Stage 1: Validate"
-        if: github.event.inputs.skip_validation != 'true'
-        run: |
-          INPUT_CSV="${{ needs.prepare.outputs.input_csv }}"
-          STATE="${{ needs.prepare.outputs.state }}"
-
-          echo "=========================================="
-          echo "Stage 1: Validate full dataset"
-          echo "Input: $INPUT_CSV"
-          echo "=========================================="
-
-          if [ -z "$INPUT_CSV" ] || [ ! -f "$INPUT_CSV" ]; then
-            echo "WARNING: Input CSV not found ($INPUT_CSV) — skipping validation"
-            exit 0
-          fi
-
-          python scripts/validate_data.py \
-            --state "$STATE" \
-            --input "$INPUT_CSV" \
-            --cache-dir ".cache/$STATE/validation" || {
-            echo "WARNING: Validation had issues (non-fatal)"
-          }
-
-      # ── Stage 2: Geocode (on full dataset) ──
-      - name: "Stage 2: Geocode"
-        if: github.event.inputs.skip_geocode != 'true'
-        timeout-minutes: 60
-        run: |
-          INPUT_CSV="${{ needs.prepare.outputs.input_csv }}"
-          STATE="${{ needs.prepare.outputs.state }}"
-          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
-
-          echo "=========================================="
-          echo "Stage 2: Geocode full dataset"
-          echo "=========================================="
-
-          if [ -z "$INPUT_CSV" ] || [ ! -f "$INPUT_CSV" ]; then
-            echo "WARNING: Input CSV not found ($INPUT_CSV) — skipping geocoding"
-            exit 0
-          fi
-
-          python scripts/geocode_data.py \
-            --state "$STATE" \
-            --input "$INPUT_CSV" \
-            --output "$DATA_DIR/${STATE}_statewide_validated_geocoded.csv" \
-            --cache-dir ".cache/$STATE/geocode" \
-            --save-gzip || {
-            echo "WARNING: Geocoding had issues (non-fatal)"
-          }
-
-      # ── Stage 3: Split by Jurisdiction (batch mode only) ──
-      - name: "Stage 3: Split by jurisdiction"
+      # ── Stage 1: Split by Jurisdiction (batch mode only) ──
+      # NOTE: Validation (old Stage 1) and Geocoding (old Stage 2) are now
+      #       handled separately on Cloudflare Workers.
+      - name: "Stage 1: Split by jurisdiction"
         if: needs.prepare.outputs.download_mode == 'statewide'
         run: |
           STATE="${{ needs.prepare.outputs.state }}"
@@ -246,16 +186,10 @@ jobs:
           JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
 
           echo "=========================================="
-          echo "Stage 3: Split validated+geocoded CSV into jurisdictions"
+          echo "Stage 1: Split CSV into jurisdictions"
           echo "=========================================="
 
-          # Use geocoded file if it exists, otherwise use original input
-          GEOCODED="$DATA_DIR/${STATE}_statewide_validated_geocoded.csv"
-          if [ -f "$GEOCODED" ]; then
-            SPLIT_INPUT="$GEOCODED"
-          else
-            SPLIT_INPUT="$INPUT_CSV"
-          fi
+          SPLIT_INPUT="$INPUT_CSV"
 
           if [ -z "$SPLIT_INPUT" ] || [ ! -f "$SPLIT_INPUT" ]; then
             echo "WARNING: No input CSV found for splitting"
@@ -275,15 +209,15 @@ jobs:
 
           python scripts/split_jurisdictions.py $ARGS
 
-      # ── Stage 4: Split by Road Type ──
-      - name: "Stage 4: Split by road type"
+      # ── Stage 2: Split by Road Type ──
+      - name: "Stage 2: Split by road type"
         run: |
           STATE="${{ needs.prepare.outputs.state }}"
           DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
           JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
 
           echo "=========================================="
-          echo "Stage 4: Split by road type (3 CSVs per jurisdiction)"
+          echo "Stage 2: Split by road type (3 CSVs per jurisdiction)"
           echo "=========================================="
 
           JURIS_LIST=$(echo "$JURISDICTIONS" | python3 -c "import json,sys; print(' '.join(json.load(sys.stdin)))")
@@ -295,8 +229,8 @@ jobs:
             echo "WARNING: Road-type split had issues (non-fatal)"
           }
 
-      # ── Stage 5: Aggregate by Scope (CSV) ──
-      - name: "Stage 5: Aggregate by scope (CSV)"
+      # ── Stage 3: Aggregate by Scope (CSV) ──
+      - name: "Stage 3: Aggregate by scope (CSV)"
         if: github.event.inputs.dry_run != 'true'
         run: |
           STATE="${{ needs.prepare.outputs.state }}"
@@ -305,7 +239,7 @@ jobs:
           DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
 
           echo "=========================================="
-          echo "Stage 5: Aggregate by scope (scope=$SCOPE, format=CSV)"
+          echo "Stage 3: Aggregate by scope (scope=$SCOPE, format=CSV)"
           echo "=========================================="
 
           # Scope-aware CSV aggregation
@@ -330,8 +264,8 @@ jobs:
             }
           fi
 
-      # ── Stage 6: Upload to R2 ──
-      - name: "Stage 6: Upload to R2"
+      # ── Stage 4: Upload to R2 ──
+      - name: "Stage 4: Upload to R2"
         if: github.event.inputs.dry_run != 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
@@ -346,10 +280,10 @@ jobs:
           R2_BUCKET="crash-lens-data"
 
           echo "=========================================="
-          echo "Stage 6: Upload to R2 (all CSVs)"
+          echo "Stage 4: Upload to R2 (all CSVs)"
           echo "=========================================="
 
-          # 6a: Upload jurisdiction CSVs (county-level road-type splits)
+          # 4a: Upload jurisdiction CSVs (county-level road-type splits)
           MANIFEST=$(python scripts/split_jurisdictions.py \
             --state "$STATE" --r2-manifest --r2-prefix "$R2_PREFIX" --output-dir "$DATA_DIR")
 
@@ -381,7 +315,7 @@ jobs:
           print(f'County CSV upload: {success} ok, {failed} fail, {skipped} skip')
           "
 
-          # 6b: Upload region/MPO aggregate CSVs
+          # 4b: Upload region/MPO aggregate CSVs
           find "$DATA_DIR" -path "*/_region/*" -name "*.csv" -o -path "*/_mpo/*" -name "*.csv" 2>/dev/null | while read f; do
             REL="${f#$DATA_DIR/}"
             R2_KEY="$R2_PREFIX/$REL"
@@ -391,7 +325,7 @@ jobs:
               --only-show-errors || echo "  WARN: failed to upload $R2_KEY"
           done
 
-          # 6c: Upload federal aggregate CSVs (statewide scope only)
+          # 4c: Upload federal aggregate CSVs (statewide scope only)
           if [ "$SCOPE" = "statewide" ]; then
             find "data/_federal" -name "*.csv" 2>/dev/null | while read f; do
               R2_KEY="_federal/${f#data/_federal/}"
@@ -402,17 +336,10 @@ jobs:
             done
           fi
 
-          # 6d: Upload statewide gzip (batch mode only)
-          GZ="$DATA_DIR/${STATE}_statewide_validated_geocoded.csv.gz"
-          if [ -f "$GZ" ]; then
-            aws s3 cp "$GZ" "s3://$R2_BUCKET/$R2_PREFIX/_state/statewide_all_roads.csv.gz" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --content-type "application/gzip" \
-              --content-encoding "gzip"
-          fi
+          # NOTE: Statewide gzip upload removed — validation/geocoding handled on Cloudflare
 
-      # ── Stage 7: Predict (Forecasts) ──
-      - name: "Stage 7: Generate forecasts"
+      # ── Stage 5: Predict (Forecasts) ──
+      - name: "Stage 5: Generate forecasts"
         if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
         timeout-minutes: 60
         env:
@@ -424,7 +351,7 @@ jobs:
           JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
 
           echo "=========================================="
-          echo "Stage 7: Forecast generation (per county only)"
+          echo "Stage 5: Forecast generation (per county only)"
           echo "=========================================="
 
           echo "$JURISDICTIONS" | python3 -c "
@@ -443,8 +370,8 @@ jobs:
           print(f'Forecasts: {success}/{len(jurisdictions)} jurisdictions')
           "
 
-      # ── Stage 7b: Upload forecast JSONs to R2 ──
-      - name: "Stage 7b: Upload forecast JSONs to R2"
+      # ── Stage 5b: Upload forecast JSONs to R2 ──
+      - name: "Stage 5b: Upload forecast JSONs to R2"
         if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
@@ -459,7 +386,7 @@ jobs:
           R2_BUCKET="crash-lens-data"
 
           echo "=========================================="
-          echo "Stage 7b: Upload forecast JSONs to R2"
+          echo "Stage 5b: Upload forecast JSONs to R2"
           echo "=========================================="
 
           UPLOADED=0
@@ -503,8 +430,8 @@ jobs:
           print(f'Forecast upload: {uploaded} uploaded, {skipped} skipped')
           "
 
-      # ── Stage 8: Commit ──
-      - name: "Stage 8: Commit manifest and metadata"
+      # ── Stage 6: Commit ──
+      - name: "Stage 6: Commit manifest and metadata"
         if: github.event.inputs.dry_run != 'true'
         run: |
           STATE="${{ needs.prepare.outputs.state }}"
@@ -516,9 +443,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add data/r2-manifest.json 2>/dev/null || true
-          git add data/.validation/ 2>/dev/null || true
           git add data/*/.split_report.json 2>/dev/null || true
-          git add data/*/.geocode_cache.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No metadata changes to commit"
@@ -551,4 +476,4 @@ jobs:
           echo "| Scope | $SCOPE ($SELECTION) |" >> $GITHUB_STEP_SUMMARY
           echo "| Jurisdictions | ${{ needs.prepare.outputs.jurisdiction_count }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Stages | Init Cache → Validate → Geocode → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stages | Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest |" >> $GITHUB_STEP_SUMMARY
