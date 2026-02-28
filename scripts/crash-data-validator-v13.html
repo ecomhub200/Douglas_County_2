@@ -731,10 +731,20 @@ select.form-input {
   .file-grid { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 }
+
+/* Embedded mode — hide redundant UI when loaded inside parent app iframe */
+body.embedded .topbar { display: none; }
+body.embedded .stepper { display: none; }
+body.embedded .config-section { display: none; }
+body.embedded .container { padding-top: 12px; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
 <body>
+<script>
+// Detect embedded mode (loaded in parent app iframe) — hide redundant topbar, stepper, jurisdiction UI
+if (window.parent !== window) { document.body.classList.add('embedded'); }
+</script>
 
 <!-- Toast Container -->
 <div class="toast-container" id="toastContainer"></div>
