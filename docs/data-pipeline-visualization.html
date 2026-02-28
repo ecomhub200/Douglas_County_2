@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crash Lens — Data Pipeline Visualization</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #334155;
+    --border: #475569;
+    --text: #f1f5f9;
+    --text-dim: #94a3b8;
+    --accent: #3b82f6;
+    --accent-glow: rgba(59, 130, 246, 0.3);
+    --green: #22c55e;
+    --green-glow: rgba(34, 197, 94, 0.25);
+    --orange: #f59e0b;
+    --orange-glow: rgba(245, 158, 11, 0.25);
+    --purple: #a855f7;
+    --purple-glow: rgba(168, 85, 247, 0.25);
+    --red: #ef4444;
+    --red-glow: rgba(239, 68, 68, 0.25);
+    --cyan: #06b6d4;
+    --cyan-glow: rgba(6, 182, 212, 0.25);
+    --pink: #ec4899;
+    --pink-glow: rgba(236, 72, 153, 0.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    text-align: center;
+    padding: 40px 20px 20px;
+    position: relative;
+  }
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #3b82f6, #06b6d4, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+  .header p {
+    color: var(--text-dim);
+    font-size: 1rem;
+    max-width: 650px;
+    margin: 0 auto;
+  }
+
+  .legend {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px 20px;
+    margin-bottom: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  /* ── Pipeline Container ── */
+  .pipeline {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 60px;
+    position: relative;
+  }
+
+  /* Central vertical line */
+  .pipeline::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 60px;
+    width: 2px;
+    background: linear-gradient(to bottom, transparent, var(--border) 5%, var(--border) 95%, transparent);
+    transform: translateX(-50%);
+    z-index: 0;
+  }
+
+  /* ── Phase Sections ── */
+  .phase {
+    position: relative;
+    margin-bottom: 20px;
+    z-index: 1;
+  }
+
+  .phase-label {
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .phase-label span {
+    display: inline-block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 6px 20px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+  }
+
+  /* ── Flow Arrow between phases ── */
+  .flow-arrow {
+    text-align: center;
+    margin: 8px 0 12px;
+    position: relative;
+    z-index: 1;
+  }
+  .flow-arrow svg {
+    filter: drop-shadow(0 0 4px var(--accent-glow));
+  }
+
+  /* ── Stage Node ── */
+  .stage {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 8px;
+    position: relative;
+  }
+
+  .stage-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 22px;
+    width: 480px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .stage-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px var(--accent-glow), 0 8px 32px rgba(0,0,0,0.3);
+    transform: translateY(-2px);
+  }
+  .stage-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px;
+    height: 100%;
+    border-radius: 12px 0 0 12px;
+  }
+
+  .stage-card.source::before { background: var(--cyan); }
+  .stage-card.trigger::before { background: var(--orange); }
+  .stage-card.validate::before { background: var(--green); }
+  .stage-card.transform::before { background: var(--purple); }
+  .stage-card.store::before { background: var(--accent); }
+  .stage-card.serve::before { background: var(--pink); }
+  .stage-card.predict::before { background: var(--red); }
+
+  .stage-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .stage-number {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .source .stage-number { background: rgba(6,182,212,0.15); color: var(--cyan); }
+  .trigger .stage-number { background: rgba(245,158,11,0.15); color: var(--orange); }
+  .validate .stage-number { background: rgba(34,197,94,0.15); color: var(--green); }
+  .transform .stage-number { background: rgba(168,85,247,0.15); color: var(--purple); }
+  .store .stage-number { background: rgba(59,130,246,0.15); color: var(--accent); }
+  .serve .stage-number { background: rgba(236,72,153,0.15); color: var(--pink); }
+  .predict .stage-number { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  .stage-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  .stage-desc {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+
+  .stage-details {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .stage-card.expanded .stage-details {
+    display: block;
+  }
+
+  .detail-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+  .detail-label {
+    color: var(--text-dim);
+    min-width: 80px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .detail-value {
+    color: var(--text);
+  }
+  .detail-value code {
+    background: var(--surface2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.73rem;
+  }
+
+  .expand-hint {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-align: right;
+    opacity: 0.6;
+    margin-top: 4px;
+  }
+  .stage-card.expanded .expand-hint {
+    display: none;
+  }
+
+  /* ── Connector dots on center line ── */
+  .connector-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 24px;
+    z-index: 2;
+  }
+
+  /* ── Parallel branches ── */
+  .parallel-group {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .parallel-group .stage-card {
+    width: 360px;
+  }
+  .parallel-label {
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    background: var(--bg);
+    padding: 2px 10px;
+    border-radius: 8px;
+    border: 1px dashed var(--border);
+    white-space: nowrap;
+  }
+
+  /* ── Split/merge indicators ── */
+  .split-indicator {
+    text-align: center;
+    margin: 6px 0;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  /* ── Final destination card ── */
+  .destination {
+    text-align: center;
+    margin-top: 10px;
+  }
+  .destination-card {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(168,85,247,0.1));
+    border: 1px solid var(--accent);
+    border-radius: 16px;
+    padding: 24px 40px;
+    box-shadow: 0 0 30px var(--accent-glow);
+  }
+  .destination-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 6px;
+  }
+  .destination-card p {
+    color: var(--text-dim);
+    font-size: 0.82rem;
+  }
+
+  /* ── File paths ── */
+  .file-ref {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.72rem;
+    color: var(--cyan);
+    opacity: 0.8;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .stage-card { width: 90vw; max-width: 440px; }
+    .parallel-group { flex-direction: column; align-items: center; }
+    .parallel-group .stage-card { width: 90vw; max-width: 440px; }
+    .pipeline::before { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Crash Lens Data Pipeline</h1>
+  <p>End-to-end flow from external data sources through processing, validation, and delivery to the browser application. Click any stage to expand details.</p>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div> Data Source</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div> Trigger / Orchestration</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Validation</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div> Transformation</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div> ML / Prediction</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div> Storage</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--pink)"></div> Serving / App</div>
+</div>
+
+<div class="pipeline">
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- PHASE 1: DATA SOURCES                          -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="phase">
+    <div class="phase-label"><span>Phase 1 — External Data Sources</span></div>
+
+    <div class="parallel-group">
+      <div class="parallel-label">Multiple sources fetched in parallel</div>
+
+      <div class="stage-card source" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">SOURCE</span>
+          <span class="stage-title">State DOT Crash APIs</span>
+        </div>
+        <div class="stage-desc">
+          50+ state data portals — ArcGIS REST APIs, Open Data portals, CSV downloads.
+          Virginia uses the Virginia Roads ArcGIS FeatureServer with 2,000-record pagination.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">VA API</span>
+            <span class="detail-value"><code>services.arcgis.com/.../CrashData_Basic_Updated</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Fallback</span>
+            <span class="detail-value"><code>virginiaroads.org/api/download/v1/...</code> (CSV)</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">CO Source</span>
+            <span class="detail-value">CDOT Open Data Portal (ArcGIS)</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">MD Source</span>
+            <span class="detail-value">Maryland ACRS crash reporting system</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Pagination</span>
+            <span class="detail-value">2,000 records/request, auto-paginated</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Retry</span>
+            <span class="detail-value">Exponential backoff: 2s → 4s → 8s → 16s (max 4)</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Output</span>
+            <span class="detail-value"><code>{jurisdiction}_all_roads.csv</code></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-card source" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">SOURCE</span>
+          <span class="stage-title">Grants Data</span>
+        </div>
+        <div class="stage-desc">
+          Federal grants from Grants.gov Extract API + static state-specific safety programs
+          (HSIP, Section 402/405, SS4A). Filtered by CFDA numbers.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Federal</span>
+            <span class="detail-value">Grants.gov API → CFDA 20.600–20.616</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Static</span>
+            <span class="detail-value">HSIP, Section 402/405, SS4A per state</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Script</span>
+            <span class="detail-value"><code>download_grants_data.py</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Output</span>
+            <span class="detail-value"><code>data/grants.csv</code></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">
+    <svg width="24" height="36" viewBox="0 0 24 36"><path d="M12 0 L12 28 M6 22 L12 30 L18 22" stroke="#3b82f6" fill="none" stroke-width="2"/></svg>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- PHASE 2: DOWNLOAD ORCHESTRATION                -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="phase">
+    <div class="phase-label"><span>Phase 2 — Download &amp; Trigger</span></div>
+
+    <div class="stage">
+      <div class="stage-card trigger" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">TRIGGER</span>
+          <span class="stage-title">GitHub Actions — State Download Workflows</span>
+        </div>
+        <div class="stage-desc">
+          34 state-specific workflows (e.g. <code>download-virginia.yml</code>) run on cron schedule
+          (1st Monday/month) or manual dispatch. Supports scopes: jurisdiction, region, MPO, statewide.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Schedule</span>
+            <span class="detail-value">1st Monday/month @ 11:00 UTC (6 AM ET)</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Scopes</span>
+            <span class="detail-value"><code>jurisdiction</code> | <code>region</code> | <code>mpo</code> | <code>statewide</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Batch</span>
+            <span class="detail-value"><code>batch-all-jurisdictions.yml</code> — bulk download + split</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Resolver</span>
+            <span class="detail-value"><code>scripts/resolve_scope.py</code> maps scope → jurisdiction list</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Config</span>
+            <span class="detail-value"><code>config.json</code> (133 VA jurisdictions, 64 CO counties)</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Output</span>
+            <span class="detail-value">Raw CSV committed to repo → auto-triggers <code>pipeline.yml</code></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">
+    <svg width="24" height="36" viewBox="0 0 24 36"><path d="M12 0 L12 28 M6 22 L12 30 L18 22" stroke="#f59e0b" fill="none" stroke-width="2"/></svg>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- PHASE 3: PIPELINE PROCESSING                    -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="phase">
+    <div class="phase-label"><span>Phase 3 — Unified Processing Pipeline</span></div>
+    <div style="text-align:center;margin-bottom:14px;">
+      <span class="file-ref">.github/workflows/pipeline.yml → scripts/*.py</span>
+    </div>
+
+    <!-- Stage 0 -->
+    <div class="stage">
+      <div class="stage-card trigger" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">STAGE 0</span>
+          <span class="stage-title">Initialize Cache</span>
+        </div>
+        <div class="stage-desc">
+          Creates state-isolated cache directories for incremental processing.
+          Previously validated rows and geocoded coordinates are cached to skip on re-runs.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Script</span>
+            <span class="detail-value"><code>scripts/init_cache.py</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Output</span>
+            <span class="detail-value"><code>.cache/{state}/validation/</code>, <code>.cache/{state}/geocode/</code></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">
+      <svg width="24" height="28" viewBox="0 0 24 28"><path d="M12 0 L12 20 M6 14 L12 22 L18 14" stroke="#475569" fill="none" stroke-width="2"/></svg>
+    </div>
+
+    <!-- Stage 1 -->
+    <div class="stage">
+      <div class="stage-card validate" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">STAGE 1</span>
+          <span class="stage-title">Validate</span>
+        </div>
+        <div class="stage-desc">
+          Runs quality checks on the full statewide dataset: required fields, date ranges (1995–2030),
+          KABCO severity codes, coordinate bounds with 2% GPS drift tolerance, and duplicate detection.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Script</span>
+            <span class="detail-value"><code>scripts/validate_data.py</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Checks</span>
+            <span class="detail-value">Required fields, date format/range, severity codes, coordinate bounds, duplicates, transposed coords</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Bounds</span>
+            <span class="detail-value">State-specific from <code>states/{state}/config.json</code> + 2% buffer</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Cache</span>
+            <span class="detail-value"><code>.cache/{state}/validation/</code> — incremental, hash-based</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Log</span>
+            <span class="detail-value"><code>.validation/corrections_log.csv</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Skippable</span>
+            <span class="detail-value">Yes — <code>skip_validation: true</code></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">
+      <svg width="24" height="28" viewBox="0 0 24 28"><path d="M12 0 L12 20 M6 14 L12 22 L18 14" stroke="#475569" fill="none" stroke-width="2"/></svg>
+    </div>
+
+    <!-- Stage 2 -->
+    <div class="stage">
+      <div class="stage-card validate" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">STAGE 2</span>
+          <span class="stage-title">Geocode</span>
+        </div>
+        <div class="stage-desc">
+          Fills in missing GPS coordinates using a fallback chain of free geocoding services
+          and intersection node/offset data. Outputs a gzipped copy for statewide datasets.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Script</span>
+            <span class="detail-value"><code>scripts/geocode_data.py</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Methods</span>
+            <span class="detail-value">Multiple geocoding APIs (fallback chain) + intersection nodes</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Cache</span>
+            <span class="detail-value"><code>.cache/{state}/geocode/</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Output</span>
+            <span class="detail-value"><code>{state}_statewide_validated_geocoded.csv</code> + <code>.csv.gz</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Timeout</span>
+            <span class="detail-value">60 minutes max</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">
+      <svg width="24" height="28" viewBox="0 0 24 28"><path d="M12 0 L12 20 M6 14 L12 22 L18 14" stroke="#475569" fill="none" stroke-width="2"/></svg>
+    </div>
+
+    <!-- Stage 3 -->
+    <div class="stage">
+      <div class="stage-card transform" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">STAGE 3</span>
+          <span class="stage-title">Split by Jurisdiction</span>
+        </div>
+        <div class="stage-desc">
+          Splits the single statewide CSV into per-jurisdiction files.
+          Virginia → 133 county CSVs. Colorado → 64 county CSVs.
+          Only runs in statewide/batch mode.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Script</span>
+            <span class="detail-value"><code>scripts/split_jurisdictions.py</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Input</span>
+            <span class="detail-value">Statewide validated+geocoded CSV</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Condition</span>
+            <span class="detail-value">Only when <code>download_mode == 'statewide'</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Config</span>
+            <span class="detail-value"><code>config.json</code> jurisdiction definitions + <code>states/{state}/hierarchy.json</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Output</span>
+            <span class="detail-value"><code>data/{state}/{jurisdiction}_all_roads.csv</code> × N</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">
+      <svg width="24" height="28" viewBox="0 0 24 28"><path d="M12 0 L12 20 M6 14 L12 22 L18 14" stroke="#475569" fill="none" stroke-width="2"/></svg>
+    </div>
+
+    <!-- Stage 4 -->
+    <div class="stage">
+      <div class="stage-card transform" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">STAGE 4</span>
+          <span class="stage-title">Split by Road Type</span>
+        </div>
+        <div class="stage-desc">
+          Creates 3 road-type variants per jurisdiction: county roads only, no-interstate, and all roads.
+          Virginia: 133 × 3 = 399 CSV files.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Script</span>
+            <span class="detail-value"><code>scripts/split_road_type.py</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Variants</span>
+            <span class="detail-value">
+              <code>county_roads.csv</code> — local roads only<br>
+              <code>no_interstate.csv</code> — excludes interstates<br>
+              <code>all_roads.csv</code> — complete dataset
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Filter</span>
+            <span class="detail-value"><code>SYSTEM</code> column + route exclusion patterns</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">
+      <svg width="24" height="28" viewBox="0 0 24 28"><path d="M12 0 L12 20 M6 14 L12 22 L18 14" stroke="#475569" fill="none" stroke-width="2"/></svg>
+    </div>
+
+    <!-- Stage 5 -->
+    <div class="stage">
+      <div class="stage-card transform" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">STAGE 5</span>
+          <span class="stage-title">Aggregate by Scope</span>
+        </div>
+        <div class="stage-desc">
+          Generates scope-aware aggregate CSVs — by jurisdiction, region, MPO, or statewide.
+          Also produces federal cross-state aggregates for statewide runs.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Script</span>
+            <span class="detail-value"><code>scripts/aggregate_by_scope.py</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Scopes</span>
+            <span class="detail-value">jurisdiction, region, MPO, statewide, federal</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Region</span>
+            <span class="detail-value"><code>data/{state}/_region/{name}/</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">MPO</span>
+            <span class="detail-value"><code>data/{state}/_mpo/{name}/</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Federal</span>
+            <span class="detail-value"><code>data/_federal/</code> — cross-state (statewide only)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">
+      <svg width="24" height="28" viewBox="0 0 24 28"><path d="M12 0 L12 20 M6 14 L12 22 L18 14" stroke="#475569" fill="none" stroke-width="2"/></svg>
+    </div>
+
+    <!-- Stage 6 -->
+    <div class="stage">
+      <div class="stage-card store" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">STAGE 6</span>
+          <span class="stage-title">Upload to Cloudflare R2</span>
+        </div>
+        <div class="stage-desc">
+          Uploads all processed CSVs to the <code>crash-lens-data</code> R2 bucket for CDN delivery.
+          Includes county CSVs, region/MPO aggregates, federal aggregates, and statewide gzip.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Script</span>
+            <span class="detail-value"><code>scripts/upload-to-r2.py</code> (+ inline AWS CLI in workflow)</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Bucket</span>
+            <span class="detail-value"><code>crash-lens-data</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">CDN URL</span>
+            <span class="detail-value"><code>https://data.aicreatesai.com/{state}/{jurisdiction}/</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Sub-steps</span>
+            <span class="detail-value">
+              6a: County road-type CSVs<br>
+              6b: Region/MPO aggregate CSVs<br>
+              6c: Federal aggregates (statewide only)<br>
+              6d: Statewide gzip (<code>.csv.gz</code>)
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Manifest</span>
+            <span class="detail-value"><code>data/r2-manifest.json</code> — tracks sizes, hashes, timestamps</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">
+      <svg width="24" height="28" viewBox="0 0 24 28"><path d="M12 0 L12 20 M6 14 L12 22 L18 14" stroke="#475569" fill="none" stroke-width="2"/></svg>
+    </div>
+
+    <!-- Stage 7 -->
+    <div class="stage">
+      <div class="stage-card predict" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">STAGE 7</span>
+          <span class="stage-title">Generate Forecasts (ML)</span>
+        </div>
+        <div class="stage-desc">
+          Runs ML models (Chronos, SageForecasting) on per-jurisdiction road-type CSVs
+          to predict future crash rates by severity. Forecast JSONs uploaded to R2 (Stage 7b).
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Script</span>
+            <span class="detail-value"><code>scripts/generate_forecast.py</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Models</span>
+            <span class="detail-value">Chronos, SageForecasting (AWS SageMaker)</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Input</span>
+            <span class="detail-value">Per-jurisdiction road-type CSVs (3 per county)</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Output</span>
+            <span class="detail-value"><code>forecasts_{road_type}.json</code> per jurisdiction</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Upload</span>
+            <span class="detail-value">Stage 7b → R2 as <code>{state}/{jurisdiction}/forecasts_*.json</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Timeout</span>
+            <span class="detail-value">60 minutes max</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">
+      <svg width="24" height="28" viewBox="0 0 24 28"><path d="M12 0 L12 20 M6 14 L12 22 L18 14" stroke="#475569" fill="none" stroke-width="2"/></svg>
+    </div>
+
+    <!-- Stage 8 -->
+    <div class="stage">
+      <div class="stage-card store" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">STAGE 8</span>
+          <span class="stage-title">Commit Manifest &amp; Metadata</span>
+        </div>
+        <div class="stage-desc">
+          Commits the R2 manifest, validation logs, and split reports back to the git repo.
+          Pushes to <code>main</code> with retry + rebase on conflict.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Files</span>
+            <span class="detail-value">
+              <code>data/r2-manifest.json</code><br>
+              <code>data/.validation/</code><br>
+              <code>data/*/.split_report.json</code><br>
+              <code>data/*/.geocode_cache.json</code>
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Message</span>
+            <span class="detail-value"><code>pipeline: {state} {scope}/{selection} — N jurisdictions (date)</code></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Push</span>
+            <span class="detail-value">Retry 4× with exponential backoff + rebase on conflict</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">
+    <svg width="24" height="36" viewBox="0 0 24 36"><path d="M12 0 L12 28 M6 22 L12 30 L18 22" stroke="#3b82f6" fill="none" stroke-width="2"/></svg>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- PHASE 4: SERVING                                -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="phase">
+    <div class="phase-label"><span>Phase 4 — CDN &amp; Application</span></div>
+
+    <div class="stage">
+      <div class="stage-card store" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">CDN</span>
+          <span class="stage-title">Cloudflare R2 — data.aicreatesai.com</span>
+        </div>
+        <div class="stage-desc">
+          Global CDN serves all processed data files. Browser auto-decompresses gzip.
+          Organized as <code>/{state}/{jurisdiction}/{road_type}.csv</code>.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Structure</span>
+            <span class="detail-value">
+              <code>/{state}/{jurisdiction}/all_roads.csv</code><br>
+              <code>/{state}/{jurisdiction}/county_roads.csv</code><br>
+              <code>/{state}/{jurisdiction}/no_interstate.csv</code><br>
+              <code>/{state}/{jurisdiction}/forecasts_*.json</code><br>
+              <code>/{state}/_state/statewide_all_roads.csv.gz</code><br>
+              <code>/{state}/_region/{name}/*.csv</code><br>
+              <code>/{state}/_mpo/{name}/*.csv</code><br>
+              <code>/_federal/*.csv</code>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-arrow">
+      <svg width="24" height="28" viewBox="0 0 24 28"><path d="M12 0 L12 20 M6 14 L12 22 L18 14" stroke="#ec4899" fill="none" stroke-width="2"/></svg>
+    </div>
+
+    <div class="stage">
+      <div class="stage-card serve" onclick="toggleExpand(this)">
+        <div class="stage-header">
+          <span class="stage-number">APP</span>
+          <span class="stage-title">Browser Application — app/index.html</span>
+        </div>
+        <div class="stage-desc">
+          Single-page application loads crash data via PapaParse streaming CSV parser.
+          User selects jurisdiction → fetches from R2 → parses in 1,000-row chunks →
+          populates global state objects → renders across all tabs.
+        </div>
+        <div class="expand-hint">click to expand</div>
+        <div class="stage-details">
+          <div class="detail-row">
+            <span class="detail-label">Parser</span>
+            <span class="detail-value">PapaParse — streaming 1,000-row chunks</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Loading</span>
+            <span class="detail-value">
+              1. User selects jurisdiction<br>
+              2. Fetch <code>data.aicreatesai.com/{state}/{juris}/all_roads.csv</code><br>
+              3. Auto-detect state → apply column mapping<br>
+              4. Stream-parse into <code>crashState.sampleRows[]</code>
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Adapter</span>
+            <span class="detail-value"><code>state_adapter.js</code> — normalizes all states to internal <code>COL</code> format</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">State Mgmt</span>
+            <span class="detail-value">
+              <code>crashState</code> → raw data + aggregates<br>
+              <code>cmfState</code> → countermeasures tab<br>
+              <code>warrantsState</code> → signal warrants<br>
+              <code>grantState</code> → grants ranking<br>
+              <code>baState</code> → before/after study<br>
+              <code>safetyState</code> → safety focus
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">EPDO</span>
+            <span class="detail-value">K=462, A=62, B=12, C=5, O=1</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Tabs</span>
+            <span class="detail-value">Dashboard, Analysis, Map, Hotspots, CMF, Warrants, Grants, Before/After, Safety, AI</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Final destination -->
+  <div class="destination">
+    <div class="destination-card">
+      <h3>Traffic Safety Engineers &amp; Analysts</h3>
+      <p>Interactive crash analysis across 10 specialized tabs — maps, charts, AI insights, countermeasure recommendations</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggleExpand(card) {
+  card.classList.toggle('expanded');
+}
+
+// Animate cards on scroll
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.style.opacity = '1';
+      entry.target.style.transform = 'translateY(0)';
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.stage-card, .destination-card').forEach(card => {
+  card.style.opacity = '0';
+  card.style.transform = 'translateY(20px)';
+  card.style.transition = 'opacity 0.5s ease, transform 0.5s ease, border-color 0.3s ease, box-shadow 0.3s ease';
+  observer.observe(card);
+});
+</script>
+
+</body>
+</html>
