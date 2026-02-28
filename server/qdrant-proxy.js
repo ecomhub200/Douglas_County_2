@@ -1077,6 +1077,87 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // ---- Stripe Billing History (Invoices) ----
+    if (req.url === '/stripe/billing-history' && req.method === 'POST') {
+        if (!STRIPE_SECRET_KEY) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({ error: 'Stripe not configured' }));
+            return;
+        }
+
+        collectBody(req).then(async (body) => {
+            let payload;
+            try {
+                payload = JSON.parse(body);
+            } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { stripeCustomerId, limit } = payload;
+            if (!stripeCustomerId) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Missing stripeCustomerId' }));
+                return;
+            }
+
+            try {
+                const stripeClient = getStripe();
+                const invoices = await stripeClient.invoices.list({
+                    customer: stripeCustomerId,
+                    limit: Math.min(limit || 24, 100),
+                    expand: ['data.charge']
+                });
+
+                const results = invoices.data.map(inv => ({
+                    id: inv.id,
+                    number: inv.number,
+                    created: inv.created,
+                    periodStart: inv.period_start,
+                    periodEnd: inv.period_end,
+                    amountDue: inv.amount_due,
+                    amountPaid: inv.amount_paid,
+                    currency: inv.currency,
+                    status: inv.status,
+                    billingReason: inv.billing_reason,
+                    pdfUrl: inv.invoice_pdf || null,
+                    hostedUrl: inv.hosted_invoice_url || null,
+                    description: inv.lines && inv.lines.data && inv.lines.data.length > 0
+                        ? inv.lines.data[0].description : null,
+                    paymentMethod: inv.charge && inv.charge.payment_method_details
+                        ? {
+                            type: inv.charge.payment_method_details.type,
+                            last4: inv.charge.payment_method_details.card
+                                ? inv.charge.payment_method_details.card.last4 : null,
+                            brand: inv.charge.payment_method_details.card
+                                ? inv.charge.payment_method_details.card.brand : null
+                        }
+                        : null
+                }));
+
+                const totalSpent = invoices.data
+                    .filter(inv => inv.status === 'paid')
+                    .reduce((sum, inv) => sum + inv.amount_paid, 0);
+
+                console.log(`[Stripe] Billing history retrieved for customer ${stripeCustomerId}: ${results.length} invoices`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({
+                    invoices: results,
+                    totalSpent: totalSpent,
+                    currency: results.length > 0 ? results[0].currency : 'usd',
+                    hasMore: invoices.has_more
+                }));
+
+            } catch (err) {
+                console.error(`[Stripe] Billing history error: ${err.message}`);
+                res.writeHead(500, corsHeaders);
+                res.end(JSON.stringify({ error: 'Failed to retrieve billing history', message: err.message }));
+            }
+        });
+        return;
+    }
+
     // ---- Qdrant proxy (existing) ----
 
     // Check if Qdrant is configured
