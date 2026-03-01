@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CRASH LENS — Sign & Signal Deficiency v20</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5/dist/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5/dist/MarkerCluster.Default.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{--p:#1e40af;--pl:#3b82f6;--ok:#059669;--wr:#d97706;--er:#dc2626;--bg:#f8fafc;--cd:#fff;--tx:#0f172a;--mu:#64748b;--bd:#cbd5e1;--bl:#e2e8f0;--r:8px;--sh:0 1px 3px rgba(0,0,0,.06)}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;line-height:1.5}
+.hidden{display:none!important}
+a{color:var(--pl)}
+
+/* ── Header ── */
+.app-h{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);color:#fff;padding:.55rem 1rem;position:sticky;top:0;z-index:900}
+.hi{max-width:1800px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.3rem}
+.hb{display:flex;align-items:center;gap:.55rem}.hl{background:var(--er);font-weight:800;padding:.2rem .5rem;border-radius:6px;font-size:.85rem}
+h1{font-size:.95rem;font-weight:700}h1+small{font-size:.58rem;color:#94a3b8}
+.hp{display:flex;gap:.55rem}.hpi{font-size:.62rem;padding:.15rem .5rem;background:rgba(255,255,255,.08);border-radius:99px;white-space:nowrap}
+
+/* ── Layout ── */
+.wrap{max-width:1800px;margin:0 auto;padding:.6rem .8rem}
+.input-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+@media(max-width:900px){.input-grid{grid-template-columns:1fr}}
+
+/* ── Cards / Inputs ── */
+.card{background:var(--cd);border:1px solid var(--bl);border-radius:var(--r);padding:.55rem .7rem;margin-bottom:.6rem;box-shadow:var(--sh)}
+.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem}.ct{font-weight:700;font-size:.78rem}
+.badge{font-size:.52rem;padding:.12rem .4rem;border-radius:99px;font-weight:600}.b-bl{background:#dbeafe;color:#1e40af}.b-pp{background:#ede9fe;color:#6d28d9}
+.fl{display:block;font-size:.62rem;font-weight:600;color:var(--mu);margin-bottom:.15rem;text-transform:uppercase;letter-spacing:.03em}
+input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-radius:5px;font-size:.72rem;font-family:inherit}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}@media(max-width:700px){.fg{grid-template-columns:1fr}}
+.row{display:flex;gap:.25rem}
+.btn{padding:.3rem .6rem;border:1px solid var(--bd);border-radius:5px;font-size:.68rem;font-family:inherit;cursor:pointer;font-weight:600;transition:all .15s}
+.btn-p{background:var(--p);color:#fff;border-color:var(--p)}.btn-p:hover{background:var(--pl)}
+.btn-o{background:var(--cd);color:var(--tx)}.btn-o:hover{background:var(--bg)}
+.btn-sm{padding:.22rem .4rem;font-size:.62rem}.btn-lg{padding:.45rem .8rem;font-size:.78rem}
+.btn-blk{width:100%}.btn:disabled{opacity:.5;cursor:not-allowed}
+.ib{font-size:.6rem;color:var(--mu);padding:.2rem .3rem;background:var(--bg);border-radius:4px;margin-top:.25rem;line-height:1.5}
+.enr-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.3rem}
+.enr{background:var(--bg);border-radius:5px;padding:.25rem .4rem;font-size:.6rem;border:1px solid var(--bl)}
+.en-t{font-weight:600;font-size:.58rem}.en-s{color:var(--mu);font-size:.56rem;margin-top:.1rem}
+.fc-t{display:inline-block;padding:0 .3rem;border-radius:3px;font-size:.52rem;font-weight:600;margin:.05rem}
+.fc-1{background:#fecaca;color:#991b1b}.fc-2{background:#fecaca;color:#991b1b}.fc-3{background:#dbeafe;color:#1e40af}.fc-4{background:#d1fae5;color:#065f46}.fc-5{background:#fef3c7;color:#92400e}.fc-6{background:#f3e8ff;color:#6b21a8}.fc-7{background:#e2e8f0;color:#334155}
+
+/* ── Progress / Logs ── */
+.pbar{height:5px;background:var(--bl);border-radius:99px;overflow:hidden}.pfill{height:100%;background:linear-gradient(90deg,var(--p),var(--pl));transition:width .2s;width:0}
+.logbox{max-height:140px;overflow-y:auto;font-size:.55rem;font-family:'Fira Code',monospace;background:#0f172a;color:#e2e8f0;border-radius:5px;padding:.35rem;scroll-behavior:smooth}
+.logln{padding:.08rem 0;border-bottom:1px solid rgba(255,255,255,.04)}.logln.ok{color:#34d399}.logln.wrn{color:#fbbf24}.logln.err{color:#f87171}.logln.inf{color:#94a3b8}
+.toast-c{position:fixed;top:70px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:.35rem}
+.toast{padding:.4rem .7rem;border-radius:6px;font-size:.7rem;font-weight:500;animation:tIn .25s;box-shadow:0 4px 12px rgba(0,0,0,.12)}.toast.ok{background:#d1fae5;color:#065f46}.toast.err{background:#fee2e2;color:#991b1b}.toast.inf{background:#dbeafe;color:#1e40af}
+@keyframes tIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .5s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ═══ MAP HERO — Full width ═══ */
+#mapSection{background:var(--cd);border:1px solid var(--bl);border-radius:var(--r);overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08);margin-bottom:.6rem}
+.map-bar{display:flex;align-items:center;justify-content:space-between;padding:.4rem .7rem;gap:.5rem;flex-wrap:wrap;border-bottom:1px solid var(--bl);background:#fafbfc}
+.map-bar-l{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.cat-dd{min-width:220px;font-weight:600;font-size:.74rem;padding:.35rem .5rem;border-radius:6px;border:2px solid var(--p);background:var(--cd);color:var(--p);cursor:pointer}
+.cat-dd:focus{outline:none;box-shadow:0 0 0 3px rgba(30,64,175,.15)}
+.wonly-lbl{font-size:.62rem;color:var(--mu);display:flex;align-items:center;gap:.2rem;cursor:pointer;user-select:none}
+.map-stats{display:flex;gap:.8rem;align-items:center}
+.ms{text-align:center}.ms .v{font-size:1.1rem;font-weight:800;line-height:1}.ms .l{font-size:.5rem;color:var(--mu);text-transform:uppercase;letter-spacing:.04em}
+.ms.warrant .v{color:var(--er)}
+#defMap{height:calc(100vh - 240px);min-height:400px;max-height:700px;width:100%;background:#e2e8f0}
+
+/* ── Map markers ── */
+.dm{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;border:2px solid rgba(255,255,255,.9);box-shadow:0 2px 6px rgba(0,0,0,.25);transition:transform .15s}
+.dm-lg{width:28px;height:28px;font-size:12px;border-width:2.5px}
+.dm-xl{width:34px;height:34px;font-size:14px;border-width:3px}
+.dm-pulse{animation:pulse 2s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(220,38,38,.45)}70%{box-shadow:0 0 0 10px rgba(220,38,38,0)}100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}}
+
+/* ── Map popup — enhanced ── */
+.pop{font-family:'DM Sans',sans-serif;min-width:300px;max-width:380px}
+.pop-hdr{padding:.45rem .6rem;color:#fff;border-radius:6px 6px 0 0}
+.pop-type{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;opacity:.9}
+.pop-road{font-size:.88rem;font-weight:700;margin-top:.1rem}
+.pop-sub{font-size:.58rem;opacity:.8;margin-top:.05rem}
+.pop-status{padding:.25rem .6rem;font-size:.68rem;font-weight:700;display:flex;align-items:center;gap:.3rem}
+.pop-status.met{background:#fef2f2;color:#dc2626;border-left:3px solid #dc2626}
+.pop-status.mon{background:#fffbeb;color:#d97706;border-left:3px solid #d97706}
+.pop-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;padding:.35rem .6rem;text-align:center}
+.pop-n .v{font-size:.9rem;font-weight:700;line-height:1.1}.pop-n .l{font-size:.48rem;color:var(--mu);text-transform:uppercase}
+.pop-action{padding:.3rem .6rem;font-size:.68rem;line-height:1.4;color:var(--tx);border-top:1px solid var(--bl)}
+.pop-action b{color:var(--p)}
+.pop-tags{padding:.15rem .6rem .3rem;display:flex;flex-wrap:wrap;gap:.15rem}
+.tag{font-size:.52rem;padding:.1rem .3rem;border-radius:3px;font-weight:600}
+.tag-school{background:#dcfce7;color:#166534}.tag-rr{background:#dbeafe;color:#1e40af}.tag-nbi{background:#fef3c7;color:#78350f}.tag-transit{background:#f3e8ff;color:#6b21a8}
+.pop-eng{padding:.35rem .6rem;font-size:.56rem;color:var(--mu);background:var(--bg);line-height:1.6;border-top:1px solid var(--bl)}
+.pop-eng-title{font-size:.54rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tx);margin-bottom:.15rem}
+/* Severity mini-bar */
+.sev-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;margin:.15rem 0;width:100%}
+.sev-bar span{display:block;height:100%}
+.sev-k{background:#7f1d1d}.sev-a{background:#dc2626}.sev-b{background:#f97316}.sev-c{background:#eab308}.sev-o{background:#94a3b8}
+/* Data source badges */
+.src-badge{font-size:.46rem;padding:.05rem .2rem;border-radius:2px;font-weight:700;vertical-align:middle}
+.src-hpms{background:#dbeafe;color:#1e40af}.src-r21{background:#dcfce7;color:#166534}.src-est{background:#fef3c7;color:#92400e}.src-cr{background:#e2e8f0;color:#475569}
+.src-conflict{background:#fee2e2;color:#991b1b}
+/* Countermeasure list in popup */
+.cm-list{margin:.15rem 0;padding-left:.6rem;font-size:.54rem;line-height:1.7;list-style:none}
+.cm-list li{position:relative;padding-left:.5rem}.cm-list li::before{content:'▸';position:absolute;left:0;color:var(--p);font-weight:700}
+.cm-pri{font-size:.44rem;padding:.04rem .18rem;border-radius:2px;font-weight:700;margin-left:.15rem}
+.cm-p1{background:#fecaca;color:#991b1b}.cm-p2{background:#fef3c7;color:#92400e}.cm-p3{background:#dbeafe;color:#1e40af}
+/* Collapsible config */
+#inputSection{transition:max-height .4s ease,opacity .3s ease,padding .3s ease;overflow:hidden}
+#inputSection.collapsed{max-height:0!important;opacity:0;padding:0!important;margin:0!important;pointer-events:none}
+.cfg-toggle{font-size:.64rem;padding:.22rem .5rem;border-radius:5px;cursor:pointer;font-weight:600;border:1px solid var(--bd);background:var(--cd);color:var(--tx);transition:all .15s;display:flex;align-items:center;gap:.25rem}
+.cfg-toggle:hover{background:var(--bg);border-color:var(--p);color:var(--p)}
+.cfg-toggle .arrow{transition:transform .3s;display:inline-block}
+.cfg-toggle.open .arrow{transform:rotate(180deg)}
+.wg{display:grid;grid-template-columns:1fr 1fr;gap:.15rem;margin:.2rem 0}
+.wg .met{color:#059669;font-weight:700}.wg .not{color:#dc2626}
+
+/* ═══ RESULTS TABLE ═══ */
+.tbl-section{background:var(--cd);border:1px solid var(--bl);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh);margin-bottom:.6rem}
+.tbl-bar{display:flex;align-items:center;justify-content:space-between;padding:.4rem .6rem;border-bottom:1px solid var(--bl);flex-wrap:wrap;gap:.3rem}
+.tbl-bar-l{font-size:.74rem;font-weight:700}
+.tbl-scroll{overflow-x:auto;max-height:420px;overflow-y:auto}
+.rtbl{width:100%;border-collapse:collapse;font-size:.65rem}
+.rtbl th{position:sticky;top:0;background:#f1f5f9;padding:.35rem .4rem;text-align:left;font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--mu);border-bottom:2px solid var(--bl);cursor:pointer;white-space:nowrap;z-index:2}
+.rtbl th:hover{color:var(--p)}
+.rtbl td{padding:.3rem .4rem;border-bottom:1px solid var(--bl);vertical-align:top}
+.rtbl tr{cursor:pointer;transition:background .1s}.rtbl tr:hover{background:#f0f7ff}
+.rtbl tr.warrant-row{background:#fef2f2}.rtbl tr.warrant-row:hover{background:#fde8e8}
+.type-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:.3rem;vertical-align:middle}
+.status-badge{font-size:.52rem;font-weight:700;padding:.1rem .35rem;border-radius:3px;white-space:nowrap}
+.sb-met{background:#fecaca;color:#dc2626}.sb-mon{background:#fef3c7;color:#92400e}
+.action-text{font-size:.6rem;line-height:1.4;max-width:400px}
+.action-text b{color:var(--p)}
+.tbl-footer{padding:.3rem .6rem;font-size:.58rem;color:var(--mu);border-top:1px solid var(--bl);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.3rem}
+
+/* ── Misc ── */
+.leaflet-popup-content-wrapper{border-radius:8px!important;box-shadow:0 4px 20px rgba(0,0,0,.15)!important;padding:0!important;overflow:hidden}
+.leaflet-popup-content{margin:0!important;line-height:1.4!important}
+.leaflet-popup-close-button{color:#fff!important;font-size:18px!important;top:6px!important;right:8px!important;z-index:10}
+.marker-cluster-small,.marker-cluster-medium,.marker-cluster-large{background:rgba(30,64,175,.15)!important}
+.marker-cluster-small div,.marker-cluster-medium div,.marker-cluster-large div{background:var(--p)!important;color:#fff!important;font-weight:700!important;font-family:'DM Sans',sans-serif!important}
+.map-progress{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:800;background:rgba(15,23,42,.9);color:#fff;padding:.3rem .8rem;border-radius:99px;font-size:.65rem;font-weight:600;display:flex;align-items:center;gap:.4rem;backdrop-filter:blur(8px)}
+.map-progress .spin{width:12px;height:12px;border-width:1.5px}
+.status-row{display:flex;flex-wrap:wrap;gap:.3rem .8rem;font-size:.58rem;color:var(--mu);padding:.3rem .6rem;background:var(--cd);border:1px solid var(--bl);border-radius:var(--r);margin-bottom:.6rem}
+.status-row b{color:var(--tx)}
+</style>
+</head>
+<body>
+<div class="toast-c" id="tc"></div>
+<header class="app-h"><div class="hi">
+  <div class="hb"><div class="hl">CL</div><div><h1>CRASH LENS — Sign &amp; Signal Deficiency v20</h1><small>MUTCD 11th Ed. • HPMS Cross-Validated FC • R2-1 Speed • BTS Enriched</small></div></div>
+  <div class="hp"><span class="hpi" id="pD">📋 No Data</span><span class="hpi" id="pC">🔍 0</span><span class="hpi" id="pS">Ready</span></div>
+</div></header>
+
+<div class="wrap">
+
+<!-- ═══ INPUT SECTION — collapsible after analysis ═══ -->
+<div id="inputSection">
+<div class="input-grid">
+<div>
+  <!-- DATA SOURCES -->
+  <div class="card"><div class="ch"><span class="ct">☁️ Data Sources</span><span class="badge b-bl">Virginia Roads + R2</span></div>
+    <div class="fg">
+      <div><label class="fl">Crash Data CSV</label><div class="row"><input id="uCr" value="https://data.aicreatesai.com/virginia/henrico/all_roads.csv"><button class="btn btn-p btn-sm" onclick="loadUrl('crash')">Load</button></div></div>
+      <div><label class="fl">Traffic Inventory CSV</label><div class="row"><input id="uIn" value="https://data.aicreatesai.com/virginia/henrico/traffic-inventory.csv"><button class="btn btn-p btn-sm" onclick="loadUrl('inv')">Load</button></div></div>
+    </div>
+    <div style="margin-top:.3rem;display:flex;gap:.3rem;flex-wrap:wrap">
+      <button class="btn btn-p" onclick="loadBoth()">⬇️ Load Both</button>
+      <button class="btn btn-o btn-sm" onclick="$('cF').click()">📁 Upload Crash</button>
+      <button class="btn btn-o btn-sm" onclick="$('iF').click()">📁 Upload Inv</button>
+    </div>
+    <input type="file" id="cF" accept=".csv" class="hidden" onchange="loadFile(event,'crash')">
+    <input type="file" id="iF" accept=".csv" class="hidden" onchange="loadFile(event,'inv')">
+    <div id="loadSt" style="margin-top:.2rem;font-size:.65rem;color:var(--mu)"></div>
+  </div>
+
+  <!-- ENRICHMENT -->
+  <div class="card"><div class="ch"><span class="ct">🛰️ Enrichment</span><span class="badge b-pp">Federal APIs</span></div>
+    <div class="fg" style="margin-top:0">
+      <div><label class="fl">County FIPS</label><input id="cFips" value="51087" placeholder="51087"></div>
+      <div><label class="fl">School Radius</label><select id="cSchR"><option value="500">500 ft</option><option value="750">750 ft</option><option value="1000" selected>1000 ft</option><option value="1320">1320 ft</option></select></div>
+    </div>
+    <div style="margin-top:.3rem;display:flex;gap:.3rem;flex-wrap:wrap">
+      <button class="btn btn-p" onclick="loadAllEnrich()">🛰️ Load All</button>
+      <button class="btn btn-o btn-sm" onclick="loadSchools()">🏫</button>
+      <button class="btn btn-o btn-sm" onclick="loadHPMS()">🛣️</button>
+      <button class="btn btn-o btn-sm" onclick="loadRailXing()">🚂</button>
+      <button class="btn btn-o btn-sm" onclick="loadTransit()">🚏</button>
+      <button class="btn btn-o btn-sm" onclick="loadNBI()">🌉</button>
+    </div>
+    <div class="enr-grid" id="enrGrid">
+      <div class="enr"><div class="en-t">🏫 Schools</div><div class="en-s" id="enr-school-s">—</div></div>
+      <div class="enr"><div class="en-t">🛣️ HPMS</div><div class="en-s" id="enr-hpms-s">—</div></div>
+      <div class="enr"><div class="en-t">🚂 Rail</div><div class="en-s" id="enr-rail-s">—</div></div>
+      <div class="enr"><div class="en-t">🚏 Transit</div><div class="en-s" id="enr-transit-s">—</div></div>
+      <div class="enr"><div class="en-t">🌉 Bridges</div><div class="en-s" id="enr-nbi-s">—</div></div>
+    </div>
+    <div class="ib">💡 <b>HPMS provides authoritative FC &amp; AADT.</b> Load enrichment before analysis for accurate functional classification.</div>
+  </div>
+</div>
+<div>
+  <!-- CONFIG -->
+  <div class="card"><div class="ch"><span class="ct">⚙️ Configuration</span></div>
+    <div class="fg">
+      <div><label class="fl">Proximity Radius</label><select id="cR"><option value="150">150 ft</option><option value="250" selected>250 ft</option><option value="500">500 ft</option></select></div>
+      <div><label class="fl">Area Type</label><select id="cArea"><option value="urban" selected>Urban</option><option value="rural">Rural</option></select></div>
+      <div><label class="fl">N/D Ratio Threshold</label><input type="number" id="cNDR" value="1.5" step="0.1" min="0.5" max="5"></div>
+      <div><label class="fl">Min Qualifying Crashes</label><select id="cMin"><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option></select></div>
+    </div>
+    <div class="ib"><b>FC Gate:</b> FC1/2 excluded from signal/stop/crosswalk/school/ped/bike (§4A.02 limited access).</div>
+    <div class="ib"><b>Speed Gate:</b> R2-1 posted speed → device selection. ≥50 mph no AWS. RRFB vs PHB vs signal per FHWA.</div>
+    <div class="ib"><b>FC Source Priority:</b> HPMS F_SYSTEM (federal) → Crash record FC → estimate. Conflicts flagged.</div>
+  </div>
+
+  <!-- RUN -->
+  <div class="card">
+    <button class="btn btn-p btn-lg btn-blk" id="runBtn" onclick="runAnalysis()">🔍 Run Analysis</button>
+    <div id="progW" class="hidden" style="margin-top:.3rem"><div style="display:flex;justify-content:space-between;font-size:.65rem"><span id="pL">...</span><span id="pP">0%</span></div><div class="pbar"><div class="pfill" id="pB"></div></div></div>
+    <div class="logbox hidden" id="logbox" style="margin-top:.25rem"></div>
+  </div>
+
+  <!-- Data status -->
+  <div class="card" style="font-size:.6rem;color:var(--mu)">
+    <div style="display:flex;flex-wrap:wrap;gap:.2rem .6rem">
+      <span>📋 <span id="sC">—</span></span>
+      <span>🗺️ <span id="sI">—</span></span>
+      <span>📅 <span id="sDt">—</span></span>
+      <span>🏷️ <span id="sFC">—</span></span>
+      <span>🚗 <span id="sSp">—</span></span>
+      <span>🔍 <b id="sN">—</b></span>
+    </div>
+  </div>
+</div>
+</div><!-- /input-grid -->
+</div><!-- /inputSection -->
+
+<!-- ═══ MAP — Always visible, full width ═══ -->
+<div id="mapSection">
+  <div class="map-bar">
+    <div class="map-bar-l">
+      <button class="cfg-toggle open hidden" id="cfgToggle" onclick="toggleConfig()"><span class="arrow">▼</span> Config</button>
+      <select class="cat-dd" id="catDD" onchange="filterChanged()">
+        <option value="all">🗺️ All Categories (0)</option>
+      </select>
+      <label class="wonly-lbl"><input type="checkbox" id="wOnly" onchange="filterChanged()"> Warrant only</label>
+    </div>
+    <div class="map-stats">
+      <div class="ms"><span class="v" id="mT">0</span><span class="l">Shown</span></div>
+      <div class="ms warrant"><span class="v" id="mW">0</span><span class="l">Warrant</span></div>
+      <div class="ms"><span class="v" id="mCr">0</span><span class="l">Crashes</span></div>
+    </div>
+  </div>
+  <div style="position:relative">
+    <div id="defMap"></div>
+    <div class="map-progress hidden" id="mapProg"><span class="spin"></span> <span id="mapProgTxt">Analyzing...</span></div>
+  </div>
+</div>
+
+</div>
+
+<!-- ═══ TABLE — filtered by dropdown ═══ -->
+<div class="tbl-section hidden" id="tblSection">
+  <div class="tbl-bar">
+    <div class="tbl-bar-l" id="tblTitle">Results</div>
+    <div style="display:flex;gap:.25rem">
+      <button class="btn btn-o btn-sm" onclick="expCSV('all')">📊 CSV</button>
+      <button class="btn btn-o btn-sm" onclick="expGeo()">🌐 GeoJSON</button>
+      <button class="btn btn-o btn-sm" onclick="expKML()">🗺️ KML</button>
+      <button class="btn btn-o btn-sm" onclick="expPDF()">📋 PDF</button>
+    </div>
+  </div>
+  <div class="tbl-scroll">
+    <table class="rtbl"><thead><tr>
+      <th>#</th><th onclick="doSort('type')">Type ↕</th><th onclick="doSort('road')">Road ↕</th>
+      <th onclick="doSort('fc')">FC ↕</th><th onclick="doSort('spd')">Spd ↕</th>
+      <th onclick="doSort('cnt')">Qual ↕</th><th onclick="doSort('sev')">Severity ↕</th><th onclick="doSort('epdo')">EPDO ↕</th>
+      <th>Status</th><th>Why — Action Required</th>
+    </tr></thead><tbody id="tBody"></tbody></table>
+  </div>
+  <div class="tbl-footer">
+    <span id="tblCount"></span>
+    <span style="font-size:.52rem"><b>Ranked by EPDO</b> (K=8500 A=850 B=170 C=35 O=1). §4B.03/§2B.12: Warrant met ≠ required. P.E. certification required.</span>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<footer style="text-align:center;padding:.4rem;font-size:.52rem;color:var(--mu)">
+<div style="margin-bottom:.2rem">⚠️ <b>Engineering Review Required.</b> MUTCD 11th Ed. screening only. FC: HPMS-validated. Speed: R2-1 verified.</div>
+CRASH LENS v20.0 — <a href="https://mutcd.fhwa.dot.gov/kno_11th_Edition.htm" target="_blank">MUTCD</a> • <a href="https://geodata.bts.gov" target="_blank">BTS</a> • <a href="https://www.cmfclearinghouse.org/" target="_blank">CMF</a>
+</footer>
+
+<script>
+const $=id=>document.getElementById(id);
+let CRASH=[],INV=[],DEFS=[],SCHOOLS=[],HPMS=[],RAIL_X=[],TRANSIT=[],NBI=[],SPD_MAP={},map,clGrp;
+let filters={};let sortCol='epdo',sortAsc=false;
+const PM={signal:'signal',stop:'stop',streetlight:'light',crosswalk:'ped',ped:'ped',school:'ped',bike:'ped',animal:'ped',railroad:'ped',bridge:'sys',speed:'sys',headon:'sys',rearend:'sys',departure:'sys'};
+const COL={signal:'#dc2626',stop:'#b91c1c',streetlight:'#d97706',crosswalk:'#7c3aed',school:'#4d7c0f',animal:'#7c3aed',bike:'#0891b2',ped:'#9333ea',railroad:'#0369a1',bridge:'#78350f',speed:'#ea580c',headon:'#dc2626',rearend:'#d97706',departure:'#0891b2'};
+const ICO={signal:'🚦',stop:'🛑',streetlight:'💡',crosswalk:'🚶',school:'🏫',animal:'🦌',bike:'🚲',ped:'🚶‍♀️',railroad:'🚂',bridge:'🌉',speed:'⚡',headon:'💥',rearend:'🔙',departure:'↗️'};
+const LBL={signal:'Signal W7',stop:'Stop AWS-A',streetlight:'Lighting',crosswalk:'Crosswalk',school:'School Zone',animal:'Animal',bike:'Bicycle',ped:'Pedestrian',railroad:'Railroad Xing',bridge:'Bridge',speed:'Speed',headon:'Head-On',rearend:'Rear-End',departure:'Departure'};
+const W7={urban:{yr1:{leg4:{all:5,fi:3},leg3:{all:4,fi:3}},yr3:{leg4:{all:6,fi:4},leg3:{all:5,fi:4}}},rural_1x1:{yr1:{leg4:{all:4,fi:3},leg3:{all:3,fi:3}},yr3:{leg4:{all:6,fi:4},leg3:{all:5,fi:4}}},rural_2plus:{yr1:{leg4:{all:10,fi:6},leg3:{all:9,fi:6}},yr3:{leg4:{all:16,fi:9},leg3:{all:13,fi:9}}}};
+const WSA={leg4:{mo12:5,mo36:6},leg3:{mo12:4,mo36:5}};
+const SEV={K:8500,A:850,B:170,C:35,O:1};
+const FC_EX=['1','2'];const FC_PED_EX=['1','2'];
+const FC_LABELS={1:'Interstate',2:'Freeway/Expwy',3:'Princ. Arterial',4:'Minor Arterial',5:'Major Collector',6:'Minor Collector',7:'Local'};
+function pFC(f){const m=(f||'').match(/^(\d)/);return m?m[1]:null}
+
+function toast(m,t='inf'){const c=$('tc'),d=document.createElement('div');d.className=`toast ${t}`;d.textContent=m;c.appendChild(d);setTimeout(()=>d.remove(),4000)}
+function log(m,t='inf'){const b=$('logbox');b.classList.remove('hidden');const d=document.createElement('div');d.className=`logln ${t}`;d.textContent=`[${new Date().toLocaleTimeString()}] ${m}`;b.appendChild(d);b.scrollTop=b.scrollHeight}
+function prog(p,l){$('pB').style.width=p+'%';$('pP').textContent=Math.round(p)+'%';if(l)$('pL').textContent=l}
+function parseCSV(t){const ls=t.split('\n');if(ls.length<2)return[];const h=sCSV(ls[0].replace(/\r$/,'')).map(x=>x.replace(/^"|"$/g,'').trim());const o=[];for(let i=1;i<ls.length;i++){const l=ls[i].replace(/\r$/,'');if(!l.trim())continue;const v=sCSV(l);const r={};h.forEach((k,j)=>r[k]=v[j]?v[j].replace(/^"|"$/g,'').trim():'');o.push(r)}return o}
+function sCSV(l){const r=[];let c='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(ch==='"')q=!q;else if(ch===','&&!q){r.push(c);c=''}else c+=ch}r.push(c);return r}
+function hvd(a,b,c,d){const R=20902231,dLat=(c-a)*Math.PI/180,dLon=(d-b)*Math.PI/180,h=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h))}
+function isFI(s){return s==='K'||s==='A'||s==='B'}
+function sl(s){return({K:'Fatal',A:'Serious Injury',B:'Moderate Injury',C:'Minor Injury',O:'PDO'})[s]||'PDO'}
+function slShort(s){return({5:'Fatal',4:'Serious',3:'Injury',2:'Minor',1:'PDO',0:'PDO'})[s]||'PDO'}
+function mSev(cc){const o=['K','A','B','C','O'];for(const s of o)if(cc.some(c=>c.sev===s))return o.indexOf(s)+5;return 0}
+function ep(cc){return cc.reduce((s,c)=>s+(SEV[c.sev]||1),0)}
+function rn(r){return(r||'Unknown').replace(/^\d+\s*/,'').substring(0,35)}
+function tr(cc){const m={};cc.forEach(c=>{const r=rn(c.road);m[r]=(m[r]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1])[0]?.[0]||'Unknown'}
+
+// ═══════════════════════════════════════════════════════════
+// MAP — Init immediately on page load
+// ═══════════════════════════════════════════════════════════
+function initMap(){
+  if(map)return;
+  map=L.map('defMap',{zoomControl:true,scrollWheelZoom:true}).setView([37.56,-77.46],11);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OSM © CARTO',maxZoom:19}).addTo(map);
+  clGrp=L.markerClusterGroup({maxClusterRadius:50,showCoverageOnHover:false,spiderfyOnMaxZoom:true,disableClusteringAtZoom:15});
+  map.addLayer(clGrp);
+  setTimeout(()=>map.invalidateSize(),100);
+  setTimeout(()=>map.invalidateSize(),500);
+}
+
+// ═══════════════════════════════════════════════════════════
+// IndexedDB CACHE — persist loaded CSV across sessions
+// ═══════════════════════════════════════════════════════════
+const DB_NAME='CrashLensCache',DB_VER=1;
+function openDB(){return new Promise((res,rej)=>{const rq=indexedDB.open(DB_NAME,DB_VER);rq.onupgradeneeded=()=>{const db=rq.result;if(!db.objectStoreNames.contains('csv'))db.createObjectStore('csv')};rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error)})}
+async function cacheGet(key){try{const db=await openDB();return new Promise((res)=>{const tx=db.transaction('csv','readonly');const rq=tx.objectStore('csv').get(key);rq.onsuccess=()=>res(rq.result||null);rq.onerror=()=>res(null)})}catch(e){return null}}
+async function cacheSet(key,val){try{const db=await openDB();const tx=db.transaction('csv','readwrite');tx.objectStore('csv').put(val,key)}catch(e){}}
+
+// ═══════════════════════════════════════════════════════════
+// DATA LOADING — with IndexedDB cache
+// ═══════════════════════════════════════════════════════════
+async function loadUrl(type){
+  const url=$(type==='crash'?'uCr':'uIn').value.trim();
+  if(!url){toast('Enter URL','err');return}
+  $('loadSt').innerHTML=`<span style="color:var(--p)">⏳ Loading...</span>`;
+  const cached=await cacheGet(url);
+  if(cached){toast(`${type} loaded from cache`,'ok');procData(cached,type,url.split('/').pop()+' (cached)');return}
+  toast(`Loading ${type}...`);
+  try{const r=await fetch(url);if(!r.ok)throw new Error(`HTTP ${r.status}`);const txt=await r.text();await cacheSet(url,txt);procData(txt,type,url.split('/').pop())}catch(e){toast(e.message,'err');$('loadSt').innerHTML=`<span style="color:var(--er)">❌ ${e.message}</span>`}
+}
+async function loadBoth(){await loadUrl('crash');await loadUrl('inv')}
+function loadFile(ev,type){const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=e=>procData(e.target.result,type,f.name);r.readAsText(f)}
+function procData(txt,type,fn){
+  const rows=parseCSV(txt);if(!rows.length){toast('No rows','err');return}
+  if(type==='crash'){
+    CRASH=rows;$('sC').innerHTML=`<span style="color:var(--ok)">✅ ${rows.length.toLocaleString()}</span>`;$('pD').textContent=`📋 ${rows.length.toLocaleString()}`;
+    const yrs=new Set();rows.forEach(r=>{if(r['Crash Year'])yrs.add(r['Crash Year'])});const sy=[...yrs].sort();$('sDt').innerHTML=`<span style="color:var(--p)">${sy[0]}–${sy[sy.length-1]}</span>`;
+    const fc={};rows.forEach(r=>{const f=r['Functional Class']||'';fc[f]=(fc[f]||0)+1});
+    $('sFC').innerHTML=Object.entries(fc).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>{const c=pFC(k);return`<span class="fc-t fc-${c||''}">${k?k.split('(')[0].trim():'?'}:${v}</span>`}).join(' ');
+  }else{
+    INV=rows;$('sI').innerHTML=`<span style="color:var(--ok)">✅ ${rows.length.toLocaleString()}</span>`;
+    buildSpeedMap(rows);
+  }
+  $('loadSt').innerHTML=`<span style="color:var(--ok)">✅ ${fn}: ${rows.length.toLocaleString()}</span>`;toast(`${fn}: ${rows.length.toLocaleString()}`,'ok');
+}
+
+// ═══════════════════════════════════════════════════════════
+// SPEED MAP from R2-1 signs in traffic inventory
+// ═══════════════════════════════════════════════════════════
+function buildSpeedMap(rows){
+  SPD_MAP={};let cnt=0;
+  rows.forEach(r=>{
+    const mutcd=(r.mutcd||'').toUpperCase();const nm=(r.name||'').toLowerCase();let spd=0;
+    if(mutcd.startsWith('R2-1')||nm.includes('speed limit')){const m=(r.name||'').match(/(\d{2,3})\s*(mph)?/i);if(m)spd=parseInt(m[1])}
+    if(!spd&&r.speed_limit)spd=parseInt(r.speed_limit)||0;
+    if(!spd&&r.posted_speed)spd=parseInt(r.posted_speed)||0;
+    if(spd>0){const lat=parseFloat(r.lat),lng=parseFloat(r.lon);if(!isNaN(lat)&&!isNaN(lng)){const gk=`${(lat*1000).toFixed(0)}_${(lng*1000).toFixed(0)}`;if(!SPD_MAP[gk]||spd>SPD_MAP[gk].spd)SPD_MAP[gk]={spd,lat,lng};cnt++}}
+  });
+  if(cnt>0){const speeds=Object.values(SPD_MAP).map(s=>s.spd);$('sSp').innerHTML=`<span style="color:var(--ok)">${cnt} R2-1 (${Math.min(...speeds)}–${Math.max(...speeds)} mph)</span>`;log(`Speed map: ${cnt} R2-1 signs`,'ok')}
+  else{$('sSp').innerHTML=`<span style="color:var(--mu)">No R2-1</span>`}
+}
+function getPostedSpeed(lat,lng){const gk=`${(lat*1000).toFixed(0)}_${(lng*1000).toFixed(0)}`;if(SPD_MAP[gk])return{spd:SPD_MAP[gk].spd,src:'R2-1'};for(let di=-2;di<=2;di++){for(let dj=-2;dj<=2;dj++){const nk=`${((lat*1000)+di).toFixed(0)}_${((lng*1000)+dj).toFixed(0)}`;if(SPD_MAP[nk])return{spd:SPD_MAP[nk].spd,src:'R2-1'}}}return null}
+function estimateSpeed(fcCode,isUrban){if(!fcCode)return 35;const fc=parseInt(fcCode);if(fc===1)return 65;if(fc===2)return 55;if(fc===3)return isUrban?45:55;if(fc===4)return isUrban?35:45;if(fc===5)return isUrban?35:45;if(fc===6)return isUrban?30:40;return isUrban?25:35}
+
+// ═══════════════════════════════════════════════════════════
+// HPMS CROSS-REFERENCE — authoritative FC, AADT, road name
+// Returns nearest HPMS segment within threshold distance
+// ═══════════════════════════════════════════════════════════
+function getHPMSInfo(lat,lng){
+  if(!HPMS.length)return null;
+  let best=null,bestD=Infinity;
+  for(const h of HPMS){
+    const d=hvd(lat,lng,h.lat,h.lng);
+    if(d<bestD){bestD=d;best=h}
+  }
+  if(bestD>1000)return null; // >1000ft too far for reliable match
+  // Parse HPMS FCLASS to standard FC code
+  let hpmsFC=null;
+  if(best.fclass){
+    const fc=parseInt(best.fclass);
+    if(fc>=1&&fc<=7)hpmsFC=String(fc);
+  }
+  return{
+    aadt:best.aadt||0,
+    fc:hpmsFC,
+    fcRaw:best.fclass,
+    name:best.name||'',
+    signt:best.signt||'',
+    signn:best.signn||'',
+    lanes:best.lanes||2,
+    nhs:best.nhs||'',
+    miles:best.miles||0,
+    dist:Math.round(bestD)
+  };
+}
+
+// Resolve FC: HPMS > crash record > estimate
+// Returns {fc, label, source, conflict}
+function resolveFC(crashFC,hpmsInfo){
+  const hFC=hpmsInfo?.fc;
+  const cFC=crashFC;
+  if(hFC&&cFC&&hFC!==cFC){
+    // Conflict — trust HPMS (federal data source)
+    return{fc:hFC,label:FC_LABELS[parseInt(hFC)]||'Unknown',source:'HPMS',conflict:true,crashFC:cFC,crashLabel:FC_LABELS[parseInt(cFC)]||'Unknown'};
+  }
+  if(hFC)return{fc:hFC,label:FC_LABELS[parseInt(hFC)]||'Unknown',source:'HPMS',conflict:false};
+  if(cFC)return{fc:cFC,label:FC_LABELS[parseInt(cFC)]||'Unknown',source:'Crash Record',conflict:false};
+  return{fc:null,label:'Unknown',source:'None',conflict:false};
+}
+
+// Resolve speed: R2-1 > HPMS-informed > FC estimate
+function resolveSpeed(lat,lng,fcCode,isUrban){
+  const posted=getPostedSpeed(lat,lng);
+  if(posted){
+    // Validate against FC
+    const fc=parseInt(fcCode||'7');
+    const floor={1:45,2:40,3:25,4:20,5:20,6:15,7:15}[fc]||15;
+    if(posted.spd<floor)return{spd:estimateSpeed(fcCode,isUrban),src:'FC estimate (R2-1 below floor)'};
+    return posted;
+  }
+  return{spd:estimateSpeed(fcCode,isUrban),src:'FC estimate'};
+}
+
+// Resolve road name: HPMS > crash record
+function resolveRoadName(crashRoad,hpmsInfo){
+  if(hpmsInfo&&hpmsInfo.name&&hpmsInfo.name.length>2){
+    const hn=hpmsInfo.name.trim();
+    // HPMS names can include route info
+    if(hpmsInfo.signt&&hpmsInfo.signn){
+      const prefix={I:'I-',U:'US-',S:'SR-'}[hpmsInfo.signt]||'';
+      if(prefix)return prefix+hpmsInfo.signn+(hn?' ('+hn+')':'');
+    }
+    return hn;
+  }
+  return crashRoad||'Unknown';
+}
+
+// ═══════════════════════════════════════════════════════════
+// CORS PROXY + RETRY
+// ═══════════════════════════════════════════════════════════
+const PROXIES=[
+  {name:'direct',    fn:u=>u,                                                   wrapped:false},
+  {name:'corsproxy', fn:u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,    wrapped:false},
+  {name:'allorigins',fn:u=>`https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,wrapped:true}
+];
+async function fetchR(url,retries=1){
+  const errors=[];
+  for(const proxy of PROXIES){
+    for(let attempt=0;attempt<=retries;attempt++){
+      try{
+        const ctrl=new AbortController();const tid=setTimeout(()=>ctrl.abort(),20000);
+        const r=await fetch(proxy.fn(url),{signal:ctrl.signal});clearTimeout(tid);
+        if(!r.ok) throw new Error(`HTTP ${r.status}`);
+        let j;
+        if(proxy.wrapped){const wrapper=await r.json();if(!wrapper.contents) throw new Error('Empty proxy response');j=JSON.parse(wrapper.contents)}else{j=await r.json()}
+        if(j.error){const msg=j.error?.message||j.error?.details?.join('; ')||JSON.stringify(j.error);throw new Error(`Service error: ${msg}`)}
+        return j;
+      }catch(e){errors.push(`${proxy.name}#${attempt}: ${e.message}`);if(attempt<retries){await new Promise(r=>setTimeout(r,800*(attempt+1)));continue}}
+    }
+  }
+  console.warn('fetchR failures:',errors);throw new Error('All fetch attempts failed — see console');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ENRICHMENT — Schools (Urban Institute Education Data Portal)
+// ═══════════════════════════════════════════════════════════
+const schoolsDataCache={stateFips:null,countyCode:null,schools:null,year:null,timestamp:null,maxAge:24*60*60*1000};
+async function fetchSchoolPage(url){
+  try{const ctrl=new AbortController();const tid=setTimeout(()=>ctrl.abort(),15000);const r=await fetch(url,{signal:ctrl.signal});clearTimeout(tid);if(r.ok)return r.json()}catch(e){console.log('School direct failed:',e.message)}
+  try{const ctrl=new AbortController();const tid=setTimeout(()=>ctrl.abort(),15000);const r=await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`,{signal:ctrl.signal});clearTimeout(tid);if(r.ok)return r.json()}catch(e){console.log('School corsproxy failed:',e.message)}
+  try{const ctrl=new AbortController();const tid=setTimeout(()=>ctrl.abort(),15000);const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,{signal:ctrl.signal});clearTimeout(tid);if(r.ok){const w=await r.json();if(w.contents)return JSON.parse(w.contents)}}catch(e){console.log('School allorigins failed:',e.message)}
+  throw new Error('All school fetch attempts failed');
+}
+async function loadSchools(){
+  const fips=$('cFips').value.trim();if(!fips||fips.length<5){toast('Enter 5-digit FIPS','err');return}
+  const stateFipsNum=parseInt(fips.substring(0,2));const countyCode=parseInt(fips.substring(2));
+  if(schoolsDataCache.schools&&schoolsDataCache.stateFips===stateFipsNum&&schoolsDataCache.countyCode===countyCode&&(Date.now()-schoolsDataCache.timestamp)<schoolsDataCache.maxAge){
+    SCHOOLS=schoolsDataCache.schools;$('enr-school-s').innerHTML=`<span style="color:var(--ok)">✅ ${SCHOOLS.length} (${schoolsDataCache.year}, cached)</span>`;toast(`${SCHOOLS.length} schools (cached)`,'ok');return;
+  }
+  $('enr-school-s').textContent='Loading...';
+  const currentYear=new Date().getFullYear();const yearsToTry=[];for(let y=currentYear-2;y>=currentYear-6;y--)yearsToTry.push(y);
+  let allSchools=[],usedYear=null;
+  for(const year of yearsToTry){
+    allSchools=[];let nextUrl=`https://educationdata.urban.org/api/v1/schools/ccd/directory/${year}/?fips=${stateFipsNum}`;let pageCount=0;
+    $('enr-school-s').textContent=`Trying year ${year}...`;
+    try{while(nextUrl&&pageCount<10){const result=await fetchSchoolPage(nextUrl);if(result.results&&result.results.length>0){allSchools=allSchools.concat(result.results);pageCount++}else break;nextUrl=result.next||null;$('enr-school-s').textContent=`Loading ${year}... ${allSchools.length} schools (page ${pageCount})`;}}catch(e){console.warn(`Schools year ${year} failed:`,e.message);$('enr-school-s').textContent=`Year ${year} failed, trying next...`;continue}
+    if(allSchools.length>0){usedYear=year;break}
+  }
+  const fullFips=parseInt(fips);const countyPad=fips.substring(2);
+  SCHOOLS=allSchools.filter(s=>{const sCode=parseInt(s.county_code);const sCodeStr=String(s.county_code||'');return(sCode===countyCode||sCode===fullFips||sCodeStr===fips||sCodeStr===countyPad||s.county_fips===fips||String(s.county_fips)===fips)&&s.latitude&&s.longitude});
+  if(SCHOOLS.length>0){schoolsDataCache.stateFips=stateFipsNum;schoolsDataCache.countyCode=countyCode;schoolsDataCache.schools=SCHOOLS;schoolsDataCache.year=usedYear;schoolsDataCache.timestamp=Date.now();
+    $('enr-school-s').innerHTML=`<span style="color:var(--ok)">✅ ${SCHOOLS.length} schools (${usedYear})</span>`;log(`Schools: ${SCHOOLS.length} (${usedYear})`,'ok');toast(`${SCHOOLS.length} schools loaded`,'ok');
+  }else{$('enr-school-s').innerHTML=`<span style="color:var(--er)">❌ 0 matched county ${fips}</span>`;toast('No schools matched county — check FIPS','wrn')}
+}
+
+// ═══════════════════════════════════════════════════════════
+// ENRICHMENT — HPMS (AADT + FC) via BTS ArcGIS
+// ═══════════════════════════════════════════════════════════
+async function loadHPMS(){
+  $('enr-hpms-s').textContent='Querying BTS...';
+  const lats=[],lngs=[];CRASH.forEach(r=>{const la=parseFloat(r['y']),lo=parseFloat(r['x']);if(!isNaN(la)&&Math.abs(la)>10){lats.push(la);lngs.push(lo)}});
+  if(!lats.length){toast('Load crash data first','err');return}
+  const bb={xmin:Math.min(...lngs)-.01,ymin:Math.min(...lats)-.01,xmax:Math.max(...lngs)+.01,ymax:Math.max(...lats)+.01};
+  const env=JSON.stringify({...bb,spatialReference:{wkid:4326}});
+  const base='https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_National_Highway_Planning_Network/FeatureServer/0/query';
+  let all=[],offset=0,pages=0;
+  try{while(pages<20){
+    const url=base+'?'+['where='+encodeURIComponent('1=1'),'geometry='+encodeURIComponent(env),'geometryType=esriGeometryEnvelope','spatialRel=esriSpatialRelIntersects','inSR=4326','outFields=*','outSR=4326','returnGeometry=true','resultRecordCount=2000','resultOffset='+offset,'f=geojson'].join('&');
+    const j=await fetchR(url);const feats=j.features||[];all=all.concat(feats);pages++;$('enr-hpms-s').textContent=`Loading... ${all.length} segments (page ${pages})`;if(feats.length<2000&&!j.exceededTransferLimit)break;offset+=feats.length;
+  }}catch(e){$('enr-hpms-s').innerHTML=`<span style="color:var(--er)">❌ ${e.message}</span>`;log(`HPMS: ${e.message}`,'wrn');return}
+  if(all.length>0)console.log('HPMS sample fields:',Object.keys(all[0].properties||all[0].attributes||{}));
+  HPMS=all.map(f=>{const p=f.properties||f.attributes||{};const g=f.geometry;let lat=null,lng=null;
+    if(g&&g.type==='LineString'&&g.coordinates.length){const mid=g.coordinates[Math.floor(g.coordinates.length/2)];lng=mid[0];lat=mid[1]}
+    else if(g&&g.type==='MultiLineString'&&g.coordinates.length){const line=g.coordinates[0];const mid=line[Math.floor(line.length/2)];lng=mid[0];lat=mid[1]}
+    return{lat,lng,aadt:p.AADT||p.aadt||0,fclass:p.FCLASS||p.F_SYSTEM||p.FUNC_CLASS||'',name:p.LNAME||p.ROUTE_NAME||p.NAME||'',signt:p.SIGNT1||p.SIGN_TYPE||'',signn:p.SIGNN1||p.SIGN_NUM||'',miles:p.MILES||p.LENGTH||0,lanes:p.THROUGH_LANES||p.LANES||2,nhs:p.NHS||p.NHS_IND||'',speed_limit:p.SPEED_LIMIT||p.SPD_LIMIT||0}}).filter(h=>h.lat);
+  // Count FC distribution from HPMS
+  const fcDist={};HPMS.forEach(h=>{const f=h.fclass||'?';fcDist[f]=(fcDist[f]||0)+1});
+  const fcSummary=Object.entries(fcDist).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`FC${k}:${v}`).join(' ');
+  $('enr-hpms-s').innerHTML=`<span style="color:var(--ok)">✅ ${HPMS.length} segments (${fcSummary})</span>`;
+  log(`HPMS: ${HPMS.length} segments — ${fcSummary}`,'ok');toast(`${HPMS.length} HPMS segments loaded`,'ok');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ENRICHMENT — Railroad, Transit, NBI (unchanged from v18)
+// ═══════════════════════════════════════════════════════════
+async function loadRailXing(){
+  $('enr-rail-s').textContent='Querying BTS...';
+  const lats=[],lngs=[];CRASH.forEach(r=>{const la=parseFloat(r['y']),lo=parseFloat(r['x']);if(!isNaN(la)&&Math.abs(la)>10){lats.push(la);lngs.push(lo)}});
+  if(!lats.length){toast('Load crash data first','err');return}
+  const bb={xmin:Math.min(...lngs)-.01,ymin:Math.min(...lats)-.01,xmax:Math.max(...lngs)+.01,ymax:Math.max(...lats)+.01};
+  const env=JSON.stringify({...bb,spatialReference:{wkid:4326}});
+  const base='https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Railroad_Grade_Crossings/FeatureServer/0/query';
+  try{const url=base+'?'+['where='+encodeURIComponent('1=1'),'geometry='+encodeURIComponent(env),'geometryType=esriGeometryEnvelope','spatialRel=esriSpatialRelIntersects','inSR=4326','outFields=*','outSR=4326','returnGeometry=true','resultRecordCount=2000','f=geojson'].join('&');
+    const j=await fetchR(url);
+    RAIL_X=(j.features||[]).map(f=>{const p=f.properties||f.attributes||{},g=f.geometry;return{lat:g?.coordinates?.[1],lng:g?.coordinates?.[0],id:p.CROSSING||p.XINGID||'',rr:p.RAILROAD||p.RRCOMPANY||'',street:p.STREET||'',highway:p.HIGHWAY||'',warn:p.WDCODE||'9',trains:p.TTSTN||p.TOTALTRN||0,crashes5yr:p.APTS||p.CRASHES||0}}).filter(x=>x.lat);
+    $('enr-rail-s').innerHTML=`<span style="color:var(--ok)">✅ ${RAIL_X.length} crossings</span>`;log(`Railroad: ${RAIL_X.length} crossings`,'ok');toast(`${RAIL_X.length} rail crossings`,'ok');
+  }catch(e){$('enr-rail-s').innerHTML=`<span style="color:var(--er)">❌ ${e.message}</span>`;log(`Rail: ${e.message}`,'wrn')}
+}
+async function loadTransit(){
+  $('enr-transit-s').textContent='Querying BTS...';
+  const lats=[],lngs=[];CRASH.forEach(r=>{const la=parseFloat(r['y']),lo=parseFloat(r['x']);if(!isNaN(la)&&Math.abs(la)>10){lats.push(la);lngs.push(lo)}});
+  if(!lats.length){toast('Load crash data first','err');return}
+  const cLat=lats.reduce((a,b)=>a+b,0)/lats.length,cLng=lngs.reduce((a,b)=>a+b,0)/lngs.length;
+  const base='https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_National_Transit_Map_Stops/FeatureServer/0/query';
+  try{const geom=JSON.stringify({x:cLng,y:cLat,spatialReference:{wkid:4326}});
+    const url=base+'?'+['where='+encodeURIComponent('1=1'),'geometry='+encodeURIComponent(geom),'geometryType=esriGeometryPoint','spatialRel=esriSpatialRelIntersects','distance=20000','units=esriSRUnit_Meter','inSR=4326','outFields=*','outSR=4326','returnGeometry=true','resultRecordCount=2000','f=geojson'].join('&');
+    const j=await fetchR(url);
+    TRANSIT=(j.features||[]).map(f=>{const p=f.properties||f.attributes||{},g=f.geometry;return{lat:g?.coordinates?.[1]||p.stop_lat,lng:g?.coordinates?.[0]||p.stop_lon,name:p.stop_name||p.STOP_NAME||'',type:p.route_type||p.stop_type_text||p.ROUTE_TYPE||''}}).filter(t=>t.lat);
+    $('enr-transit-s').innerHTML=`<span style="color:var(--ok)">✅ ${TRANSIT.length} stops</span>`;log(`Transit: ${TRANSIT.length} stops`,'ok');toast(`${TRANSIT.length} transit stops`,'ok');
+  }catch(e){$('enr-transit-s').innerHTML=`<span style="color:var(--er)">❌ ${e.message}</span>`;log(`Transit: ${e.message}`,'wrn')}
+}
+async function loadNBI(){
+  $('enr-nbi-s').textContent='Querying BTS...';
+  const lats=[],lngs=[];CRASH.forEach(r=>{const la=parseFloat(r['y']),lo=parseFloat(r['x']);if(!isNaN(la)&&Math.abs(la)>10){lats.push(la);lngs.push(lo)}});
+  if(!lats.length){toast('Load crash data first','err');return}
+  const bb={xmin:Math.min(...lngs)-.01,ymin:Math.min(...lats)-.01,xmax:Math.max(...lngs)+.01,ymax:Math.max(...lats)+.01};
+  const env=JSON.stringify({...bb,spatialReference:{wkid:4326}});
+  const base='https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_National_Bridge_Inventory/FeatureServer/0/query';
+  let all=[],offset=0,pages=0;
+  try{while(pages<10){
+    const url=base+'?'+['where='+encodeURIComponent('1=1'),'geometry='+encodeURIComponent(env),'geometryType=esriGeometryEnvelope','spatialRel=esriSpatialRelIntersects','inSR=4326','outFields=*','outSR=4326','returnGeometry=true','resultRecordCount=2000','resultOffset='+offset,'f=geojson'].join('&');
+    const j=await fetchR(url);const feats=j.features||[];all=all.concat(feats);pages++;$('enr-nbi-s').textContent=`Loading... ${all.length} bridges (page ${pages})`;if(feats.length<2000&&!j.exceededTransferLimit)break;offset+=feats.length;
+  }}catch(e){$('enr-nbi-s').innerHTML=`<span style="color:var(--er)">❌ ${e.message}</span>`;log(`NBI: ${e.message}`,'wrn');return}
+  NBI=all.map(f=>{const p=f.properties||f.attributes||{},g=f.geometry;
+    return{lat:g?.coordinates?.[1],lng:g?.coordinates?.[0],facility:p.FACILITY_CARRIED_007||p.FACILITY||'',feature:p.FEATURES_DESC_006A||p.FEATURE||'',structNum:p.STRUCTURE_NUMBER_008||p.STRUCT_NUM||'',deck:parseInt(p.DECK_COND_058||p.DECK_COND)||0,super:parseInt(p.SUPERSTRUCTURE_COND_059||p.SUPER_COND)||0,sub:parseInt(p.SUBSTRUCTURE_COND_060||p.SUB_COND)||0,yearBuilt:p.YEAR_BUILT_027||p.YEAR_BUILT||'',adt:p.ADT_029||p.ADT||0,lengthM:parseFloat(p.STRUCTURE_LEN_MT_049||p.STRUCT_LEN)||0,widthM:parseFloat(p.DECK_WIDTH_MT_048||p.DECK_WIDTH)||0}}).filter(b=>b.lat);
+  const poor=NBI.filter(b=>b.deck<=4||b.super<=4||b.sub<=4);
+  $('enr-nbi-s').innerHTML=`<span style="color:var(--ok)">✅ ${NBI.length} bridges (${poor.length} poor)</span>`;log(`NBI: ${NBI.length} bridges (${poor.length} poor)`,'ok');toast(`${NBI.length} bridges loaded`,'ok');
+}
+
+async function loadAllEnrich(){
+  await loadSchools();await new Promise(r=>setTimeout(r,500));
+  await loadHPMS();await new Promise(r=>setTimeout(r,500));
+  await loadRailXing();await new Promise(r=>setTimeout(r,500));
+  await loadTransit();await new Promise(r=>setTimeout(r,500));
+  await loadNBI();toast('All enrichment loaded','ok');
+}
+
+// ═══════════════════════════════════════════════════════════
+// PROXIMITY / CLUSTER HELPERS
+// ═══════════════════════════════════════════════════════════
+function nearestSchools(lat,lng,radiusFt){return SCHOOLS.filter(s=>hvd(lat,lng,s.latitude,s.longitude)<=radiusFt).sort((a,b)=>hvd(lat,lng,a.latitude,a.longitude)-hvd(lat,lng,b.latitude,b.longitude))}
+function schoolGradeLevel(s){const lo=String(s.lowest_grade_offered||''),hi=String(s.highest_grade_offered||'');const loN=lo==='PK'||lo==='-1'?-1:lo==='KG'||lo==='0'?0:parseInt(lo)||0;const hiN=parseInt(hi)||12;if(hiN<=5)return'Elementary';if(hiN<=8)return'Middle';return'High'}
+function fNear(lat,lng,r,assets){return assets.filter(a=>hvd(lat,lng,a.lat,a.lng)<=r)}
+function cluster(pts,r){const used=new Set(),cls=[];for(let i=0;i<pts.length;i++){if(used.has(i))continue;const g=[i];for(let j=i+1;j<pts.length;j++){if(!used.has(j)&&hvd(pts[i].lat,pts[i].lng,pts[j].lat,pts[j].lng)<=r)g.push(j)}g.forEach(x=>used.add(x));const cc=g.map(x=>pts[x]);const lat=cc.reduce((s,c)=>s+c.lat,0)/cc.length,lng=cc.reduce((s,c)=>s+c.lng,0)/cc.length;cls.push({cen:{lat,lng},cc})}return cls}
+function dedup(defs,r){const out=[];for(const d of defs){const dup=out.find(o=>o.type===d.type&&hvd(o.lat,o.lng,d.lat,d.lng)<=r);if(dup){if(d.epdo>dup.epdo)Object.assign(dup,d)}else out.push(d)}return out}
+function classifyLightPeriod(c){const l=c.light;if(!l||l==='unknown')return'unknown';if(l.includes('daylight'))return'day';if(l.includes('dark')||l.includes('not lighted')||l.includes('lighted'))return'night';if(l.includes('dawn')||l.includes('dusk'))return'twilight';return'unknown'}
+function calcNTDCRR(n,d,aadt){const sr=d>0?n/d:n>0?99:0;let ntdcrr=null;if(aadt&&aadt>0){const nV=aadt*0.25,dV=aadt*0.75;const nR=nV>0?n/nV:0,dR=dV>0?d/dV:0;ntdcrr=dR>0?nR/dR:nR>0?99:0}return{simpleRatio:sr,ntdcrr}}
+
+// Severity distribution of a crash array
+function sevDist(cc){const d={K:0,A:0,B:0,C:0,O:0};cc.forEach(c=>d[c.sev]=(d[c.sev]||0)+1);return d}
+// Top collision types
+function topCollTypes(cc,n=3){const m={};cc.forEach(c=>{const t=(c.ct||'unknown').replace(/\b\w/g,l=>l.toUpperCase());m[t]=(m[t]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n)}
+
+function eW7(cc,isUrban,legs,lat,lng,fcCode){
+  const now=new Date(),y1=new Date(now);y1.setFullYear(y1.getFullYear()-1);const y3=new Date(now);y3.setFullYear(y3.getFullYear()-3);
+  const q=cc.filter(c=>/angle|ped|left turn|right turn/i.test(c.ct));const q1=q.filter(c=>c.dt&&c.dt>=y1),q3=q.filter(c=>c.dt&&c.dt>=y3);
+  const fi1=q1.filter(c=>isFI(c.sev)),fi3=q3.filter(c=>isFI(c.sev));
+  const hpms=getHPMSInfo(lat,lng);const lanes=hpms?.lanes||2;
+  let subcat=isUrban?'urban':(lanes<=2?'rural_1x1':'rural_2plus');
+  const lk=legs==='3-leg'?'leg3':'leg4';const t=W7[subcat];
+  const yr1t=t.yr1[lk],yr3t=t.yr3[lk];
+  const m1a=q1.length>=yr1t.all,m1f=fi1.length>=yr1t.fi,m3a=q3.length>=yr3t.all,m3f=fi3.length>=yr3t.fi;
+  const tbl=subcat==='urban'?'4C-2/4C-4':subcat==='rural_1x1'?'4C-3(low)/4C-5(low)':'4C-3/4C-5';
+  return{qual:q.length,area:isUrban?'Urban':'Rural',legs,tbl,met:(m1a||m1f||m3a||m3f),
+    yr1:{all:q1.length,fi:fi1.length,tAll:yr1t.all,tFI:yr1t.fi,metAll:m1a,metFI:m1f},
+    yr3:{all:q3.length,fi:fi3.length,tAll:yr3t.all,tFI:yr3t.fi,metAll:m3a,metFI:m3f}}
+}
+function eWSA(cc,legs){
+  const now=new Date(),m12d=new Date(now);m12d.setMonth(m12d.getMonth()-12);const m36d=new Date(now);m36d.setMonth(m36d.getMonth()-36);
+  const q=cc.filter(c=>!/rear end/i.test(c.ct)&&(/angle|ped|left turn|right turn/i.test(c.ct)));
+  const q12=q.filter(c=>c.dt&&c.dt>=m12d),q36=q.filter(c=>c.dt&&c.dt>=m36d);
+  const lk=legs==='3-leg'?'leg3':'leg4';const t=WSA[lk];
+  return{qual:q.length,legs,mo12:{count:q12.length,threshold:t.mo12,met:q12.length>=t.mo12},mo36:{count:q36.length,threshold:t.mo36,met:q36.length>=t.mo36},met:(q12.length>=t.mo12||q36.length>=t.mo36)}
+}
+function pedTreatment(spd,fcCode){
+  if(FC_PED_EX.includes(fcCode))return{rec:'FC1/2: no at-grade ped facilities (limited access).',ok:false,device:'None — limited access'};
+  if(!spd||spd<=30)return{rec:`≤30 mph: high-vis crosswalk + in-street ped sign R1-6a. CMF 0.53.`,ok:true,device:'High-vis crosswalk + R1-6a'};
+  if(spd<=39)return{rec:`31-39 mph: high-vis crosswalk + RRFB (§4L.04). CMF 0.53.`,ok:true,device:'High-vis crosswalk + RRFB'};
+  if(spd<=45)return{rec:`40-45 mph: PHB (§4G) or RRFB (§4L). CMF 0.45.`,ok:true,device:'PHB or RRFB'};
+  if(spd<=55)return{rec:`46-55 mph: PHB (§4G) required. CMF 0.45.`,ok:true,device:'PHB'};
+  return{rec:`>55 mph: traffic signal or grade separation required. §4A.`,ok:true,device:'Signal or grade sep'}
+}
+
+// ═══════════════════════════════════════════════════════════
+// ANALYSIS ENGINE — with HPMS cross-validation
+// ═══════════════════════════════════════════════════════════
+async function runAnalysis(){
+  if(!CRASH.length){toast('Load crash data first','err');return}
+  const btn=$('runBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Analyzing...';
+  $('progW').classList.remove('hidden');$('logbox').innerHTML='';$('logbox').classList.remove('hidden');$('pS').textContent='Analyzing...';DEFS=[];
+  $('mapProg').classList.remove('hidden');$('mapProgTxt').textContent='Parsing crashes...';
+
+  const radius=+$('cR').value,isUrban=$('cArea').value==='urban',ndr=+$('cNDR').value,minQ=+$('cMin').value,schR=+$('cSchR').value;
+  log(`Config: R=${radius}ft Area=${isUrban?'Urban':'Rural'} N/D=${ndr} Min=${minQ}`);
+  if(HPMS.length)log(`HPMS: ${HPMS.length} segments for FC cross-validation`,'ok');
+  else log('⚠️ HPMS not loaded — FC from crash records only (may be inaccurate)','wrn');
+
+  // ── STEP 1: Parse ──
+  prog(5,'Parsing...');const valid=[];
+  for(const r of CRASH){
+    const lat=parseFloat(r['y']),lng=parseFloat(r['x']);if(isNaN(lat)||isNaN(lng)||Math.abs(lat)<10)continue;
+    let dt=null;if(r['Crash Date']){dt=new Date(r['Crash Date']);if(isNaN(dt.getTime()))dt=null}
+    const fc=r['Functional Class']||'',fcCode=pFC(fc),it=r['Intersection Type']||'',ct=(r['Collision Type']||'').toLowerCase(),tctl=(r['Traffic Control Type']||'').toLowerCase(),light=(r['Light Condition']||'').toLowerCase();
+    let legs='4-leg';if(it.includes('Three'))legs='3-leg';else if(it.includes('Two'))legs='2-leg';else if(it.includes('Five'))legs='5-leg';
+    const isR=it.includes('Roundabout'),ia=r['Intersection Analysis']||'',isI=ia.includes('Intersection')&&!ia.startsWith('Not');
+    const weather=(r['Weather']||'').toLowerCase(),surface=(r['Surface Condition']||'').toLowerCase();
+    valid.push({lat,lng,ct,sev:r['Crash Severity']||'O',dt,light,tctl,legs,isInt:isI,isR,fc,fcCode,road:rn(r['RTE Name']),areaType:(r['Area Type']||'').toLowerCase(),animal:r['Animal Related?']==='Yes',ped:r['Pedestrian?']==='Yes',bike:r['Bike?']==='Yes',speed:r['Speed?']==='Yes',night:r['Night?']==='Yes',school:r['School Zone']&&(r['School Zone'].startsWith('1.')||r['School Zone'].startsWith('2.')),hasSig:tctl.includes('traffic signal'),hasStp:tctl.includes('stop sign'),rdDep:(r['RoadDeparture Type']||'')!=='NOT_RD'&&(r['RoadDeparture Type']||'')!=='',wet:surface.includes('wet')||weather.includes('rain')||weather.includes('snow')});
+  }
+  valid.forEach(c=>{c.lightPd=classifyLightPeriod(c)});
+  log(`${valid.length} valid crashes`,'ok');
+
+  // ── STEP 2: Center map ──
+  if(valid.length){
+    const bounds=valid.reduce((b,c)=>({minLat:Math.min(b.minLat,c.lat),maxLat:Math.max(b.maxLat,c.lat),minLng:Math.min(b.minLng,c.lng),maxLng:Math.max(b.maxLng,c.lng)}),{minLat:90,maxLat:-90,minLng:180,maxLng:-180});
+    map.fitBounds([[bounds.minLat,bounds.minLng],[bounds.maxLat,bounds.maxLng]],{padding:[30,30]});
+  }
+  await new Promise(r=>setTimeout(r,0));
+
+  // ── STEP 3: Cluster ──
+  prog(15,'Clustering...');$('mapProgTxt').textContent=`Clustering ${valid.length.toLocaleString()} crashes...`;
+  await new Promise(r=>setTimeout(r,0));
+  const cls=cluster(valid,radius);log(`${cls.length} clusters`,'ok');
+
+  // ── STEP 4: Assets ──
+  prog(25,'Assets...');
+  const assets=INV.map(r=>{const lat=parseFloat(r.lat),lng=parseFloat(r.lon);if(isNaN(lat)||isNaN(lng))return null;return{lat,lng,cls:(r.class||'').toLowerCase(),nm:(r.name||'').toLowerCase(),mutcd:(r.mutcd||'').toUpperCase()}}).filter(Boolean);
+  log(`${assets.length} assets`,'ok');
+
+  // ── STEP 5: Evaluate with HPMS cross-validation ──
+  prog(35,'Evaluating...');
+  let ci=0,fcGateCount=0,spdGateCount=0,fcConflicts=0,batchCount=0;
+
+  for(const cl of cls){ci++;
+    if(ci%50===0){
+      prog(35+(ci/cls.length)*55,`${ci}/${cls.length}`);
+      $('mapProgTxt').textContent=`${ci}/${cls.length} clusters • ${DEFS.length} found`;
+      if(DEFS.length>batchCount){streamToMap(batchCount);batchCount=DEFS.length}
+      await new Promise(r=>setTimeout(r,0));
+    }
+    const{cen,cc}=cl;if(cc.length<minQ)continue;
+    const near=fNear(cen.lat,cen.lng,radius,assets),crashRoad=tr(cc),epdo=ep(cc),msx=mSev(cc);
+    
+    // ── FC CROSS-VALIDATION with HPMS ──
+    const fcC={};cc.forEach(c=>{if(c.fcCode)fcC[c.fcCode]=(fcC[c.fcCode]||0)+1});const dFC=Object.entries(fcC).sort((a,b)=>b[1]-a[1])[0];
+    const crashFCCode=dFC?dFC[0]:null;
+    const hpmsInfo=getHPMSInfo(cen.lat,cen.lng);
+    const fcRes=resolveFC(crashFCCode,hpmsInfo);
+    const cFC=fcRes.fc; // Resolved FC code
+    if(fcRes.conflict)fcConflicts++;
+    
+    const isLA=cFC&&FC_EX.includes(cFC);const isPedEx=cFC&&FC_PED_EX.includes(cFC);
+    const lC={};cc.forEach(c=>{if(c.legs)lC[c.legs]=(lC[c.legs]||0)+1});const dL=Object.entries(lC).sort((a,b)=>b[1]-a[1])[0];const legs=dL?dL[0]:'4-leg';
+    const isI=cc.some(c=>c.isInt),isR=cc.some(c=>c.isR),cA=cc.some(c=>c.areaType==='rural')?false:true;
+    
+    // Resolve speed with source tracking
+    const spdRes=resolveSpeed(cen.lat,cen.lng,cFC,isUrban||cA);
+    const postedSpd=spdRes.spd;const spdSrc=spdRes.src;
+    
+    // Resolve road name from HPMS
+    const road=resolveRoadName(crashRoad,hpmsInfo);
+    
+    // AADT
+    const aadt=hpmsInfo?.aadt||0;
+    const crashRate=aadt>0?((cc.length/(aadt*365*3))*1e6).toFixed(2):null;
+    const lanes=hpmsInfo?.lanes||2;
+    
+    // Severity distribution & crash type breakdown
+    const sd=sevDist(cc);
+    const topCT=topCollTypes(cc);
+    const wetCount=cc.filter(c=>c.wet).length;
+    const fiCount=cc.filter(c=>isFI(c.sev)).length;
+    
+    // Common properties for all deficiencies
+    const common={lat:cen.lat,lng:cen.lng,road,fc:fcRes.label,fcCode:cFC,fcSource:fcRes.source,fcConflict:fcRes.conflict,crashFC:fcRes.crashLabel,total:cc.length,sev:msx,epdo,spd:postedSpd,spdSrc,aadt,crashRate,lanes,sevDist:sd,topCT,wetPct:cc.length>0?Math.round(wetCount/cc.length*100):0,fiCount,hpmsName:hpmsInfo?.name||''};
+
+    // Signal W7
+    if(isI&&!isLA&&!isR){const hs=cc.some(c=>c.hasSig)||near.some(a=>a.cls.includes('traffic-light')||a.nm.includes('signal'));
+      if(!hs){const w=eW7(cc,cA||isUrban,legs,cen.lat,cen.lng,cFC);if(w.qual>=minQ){
+        DEFS.push({...common,type:'signal',cnt:w.qual,w7:w,we:w.met,legs,
+          rec:`W7 §4C.08 (${legs}/${w.area} Tbl ${w.tbl}). Angle+ped only. §4B.03 alternatives.`})}}}
+
+    // Stop AWS-A
+    if(isI&&!isLA&&!isR&&postedSpd<50){
+      const hc=cc.some(c=>c.hasSig||c.hasStp)||near.some(a=>a.mutcd==='R1-1'||a.cls.includes('stop')||a.cls.includes('traffic-light'));
+      if(!hc){const w=eWSA(cc,legs);if(w.qual>=minQ){
+        DEFS.push({...common,type:'stop',cnt:w.qual,wsa:w,we:w.met,legs,
+          rec:`AWS-A §2B.13 (${legs}). Rear-end excluded. §2B.12 warrant ≠ required.`})}}}
+    else if(isI&&!isLA&&!isR&&postedSpd>=50){spdGateCount++}
+
+    // Lighting
+    {const nC=cc.filter(c=>c.lightPd==='night');const dC=cc.filter(c=>c.lightPd==='day');const twC=cc.filter(c=>c.lightPd==='twilight');
+     const ndStats=calcNTDCRR(nC.length,dC.length,aadt);const rat=ndStats.simpleRatio;
+     if(nC.length>=3&&rat>=ndr){const hL=near.some(a=>a.cls.includes('street-light'));
+       if(!hL){const nFI=nC.filter(c=>isFI(c.sev)).length;const autoW=(rat>=2.0&&nC.length>=3);const strongCand=(rat>=1.5&&nC.length>=5);
+         DEFS.push({...common,type:'streetlight',cnt:nC.length,ndr:rat.toFixed(2),ntdcrr:ndStats.ntdcrr?ndStats.ntdcrr.toFixed(2):null,nightFI:nFI,twilight:twC.length,nightCount:nC.length,dayCount:dC.length,
+           we:autoW||strongCand,
+           rec:`FHWA NTDCRR: ${nC.length}N/${dC.length}D=${rat.toFixed(2)}. ${nFI} night F+I. CMF 0.72. §4B.03-K.`})}}}
+
+    // School
+    if(!isPedEx){
+      const schC=cc.filter(c=>c.school);const nearSch=nearestSchools(cen.lat,cen.lng,schR);
+      if(nearSch.length>0||schC.length>=2){const hasSch=near.some(a=>a.mutcd&&(a.mutcd.startsWith('S1')||a.mutcd.startsWith('S3')||a.mutcd.startsWith('S4')));
+        if(!hasSch){const crashCount=Math.max(schC.length,cc.filter(c=>nearSch.some(s=>hvd(c.lat,c.lng,s.latitude,s.longitude)<=schR)).length);const isElem=nearSch.some(s=>schoolGradeLevel(s)==='Elementary');
+          DEFS.push({...common,type:'school',cnt:crashCount||schC.length,we:crashCount>=3||isElem,schools:nearSch.slice(0,3),
+            rec:`${nearSch.length} school(s) within ${schR}ft. ${isElem?'⚠️ Elementary.':''} S1-1/S3-1/S4-3P §7B.09. CMF 0.82.`})}}}
+    else{fcGateCount++}
+
+    // Crosswalk
+    if(!isPedEx){const pedC=cc.filter(c=>c.ped||/ped/i.test(c.ct));const nearTr=TRANSIT.filter(t=>hvd(cen.lat,cen.lng,t.lat,t.lng)<=500);
+      if(pedC.length>=2){const h=near.some(a=>a.cls.includes('crosswalk'));if(!h){const pt=pedTreatment(postedSpd,cFC);
+        DEFS.push({...common,type:'crosswalk',cnt:pedC.length,sev:mSev(pedC),epdo:ep(pedC),we:pedC.length>=3&&pt.ok,transitNear:nearTr.length,pedDevice:pt.device,
+          rec:`${pedC.length} ped crashes at ${postedSpd} mph. ${nearTr.length?nearTr.length+' transit stop(s). ':''}${pt.rec}`})}}}
+
+    // Ped warning
+    if(!isPedEx){const pedC=cc.filter(c=>c.ped||/ped/i.test(c.ct));if(pedC.length>=2){const h=near.some(a=>a.mutcd==='W11-2'||a.cls.includes('pedestrian'));if(!h)DEFS.push({...common,type:'ped',cnt:pedC.length,sev:mSev(pedC),epdo:ep(pedC),we:pedC.length>=3,rec:`W11-2: ${pedC.length} ped, ${pedC.filter(c=>isFI(c.sev)).length} F+I. §2C.50.`})}}
+
+    // Animal
+    {const aC=cc.filter(c=>c.animal||/deer|animal/i.test(c.ct));if(aC.length>=3){const h=near.some(a=>a.mutcd==='W11-3'||a.mutcd==='W11-4');if(!h)DEFS.push({...common,type:'animal',cnt:aC.length,sev:mSev(aC),epdo:ep(aC),we:aC.length>=5,rec:`${aC.length} animal. W11-3/W11-4 §2C.50.`})}}
+
+    // Bike
+    if(!isPedEx){const bC=cc.filter(c=>c.bike||/bicycl/i.test(c.ct));if(bC.length>=2)DEFS.push({...common,type:'bike',cnt:bC.length,sev:mSev(bC),epdo:ep(bC),we:bC.length>=3,rec:`${bC.length} bicycle. W11-1 §9B.18, bike lane CMF 0.65.`})}
+
+    // Railroad
+    if(RAIL_X.length){const nearRR=RAIL_X.filter(x=>hvd(cen.lat,cen.lng,x.lat,x.lng)<=500);
+      if(nearRR.length>0){const rrC=cc.filter(c=>/train|rail/i.test(c.ct));const hasW10=near.some(a=>a.mutcd&&(a.mutcd.startsWith('W10')||a.mutcd.startsWith('R15')));
+        const xing=nearRR[0];const warnLvl=parseInt(xing.warn)||9;const lowWarn=warnLvl>=5;
+        if((rrC.length>=1||cc.length>=3)&&(lowWarn||!hasW10)){
+          DEFS.push({...common,type:'railroad',cnt:rrC.length||cc.length,we:rrC.length>=1||lowWarn,railXing:xing,
+            rec:`${rrC.length} train crash near ${xing.rr||'RR'} #${xing.id}. ${lowWarn?'⚠️ LOW WARNING. ':''} W10-1/W10-2 §8B.03. CMF 0.41 gates.`})}}}
+
+    // Bridge
+    if(NBI.length){const nearBr=NBI.filter(b=>hvd(cen.lat,cen.lng,b.lat,b.lng)<=300);
+      if(nearBr.length>0){const br=nearBr[0];const minCond=Math.min(br.deck||9,br.super||9,br.sub||9);const isPoor=minCond<=4;const isNarrow=br.widthM>0&&br.widthM<7.3;
+        if(isPoor||isNarrow){const hasW5=near.some(a=>a.mutcd&&a.mutcd.startsWith('W5'));
+          if(!hasW5){DEFS.push({...common,type:'bridge',lat:br.lat,lng:br.lng,road:br.facility||road,cnt:cc.length,we:isPoor||cc.length>=3,nbi:br,
+            rec:`Bridge ${br.structNum}: D:${br.deck} S:${br.super} Sub:${br.sub}.${isNarrow?' NARROW':''}${isPoor?' POOR':''}.${br.adt?' ADT:'+br.adt.toLocaleString()+'.':''} W5-2 §2C.34.`})}}}}
+
+    // Speed — enhanced with specific countermeasures
+    {const sC=cc.filter(c=>c.speed);if(sC.length>=3){
+      const sFI=sC.filter(c=>isFI(c.sev)).length;
+      DEFS.push({...common,type:'speed',cnt:sC.length,sev:mSev(sC),epdo:ep(sC),we:sC.length>=5||msx>=4,speedFI:sFI,
+        rec:`${sC.length} speed-related (${sFI} F+I). ${postedSpd>=45?'Speed feedback sign + enforcement.':'Road diet / traffic calming.'} §2B.25, FHWA STEP.`})}}
+
+    // Head-on — enhanced
+    {const hC=cc.filter(c=>/head on/i.test(c.ct));if(hC.length>=3){
+      const hFI=hC.filter(c=>isFI(c.sev)).length;
+      DEFS.push({...common,type:'headon',cnt:hC.length,sev:mSev(hC),epdo:ep(hC),we:mSev(hC)>=4,headonFI:hFI,
+        rec:`${hC.length} head-on (${hFI} F+I). ${lanes<=2?'Centerline rumble strips CMF 0.56 + wider CL markings.':'Median barrier / cable barrier CMF 0.20.'}`})}}
+
+    // Rear-end — enhanced
+    {const rC=cc.filter(c=>/rear end/i.test(c.ct));if(rC.length>=5){
+      DEFS.push({...common,type:'rearend',cnt:rC.length,sev:mSev(rC),epdo:ep(rC),we:rC.length>=8,
+        rec:`${rC.length} rear-end. ${isI?'Signal timing review + backplate reflectors CMF 0.85 + dilemma zone detection.':'Advance warning signs + deceleration lane.'}`})}}
+
+    // Departure — enhanced with specific treatments
+    {const dC=cc.filter(c=>c.rdDep||/fixed object/i.test(c.ct));if(dC.length>=3){
+      const dFI=dC.filter(c=>isFI(c.sev)).length;const isCurve=dC.some(c=>/curve/i.test(c.ct));
+      let recs=[];
+      if(dC.length>=10)recs.push('Edge line rumble strips CMF 0.79');
+      if(dC.length>=5)recs.push('Shoulder rumble strips CMF 0.85');
+      if(dFI>=2&&postedSpd>=45)recs.push('Cable barrier / guardrail CMF 0.53');
+      if(isCurve)recs.push('Chevron alignment signs W1-8 CMF 0.65');
+      if(postedSpd>=45)recs.push('Delineation + reflective markers');
+      if(dFI>=1)recs.push('Clear zone improvements');
+      if(recs.length===0)recs.push('Edge rumble strips CMF 0.79','Chevrons');
+      DEFS.push({...common,type:'departure',cnt:dC.length,sev:mSev(dC),epdo:ep(dC),we:mSev(dC)>=4||dC.length>=5,depFI:dFI,isCurve,depRecs:recs,
+        rec:`${dC.length} run-off-road (${dFI} F+I)${isCurve?' [curve]':''}. ${recs.slice(0,3).join('; ')}.`})}}
+  }
+
+  // ── FINALIZE ──
+  DEFS=dedup(DEFS,100);DEFS.sort((a,b)=>b.epdo-a.epdo);DEFS.forEach((d,i)=>d.rank=i+1);
+  prog(95,'Rendering...');const wM=DEFS.filter(d=>d.we).length;
+  log(`✅ ${DEFS.length} candidates, ${wM} warrant-met`,'ok');
+  if(fcGateCount)log(`FC gate: ${fcGateCount} on FC1/2 skipped`,'wrn');
+  if(spdGateCount)log(`Speed gate: ${spdGateCount} ≥50 mph skipped for AWS`,'wrn');
+  if(fcConflicts)log(`⚠️ FC conflicts: ${fcConflicts} locations where HPMS FC ≠ crash record FC`,'wrn');
+
+  $('mapProg').classList.add('hidden');
+  clGrp.clearLayers();
+  renderAll();
+  btn.disabled=false;btn.innerHTML='🔍 Run Analysis';
+  $('pS').textContent=`${DEFS.length}`;$('pC').textContent=`🔍 ${DEFS.length}`;
+  $('sN').innerHTML=`<b>${DEFS.length}</b> (${wM} warrant)`;
+  toast(`${DEFS.length} candidates, ${wM} warrant`,'ok');
+  prog(100,'Done');
+}
+
+function streamToMap(fromIdx){
+  for(let i=fromIdx;i<DEFS.length;i++){
+    const d=DEFS[i];
+    const ico=L.divIcon({html:`<div class="dm" style="background:${COL[d.type]}">${ICO[d.type]}</div>`,className:'',iconSize:[22,22],iconAnchor:[11,11]});
+    L.marker([d.lat,d.lng],{icon:ico}).addTo(clGrp);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════════════════
+function renderAll(){
+  buildDropdown();renderMarkers();renderTable();
+  $('tblSection').classList.remove('hidden');
+  const inp=$('inputSection');inp.style.maxHeight=inp.scrollHeight+'px';
+  requestAnimationFrame(()=>{inp.classList.add('collapsed')});
+  $('cfgToggle').classList.remove('hidden');$('cfgToggle').classList.remove('open');
+  if(DEFS.length){map.fitBounds(DEFS.map(d=>[d.lat,d.lng]),{padding:[40,40]});setTimeout(()=>map.invalidateSize(),200)}
+}
+function toggleConfig(){
+  const inp=$('inputSection'),btn=$('cfgToggle');
+  if(inp.classList.contains('collapsed')){inp.classList.remove('collapsed');inp.style.maxHeight=inp.scrollHeight+'px';btn.classList.add('open');inp.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{inp.style.maxHeight='none'},400)}
+  else{inp.style.maxHeight=inp.scrollHeight+'px';requestAnimationFrame(()=>{inp.classList.add('collapsed')});btn.classList.remove('open')}
+}
+function buildDropdown(){
+  const dd=$('catDD');const types={};DEFS.forEach(d=>{types[d.type]=(types[d.type]||0)+1});
+  let h=`<option value="all">🗺️ All Categories (${DEFS.length})</option>`;
+  h+=`<option value="warrant">⚠️ Warrant Met Only (${DEFS.filter(d=>d.we).length})</option>`;
+  const plans=[{id:'signal',label:'🚦 Signal',types:['signal']},{id:'stop',label:'🛑 Stop Sign',types:['stop']},{id:'light',label:'💡 Lighting',types:['streetlight']},{id:'ped',label:'🚶 Ped / Crosswalk / School',types:['crosswalk','ped','school','bike']},{id:'animal',label:'🦌 Animal',types:['animal']},{id:'rr',label:'🚂 Railroad',types:['railroad']},{id:'bridge',label:'🌉 Bridge',types:['bridge']},{id:'speed',label:'⚡ Speed',types:['speed']},{id:'headon',label:'💥 Head-On',types:['headon']},{id:'rearend',label:'🔙 Rear-End',types:['rearend']},{id:'departure',label:'↗️ Departure',types:['departure']}];
+  plans.forEach(p=>{const cnt=DEFS.filter(d=>p.types.includes(d.type)).length;const wCnt=DEFS.filter(d=>p.types.includes(d.type)&&d.we).length;if(cnt>0)h+=`<option value="${p.id}">${p.label} (${cnt}${wCnt?' • '+wCnt+' warrant':''})</option>`});
+  dd.innerHTML=h;
+}
+function getFilteredDefs(){
+  const cat=$('catDD').value;const wOnly=$('wOnly').checked;
+  const planMap={signal:['signal'],stop:['stop'],light:['streetlight'],ped:['crosswalk','ped','school','bike'],animal:['animal'],rr:['railroad'],bridge:['bridge'],speed:['speed'],headon:['headon'],rearend:['rearend'],departure:['departure']};
+  let items=DEFS;
+  if(cat==='warrant')items=items.filter(d=>d.we);
+  else if(cat!=='all')items=items.filter(d=>(planMap[cat]||[]).includes(d.type));
+  if(wOnly&&cat!=='warrant')items=items.filter(d=>d.we);
+  return items;
+}
+function filterChanged(){renderMarkers();renderTable()}
+
+function renderMarkers(){
+  clGrp.clearLayers();const items=getFilteredDefs();let wCnt=0;
+  items.forEach((d,idx)=>{
+    if(d.we)wCnt++;const isWarrant=d.we;const sz=isWarrant?(d.epdo>=2000?'xl':'lg'):'';
+    const ico=L.divIcon({html:`<div class="dm ${sz?'dm-'+sz:''} ${isWarrant?'dm-pulse':''}" style="background:${COL[d.type]}">${ICO[d.type]}</div>`,className:'',
+      iconSize:[sz==='xl'?34:sz==='lg'?28:22,sz==='xl'?34:sz==='lg'?28:22],
+      iconAnchor:[sz==='xl'?17:sz==='lg'?14:11,sz==='xl'?17:sz==='lg'?14:11],
+      popupAnchor:[0,-(sz==='xl'?17:sz==='lg'?14:11)]});
+    const pop=buildPopup(d,idx);
+    L.marker([d.lat,d.lng],{icon:ico}).bindPopup(pop,{maxWidth:400,className:'leaflet-popup-styled'}).addTo(clGrp);
+  });
+  $('mT').textContent=items.length;$('mW').textContent=wCnt;
+  $('mCr').textContent=items.reduce((s,d)=>s+d.total,0).toLocaleString();
+  if(items.length)map.fitBounds(items.map(d=>[d.lat,d.lng]),{padding:[40,40]});
+}
+
+// ═══════════════════════════════════════════════════════════
+// POPUP — Enhanced with data sources, severity bar, crash breakdown
+// ═══════════════════════════════════════════════════════════
+function buildPopup(d,idx){
+  const sevLabel=slShort(d.sev);const sevColor=d.sev>=4?'#dc2626':d.sev>=3?'#d97706':'#64748b';
+  const actionText=buildAction(d);
+  const qualLabel=(d.type==='signal'||d.type==='stop')?'Angle+Ped':'Qualifying';
+  
+  // FC source badge
+  const fcSrcBadge=d.fcSource==='HPMS'?'<span class="src-badge src-hpms">HPMS</span>':d.fcSource==='Crash Record'?'<span class="src-badge src-cr">CR</span>':'';
+  const fcConflictNote=d.fcConflict?` <span class="src-badge src-conflict">⚠ CR: ${d.crashFC}</span>`:'';
+  // Speed source badge
+  const spdBadge=d.spdSrc==='R2-1'?'<span class="src-badge src-r21">R2-1</span>':d.spdSrc?.includes('estimate')?'<span class="src-badge src-est">Est</span>':'';
+
+  let h=`<div class="pop">`;
+  // Header
+  h+=`<div class="pop-hdr" style="background:${COL[d.type]}"><div class="pop-type">${LBL[d.type]}</div><div class="pop-road">${d.road}</div>`;
+  h+=`<div class="pop-sub">${d.fc||''} ${fcSrcBadge}${fcConflictNote}${d.spd?' • '+d.spd+' mph ':''}${spdBadge}${d.aadt?' • AADT '+d.aadt.toLocaleString():''}</div></div>`;
+  // Status
+  h+=`<div class="pop-status ${d.we?'met':'mon'}">${d.we?'⚠️ WARRANT MET — Action Required':'📋 Monitor — Below Threshold'}</div>`;
+  // 3 numbers
+  h+=`<div class="pop-nums"><div class="pop-n"><span class="v">${d.cnt}</span><span class="l">${qualLabel}</span></div><div class="pop-n"><span class="v" style="color:${sevColor}">${sevLabel}</span><span class="l">Worst</span></div><div class="pop-n"><span class="v">${d.epdo.toLocaleString()}</span><span class="l">EPDO</span></div></div>`;
+  // Action
+  h+=`<div class="pop-action">${actionText}</div>`;
+  // Tags
+  let tags='';
+  if(d.schools?.length)tags+=d.schools.slice(0,2).map(s=>`<span class="tag tag-school">🏫 ${s.school_name.substring(0,20)}</span>`).join('');
+  if(d.railXing)tags+=`<span class="tag tag-rr">🚂 ${d.railXing.rr||'RR'}</span>`;
+  if(d.nbi)tags+=`<span class="tag tag-nbi">🌉 D:${d.nbi.deck} S:${d.nbi.super}</span>`;
+  if(d.transitNear)tags+=`<span class="tag tag-transit">🚏 ${d.transitNear} stop(s)</span>`;
+  if(tags)h+=`<div class="pop-tags">${tags}</div>`;
+
+  // ── Engineering Detail — ENHANCED ──
+  h+=`<div class="pop-eng">`;
+  h+=`<div class="pop-eng-title">Engineering Detail</div>`;
+  
+  // Severity distribution bar
+  if(d.sevDist){
+    const sd=d.sevDist;const tot=d.total||1;
+    h+=`<div style="font-size:.5rem;color:#475569;margin-bottom:.1rem">Severity: <b style="color:#7f1d1d">${sd.K||0}K</b> <b style="color:#dc2626">${sd.A||0}A</b> <b style="color:#f97316">${sd.B||0}B</b> <b style="color:#eab308">${sd.C||0}C</b> <b style="color:#94a3b8">${sd.O||0}O</b></div>`;
+    h+=`<div class="sev-bar">`;
+    if(sd.K)h+=`<span class="sev-k" style="width:${sd.K/tot*100}%" title="${sd.K} Fatal"></span>`;
+    if(sd.A)h+=`<span class="sev-a" style="width:${sd.A/tot*100}%" title="${sd.A} Serious"></span>`;
+    if(sd.B)h+=`<span class="sev-b" style="width:${sd.B/tot*100}%" title="${sd.B} Moderate"></span>`;
+    if(sd.C)h+=`<span class="sev-c" style="width:${sd.C/tot*100}%" title="${sd.C} Minor"></span>`;
+    if(sd.O)h+=`<span class="sev-o" style="width:${sd.O/tot*100}%" title="${sd.O} PDO"></span>`;
+    h+=`</div>`;
+  }
+  
+  // Crash type breakdown
+  if(d.topCT&&d.topCT.length){
+    h+=`<div style="font-size:.5rem;margin:.1rem 0">Top types: ${d.topCT.map(([t,n])=>`<b>${t}</b>(${n})`).join(', ')}</div>`;
+  }
+  
+  // Cluster info
+  h+=`<div style="font-size:.5rem;margin:.1rem 0">Cluster: ${d.cnt}/${d.total} crashes`;
+  if(d.crashRate)h+=` • Rate: ${d.crashRate}/MEV`;
+  if(d.lanes)h+=` • ${d.lanes} lanes`;
+  if(d.wetPct>0)h+=` • ${d.wetPct}% wet`;
+  h+=`</div>`;
+  
+  // FC & Speed source info
+  h+=`<div style="font-size:.48rem;margin:.1rem 0;color:#64748b">`;
+  h+=`FC: ${d.fc} <span style="font-weight:700">[${d.fcSource}]</span>`;
+  if(d.fcConflict)h+=` <span style="color:#dc2626">⚠ Crash record says ${d.crashFC}</span>`;
+  h+=` • Speed: ${d.spd} mph <span style="font-weight:700">[${d.spdSrc}]</span>`;
+  if(d.hpmsName&&d.hpmsName!==d.road)h+=` • HPMS: ${d.hpmsName}`;
+  h+=`</div>`;
+
+  // Warrant-specific detail
+  if(d.w7){
+    h+=`<div style="font-size:.54rem;font-weight:600;margin:.15rem 0">§4C.08 Warrant 7 — ${d.w7.area} / ${d.w7.legs}</div>`;
+    h+=`<div class="wg">`;
+    h+=`<div class="${d.w7.yr1.metAll?'met':'not'}">${d.w7.yr1.metAll?'✅':'❌'} 1yr All: ${d.w7.yr1.all}/${d.w7.yr1.tAll}</div>`;
+    h+=`<div class="${d.w7.yr1.metFI?'met':'not'}">${d.w7.yr1.metFI?'✅':'❌'} 1yr F+I: ${d.w7.yr1.fi}/${d.w7.yr1.tFI}</div>`;
+    h+=`<div class="${d.w7.yr3.metAll?'met':'not'}">${d.w7.yr3.metAll?'✅':'❌'} 3yr All: ${d.w7.yr3.all}/${d.w7.yr3.tAll}</div>`;
+    h+=`<div class="${d.w7.yr3.metFI?'met':'not'}">${d.w7.yr3.metFI?'✅':'❌'} 3yr F+I: ${d.w7.yr3.fi}/${d.w7.yr3.tFI}</div>`;
+    h+=`</div>`;
+    h+=`<div style="font-size:.5rem;color:#64748b;margin-top:.1rem">Tbl ${d.w7.tbl} • Angle+ped crashes susceptible to signal correction</div>`;
+  }
+  if(d.wsa){
+    h+=`<div style="font-size:.54rem;font-weight:600;margin:.15rem 0">§2B.12 AWS Warrant A</div>`;
+    h+=`<div class="wg"><div class="${d.wsa.mo12.met?'met':'not'}">${d.wsa.mo12.met?'✅':'❌'} 12mo: ${d.wsa.mo12.count}/${d.wsa.mo12.threshold}</div><div class="${d.wsa.mo36.met?'met':'not'}">${d.wsa.mo36.met?'✅':'❌'} 36mo: ${d.wsa.mo36.count}/${d.wsa.mo36.threshold}</div></div>`;
+  }
+
+  // Specific countermeasure list for departure type
+  if(d.depRecs&&d.depRecs.length){
+    h+=`<div style="font-size:.52rem;font-weight:600;margin:.15rem 0 .05rem">Recommended Countermeasures:</div>`;
+    h+=`<ul class="cm-list">`;
+    d.depRecs.forEach((r,i)=>{
+      const pri=i===0?'P1':i<3?'P2':'P3';const priCls=i===0?'cm-p1':i<3?'cm-p2':'cm-p3';
+      h+=`<li>${r} <span class="cm-pri ${priCls}">${pri}</span></li>`;
+    });
+    h+=`</ul>`;
+  }
+
+  h+=`<div style="font-size:.48rem;color:#94a3b8;margin-top:.15rem;border-top:1px solid #e2e8f0;padding-top:.1rem">MUTCD: ${d.rec}</div>`;
+  h+=`</div></div>`;
+  return h;
+}
+
+// ═══════════════════════════════════════════════════════════
+// ACTION TEXT — Enhanced with specific countermeasures
+// ═══════════════════════════════════════════════════════════
+function buildAction(d){
+  if(d.type==='signal') return d.we?`<b>Install signal</b> — ${d.cnt} angle+ped crashes (§4C.08). Review alternatives per §4B.03.`:`Signal candidate — ${d.cnt} angle+ped crashes, below threshold.`;
+  if(d.type==='stop') return d.we?`<b>Install all-way stop</b> — ${d.cnt} qualifying (rear-end excluded).`:`Stop sign candidate — monitor.`;
+  if(d.type==='streetlight') return d.we?`<b>Install lighting</b> — night ratio ${d.ndr}. ${d.cnt} dark crashes (${d.nightFI||0} F+I).`:`Lighting candidate — N/D ${d.ndr}. ${d.cnt} night crashes.`;
+  if(d.type==='school') return `<b>School zone signs needed</b> — ${d.cnt} crashes near school. S1-1/S3-1.`;
+  if(d.type==='crosswalk'){return `<b>Install ${d.pedDevice||'crosswalk'}</b> — ${d.cnt} ped crashes at ${d.spd||'?'} mph.`}
+  if(d.type==='ped') return d.we?`<b>Action required</b> — ${d.cnt} pedestrian crashes (${d.fiCount||0} F+I).`:`${d.cnt} ped crashes — monitor.`;
+  if(d.type==='railroad') return `<b>Railroad warning</b> — W10-1/W10-2. ${d.cnt} crashes near crossing.`;
+  if(d.type==='bridge') return `<b>Bridge warning</b> — NBI poor condition. W5-2.`;
+  if(d.type==='speed') return `<b>Speed management</b> — ${d.cnt} speed-related (${d.speedFI||0} F+I). ${d.spd>=45?'Speed feedback signs + enforcement.':'Traffic calming / road diet.'}`;
+  if(d.type==='headon') return `<b>Head-on countermeasures</b> — ${d.cnt} crashes (${d.headonFI||0} F+I). ${d.lanes<=2?'Centerline rumble strips + wider markings.':'Median barrier / cable barrier.'}`;
+  if(d.type==='rearend') return `<b>Rear-end countermeasures</b> — ${d.cnt} crashes. Signal timing review + backplate reflectors.`;
+  if(d.type==='departure'){
+    const recs=d.depRecs||['Edge rumble strips','Chevrons'];
+    return `<b>Departure countermeasures</b> — ${d.cnt} run-off-road (${d.depFI||0} F+I)${d.isCurve?' [curve]':''}. ${recs.slice(0,2).join(' + ')}.`;
+  }
+  return d.we?`<b>Action required</b> — ${d.cnt} qualifying crashes.`:`${d.cnt} qualifying — monitor.`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TABLE — Enhanced with FC source column
+// ═══════════════════════════════════════════════════════════
+function doSort(col){if(sortCol===col)sortAsc=!sortAsc;else{sortCol=col;sortAsc=col==='road'||col==='type'}renderTable()}
+
+function renderTable(){
+  let items=getFilteredDefs();
+  items=[...items].sort((a,b)=>{
+    let va,vb;
+    if(sortCol==='type'){va=LBL[a.type];vb=LBL[b.type]}
+    else if(sortCol==='road'){va=a.road;vb=b.road}
+    else if(sortCol==='fc'){va=a.fc||'';vb=b.fc||''}
+    else if(sortCol==='cnt'){va=a.cnt;vb=b.cnt}
+    else if(sortCol==='sev'){va=a.sev;vb=b.sev}
+    else if(sortCol==='epdo'){va=a.epdo;vb=b.epdo}
+    else if(sortCol==='spd'){va=a.spd||0;vb=b.spd||0}
+    else{va=a.epdo;vb=b.epdo}
+    if(typeof va==='string')return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
+    return sortAsc?va-vb:vb-va;
+  });
+
+  const tbody=$('tBody');const sevColor=s=>s>=4?'var(--er)':s>=3?'var(--wr)':'var(--mu)';
+  let h='';
+  items.forEach((d,i)=>{
+    const action=buildAction(d);
+    const fcSrc=d.fcSource==='HPMS'?'<span class="src-badge src-hpms" title="HPMS verified">✓</span>':d.fcConflict?'<span class="src-badge src-conflict" title="FC conflict">⚠</span>':'';
+    const spdSrc=d.spdSrc==='R2-1'?'<span class="src-badge src-r21" title="R2-1 sign">✓</span>':d.spdSrc?.includes('estimate')?'<span class="src-badge src-est" title="Estimated">~</span>':'';
+    h+=`<tr class="${d.we?'warrant-row':''}" onclick="flyTo(${d.rank-1})" title="Click to fly to location">`;
+    h+=`<td style="font-weight:700;color:var(--mu)">${d.rank}</td>`;
+    h+=`<td><span class="type-dot" style="background:${COL[d.type]}"></span>${ICO[d.type]} ${LBL[d.type]}</td>`;
+    h+=`<td style="font-weight:600">${d.road}</td>`;
+    h+=`<td style="font-size:.6rem;color:var(--mu)">${d.fc||'—'} ${fcSrc}</td>`;
+    h+=`<td style="text-align:center">${d.spd||'—'} ${spdSrc}</td>`;
+    h+=`<td style="text-align:center;font-weight:700">${d.cnt}<span style="color:var(--mu);font-weight:400">/${d.total}</span></td>`;
+    h+=`<td style="color:${sevColor(d.sev)};font-weight:600">${slShort(d.sev)}</td>`;
+    h+=`<td style="font-weight:700">${d.epdo.toLocaleString()}</td>`;
+    h+=`<td><span class="status-badge ${d.we?'sb-met':'sb-mon'}">${d.we?'WARRANT':'Monitor'}</span></td>`;
+    h+=`<td class="action-text">${action}</td>`;
+    h+=`</tr>`;
+  });
+  tbody.innerHTML=h;
+
+  const wCnt=items.filter(d=>d.we).length;
+  $('tblTitle').textContent=`${$('catDD').options[$('catDD').selectedIndex].text.replace(/\(.*\)/,'')} — ${items.length} locations`;
+  $('tblCount').textContent=`${items.length} shown • ${wCnt} warrant met • ${items.reduce((s,d)=>s+d.total,0).toLocaleString()} total crashes`;
+}
+
+function flyTo(rank){
+  const d=DEFS.find(x=>x.rank===rank+1);if(!d||!map)return;
+  map.setView([d.lat,d.lng],16);
+  clGrp.eachLayer(l=>{const ll=l.getLatLng();if(Math.abs(ll.lat-d.lat)<.0001&&Math.abs(ll.lng-d.lng)<.0001)clGrp.zoomToShowLayer(l,()=>l.openPopup())});
+  $('mapSection').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORTS
+// ═══════════════════════════════════════════════════════════
+function dl(c,fn,m){const b=new Blob([c],{type:m}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u)}
+function expCSV(plan){
+  const items=plan==='all'?DEFS:DEFS.filter(d=>PM[d.type]===plan);if(!items.length)return toast('No data','err');
+  const h='Rank,Type,Road,FC,FC_Source,Speed_mph,Speed_Source,AADT,Lanes,CrashRate,Lat,Lng,Qualifying,Cluster,F+I,Severity,EPDO,NDR,Warrant,Recommendation';
+  const rows=items.map(d=>[d.rank,LBL[d.type],`"${d.road}"`,d.fc||'',d.fcSource||'',d.spd||'',d.spdSrc||'',d.aadt||'',d.lanes||'',d.crashRate||'',d.lat.toFixed(5),d.lng.toFixed(5),d.cnt,d.total,d.fiCount||0,sl(d.sev),d.epdo,d.ndr||'',d.we?'Yes':'No',`"${d.rec}"`].join(','));
+  dl([h,...rows].join('\n'),`crash_lens_${plan}.csv`,'text/csv');toast('CSV exported','ok')
+}
+function expGeo(){if(!DEFS.length)return toast('No data','err');const fc={type:'FeatureCollection',features:DEFS.map(d=>({type:'Feature',geometry:{type:'Point',coordinates:[d.lng,d.lat]},properties:{rank:d.rank,type:LBL[d.type],road:d.road,fc:d.fc,fc_source:d.fcSource,speed:d.spd,speed_source:d.spdSrc,aadt:d.aadt,lanes:d.lanes,crashes:d.cnt,fi_count:d.fiCount||0,epdo:d.epdo,warrant:d.we,rec:d.rec}}))};dl(JSON.stringify(fc,null,2),'crash_lens.geojson','application/json');toast('GeoJSON','ok')}
+function expKML(){if(!DEFS.length)return toast('No data','err');const pm=DEFS.map(d=>`<Placemark><n>${LBL[d.type]} #${d.rank} - ${d.road.replace(/&/g,'&amp;')}</n><description><![CDATA[${d.we?'WARRANT MET':'Monitor'}|FC:${d.fc}(${d.fcSource})|${d.spd}mph(${d.spdSrc})|${d.rec}]]></description><Point><coordinates>${d.lng},${d.lat},0</coordinates></Point></Placemark>`).join('\n');dl(`<?xml version="1.0"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>CRASH LENS v20</n>\n${pm}\n</Document></kml>`,'crash_lens.kml','application/vnd.google-earth.kml+xml');toast('KML','ok')}
+function expPDF(){if(!DEFS.length)return toast('No data','err');const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape'});let y=12;
+  doc.setFontSize(16);doc.setTextColor(30,64,175);doc.text('CRASH LENS v20 — Deficiency Report (MUTCD 11th Ed.)',14,y);y+=6;
+  doc.setFontSize(8);doc.setTextColor(100);doc.text(`${new Date().toLocaleDateString()} | ${DEFS.length} Candidates | ${DEFS.filter(d=>d.we).length} Warrant-Met | FC: HPMS-validated | Speed: R2-1 verified | EPDO (K=8500 A=850 B=170 C=35 O=1)`,14,y);y+=8;
+  doc.autoTable({startY:y,head:[['#','Type','Road','FC','Src','Spd','Qual','Sev','EPDO','W','Action']],
+    body:DEFS.slice(0,200).map(d=>[d.rank,LBL[d.type],d.road,d.fc||'—',d.fcSource||'',d.spd||'—',d.cnt,sl(d.sev),d.epdo,d.we?'MET':'Mon',buildAction(d).replace(/<[^>]+>/g,'').substring(0,60)]),
+    styles:{fontSize:5.5,cellPadding:1.2},headStyles:{fillColor:[30,64,175],fontSize:6},columnStyles:{10:{cellWidth:50}},margin:{left:14,right:14}});
+  doc.save('crash_lens_v20_report.pdf');toast('PDF','ok')}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',()=>{initMap()});
+</script>
+</body>
+</html>
