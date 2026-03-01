@@ -113,6 +113,10 @@ const CF_R2_ACCESS_KEY_ID = process.env.CF_R2_ACCESS_KEY_ID || '';
 const CF_R2_SECRET_ACCESS_KEY = process.env.CF_R2_SECRET_ACCESS_KEY || '';
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || 'crash-lens-data';
 
+// R2 Worker proxy configuration (secret stays server-side only)
+const R2_WORKER_URL = process.env.R2_WORKER_URL || '';
+const R2_WORKER_SECRET = process.env.R2_WORKER_SECRET || '';
+
 // CORS headers
 function getCorsHeaders(origin) {
     return {
@@ -521,6 +525,144 @@ const server = http.createServer((req, res) => {
                 });
         }).catch(err => {
             console.error(`[R2 Upload] Body error: ${err.message}`);
+            res.writeHead(413, corsHeaders);
+            res.end(JSON.stringify({ error: 'Request too large', message: err.message }));
+        });
+        return;
+    }
+
+    // ---- R2 Worker proxy: status check ----
+    if (req.url === '/r2/worker-status' && req.method === 'GET') {
+        const configured = !!(R2_WORKER_URL && R2_WORKER_SECRET);
+        res.writeHead(200, corsHeaders);
+        res.end(JSON.stringify({
+            configured,
+            workerUrl: configured ? R2_WORKER_URL.replace(/\/+$/, '') : null
+        }));
+        return;
+    }
+
+    // ---- R2 Worker proxy: list objects ----
+    if (req.url.startsWith('/r2/worker-list') && req.method === 'GET') {
+        if (!R2_WORKER_URL || !R2_WORKER_SECRET) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({
+                error: 'R2 Worker not configured',
+                message: 'Set R2_WORKER_URL and R2_WORKER_SECRET environment variables'
+            }));
+            return;
+        }
+
+        const parsed = url.parse(req.url, true);
+        const prefix = parsed.query.prefix || '';
+        const listUrl = `${R2_WORKER_URL.replace(/\/+$/, '')}/?list=1&prefix=${encodeURIComponent(prefix)}`;
+
+        console.log(`[R2 Worker] List request: prefix=${prefix}`);
+
+        const workerReq = https.get(listUrl, {
+            headers: { 'X-Upload-Secret': R2_WORKER_SECRET }
+        }, (workerRes) => {
+            let data = '';
+            workerRes.on('data', chunk => { data += chunk; });
+            workerRes.on('end', () => {
+                res.writeHead(workerRes.statusCode, corsHeaders);
+                res.end(data);
+            });
+        });
+        workerReq.on('error', (err) => {
+            console.error(`[R2 Worker] List error: ${err.message}`);
+            res.writeHead(502, corsHeaders);
+            res.end(JSON.stringify({ error: 'R2 Worker request failed', message: err.message }));
+        });
+        return;
+    }
+
+    // ---- R2 Worker proxy: upload file (PUT) ----
+    if (req.url.startsWith('/r2/worker-upload') && req.method === 'POST') {
+        if (!R2_WORKER_URL || !R2_WORKER_SECRET) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({
+                error: 'R2 Worker not configured',
+                message: 'Set R2_WORKER_URL and R2_WORKER_SECRET environment variables'
+            }));
+            return;
+        }
+
+        // Accept up to 200MB for CSV uploads
+        collectBody(req, 200 * 1024 * 1024).then(body => {
+            let payload;
+            try {
+                payload = JSON.parse(body);
+            } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { r2Key, data, contentType, bucket, backupMode } = payload;
+
+            if (!r2Key || !data) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Missing required fields: r2Key, data' }));
+                return;
+            }
+
+            const uploadUrl = `${R2_WORKER_URL.replace(/\/+$/, '')}/${r2Key}`;
+            const ct = contentType || 'text/csv';
+            const headers = {
+                'X-Upload-Secret': R2_WORKER_SECRET,
+                'Content-Type': ct,
+                'Content-Length': Buffer.byteLength(data)
+            };
+            if (bucket) headers['X-Bucket'] = bucket;
+            if (backupMode) headers['X-Backup-Mode'] = backupMode;
+
+            console.log(`[R2 Worker] Upload: ${r2Key} (${(Buffer.byteLength(data) / 1024).toFixed(1)} KB, type: ${ct})`);
+
+            const parsedUrl = new URL(uploadUrl);
+            const options = {
+                hostname: parsedUrl.hostname,
+                port: 443,
+                path: parsedUrl.pathname + parsedUrl.search,
+                method: 'PUT',
+                headers
+            };
+
+            const workerReq = https.request(options, (workerRes) => {
+                let responseData = '';
+                workerRes.on('data', chunk => { responseData += chunk; });
+                workerRes.on('end', () => {
+                    if (workerRes.statusCode >= 200 && workerRes.statusCode < 300) {
+                        console.log(`[R2 Worker] Upload success: ${r2Key}`);
+                        res.writeHead(200, corsHeaders);
+                        res.end(JSON.stringify({
+                            success: true,
+                            r2Key,
+                            size: Buffer.byteLength(data),
+                            uploadedAt: new Date().toISOString()
+                        }));
+                    } else {
+                        console.error(`[R2 Worker] Upload failed: HTTP ${workerRes.statusCode} - ${responseData}`);
+                        res.writeHead(workerRes.statusCode, corsHeaders);
+                        res.end(JSON.stringify({
+                            error: `R2 Worker returned HTTP ${workerRes.statusCode}`,
+                            message: responseData
+                        }));
+                    }
+                });
+            });
+
+            workerReq.on('error', (err) => {
+                console.error(`[R2 Worker] Upload error: ${err.message}`);
+                res.writeHead(502, corsHeaders);
+                res.end(JSON.stringify({ error: 'R2 Worker request failed', message: err.message }));
+            });
+
+            workerReq.write(data);
+            workerReq.end();
+
+        }).catch(err => {
+            console.error(`[R2 Worker] Body error: ${err.message}`);
             res.writeHead(413, corsHeaders);
             res.end(JSON.stringify({ error: 'Request too large', message: err.message }));
         });
@@ -1154,6 +1296,11 @@ server.listen(PORT, '127.0.0.1', () => {
         console.log(`[R2] Upload configured (bucket: ${R2_BUCKET_NAME})`);
     } else {
         console.warn('[R2] WARNING: R2 credentials not set - /r2 endpoints will return 503');
+    }
+    if (R2_WORKER_URL && R2_WORKER_SECRET) {
+        console.log(`[R2 Worker] Proxy configured (URL: ${R2_WORKER_URL})`);
+    } else {
+        console.warn('[R2 Worker] WARNING: R2_WORKER_URL or R2_WORKER_SECRET not set - /r2/worker-* endpoints will return 503');
     }
     if (STRIPE_SECRET_KEY) {
         console.log(`[Stripe] Payment processing configured`);

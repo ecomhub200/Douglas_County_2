@@ -513,12 +513,11 @@
             <!-- Sidebar -->
             <div class="sidebar">
                 <div class="card r2-card">
-                    <div class="card-header"><span class="card-title">☁️ R2 Storage</span><span class="badge badge-r2" id="r2Status">Not Set</span></div>
-                    <div style="margin-bottom:0.4rem"><label style="font-size:0.7rem;font-weight:600;color:var(--text-muted)">Worker URL</label><input type="text" id="r2WorkerUrl" placeholder="https://r2-upload.xxx.workers.dev" style="font-size:0.72rem"></div>
-                    <div style="margin-bottom:0.4rem"><label style="font-size:0.7rem;font-weight:600;color:var(--text-muted)">Secret</label><input type="password" id="r2Secret" placeholder="UPLOAD_SECRET" style="font-size:0.72rem"></div>
+                    <div class="card-header"><span class="card-title">☁️ R2 Storage</span><span class="badge badge-r2" id="r2Status">Checking...</span></div>
                     <div style="margin-bottom:0.4rem"><label style="font-size:0.7rem;font-weight:600;color:var(--text-muted)">Public URL</label><input type="text" id="r2PublicUrl" value="https://data.aicreatesai.com" style="font-size:0.72rem"></div>
                     <div style="display:flex;gap:0.3rem"><button class="btn btn-r2 btn-sm" onclick="testR2()">🔗 Test</button><button class="btn btn-ghost btn-sm" onclick="saveR2Config()">💾 Save</button></div>
                     <div class="r2-path" id="r2PathDisplay" style="display:none">📤 <span class="hl" id="r2PathText">—</span></div>
+                    <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.3rem">Upload secret managed server-side</div>
                 </div>
                 <div class="card results-panel" id="resultsPanel">
                     <div class="results-summary">
@@ -562,18 +561,33 @@
         const ALL_SPEEDS = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,90,100,110,120,130];
         ALL_SPEEDS.forEach(s => activeSpeedFilters[s] = true);
 
-        // R2 Storage
-        let r2Cfg = {workerUrl:'',secret:'',publicUrl:'https://data.aicreatesai.com'};
-        function loadR2Config(){try{const c=localStorage.getItem('r2cfg');if(c){r2Cfg=JSON.parse(c);document.getElementById('r2WorkerUrl').value=r2Cfg.workerUrl||'';document.getElementById('r2Secret').value=r2Cfg.secret||'';document.getElementById('r2PublicUrl').value=r2Cfg.publicUrl||'https://data.aicreatesai.com';if(r2Cfg.workerUrl)document.getElementById('r2Status').textContent='Saved';}}catch(e){}}
-        function saveR2Config(){r2Cfg={workerUrl:document.getElementById('r2WorkerUrl').value.trim().replace(/\/+$/,''),secret:document.getElementById('r2Secret').value.trim(),publicUrl:document.getElementById('r2PublicUrl').value.trim().replace(/\/+$/,'')};localStorage.setItem('r2cfg',JSON.stringify(r2Cfg));showToast('R2 saved','success');updateR2Path();}
-        async function testR2(){saveR2Config();if(!r2Cfg.workerUrl)return showToast('Set Worker URL','error');try{const r=await fetch(`${r2Cfg.workerUrl}/?list=1&prefix=`,{headers:{'X-Upload-Secret':r2Cfg.secret}});if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();document.getElementById('r2Status').className='badge badge-success';document.getElementById('r2Status').textContent='✓ Connected';const rb=document.getElementById('r2HeaderBadge');if(rb){rb.textContent='R2: ✓';rb.style.background='rgba(16,185,129,0.3)';}showToast(`R2 connected! ${d.files?.length||0} objects`,'success');}catch(e){document.getElementById('r2Status').className='badge badge-warning';document.getElementById('r2Status').textContent='Failed';showToast('R2: '+e.message,'error');}}
-        function updateR2Path(){if(!r2Cfg.workerUrl||!currentJurisdiction)return;const p=document.getElementById('r2PathDisplay');p.style.display='block';document.getElementById('r2PathText').textContent=`${currentJurisdiction.state}/${currentJurisdiction.folder}/traffic-inventory.csv`;}
+        // R2 Storage (config loaded from server, secret stays server-side)
+        let r2Cfg = {publicUrl:'https://data.aicreatesai.com', serverConfigured: false};
+
+        async function loadR2Config(){
+            // Load public URL from localStorage override if saved
+            try{
+                const c=localStorage.getItem('r2cfg');
+                if(c){const saved=JSON.parse(c);if(saved.publicUrl)r2Cfg.publicUrl=saved.publicUrl;document.getElementById('r2PublicUrl').value=r2Cfg.publicUrl;}
+            }catch(e){}
+            // Check server-side R2 Worker proxy status
+            try{
+                const r=await fetch('/api/r2/worker-status');
+                if(r.ok){const d=await r.json();r2Cfg.serverConfigured=d.configured;
+                    if(d.configured){document.getElementById('r2Status').className='badge badge-success';document.getElementById('r2Status').textContent='✓ Server Ready';}
+                    else{document.getElementById('r2Status').className='badge badge-warning';document.getElementById('r2Status').textContent='Not Configured';}
+                }
+            }catch(e){document.getElementById('r2Status').className='badge badge-r2';document.getElementById('r2Status').textContent='Server Offline';}
+        }
+        function saveR2Config(){r2Cfg.publicUrl=document.getElementById('r2PublicUrl').value.trim().replace(/\/+$/,'');localStorage.setItem('r2cfg',JSON.stringify({publicUrl:r2Cfg.publicUrl}));showToast('R2 config saved','success');updateR2Path();}
+        async function testR2(){saveR2Config();try{const r=await fetch('/api/r2/worker-list?prefix=');if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();r2Cfg.serverConfigured=true;document.getElementById('r2Status').className='badge badge-success';document.getElementById('r2Status').textContent='✓ Connected';const rb=document.getElementById('r2HeaderBadge');if(rb){rb.textContent='R2: ✓';rb.style.background='rgba(16,185,129,0.3)';}showToast(`R2 connected! ${d.files?.length||0} objects`,'success');}catch(e){document.getElementById('r2Status').className='badge badge-warning';document.getElementById('r2Status').textContent='Failed';showToast('R2: '+e.message,'error');}}
+        function updateR2Path(){if(!r2Cfg.serverConfigured||!currentJurisdiction)return;const p=document.getElementById('r2PathDisplay');p.style.display='block';document.getElementById('r2PathText').textContent=`${currentJurisdiction.state}/${currentJurisdiction.folder}/traffic-inventory.csv`;}
         async function uploadToR2(){
-            if(!allFeatures.length)return showToast('No data','error');if(!r2Cfg.workerUrl||!r2Cfg.secret)return showToast('Configure R2 first','error');if(!currentJurisdiction)return showToast('No jurisdiction','error');
+            if(!allFeatures.length)return showToast('No data','error');if(!r2Cfg.serverConfigured)return showToast('R2 not configured on server','error');if(!currentJurisdiction)return showToast('No jurisdiction','error');
             const csv=generateCSV();const key=`${currentJurisdiction.state}/${currentJurisdiction.folder}/traffic-inventory.csv`;
-            addLog(`☁️ Uploading: ${key}`,'r2');
-            try{const r=await fetch(`${r2Cfg.workerUrl}/${encodeURIComponent(key)}`,{method:'PUT',headers:{'Content-Type':'text/csv','X-Upload-Secret':r2Cfg.secret},body:csv});
-            if(!r.ok)throw new Error('HTTP '+r.status);addLog(`✅ Uploaded! ${r2Cfg.publicUrl}/${key}`,'success');showToast('Uploaded to R2!','success');}
+            addLog(`☁️ Uploading via server proxy: ${key}`,'r2');
+            try{const r=await fetch('/api/r2/worker-upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({r2Key:key,data:csv,contentType:'text/csv'})});
+            if(!r.ok){const err=await r.json().catch(()=>({}));throw new Error(err.message||'HTTP '+r.status);}addLog(`✅ Uploaded! ${r2Cfg.publicUrl}/${key}`,'success');showToast('Uploaded to R2!','success');}
             catch(e){addLog('Upload failed: '+e.message,'error');showToast('Upload failed','error');}
         }
 
