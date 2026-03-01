@@ -757,7 +757,7 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
       <span>CRASH LENS</span>
     </div>
     <span class="badge badge-blue">Data Validator v3.0</span>
-    <span class="badge badge-purple" id="envBadge">Henrico County, VA</span>
+    <span class="badge badge-purple" id="envBadge">Select Jurisdiction</span>
   </div>
   <div class="topbar-right">
     <span style="font-size:12px;color:var(--text-muted)" class="mono" id="lastValidated">—</span>
@@ -813,7 +813,7 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
             <select class="form-input" id="jurisdictionPreset" onchange="applyJurisdictionPreset()">
               <option value="">— Choose Jurisdiction —</option>
               <optgroup label="Virginia">
-                <option value="va_henrico" selected>Virginia — Henrico County</option>
+                <option value="va_henrico">Virginia — Henrico County</option>
                 <option value="va_chesterfield">Virginia — Chesterfield County</option>
                 <option value="va_hanover">Virginia — Hanover County</option>
                 <option value="va_richmond">Virginia — City of Richmond</option>
@@ -833,11 +833,11 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
           </div>
           <div class="form-group">
             <label class="form-label">State</label>
-            <input class="form-input" id="jurisdState" value="virginia" placeholder="e.g., virginia">
+            <input class="form-input" id="jurisdState" value="" placeholder="e.g., virginia">
           </div>
           <div class="form-group">
             <label class="form-label">County / City</label>
-            <input class="form-input" id="jurisdCounty" value="henrico" placeholder="e.g., henrico">
+            <input class="form-input" id="jurisdCounty" value="" placeholder="e.g., henrico">
           </div>
         </div>
       </div>
@@ -882,7 +882,7 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
         </div>
         <div class="config-row" style="padding:8px 12px;background:rgba(59,130,246,0.05);border-radius:6px;border:1px solid rgba(59,130,246,0.15);">
           <div style="font-size:12px;color:var(--text-secondary);">
-            <strong>🤖 Auto-Run URL:</strong> <code class="mono" style="font-size:11px;color:var(--accent-blue);word-break:break-all;" id="autoRunUrl">?auto=true&jurisdiction=va_henrico&file=all&apikey=YOUR_SECRET</code>
+            <strong>🤖 Auto-Run URL:</strong> <code class="mono" style="font-size:11px;color:var(--accent-blue);word-break:break-all;" id="autoRunUrl">?auto=true&jurisdiction=co_douglas&file=all&apikey=YOUR_SECRET</code>
             <div style="margin-top:4px;color:var(--text-muted);">Trigger from cron, Cloudflare Worker, or bookmark. Runs pipeline → auto-pushes corrected data to R2.</div>
           </div>
         </div>
@@ -898,7 +898,7 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
           </div>
           <div class="r2-field">
             <label>Data Path</label>
-            <input type="text" id="r2Path" value="/virginia/henrico/" />
+            <input type="text" id="r2Path" value="" placeholder="/state/county/" />
           </div>
           <div class="r2-field">
             <label>Upload Status</label>
@@ -1204,11 +1204,11 @@ const APP = {
 
   // Config
   config: {
-    bounds: { minLat: 37.45, maxLat: 37.72, minLon: -77.70, maxLon: -77.25 },
+    bounds: null,    // Set dynamically from jurisdiction selection or parent sync
     nominatimDelay: 1100,
     maxGeoBatch: 50,
     r2ReadUrl: 'https://data.aicreatesai.com',
-    r2Path: '/virginia/henrico/',
+    r2Path: '',      // Set dynamically — no hardcoded default
     r2ServerConfigured: false,
     criticalFields: ['Crash Severity','Collision Type','Weather Condition','Light Condition',
                      'Roadway Surface Condition','Functional Class','x','y'],
@@ -1294,7 +1294,7 @@ function selectFile(key) {
 
 async function runAutonomousPipeline(key) {
   const startTime = Date.now();
-  
+
   try {
     // ── Sync jurisdiction to R2 path ──
     const state = document.getElementById('jurisdState').value.trim();
@@ -1302,6 +1302,10 @@ async function runAutonomousPipeline(key) {
     if (state && county) {
       APP.config.r2Path = `/${state}/${county}/`;
       document.getElementById('r2Path').value = APP.config.r2Path;
+    }
+    if (!APP.config.r2Path) {
+      toast('Please select a jurisdiction before running the pipeline', 'error');
+      return;
     }
     
     // ── Phase 1: Load ──
@@ -1361,6 +1365,10 @@ async function runAutonomousPipeline(key) {
 }
 
 async function loadFile(key) {
+  if (!APP.config.r2Path) {
+    toast('Please select a jurisdiction first', 'error');
+    return;
+  }
   const info = APP.fileMap[key];
   const url = APP.config.r2ReadUrl + APP.config.r2Path + info.file;
   const statusEl = document.getElementById(info.statusId);
@@ -1448,6 +1456,10 @@ function parseCSVStreaming(text, filename) {
 }
 
 async function loadAllFiles() {
+  if (!APP.config.r2Path) {
+    toast('Please select a jurisdiction first', 'error');
+    return;
+  }
   for (const key of Object.keys(APP.fileMap)) {
     await loadFile(key);
   }
@@ -1544,13 +1556,14 @@ async function runValidation() {
   if (document.getElementById('vBounds').checked) {
     log(logEl, 'Checking coordinate bounds...', 'info');
     let outCount = 0;
+    const boundsCheck = APP.config.bounds; // null if no bounds configured — skip OOB check
     for (let i = 0; i < total; i++) {
       const row = data.rows[i];
       const x = parseFloat(getX(row));
       const y = parseFloat(getY(row));
-      if (!isNaN(x) && !isNaN(y)) {
-        if (y < APP.config.bounds.minLat || y > APP.config.bounds.maxLat ||
-            x < APP.config.bounds.minLon || x > APP.config.bounds.maxLon) {
+      if (!isNaN(x) && !isNaN(y) && boundsCheck) {
+        if (y < boundsCheck.minLat || y > boundsCheck.maxLat ||
+            x < boundsCheck.minLon || x > boundsCheck.maxLon) {
           APP.issues.push({
             idx: i, docNbr: getDoc(row), type: 'bounds', severity: 'error',
             field: 'coordinates', message: 'Coordinates outside county bounds',
@@ -1874,12 +1887,13 @@ async function runAutoCorrect() {
   const routeCoords = {};
   const bounds = APP.config.bounds;
   // Use slightly expanded bounds for route index (catch edge cases)
-  const idxBounds = {
+  // If bounds not configured (jurisdiction without bbox), use very wide bounds
+  const idxBounds = bounds ? {
     minLat: bounds.minLat - 0.05,
     maxLat: bounds.maxLat + 0.05,
     minLon: bounds.minLon - 0.05,
     maxLon: bounds.maxLon + 0.05,
-  };
+  } : { minLat: -90, maxLat: 90, minLon: -180, maxLon: 180 };
 
   let indexedRecords = 0, skippedNoRoute = 0, skippedNoCoords = 0, skippedOOB = 0;
 
@@ -2363,9 +2377,10 @@ async function geocodeAddress(address) {
     const lat = parseFloat(data[0].lat);
     const lon = parseFloat(data[0].lon);
     // Validate result is roughly in configured bounds (with 0.5° margin)
+    // If no bounds configured, accept any valid US coordinate
     const b = APP.config.bounds;
-    if (lat > (b.minLat - 0.5) && lat < (b.maxLat + 0.5) && 
-        lon > (b.minLon - 0.5) && lon < (b.maxLon + 0.5)) {
+    if (!b || (lat > (b.minLat - 0.5) && lat < (b.maxLat + 0.5) &&
+        lon > (b.minLon - 0.5) && lon < (b.maxLon + 0.5))) {
       return { lat, lon };
     }
   }
@@ -2945,6 +2960,7 @@ function closeSettingsModal(e) {
 }
 
 function saveSettings() {
+  if (!APP.config.bounds) APP.config.bounds = {};
   APP.config.bounds.minLat = parseFloat(document.getElementById('setMinLat').value);
   APP.config.bounds.maxLat = parseFloat(document.getElementById('setMaxLat').value);
   APP.config.bounds.minLon = parseFloat(document.getElementById('setMinLon').value);
@@ -3013,11 +3029,20 @@ function autoDetectBounds() {
   
   // Apply with small margin
   const margin = 0.005; // ~500m
-  document.getElementById('setMinLat').value = (minLat - margin).toFixed(4);
-  document.getElementById('setMaxLat').value = (maxLat + margin).toFixed(4);
-  document.getElementById('setMinLon').value = (minLon - margin).toFixed(4);
-  document.getElementById('setMaxLon').value = (maxLon + margin).toFixed(4);
-  
+  const detected = {
+    minLat: parseFloat((minLat - margin).toFixed(4)),
+    maxLat: parseFloat((maxLat + margin).toFixed(4)),
+    minLon: parseFloat((minLon - margin).toFixed(4)),
+    maxLon: parseFloat((maxLon + margin).toFixed(4)),
+  };
+  document.getElementById('setMinLat').value = detected.minLat;
+  document.getElementById('setMaxLat').value = detected.maxLat;
+  document.getElementById('setMinLon').value = detected.minLon;
+  document.getElementById('setMaxLon').value = detected.maxLon;
+
+  // Also update APP.config.bounds so validation uses detected bounds immediately
+  APP.config.bounds = detected;
+
   statusEl.textContent = `✅ Detected from ${xs.length.toLocaleString()} records (P2-P98)`;
   toast(`Auto-detected bounds: ${minLat.toFixed(3)}–${maxLat.toFixed(3)}°N, ${minLon.toFixed(3)}–${maxLon.toFixed(3)}°W`, 'success');
 }
@@ -3182,19 +3207,27 @@ window.addEventListener('message', function(evt) {
 
     // Fallback: use dynamic config from parent for jurisdictions not in presets
     const fb = evt.data.fallback;
-    if (fb && fb.state && fb.county && fb.bounds) {
+    if (fb && fb.state && fb.county) {
       document.getElementById('jurisdState').value = fb.state;
       document.getElementById('jurisdCounty').value = fb.county;
-      APP.config.bounds = { ...fb.bounds };
       APP.config.r2Path = '/' + fb.state + '/' + fb.county + '/';
       document.getElementById('r2Path').value = APP.config.r2Path;
-      const fields = { setMinLat: fb.bounds.minLat, setMaxLat: fb.bounds.maxLat, setMinLon: fb.bounds.minLon, setMaxLon: fb.bounds.maxLon };
-      for (const [id, val] of Object.entries(fields)) {
-        const el = document.getElementById(id);
-        if (el) el.value = val;
+
+      // Apply bounds if provided (optional — some jurisdictions lack bbox data)
+      if (fb.bounds) {
+        APP.config.bounds = { ...fb.bounds };
+        const fields = { setMinLat: fb.bounds.minLat, setMaxLat: fb.bounds.maxLat, setMinLon: fb.bounds.minLon, setMaxLon: fb.bounds.maxLon };
+        for (const [id, val] of Object.entries(fields)) {
+          const el = document.getElementById(id);
+          if (el) el.value = val;
+        }
       }
-      document.getElementById('envBadge').textContent =
-        fb.county.charAt(0).toUpperCase() + fb.county.slice(1) + ' County, ' + fb.state.toUpperCase();
+
+      // Use label from parent if available, otherwise build from state/county
+      const displayLabel = fb.label ||
+        (fb.county.charAt(0).toUpperCase() + fb.county.slice(1) + ' County, ' + fb.state.toUpperCase());
+      document.getElementById('envBadge').textContent = displayLabel;
+
       const preset = document.getElementById('jurisdictionPreset');
       if (preset) preset.value = '';
 
@@ -3211,7 +3244,7 @@ window.addEventListener('message', function(evt) {
       });
       document.getElementById('btnToStep2').disabled = true;
 
-      toast(`Switched to ${fb.county.charAt(0).toUpperCase() + fb.county.slice(1)} County, ${fb.state.toUpperCase()} — click a file to start`, 'info');
+      toast(`Switched to ${displayLabel} — click a file to start`, 'info');
 
       // Navigate back to step 1
       goToStep(1);
