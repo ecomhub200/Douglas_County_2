@@ -42,6 +42,9 @@ COPY logi[n]/ /usr/share/nginx/html/login/
 # Copy Firebase auth action handler (for email verification/password reset links)
 COPY __/ /usr/share/nginx/html/__/
 
+# Copy scripts directory (HTML tools - validator, Mapillary downloader)
+COPY scripts/ /usr/share/nginx/html/scripts/
+
 # Copy entrypoint script (generates api-keys.json from env vars)
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
