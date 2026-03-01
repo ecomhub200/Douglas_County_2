@@ -4,7 +4,8 @@
 .github
 
 # Python scripts (not needed in runtime container)
-scripts/
+scripts/*
+!scripts/*.html
 requirements.txt
 *.py
 

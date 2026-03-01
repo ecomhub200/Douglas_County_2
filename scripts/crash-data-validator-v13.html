@@ -734,7 +734,7 @@ select.form-input {
 
 /* Embedded mode — hide redundant UI when loaded inside parent app iframe */
 body.embedded .topbar { display: none; }
-body.embedded .stepper { display: none; }
+
 body.embedded .config-section { display: none; }
 body.embedded .container { padding-top: 12px; }
 </style>
@@ -3087,6 +3087,9 @@ function applyJurisdictionPreset() {
   // Update auto-run URL display
   const urlEl = document.getElementById('autoRunUrl');
   if (urlEl) urlEl.textContent = `?auto=true&jurisdiction=${sel}&file=all&apikey=YOUR_SECRET`;
+
+  // Navigate back to step 1 so user starts fresh with new jurisdiction
+  goToStep(1);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3174,6 +3177,25 @@ window.addEventListener('message', function(evt) {
         fb.county.charAt(0).toUpperCase() + fb.county.slice(1) + ' County, ' + fb.state.toUpperCase();
       const preset = document.getElementById('jurisdictionPreset');
       if (preset) preset.value = '';
+
+      // Reset loaded data since jurisdiction changed (matches applyJurisdictionPreset logic)
+      APP.files = {};
+      APP.issues = [];
+      APP.corrections = {};
+      APP.activeFile = null;
+      document.querySelectorAll('.file-card').forEach(c => {
+        c.classList.remove('selected', 'loaded');
+      });
+      document.querySelectorAll('.file-card-status').forEach(s => {
+        s.innerHTML = '';
+      });
+      document.getElementById('btnToStep2').disabled = true;
+
+      toast(`Switched to ${fb.county.charAt(0).toUpperCase() + fb.county.slice(1)} County, ${fb.state.toUpperCase()} — click a file to start`, 'info');
+
+      // Navigate back to step 1
+      goToStep(1);
+
       console.log('[Validator] Jurisdiction set via fallback config:', fb.state, fb.county);
     }
   }
