@@ -66,6 +66,11 @@
         "#8b5cf6",
         "#ec4899"
       ]
+    },
+    "r2Worker": {
+      "workerUrl": "https://r2-upload.ecomhub200.workers.dev",
+      "publicUrl": "https://data.aicreatesai.com",
+      "_comment": "R2 Worker upload secret is server-side only (R2_WORKER_SECRET env var). Never expose in client config."
     }
   },
   "jurisdictions": {

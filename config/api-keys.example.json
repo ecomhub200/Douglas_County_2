@@ -9,5 +9,10 @@
   "google": {
     "mapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE",
     "_help": "Get your key at https://console.cloud.google.com/apis/credentials"
+  },
+  "r2Worker": {
+    "workerUrl": "https://r2-upload.YOUR_SUBDOMAIN.workers.dev",
+    "publicUrl": "https://data.aicreatesai.com",
+    "_help": "Worker URL and public URL only. Upload secret (R2_WORKER_SECRET) stays server-side as env var."
   }
 }

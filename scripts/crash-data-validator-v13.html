@@ -890,23 +890,20 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
 
       <!-- R2 Configuration -->
       <div class="config-section">
-        <div class="config-title">☁️ R2 Worker Configuration</div>
+        <div class="config-title">☁️ R2 Storage Configuration</div>
         <div class="r2-config">
           <div class="r2-field">
             <label>Read URL (R2 Public)</label>
             <input type="text" id="r2ReadUrl" value="https://data.aicreatesai.com" />
           </div>
           <div class="r2-field">
-            <label>Write URL (Worker)</label>
-            <input type="text" id="r2WriteUrl" value="https://r2-upload.ecomhub200.workers.dev" />
-          </div>
-          <div class="r2-field">
             <label>Data Path</label>
             <input type="text" id="r2Path" value="/virginia/henrico/" />
           </div>
           <div class="r2-field">
-            <label>Upload Secret (X-Upload-Secret)</label>
-            <input type="password" id="r2ApiKey" placeholder="Enter R2 worker upload secret..." />
+            <label>Upload Status</label>
+            <div id="r2WorkerStatus" style="padding:6px 10px;border-radius:6px;font-size:0.85rem;background:#f1f5f9;color:#64748b">Checking server...</div>
+            <div style="font-size:0.72rem;color:#94a3b8;margin-top:4px">Upload secret is managed server-side for security</div>
           </div>
         </div>
       </div>
@@ -1211,8 +1208,8 @@ const APP = {
     nominatimDelay: 1100,
     maxGeoBatch: 50,
     r2ReadUrl: 'https://data.aicreatesai.com',
-    r2WriteUrl: 'https://r2-upload.ecomhub200.workers.dev',
     r2Path: '/virginia/henrico/',
+    r2ServerConfigured: false,
     criticalFields: ['Crash Severity','Collision Type','Weather Condition','Light Condition',
                      'Roadway Surface Condition','Functional Class','x','y'],
   },
@@ -1329,8 +1326,7 @@ async function runAutonomousPipeline(key) {
     }
 
     // ── Phase 4: Auto-Push to R2 ──
-    const apiKey = document.getElementById('r2ApiKey').value;
-    if (apiKey) {
+    if (APP.config.r2ServerConfigured) {
       await new Promise(r => setTimeout(r, 200));
       await pushToR2();
     }
@@ -1338,23 +1334,23 @@ async function runAutonomousPipeline(key) {
     // ── Phase 5: Show Results ──
     await new Promise(r => setTimeout(r, 200));
     goToStep(5);
-    
+
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     const actionable = APP.issues.filter(i => i.severity !== 'info');
     const fixed = actionable.filter(i => i.fixed).length;
     const remaining = actionable.filter(i => !i.fixed).length;
     const pct = actionable.length > 0 ? ((fixed / actionable.length) * 100).toFixed(1) : 100;
-    
-    const pushMsg = apiKey ? ' → pushed to R2' : '';
+
+    const pushMsg = APP.config.r2ServerConfigured ? ' → pushed to R2' : '';
     toast(`✅ Pipeline complete in ${elapsed}s — ${pct}% fix rate (${remaining} remaining)${pushMsg}`, 'success');
-    
+
     // Update auto-push status
     const statusEl = document.getElementById('autoPushStatus');
     if (statusEl) {
-      if (apiKey) {
+      if (APP.config.r2ServerConfigured) {
         statusEl.innerHTML = `<span style="color:var(--accent-green);">✅ Auto-pushed corrected data + ledger to R2 at ${new Date().toLocaleTimeString()}</span>`;
       } else {
-        statusEl.innerHTML = `<span style="color:var(--accent-orange);">⚠️ Add R2 Upload Secret in Step 1 to enable auto-push</span>`;
+        statusEl.innerHTML = `<span style="color:var(--accent-orange);">⚠️ R2 Worker not configured on server — auto-push disabled</span>`;
       }
     }
     
@@ -2798,17 +2794,16 @@ function downloadFile(content, filename, mimeType) {
 // ─── Push to R2 ───
 async function pushToR2() {
   if (!APP.activeFile || !APP.files[APP.activeFile]) return;
-  
-  const apiKey = document.getElementById('r2ApiKey').value;
-  if (!apiKey) {
-    toast('Enter R2 Upload Secret in settings (Step 1)', 'error');
+
+  if (!APP.config.r2ServerConfigured) {
+    toast('R2 upload not configured on server. Set R2_WORKER_URL and R2_WORKER_SECRET env vars.', 'error');
     return;
   }
 
   const data = APP.files[APP.activeFile];
-  const writeUrl = document.getElementById('r2WriteUrl').value;
   const path = document.getElementById('r2Path').value;
   const filename = data.filename;
+  const r2Key = (path + filename).replace(/^\/+/, '');
 
   const btnEl = document.getElementById('btnPushR2');
   if (btnEl) {
@@ -2817,28 +2812,32 @@ async function pushToR2() {
   }
 
   try {
-    // 1. Push corrected CSV
-    toast('Pushing corrected data to R2...', 'info');
+    // 1. Push corrected CSV via server proxy
+    toast('Pushing corrected data to R2 via server...', 'info');
     const csv = generateCSV(data.headers, data.rows);
-    
-    const resp = await fetch(`${writeUrl}${path}${filename}`, {
-      method: 'PUT',
-      headers: {
-        'X-Upload-Secret': apiKey,
-        'X-Bucket': 'CRASH_DATA',
-        'X-Backup-Mode': 'skip',  // Skip full CSV backup — ledger serves as backup
-        'Content-Type': 'text/csv',
-      },
-      body: csv,
+
+    const resp = await fetch('/api/r2/worker-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        r2Key: r2Key,
+        data: csv,
+        contentType: 'text/csv',
+        bucket: 'CRASH_DATA',
+        backupMode: 'skip'
+      }),
     });
 
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.message || `HTTP ${resp.status}`);
+    }
 
     // 2. Save corrections ledger (serves as lightweight backup)
-    await saveLedgerToR2(apiKey);
-    
+    await saveLedgerToR2();
+
     // 3. Save validation report (lightweight summary, ~2KB)
-    await saveValidationReport(apiKey);
+    await saveValidationReport();
 
     toast('✓ Successfully pushed corrected data + ledger to R2!', 'success');
   } catch (err) {
@@ -2851,15 +2850,15 @@ async function pushToR2() {
   }
 }
 
-async function saveValidationReport(apiKey) {
-  if (!apiKey || !APP.activeFile) return;
-  const writeUrl = document.getElementById('r2WriteUrl').value;
+async function saveValidationReport() {
+  if (!APP.config.r2ServerConfigured || !APP.activeFile) return;
   const path = document.getElementById('r2Path').value;
-  
+  const r2Key = (path + `validation_report_${APP.activeFile}.json`).replace(/^\/+/, '');
+
   const actionable = APP.issues.filter(i => i.severity !== 'info');
   const fixed = actionable.filter(i => i.fixed).length;
   const remaining = actionable.filter(i => !i.fixed).length;
-  
+
   const report = {
     timestamp: new Date().toISOString(),
     file: APP.files[APP.activeFile].filename,
@@ -2874,22 +2873,26 @@ async function saveValidationReport(apiKey) {
   };
 
   try {
-    await fetch(`${writeUrl}${path}validation_report_${APP.activeFile}.json`, {
-      method: 'PUT',
-      headers: { 'X-Upload-Secret': apiKey, 'X-Bucket': 'CRASH_DATA', 'Content-Type': 'application/json' },
-      body: JSON.stringify(report, null, 2),
+    await fetch('/api/r2/worker-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        r2Key: r2Key,
+        data: JSON.stringify(report, null, 2),
+        contentType: 'application/json',
+        bucket: 'CRASH_DATA'
+      }),
     });
   } catch (err) {
     console.warn('Validation report save failed:', err);
   }
 }
 
-async function saveLedgerToR2(apiKey) {
-  if (!apiKey) apiKey = document.getElementById('r2ApiKey').value;
-  if (!apiKey || !APP.activeFile) return;
+async function saveLedgerToR2() {
+  if (!APP.config.r2ServerConfigured || !APP.activeFile) return;
 
-  const writeUrl = document.getElementById('r2WriteUrl').value;
   const path = document.getElementById('r2Path').value;
+  const r2Key = (path + `corrections_ledger_${APP.activeFile}.json`).replace(/^\/+/, '');
   const ledger = {
     version: 2,
     file: APP.files[APP.activeFile].filename,
@@ -2899,14 +2902,15 @@ async function saveLedgerToR2(apiKey) {
   };
 
   try {
-    await fetch(`${writeUrl}${path}corrections_ledger_${APP.activeFile}.json`, {
-      method: 'PUT',
-      headers: {
-        'X-Upload-Secret': apiKey,
-        'X-Bucket': 'CRASH_DATA',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(ledger),
+    await fetch('/api/r2/worker-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        r2Key: r2Key,
+        data: JSON.stringify(ledger),
+        contentType: 'application/json',
+        bucket: 'CRASH_DATA'
+      }),
     });
     toast('Corrections ledger saved to R2', 'success');
   } catch (err) {
@@ -2915,16 +2919,15 @@ async function saveLedgerToR2(apiKey) {
 }
 
 async function saveLedger() {
-  const apiKey = document.getElementById('r2ApiKey').value;
-  if (!apiKey) {
-    toast('Enter your R2 Upload Secret in Step 1 to save ledger to R2', 'warning');
+  if (!APP.config.r2ServerConfigured) {
+    toast('R2 upload not configured on server', 'warning');
     return;
   }
   if (!APP.activeFile) {
     toast('No active file', 'warning');
     return;
   }
-  await saveLedgerToR2(apiKey);
+  await saveLedgerToR2();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3098,26 +3101,43 @@ function applyJurisdictionPreset() {
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('lastValidated').textContent = 'Ready';
-  
+
+  // ── Check R2 Worker server proxy status ──
+  (async function checkR2Status() {
+    const statusEl = document.getElementById('r2WorkerStatus');
+    try {
+      const r = await fetch('/api/r2/worker-status');
+      if (r.ok) {
+        const d = await r.json();
+        APP.config.r2ServerConfigured = d.configured;
+        if (d.configured) {
+          statusEl.innerHTML = '<span style="color:#16a34a;font-weight:600">✓ Server Ready</span> — uploads will be proxied securely';
+          statusEl.style.background = '#f0fdf4';
+        } else {
+          statusEl.innerHTML = '<span style="color:#d97706;font-weight:600">⚠ Not Configured</span> — set R2_WORKER_URL & R2_WORKER_SECRET in Coolify';
+          statusEl.style.background = '#fffbeb';
+        }
+      }
+    } catch (e) {
+      statusEl.innerHTML = '<span style="color:#dc2626;font-weight:600">✗ Server Offline</span> — R2 uploads unavailable';
+      statusEl.style.background = '#fef2f2';
+    }
+  })();
+
   // ── URL Parameter Automation ──
-  // Usage: ?auto=true&jurisdiction=va_henrico&file=all_roads&apikey=YOUR_SECRET
-  // Or run all 3 files: ?auto=true&jurisdiction=va_henrico&file=all&apikey=YOUR_SECRET
+  // Usage: ?auto=true&jurisdiction=va_henrico&file=all_roads
+  // Or run all 3 files: ?auto=true&jurisdiction=va_henrico&file=all
+  // R2 upload secret is managed server-side (no apikey parameter needed)
   const params = new URLSearchParams(window.location.search);
-  
+
   if (params.get('auto') === 'true') {
     const jurisdiction = params.get('jurisdiction');
-    const apiKey = params.get('apikey');
     const fileParam = params.get('file') || 'all_roads';
-    
+
     // Apply jurisdiction
     if (jurisdiction) {
       document.getElementById('jurisdictionPreset').value = jurisdiction;
       applyJurisdictionPreset();
-    }
-    
-    // Set API key for auto-push
-    if (apiKey) {
-      document.getElementById('r2ApiKey').value = apiKey;
     }
     
     // Auto-start pipeline after small delay for DOM
