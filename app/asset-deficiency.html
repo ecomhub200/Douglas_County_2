@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CRASH LENS — Sign & Signal Deficiency v20</title>
+<title>CRASH LENS — Asset Deficiency</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9/dist/leaflet.js"></script>
@@ -152,7 +152,7 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
 <body>
 <div class="toast-c" id="tc"></div>
 <header class="app-h"><div class="hi">
-  <div class="hb"><div class="hl">CL</div><div><h1>CRASH LENS — Sign &amp; Signal Deficiency v20</h1><small>MUTCD 11th Ed. • HPMS Cross-Validated FC • R2-1 Speed • BTS Enriched</small></div></div>
+  <div class="hb"><div class="hl">CL</div><div><h1>Asset Deficiency — MUTCD Screening</h1><small>MUTCD 11th Ed. • HPMS Cross-Validated FC • R2-1 Speed • BTS Enriched</small></div></div>
   <div class="hp"><span class="hpi" id="pD">📋 No Data</span><span class="hpi" id="pC">🔍 0</span><span class="hpi" id="pS">Ready</span></div>
 </div></header>
 
@@ -163,10 +163,10 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
 <div class="input-grid">
 <div>
   <!-- DATA SOURCES -->
-  <div class="card"><div class="ch"><span class="ct">☁️ Data Sources</span><span class="badge b-bl">Virginia Roads + R2</span></div>
+  <div class="card" id="dataSourcesCard"><div class="ch"><span class="ct">☁️ Data Sources</span><span class="badge b-bl">Crash &amp; Inventory Data</span></div>
     <div class="fg">
-      <div><label class="fl">Crash Data CSV</label><div class="row"><input id="uCr" value="https://data.aicreatesai.com/virginia/henrico/all_roads.csv"><button class="btn btn-p btn-sm" onclick="loadUrl('crash')">Load</button></div></div>
-      <div><label class="fl">Traffic Inventory CSV</label><div class="row"><input id="uIn" value="https://data.aicreatesai.com/virginia/henrico/traffic-inventory.csv"><button class="btn btn-p btn-sm" onclick="loadUrl('inv')">Load</button></div></div>
+      <div><label class="fl">Crash Data CSV</label><div class="row"><input id="uCr" value="" placeholder="R2 crash data URL"><button class="btn btn-p btn-sm" onclick="loadUrl('crash')">Load</button></div></div>
+      <div><label class="fl">Traffic Inventory CSV</label><div class="row"><input id="uIn" value="" placeholder="R2 inventory URL"><button class="btn btn-p btn-sm" onclick="loadUrl('inv')">Load</button></div></div>
     </div>
     <div style="margin-top:.3rem;display:flex;gap:.3rem;flex-wrap:wrap">
       <button class="btn btn-p" onclick="loadBoth()">⬇️ Load Both</button>
@@ -179,9 +179,9 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
   </div>
 
   <!-- ENRICHMENT -->
-  <div class="card"><div class="ch"><span class="ct">🛰️ Enrichment</span><span class="badge b-pp">Federal APIs</span></div>
+  <div class="card" id="enrichCard"><div class="ch"><span class="ct">🛰️ Enrichment</span><span class="badge b-pp">Federal APIs</span></div>
     <div class="fg" style="margin-top:0">
-      <div><label class="fl">County FIPS</label><input id="cFips" value="51087" placeholder="51087"></div>
+      <div><label class="fl">County FIPS</label><input id="cFips" value="" placeholder="5-digit FIPS"></div>
       <div><label class="fl">School Radius</label><select id="cSchR"><option value="500">500 ft</option><option value="750">750 ft</option><option value="1000" selected>1000 ft</option><option value="1320">1320 ft</option></select></div>
     </div>
     <div style="margin-top:.3rem;display:flex;gap:.3rem;flex-wrap:wrap">
@@ -206,10 +206,12 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
   <!-- CONFIG -->
   <div class="card"><div class="ch"><span class="ct">⚙️ Configuration</span></div>
     <div class="fg">
+      <div id="cfgFipsWrap" style="display:none"><label class="fl">County FIPS</label><input id="cFips2" value="" placeholder="5-digit FIPS"></div>
       <div><label class="fl">Proximity Radius</label><select id="cR"><option value="150">150 ft</option><option value="250" selected>250 ft</option><option value="500">500 ft</option></select></div>
       <div><label class="fl">Area Type</label><select id="cArea"><option value="urban" selected>Urban</option><option value="rural">Rural</option></select></div>
       <div><label class="fl">N/D Ratio Threshold</label><input type="number" id="cNDR" value="1.5" step="0.1" min="0.5" max="5"></div>
       <div><label class="fl">Min Qualifying Crashes</label><select id="cMin"><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option></select></div>
+      <div id="cfgSchoolWrap" style="display:none"><label class="fl">School Radius</label><select id="cSchR2"><option value="500">500 ft</option><option value="750">750 ft</option><option value="1000" selected>1000 ft</option><option value="1320">1320 ft</option></select></div>
     </div>
     <div class="ib"><b>FC Gate:</b> FC1/2 excluded from signal/stop/crosswalk/school/ped/bike (§4A.02 limited access).</div>
     <div class="ib"><b>Speed Gate:</b> R2-1 posted speed → device selection. ≥50 mph no AWS. RRFB vs PHB vs signal per FHWA.</div>
@@ -283,7 +285,7 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
   </div>
   <div class="tbl-footer">
     <span id="tblCount"></span>
-    <span style="font-size:.52rem"><b>Ranked by EPDO</b> (K=8500 A=850 B=170 C=35 O=1). §4B.03/§2B.12: Warrant met ≠ required. P.E. certification required.</span>
+    <span id="epdoFooter" style="font-size:.52rem"><b>Ranked by EPDO</b> (K=<span class="epdo-k">462</span> A=<span class="epdo-a">62</span> B=<span class="epdo-b">12</span> C=<span class="epdo-c">5</span> O=<span class="epdo-o">1</span>). §4B.03/§2B.12: Warrant met ≠ required. P.E. certification required.</span>
   </div>
 </div>
 
@@ -304,7 +306,7 @@ const ICO={signal:'🚦',stop:'🛑',streetlight:'💡',crosswalk:'🚶',school:
 const LBL={signal:'Signal W7',stop:'Stop AWS-A',streetlight:'Lighting',crosswalk:'Crosswalk',school:'School Zone',animal:'Animal',bike:'Bicycle',ped:'Pedestrian',railroad:'Railroad Xing',bridge:'Bridge',speed:'Speed',headon:'Head-On',rearend:'Rear-End',departure:'Departure'};
 const W7={urban:{yr1:{leg4:{all:5,fi:3},leg3:{all:4,fi:3}},yr3:{leg4:{all:6,fi:4},leg3:{all:5,fi:4}}},rural_1x1:{yr1:{leg4:{all:4,fi:3},leg3:{all:3,fi:3}},yr3:{leg4:{all:6,fi:4},leg3:{all:5,fi:4}}},rural_2plus:{yr1:{leg4:{all:10,fi:6},leg3:{all:9,fi:6}},yr3:{leg4:{all:16,fi:9},leg3:{all:13,fi:9}}}};
 const WSA={leg4:{mo12:5,mo36:6},leg3:{mo12:4,mo36:5}};
-const SEV={K:8500,A:850,B:170,C:35,O:1};
+let SEV={K:462,A:62,B:12,C:5,O:1};
 const FC_EX=['1','2'];const FC_PED_EX=['1','2'];
 const FC_LABELS={1:'Interstate',2:'Freeway/Expwy',3:'Princ. Arterial',4:'Minor Arterial',5:'Major Collector',6:'Minor Collector',7:'Local'};
 function pFC(f){const m=(f||'').match(/^(\d)/);return m?m[1]:null}
@@ -328,7 +330,7 @@ function tr(cc){const m={};cc.forEach(c=>{const r=rn(c.road);m[r]=(m[r]||0)+1});
 // ═══════════════════════════════════════════════════════════
 function initMap(){
   if(map)return;
-  map=L.map('defMap',{zoomControl:true,scrollWheelZoom:true}).setView([37.56,-77.46],11);
+  map=L.map('defMap',{zoomControl:true,scrollWheelZoom:true}).setView([39.0,-98.5],5);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OSM © CARTO',maxZoom:19}).addTo(map);
   clGrp=L.markerClusterGroup({maxClusterRadius:50,showCoverageOnHover:false,spiderfyOnMaxZoom:true,disableClusteringAtZoom:15});
   map.addLayer(clGrp);
@@ -390,6 +392,7 @@ function buildSpeedMap(rows){
     if(mutcd.startsWith('R2-1')||nm.includes('speed limit')){const m=(r.name||'').match(/(\d{2,3})\s*(mph)?/i);if(m)spd=parseInt(m[1])}
     if(!spd&&r.speed_limit)spd=parseInt(r.speed_limit)||0;
     if(!spd&&r.posted_speed)spd=parseInt(r.posted_speed)||0;
+    if(!spd&&r.speed)spd=parseInt(r.speed)||0;
     if(spd>0){const lat=parseFloat(r.lat),lng=parseFloat(r.lon);if(!isNaN(lat)&&!isNaN(lng)){const gk=`${(lat*1000).toFixed(0)}_${(lng*1000).toFixed(0)}`;if(!SPD_MAP[gk]||spd>SPD_MAP[gk].spd)SPD_MAP[gk]={spd,lat,lng};cnt++}}
   });
   if(cnt>0){const speeds=Object.values(SPD_MAP).map(s=>s.spd);$('sSp').innerHTML=`<span style="color:var(--ok)">${cnt} R2-1 (${Math.min(...speeds)}–${Math.max(...speeds)} mph)</span>`;log(`Speed map: ${cnt} R2-1 signs`,'ok')}
@@ -699,7 +702,7 @@ async function runAnalysis(){
 
   // ── STEP 4: Assets ──
   prog(25,'Assets...');
-  const assets=INV.map(r=>{const lat=parseFloat(r.lat),lng=parseFloat(r.lon);if(isNaN(lat)||isNaN(lng))return null;return{lat,lng,cls:(r.class||'').toLowerCase(),nm:(r.name||'').toLowerCase(),mutcd:(r.mutcd||'').toUpperCase()}}).filter(Boolean);
+  const assets=INV.map(r=>{const lat=parseFloat(r.lat),lng=parseFloat(r.lon);if(isNaN(lat)||isNaN(lng))return null;return{lat,lng,cls:(r.class||r.cls||'').toLowerCase(),nm:(r.name||'').toLowerCase(),mutcd:(r.mutcd||'').toUpperCase()}}).filter(Boolean);
   log(`${assets.length} assets`,'ok');
 
   // ── STEP 5: Evaluate with HPMS cross-validation ──
@@ -1111,7 +1114,7 @@ function expGeo(){if(!DEFS.length)return toast('No data','err');const fc={type:'
 function expKML(){if(!DEFS.length)return toast('No data','err');const pm=DEFS.map(d=>`<Placemark><n>${LBL[d.type]} #${d.rank} - ${d.road.replace(/&/g,'&amp;')}</n><description><![CDATA[${d.we?'WARRANT MET':'Monitor'}|FC:${d.fc}(${d.fcSource})|${d.spd}mph(${d.spdSrc})|${d.rec}]]></description><Point><coordinates>${d.lng},${d.lat},0</coordinates></Point></Placemark>`).join('\n');dl(`<?xml version="1.0"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>CRASH LENS v20</n>\n${pm}\n</Document></kml>`,'crash_lens.kml','application/vnd.google-earth.kml+xml');toast('KML','ok')}
 function expPDF(){if(!DEFS.length)return toast('No data','err');const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape'});let y=12;
   doc.setFontSize(16);doc.setTextColor(30,64,175);doc.text('CRASH LENS v20 — Deficiency Report (MUTCD 11th Ed.)',14,y);y+=6;
-  doc.setFontSize(8);doc.setTextColor(100);doc.text(`${new Date().toLocaleDateString()} | ${DEFS.length} Candidates | ${DEFS.filter(d=>d.we).length} Warrant-Met | FC: HPMS-validated | Speed: R2-1 verified | EPDO (K=8500 A=850 B=170 C=35 O=1)`,14,y);y+=8;
+  doc.setFontSize(8);doc.setTextColor(100);doc.text(`${new Date().toLocaleDateString()} | ${DEFS.length} Candidates | ${DEFS.filter(d=>d.we).length} Warrant-Met | FC: HPMS-validated | Speed: R2-1 verified | EPDO (K=${SEV.K} A=${SEV.A} B=${SEV.B} C=${SEV.C} O=${SEV.O})`,14,y);y+=8;
   doc.autoTable({startY:y,head:[['#','Type','Road','FC','Src','Spd','Qual','Sev','EPDO','W','Action']],
     body:DEFS.slice(0,200).map(d=>[d.rank,LBL[d.type],d.road,d.fc||'—',d.fcSource||'',d.spd||'—',d.cnt,sl(d.sev),d.epdo,d.we?'MET':'Mon',buildAction(d).replace(/<[^>]+>/g,'').substring(0,60)]),
     styles:{fontSize:5.5,cellPadding:1.2},headStyles:{fillColor:[30,64,175],fontSize:6},columnStyles:{10:{cellWidth:50}},margin:{left:14,right:14}});
@@ -1126,16 +1129,33 @@ document.addEventListener('DOMContentLoaded',()=>{initMap()});
 // PARENT APP INTEGRATION (postMessage)
 // ═══════════════════════════════════════════════════════════
 // When embedded as iframe in main CrashLens app, receive crash data,
-// traffic inventory, and config via postMessage — then auto-run analysis.
+// traffic inventory, config, and EPDO weights via postMessage.
+// Config panel stays visible so users can adjust analysis parameters.
 (function(){
   const embedded = window.parent !== window;
 
+  // Helper: update EPDO footer display
+  function updateEpdoFooter(){
+    var el=$('epdoFooter');
+    if(el) el.innerHTML='<b>Ranked by EPDO</b> (K='+SEV.K+' A='+SEV.A+' B='+SEV.B+' C='+SEV.C+' O='+SEV.O+'). §4B.03/§2B.12: Warrant met ≠ required. P.E. certification required.';
+  }
+
   if(embedded){
-    // Hide manual input panel — data comes from parent app
     document.addEventListener('DOMContentLoaded',function(){
-      const inp=$('inputSection');if(inp)inp.style.display='none';
+      // Hide Data Sources card (data comes from parent) and Enrichment card (auto-triggered)
+      var dataSrc=$('dataSourcesCard');if(dataSrc)dataSrc.style.display='none';
+      var enrichCard=$('enrichCard');if(enrichCard)enrichCard.style.display='none';
+
+      // Show FIPS + School Radius mirrors in Config card (since Enrichment card is hidden)
+      var fipsWrap=$('cfgFipsWrap');if(fipsWrap)fipsWrap.style.display='';
+      var schWrap=$('cfgSchoolWrap');if(schWrap)schWrap.style.display='';
+
+      // Sync mirror fields to canonical fields
+      var fips2=$('cFips2');if(fips2)fips2.addEventListener('change',function(){var el=$('cFips');if(el)el.value=this.value});
+      var schR2=$('cSchR2');if(schR2)schR2.addEventListener('change',function(){var el=$('cSchR');if(el)el.value=this.value});
+
       // Slim down header when embedded
-      const hdr=document.querySelector('.app-h');if(hdr)hdr.style.padding='.25rem .5rem';
+      var hdr=document.querySelector('.app-h');if(hdr)hdr.style.padding='.25rem .5rem';
       log('Embedded in CrashLens — awaiting data from parent app','ok');
     });
   }
@@ -1149,12 +1169,28 @@ document.addEventListener('DOMContentLoaded',()=>{initMap()});
       procData(null,'crash','Parent App');
       log('Received '+CRASH.length+' crash records from app','ok');
 
-      // Auto-run analysis after a short delay to let config settle
+      // Auto-load inventory from R2 if not already received and URL is known
+      if(embedded&&!INV.length&&window._adInventoryUrl){
+        var invInput=$('uIn');
+        if(invInput&&!invInput.value)invInput.value=window._adInventoryUrl;
+        log('Loading inventory from R2...','ok');
+        loadUrl('inv');
+      }
+
+      // Auto-run analysis (with delay for inventory + config to settle)
       if(embedded&&CRASH.length>0){
         setTimeout(function(){
-          log('Auto-running analysis...','ok');
-          runAnalysis();
-        },600);
+          log('Auto-running analysis with enrichment...','ok');
+          var fips=$('cFips').value;
+          if(fips&&fips.length>=5){
+            loadAllEnrich().then(function(){runAnalysis()}).catch(function(){
+              log('Enrichment partial — running analysis anyway','warn');
+              runAnalysis();
+            });
+          }else{
+            runAnalysis();
+          }
+        },800);
       }
     }
 
@@ -1162,20 +1198,57 @@ document.addEventListener('DOMContentLoaded',()=>{initMap()});
     if(evt.data.type==='ad-inventory-data'&&evt.data.rows){
       INV=evt.data.rows;
       procData(null,'inv','Parent App');
+      buildSpeedMap(INV);
       log('Received '+INV.length+' inventory records from app','ok');
     }
 
-    // ── Receive jurisdiction config ──
+    // ── Receive jurisdiction config (expanded ecosystem sync) ──
     if(evt.data.type==='ad-config'&&evt.data.config){
-      const cfg=evt.data.config;
-      if(cfg.fips){const el=$('cFips');if(el)el.value=cfg.fips}
-      log('Config: '+cfg.jurisdictionName+' (FIPS: '+cfg.fips+')','ok');
+      var cfg=evt.data.config;
+
+      // FIPS — set both canonical (enrichment card) and mirror (config card)
+      if(cfg.fips){
+        var el=$('cFips');if(el)el.value=cfg.fips;
+        var el2=$('cFips2');if(el2)el2.value=cfg.fips;
+      }
+
+      // Area type
+      if(cfg.areaType){var el=$('cArea');if(el)el.value=cfg.areaType}
+
+      // Map center — reposition to jurisdiction
+      if(cfg.mapCenter&&map){
+        map.setView(cfg.mapCenter,cfg.mapZoom||10);
+      }
+
+      // EPDO weights from parent ecosystem (sync ranking system)
+      if(cfg.epdoWeights&&typeof cfg.epdoWeights.K==='number'){
+        SEV=cfg.epdoWeights;
+        log('EPDO synced: K='+SEV.K+' A='+SEV.A+' B='+SEV.B+' C='+SEV.C+' O='+SEV.O,'ok');
+        updateEpdoFooter();
+      }
+
+      // Inventory URL for self-loading (fallback when parent hasn't cached inventory)
+      if(cfg.inventoryUrl){
+        window._adInventoryUrl=cfg.inventoryUrl;
+        var invInput=$('uIn');if(invInput&&!invInput.value)invInput.value=cfg.inventoryUrl;
+      }
+
+      // Crash data URL (for standalone fallback display)
+      if(cfg.crashUrl){
+        var crInput=$('uCr');if(crInput&&!crInput.value)crInput.value=cfg.crashUrl;
+      }
+
+      // Update header with jurisdiction name
+      var h1=document.querySelector('h1');
+      if(h1&&cfg.jurisdictionName)h1.textContent='Asset Deficiency — '+cfg.jurisdictionName;
+
+      log('Config: '+cfg.jurisdictionName+' (FIPS: '+(cfg.fips||'—')+', '+
+          (cfg.areaType||'auto')+')','ok');
     }
   });
 
   // Signal readiness to parent
   if(embedded){
-    // Send ready on DOMContentLoaded to ensure DOM is available
     if(document.readyState==='loading'){
       document.addEventListener('DOMContentLoaded',function(){
         window.parent.postMessage({type:'ad-ready'},'*');
