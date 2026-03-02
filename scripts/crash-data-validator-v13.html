@@ -1141,11 +1141,11 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">State</label>
-          <input class="form-input" id="setState" value="virginia" placeholder="e.g., virginia, maryland">
+          <input class="form-input" id="setState" value="" placeholder="e.g., virginia, maryland">
         </div>
         <div class="form-group">
           <label class="form-label">County / City</label>
-          <input class="form-input" id="setCounty" value="henrico" placeholder="e.g., henrico, fairfax">
+          <input class="form-input" id="setCounty" value="" placeholder="e.g., henrico, fairfax">
         </div>
       </div>
       <div style="margin-top:6px;">
@@ -1157,12 +1157,12 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
     <div class="config-section">
       <div class="config-title">🗺️ County Bounds <span style="font-size:0.75rem;opacity:0.6;">(auto-detected or manual)</span></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Min Latitude</label><input class="form-input" id="setMinLat" value="37.45"></div>
-        <div class="form-group"><label class="form-label">Max Latitude</label><input class="form-input" id="setMaxLat" value="37.72"></div>
+        <div class="form-group"><label class="form-label">Min Latitude</label><input class="form-input" id="setMinLat" value="" placeholder="min lat"></div>
+        <div class="form-group"><label class="form-label">Max Latitude</label><input class="form-input" id="setMaxLat" value="" placeholder="max lat"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Min Longitude</label><input class="form-input" id="setMinLon" value="-77.70"></div>
-        <div class="form-group"><label class="form-label">Max Longitude</label><input class="form-input" id="setMaxLon" value="-77.25"></div>
+        <div class="form-group"><label class="form-label">Min Longitude</label><input class="form-input" id="setMinLon" value="" placeholder="min lon"></div>
+        <div class="form-group"><label class="form-label">Max Longitude</label><input class="form-input" id="setMaxLon" value="" placeholder="max lon"></div>
       </div>
     </div>
 
@@ -1170,7 +1170,7 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
       <div class="config-title">📂 R2 Data Path</div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Read URL</label><input class="form-input" id="setR2Read" value="https://data.aicreatesai.com"></div>
-        <div class="form-group"><label class="form-label">Data Path</label><input class="form-input" id="setR2Path" value="/virginia/henrico/"></div>
+        <div class="form-group"><label class="form-label">Data Path</label><input class="form-input" id="setR2Path" value="" placeholder="/state/county/"></div>
       </div>
     </div>
 
@@ -2031,9 +2031,12 @@ async function runAutoCorrect() {
         const roadName = extractRoadName(route);
         if (roadName) {
           try {
-            // Use county from data path, not hardcoded
-            const county = APP.config.r2Path.split('/').filter(Boolean).pop() || 'Henrico County';
-            const state = APP.config.r2Path.split('/').filter(Boolean)[0] || 'Virginia';
+            // Use county from data path, falling back to jurisdiction selector fields
+            const pathParts = APP.config.r2Path.split('/').filter(Boolean);
+            const county = (pathParts.length >= 2 ? pathParts[pathParts.length - 1] : null)
+              || document.getElementById('jurisdCounty')?.value.trim() || '';
+            const state = (pathParts.length >= 1 ? pathParts[0] : null)
+              || document.getElementById('jurisdState')?.value.trim() || '';
             const coords = await geocodeAddress(roadName + ', ' + county + ', ' + state);
             if (coords) {
               const xKey = xField || 'x';
@@ -2949,7 +2952,35 @@ async function saveLedger() {
 //  SETTINGS
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Sync settings modal fields from current APP.config and jurisdiction fields.
+ * Ensures the settings modal always reflects the active jurisdiction,
+ * preventing stale values from overriding on Save.
+ */
+function syncSettingsModal() {
+    const state = document.getElementById('jurisdState').value.trim();
+    const county = document.getElementById('jurisdCounty').value.trim();
+
+    const setStateEl = document.getElementById('setState');
+    const setCountyEl = document.getElementById('setCounty');
+    if (setStateEl) setStateEl.value = state;
+    if (setCountyEl) setCountyEl.value = county;
+
+    const setR2PathEl = document.getElementById('setR2Path');
+    if (setR2PathEl) setR2PathEl.value = APP.config.r2Path || '';
+
+    if (APP.config.bounds) {
+        const b = APP.config.bounds;
+        const fields = { setMinLat: b.minLat, setMaxLat: b.maxLat, setMinLon: b.minLon, setMaxLon: b.maxLon };
+        for (const [id, val] of Object.entries(fields)) {
+            const el = document.getElementById(id);
+            if (el && val != null) el.value = val;
+        }
+    }
+}
+
 function showSettings() {
+  syncSettingsModal();
   document.getElementById('settingsModal').style.display = 'flex';
 }
 
@@ -3086,16 +3117,12 @@ function applyJurisdictionPreset() {
   
   // Update bounds
   APP.config.bounds = { ...j.bounds };
-  
-  // Update settings modal fields if they exist
-  const fields = { setMinLat: j.bounds.minLat, setMaxLat: j.bounds.maxLat, setMinLon: j.bounds.minLon, setMaxLon: j.bounds.maxLon };
-  for (const [id, val] of Object.entries(fields)) {
-    const el = document.getElementById(id);
-    if (el) el.value = val;
-  }
-  
+
   // Update header badge
   document.getElementById('envBadge').textContent = j.label;
+
+  // Sync settings modal fields to match new jurisdiction
+  syncSettingsModal();
   
   // Reset loaded data since jurisdiction changed
   APP.files = {};
@@ -3183,8 +3210,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Signal parent that validator iframe is ready for postMessage communication
+  // Retry a few times in case parent hasn't registered its listener yet
   if (window.parent !== window) {
-    window.parent.postMessage({ type: 'validator-ready' }, '*');
+    window._jurisdictionReceived = false;
+    let readyRetries = 0;
+    const maxRetries = 5;
+    function sendReadySignal() {
+      if (window._jurisdictionReceived) return;
+      window.parent.postMessage({ type: 'validator-ready' }, '*');
+      readyRetries++;
+      if (readyRetries < maxRetries) {
+        setTimeout(sendReadySignal, 500);
+      }
+    }
+    sendReadySignal();
   }
 });
 
@@ -3195,6 +3234,9 @@ window.addEventListener('message', function(evt) {
   if (!evt.data || !evt.data.type) return;
 
   if (evt.data.type === 'validator-set-jurisdiction') {
+    // Stop retry loop — parent responded
+    window._jurisdictionReceived = true;
+
     const key = evt.data.jurisdiction;
 
     // Try direct preset match first (e.g., 'co_douglas', 'va_henrico')
@@ -3243,6 +3285,9 @@ window.addEventListener('message', function(evt) {
         s.innerHTML = '';
       });
       document.getElementById('btnToStep2').disabled = true;
+
+      // Sync settings modal fields to match new jurisdiction
+      syncSettingsModal();
 
       toast(`Switched to ${displayLabel} — click a file to start`, 'info');
 
