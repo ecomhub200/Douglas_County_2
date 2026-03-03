@@ -811,24 +811,9 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
           <div class="form-group">
             <label class="form-label">Quick Select</label>
             <select class="form-input" id="jurisdictionPreset" onchange="applyJurisdictionPreset()">
-              <option value="">— Choose Jurisdiction —</option>
-              <optgroup label="Virginia">
-                <option value="va_henrico">Virginia — Henrico County</option>
-                <option value="va_chesterfield">Virginia — Chesterfield County</option>
-                <option value="va_hanover">Virginia — Hanover County</option>
-                <option value="va_richmond">Virginia — City of Richmond</option>
-                <option value="va_fairfax">Virginia — Fairfax County</option>
-              </optgroup>
-              <optgroup label="Colorado">
-                <option value="co_douglas">Colorado — Douglas County</option>
-                <option value="co_arapahoe">Colorado — Arapahoe County</option>
-                <option value="co_denver">Colorado — City and County of Denver</option>
-                <option value="co_jefferson">Colorado — Jefferson County</option>
-                <option value="co_elpaso">Colorado — El Paso County</option>
-              </optgroup>
-              <optgroup label="Other">
-                <option value="custom">Custom Jurisdiction...</option>
-              </optgroup>
+              <option value="">— Select Jurisdiction —</option>
+              <!-- Populated dynamically from parent app via postMessage -->
+              <option value="custom">Custom Jurisdiction...</option>
             </select>
           </div>
           <div class="form-group">
@@ -3082,18 +3067,9 @@ function autoDetectBounds() {
 //  JURISDICTION PRESETS
 // ═══════════════════════════════════════════════════════════════
 
-const JURISDICTIONS = {
-  'va_henrico':      { state: 'virginia', county: 'henrico', label: 'Henrico County, VA', bounds: { minLat: 37.45, maxLat: 37.72, minLon: -77.70, maxLon: -77.25 }},
-  'va_chesterfield': { state: 'virginia', county: 'chesterfield', label: 'Chesterfield County, VA', bounds: { minLat: 37.22, maxLat: 37.52, minLon: -77.70, maxLon: -77.30 }},
-  'va_hanover':      { state: 'virginia', county: 'hanover', label: 'Hanover County, VA', bounds: { minLat: 37.55, maxLat: 37.95, minLon: -77.70, maxLon: -77.15 }},
-  'va_richmond':     { state: 'virginia', county: 'richmond', label: 'City of Richmond, VA', bounds: { minLat: 37.49, maxLat: 37.60, minLon: -77.58, maxLon: -77.38 }},
-  'va_fairfax':      { state: 'virginia', county: 'fairfax', label: 'Fairfax County, VA', bounds: { minLat: 38.60, maxLat: 38.98, minLon: -77.55, maxLon: -77.10 }},
-  'co_douglas':      { state: 'colorado', county: 'douglas', label: 'Douglas County, CO', bounds: { minLat: 39.12, maxLat: 39.57, minLon: -105.35, maxLon: -104.60 }},
-  'co_arapahoe':     { state: 'colorado', county: 'arapahoe', label: 'Arapahoe County, CO', bounds: { minLat: 39.50, maxLat: 39.72, minLon: -105.15, maxLon: -104.00 }},
-  'co_denver':       { state: 'colorado', county: 'denver', label: 'City & County of Denver, CO', bounds: { minLat: 39.61, maxLat: 39.80, minLon: -105.12, maxLon: -104.87 }},
-  'co_jefferson':    { state: 'colorado', county: 'jefferson', label: 'Jefferson County, CO', bounds: { minLat: 39.47, maxLat: 39.82, minLon: -105.65, maxLon: -105.05 }},
-  'co_elpaso':       { state: 'colorado', county: 'elpaso', label: 'El Paso County, CO', bounds: { minLat: 38.52, maxLat: 39.06, minLon: -105.05, maxLon: -104.40 }},
-};
+// Dynamic jurisdiction registry — populated by parent app via postMessage.
+// No hardcoded presets: any jurisdiction can be set dynamically.
+const JURISDICTIONS = {};
 
 function applyJurisdictionPreset() {
   const sel = document.getElementById('jurisdictionPreset').value;
@@ -3238,17 +3214,42 @@ window.addEventListener('message', function(evt) {
     window._jurisdictionReceived = true;
 
     const key = evt.data.jurisdiction;
+    const fb = evt.data.fallback;
 
-    // Try direct preset match first (e.g., 'co_douglas', 'va_henrico')
+    // Always register the jurisdiction in JURISDICTIONS for future dropdown use
+    if (key && fb && fb.state && fb.county) {
+      const displayLabel = fb.label ||
+        (fb.county.charAt(0).toUpperCase() + fb.county.slice(1) + ' County, ' + fb.state.toUpperCase());
+      JURISDICTIONS[key] = {
+        state: fb.state,
+        county: fb.county,
+        label: displayLabel,
+        bounds: fb.bounds || null
+      };
+      // Add option to dropdown if not already present
+      const preset = document.getElementById('jurisdictionPreset');
+      if (preset && !preset.querySelector('option[value="' + key + '"]')) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = displayLabel;
+        const customOpt = preset.querySelector('option[value="custom"]');
+        if (customOpt) {
+          preset.insertBefore(opt, customOpt);
+        } else {
+          preset.appendChild(opt);
+        }
+      }
+    }
+
+    // Apply the jurisdiction — use registered entry if available
     if (key && JURISDICTIONS[key]) {
       document.getElementById('jurisdictionPreset').value = key;
       applyJurisdictionPreset();
-      console.log('[Validator] Jurisdiction set via preset:', key);
+      console.log('[Validator] Jurisdiction set from parent:', key, JURISDICTIONS[key].label);
       return;
     }
 
-    // Fallback: use dynamic config from parent for jurisdictions not in presets
-    const fb = evt.data.fallback;
+    // Direct apply for unregistered jurisdictions (no key but has fallback)
     if (fb && fb.state && fb.county) {
       document.getElementById('jurisdState').value = fb.state;
       document.getElementById('jurisdCounty').value = fb.county;
@@ -3265,13 +3266,12 @@ window.addEventListener('message', function(evt) {
         }
       }
 
-      // Use label from parent if available, otherwise build from state/county
       const displayLabel = fb.label ||
         (fb.county.charAt(0).toUpperCase() + fb.county.slice(1) + ' County, ' + fb.state.toUpperCase());
       document.getElementById('envBadge').textContent = displayLabel;
 
-      const preset = document.getElementById('jurisdictionPreset');
-      if (preset) preset.value = '';
+      const presetEl = document.getElementById('jurisdictionPreset');
+      if (presetEl) presetEl.value = '';
 
       // Reset loaded data since jurisdiction changed (matches applyJurisdictionPreset logic)
       APP.files = {};
@@ -3294,7 +3294,7 @@ window.addEventListener('message', function(evt) {
       // Navigate back to step 1
       goToStep(1);
 
-      console.log('[Validator] Jurisdiction set via fallback config:', fb.state, fb.county);
+      console.log('[Validator] Jurisdiction set via dynamic config:', fb.state, fb.county);
     }
   }
 });
