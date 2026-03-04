@@ -163,10 +163,10 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
 <div class="input-grid">
 <div>
   <!-- DATA SOURCES -->
-  <div class="card"><div class="ch"><span class="ct">☁️ Data Sources</span><span class="badge b-bl">Virginia Roads + R2</span></div>
+  <div class="card"><div class="ch"><span class="ct">☁️ Data Sources</span><span class="badge b-bl">R2 Cloud Storage</span></div>
     <div class="fg">
-      <div><label class="fl">Crash Data CSV</label><div class="row"><input id="uCr" value="https://data.aicreatesai.com/virginia/henrico/all_roads.csv"><button class="btn btn-p btn-sm" onclick="loadUrl('crash')">Load</button></div></div>
-      <div><label class="fl">Traffic Inventory CSV</label><div class="row"><input id="uIn" value="https://data.aicreatesai.com/virginia/henrico/traffic-inventory.csv"><button class="btn btn-p btn-sm" onclick="loadUrl('inv')">Load</button></div></div>
+      <div><label class="fl">Crash Data CSV</label><div class="row"><input id="uCr" value="" placeholder="Auto-populated from jurisdiction selection"><button class="btn btn-p btn-sm" onclick="loadUrl('crash')">Load</button></div></div>
+      <div><label class="fl">Traffic Inventory CSV</label><div class="row"><input id="uIn" value="" placeholder="Auto-populated from jurisdiction selection"><button class="btn btn-p btn-sm" onclick="loadUrl('inv')">Load</button></div></div>
     </div>
     <div style="margin-top:.3rem;display:flex;gap:.3rem;flex-wrap:wrap">
       <button class="btn btn-p" onclick="loadBoth()">⬇️ Load Both</button>
@@ -181,7 +181,7 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
   <!-- ENRICHMENT -->
   <div class="card"><div class="ch"><span class="ct">🛰️ Enrichment</span><span class="badge b-pp">Federal APIs</span></div>
     <div class="fg" style="margin-top:0">
-      <div><label class="fl">County FIPS</label><input id="cFips" value="51087" placeholder="51087"></div>
+      <div><label class="fl">County FIPS</label><input id="cFips" value="" placeholder="e.g., 08035"></div>
       <div><label class="fl">School Radius</label><select id="cSchR"><option value="500">500 ft</option><option value="750">750 ft</option><option value="1000" selected>1000 ft</option><option value="1320">1320 ft</option></select></div>
     </div>
     <div style="margin-top:.3rem;display:flex;gap:.3rem;flex-wrap:wrap">
@@ -1169,6 +1169,11 @@ document.addEventListener('DOMContentLoaded',()=>{initMap()});
     if(evt.data.type==='ad-config'&&evt.data.config){
       const cfg=evt.data.config;
       if(cfg.fips){const el=$('cFips');if(el)el.value=cfg.fips}
+      // Populate R2 URLs for crash data and traffic inventory
+      if(cfg.r2BaseUrl&&cfg.r2Path){
+        const crEl=$('uCr');if(crEl)crEl.value=cfg.r2BaseUrl+'/'+cfg.r2Path+'/all_roads.csv';
+        const inEl=$('uIn');if(inEl)inEl.value=cfg.r2BaseUrl+'/'+cfg.r2Path+'/traffic-inventory.csv';
+      }
       log('Config: '+cfg.jurisdictionName+' (FIPS: '+cfg.fips+')','ok');
     }
   });
