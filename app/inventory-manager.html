@@ -698,7 +698,7 @@ function applyFilters(){
 // ═══════════════════════════════════════════════
 function initMap(){
   if(map)return;
-  map=L.map('assetMap',{zoomControl:true,scrollWheelZoom:true,preferCanvas:true}).setView([37.55,-77.40],11);
+  map=L.map('assetMap',{zoomControl:true,scrollWheelZoom:true,preferCanvas:true}).setView([39.0,-98.0],4);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OSM © CARTO',maxZoom:19}).addTo(map);
   clGrp=L.markerClusterGroup({maxClusterRadius:40,showCoverageOnHover:false,spiderfyOnMaxZoom:true,disableClusteringAtZoom:15,chunkedLoading:true,chunkInterval:80,chunkDelay:15,animate:false,removeOutsideVisibleBounds:true,
     iconCreateFunction:function(cluster){const cnt=cluster.getChildCount();const sz=cnt>500?44:cnt>100?38:cnt>20?32:26;return L.divIcon({html:'<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:rgba(30,64,175,.85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:'+(sz>36?12:10)+'px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">'+cnt.toLocaleString()+'</div>',className:'',iconSize:[sz,sz]})}
