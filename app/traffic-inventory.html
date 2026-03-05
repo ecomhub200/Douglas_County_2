@@ -920,7 +920,7 @@
         });
 
         function initMap(){
-            assetMap=L.map('assetMap').setView([37.55,-77.40],10);
+            assetMap=L.map('assetMap').setView([39.0,-98.0],4); // US center; updated when jurisdiction is set
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(assetMap);
             markersLayer=L.layerGroup().addTo(assetMap);
             markersByType={stop:L.layerGroup(),speed:L.layerGroup(),warning:L.layerGroup(),school:L.layerGroup(),guide:L.layerGroup(),infra:L.layerGroup()};
