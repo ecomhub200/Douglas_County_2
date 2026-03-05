@@ -490,7 +490,7 @@ window.addEventListener('message',function(evt){
 function getR2Key(){return $('stSel').value+'/'+$('coSel').value+'/traffic-inventory.csv'}
 function getLedgerKey(){return $('stSel').value+'/'+$('coSel').value+'/traffic-inventory-edits.json'}
 function saveCfg(){localStorage.setItem('aim3_cfg',JSON.stringify({pub:$('pubUrl').value,state:$('stSel').value,county:$('coSel').value}))}
-function loadCfg(){try{const c=JSON.parse(localStorage.getItem('aim3_cfg')||'{}');if(c.pub){$('pubUrl').value=c.pub;r2Cfg.publicUrl=c.pub}if(c.state)$('stSel').value=c.state;if(c.county)$('coSel').value=c.county}catch(e){}$('r2Path').textContent=$('stSel').value+'/'+$('coSel').value}
+function loadCfg(){try{const c=JSON.parse(localStorage.getItem('aim3_cfg')||'{}');if(c.pub){$('pubUrl').value=c.pub;r2Cfg.publicUrl=c.pub}var isEmbedded=false;try{isEmbedded=window.self!==window.top}catch(e2){isEmbedded=true}if(!isEmbedded){if(c.state)$('stSel').value=c.state;if(c.county)$('coSel').value=c.county}}catch(e){}$('r2Path').textContent=$('stSel').value+'/'+$('coSel').value}
 
 // ═══════════════════════════════════════════════
 // LOAD DATA
