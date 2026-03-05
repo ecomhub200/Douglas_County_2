@@ -477,6 +477,7 @@ window.addEventListener('message',function(evt){
     updateCountyDropdown(evt.data.state);
     $('coSel').value=evt.data.jurisdictionKey;
     $('r2Path').textContent=evt.data.state+'/'+evt.data.jurisdictionKey;
+    saveCfg(); // Persist parent's selection to localStorage so it overrides stale defaults
   }
   if(evt.data.type==='im-config'){
     if(evt.data.r2PublicUrl){r2Cfg.publicUrl=evt.data.r2PublicUrl;$('pubUrl').value=r2Cfg.publicUrl}
