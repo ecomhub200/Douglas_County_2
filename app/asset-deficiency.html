@@ -320,6 +320,7 @@ CRASH LENS v20.0 — <a href="https://mutcd.fhwa.dot.gov/kno_11th_Edition.htm" t
 <script>
 const $=id=>document.getElementById(id);
 let CRASH=[],INV=[],DEFS=[],SCHOOLS=[],HPMS=[],RAIL_X=[],TRANSIT=[],NBI=[],SPD_MAP={},map,clGrp;
+let totalValidCrashes=0;
 let filters={};let sortCol='epdo',sortAsc=false;
 const PM={signal:'signal',stop:'stop',streetlight:'light',crosswalk:'ped',ped:'ped',school:'ped',bike:'ped',animal:'ped',railroad:'ped',bridge:'sys',speed:'sys',headon:'sys',rearend:'sys',departure:'sys'};
 const COL={signal:'#dc2626',stop:'#b91c1c',streetlight:'#d97706',crosswalk:'#7c3aed',school:'#4d7c0f',animal:'#7c3aed',bike:'#0891b2',ped:'#9333ea',railroad:'#0369a1',bridge:'#78350f',speed:'#ea580c',headon:'#dc2626',rearend:'#d97706',departure:'#0891b2'};
@@ -761,6 +762,7 @@ async function runAnalysis(){
     valid.push({lat,lng,ct,sev:r['Crash Severity']||'O',dt,light,tctl,legs,isInt:isI,isR,fc,fcCode,road:rn(r['RTE Name']),areaType:(r['Area Type']||'').toLowerCase(),animal:r['Animal Related?']==='Yes',ped:r['Pedestrian?']==='Yes',bike:r['Bike?']==='Yes',speed:r['Speed?']==='Yes',night:r['Night?']==='Yes',school:r['School Zone']&&(r['School Zone'].startsWith('1.')||r['School Zone'].startsWith('2.')),hasSig:tctl.includes('traffic signal'),hasStp:tctl.includes('stop sign'),rdDep:(r['RoadDeparture Type']||'')!=='NOT_RD'&&(r['RoadDeparture Type']||'')!=='',wet:surface.includes('wet')||weather.includes('rain')||weather.includes('snow')});
   }
   valid.forEach(c=>{c.lightPd=classifyLightPeriod(c)});
+  totalValidCrashes=valid.length;
   log(`${valid.length} valid crashes`,'ok');
 
   // ── STEP 2: Center map ──
@@ -1044,7 +1046,7 @@ function renderMarkers(){
     L.marker([d.lat,d.lng],{icon:ico}).bindPopup(pop,{maxWidth:420,className:'leaflet-popup-styled'}).addTo(clGrp);
   });
   $('mT').textContent=items.length;$('mW').textContent=wCnt;
-  $('mCr').textContent=dedupedCrashCount(items).toLocaleString();
+  $('mCr').textContent=totalValidCrashes.toLocaleString();
   $('mT1').textContent=items.filter(d=>d.critTier===1).length;
   $('mT2').textContent=items.filter(d=>d.critTier===2).length;
   if(items.length)map.fitBounds(items.map(d=>[d.lat,d.lng]),{padding:[40,40]});
@@ -1255,7 +1257,7 @@ function renderTable(){
   const wCnt=items.filter(d=>d.we).length;
   const t1=items.filter(d=>d.critTier===1).length;
   $('tblTitle').textContent=`${$('catDD').options[$('catDD').selectedIndex].text.replace(/\(.*\)/,'')} — ${items.length} locations`;
-  $('tblCount').innerHTML=`${items.length} shown • ${wCnt} warrant met • <span style="color:#dc2626;font-weight:700">T1 Critical: ${t1}</span> • ${dedupedCrashCount(items).toLocaleString()} total crashes`;
+  $('tblCount').innerHTML=`${items.length} shown • ${wCnt} warrant met • <span style="color:#dc2626;font-weight:700">T1 Critical: ${t1}</span> • ${totalValidCrashes.toLocaleString()} total crashes`;
 }
 
 function flyTo(rank){
