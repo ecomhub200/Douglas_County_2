@@ -756,24 +756,9 @@
         // Build reverse lookup: mapillary value -> internal key (built after MUTCD_MAPPINGS loads)
         let MAPILLARY_TO_KEY = {};
 
-        const JURISDICTIONS = {
-            albemarle:{name:"Albemarle County",type:"county",fips:"003",state:"virginia",folder:"albemarle",bbox:[-78.85,37.8333,-78.25,38.2833],mapCenter:[38.02,-78.56],mapZoom:10},
-            alexandria:{name:"Alexandria City",type:"city",fips:"510",state:"virginia",folder:"alexandria",bbox:[-77.15,38.77,-77.02,38.86],mapCenter:[38.82,-77.08],mapZoom:13},
-            arlington:{name:"Arlington County",type:"county",fips:"013",state:"virginia",folder:"arlington",bbox:[-77.17,38.82,-77.03,38.93],mapCenter:[38.88,-77.10],mapZoom:13},
-            chesapeake:{name:"Chesapeake",type:"city",fips:"550",state:"virginia",folder:"chesapeake",bbox:[-76.4667,36.55,-76.1333,36.85],mapCenter:[36.77,-76.29],mapZoom:11},
-            chesterfield:{name:"Chesterfield County",type:"county",fips:"041",state:"virginia",folder:"chesterfield",bbox:[-77.80,37.20,-77.35,37.50],mapCenter:[37.38,-77.51],mapZoom:10},
-            fairfax_county:{name:"Fairfax County",type:"county",fips:"059",state:"virginia",folder:"fairfax_county",bbox:[-77.55,38.65,-77.05,38.97],mapCenter:[38.83,-77.28],mapZoom:10},
-            hanover:{name:"Hanover County",type:"county",fips:"085",state:"virginia",folder:"hanover",bbox:[-77.75,37.60,-77.25,38.00],mapCenter:[37.76,-77.47],mapZoom:10},
-            henrico:{name:"Henrico County",type:"county",fips:"087",state:"virginia",folder:"henrico",bbox:[-77.61,37.39,-77.15,37.72],mapCenter:[37.55,-77.40],mapZoom:11},
-            loudoun:{name:"Loudoun County",type:"county",fips:"107",state:"virginia",folder:"loudoun",bbox:[-77.9667,38.85,-77.3167,39.3167],mapCenter:[39.08,-77.64],mapZoom:10},
-            newport_news:{name:"Newport News",type:"city",fips:"700",state:"virginia",folder:"newport_news",bbox:[-76.6167,36.95,-76.35,37.2167],mapCenter:[37.09,-76.47],mapZoom:11},
-            norfolk:{name:"Norfolk",type:"city",fips:"710",state:"virginia",folder:"norfolk",bbox:[-76.35,36.8167,-76.1833,36.9667],mapCenter:[36.85,-76.29],mapZoom:12},
-            prince_william:{name:"Prince William County",type:"county",fips:"153",state:"virginia",folder:"prince_william",bbox:[-77.7833,38.5167,-77.2833,38.85],mapCenter:[38.70,-77.48],mapZoom:10},
-            richmond_city:{name:"Richmond City",type:"city",fips:"760",state:"virginia",folder:"richmond_city",bbox:[-77.57,37.48,-77.37,37.60],mapCenter:[37.54,-77.44],mapZoom:12},
-            roanoke:{name:"Roanoke County",type:"county",fips:"161",state:"virginia",folder:"roanoke",bbox:[-80.2167,37.15,-79.8167,37.40],mapCenter:[37.27,-79.94],mapZoom:10},
-            stafford:{name:"Stafford County",type:"county",fips:"179",state:"virginia",folder:"stafford",bbox:[-77.65,38.35,-77.2833,38.55],mapCenter:[38.42,-77.45],mapZoom:10},
-            virginia_beach:{name:"Virginia Beach",type:"city",fips:"810",state:"virginia",folder:"virginia_beach",bbox:[-76.2333,36.6333,-75.8667,36.9333],mapCenter:[36.85,-75.98],mapZoom:10}
-        };
+        // Dynamic jurisdiction registry — populated by parent app via postMessage.
+        // No hardcoded presets: any jurisdiction can be set dynamically.
+        const JURISDICTIONS = {};
 
         const MUTCD_MAPPINGS = {
             R1_stop:{mutcd:"R1-1",name:"STOP",mapillary:["regulatory--stop--g1","regulatory--stop--g2","regulatory--stop--g3","regulatory--stop--g4","regulatory--stop--g5"]},
