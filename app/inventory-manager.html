@@ -157,12 +157,12 @@ td{padding:4px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:hover
 </div>
 <!-- Config (hidden) -->
 <div class="cfg-panel" id="cfgPanel">
-<div class="cfg-row"><label>R2 Public</label><input id="pubUrl" value="https://pub-crashlens.r2.dev" placeholder="R2 Public URL"></div>
-<div class="cfg-row"><label>Worker</label><input id="workerUrl" value="https://crashlens-worker.workers.dev" placeholder="Worker URL"></div>
-<div class="cfg-row"><label>Secret</label><input id="r2Secret" type="password" placeholder="Upload secret"></div>
-<div class="cfg-row"><label>State</label><select id="stSel"><option value="virginia">Virginia</option><option value="colorado">Colorado</option><option value="maryland">Maryland</option></select></div>
-<div class="cfg-row"><label>County</label><select id="coSel"><option value="henrico">Henrico</option><option value="chesterfield">Chesterfield</option><option value="hanover">Hanover</option></select></div>
+<div class="cfg-row"><label>R2 Public</label><input id="pubUrl" value="https://data.aicreatesai.com" placeholder="R2 Public URL"></div>
+<div class="cfg-row"><label>Server</label><span id="r2ServerStatus" style="font-size:9px;color:var(--mu)">Checking...</span></div>
+<div class="cfg-row"><label>State</label><select id="stSel"><option value="">—</option></select></div>
+<div class="cfg-row"><label>County</label><select id="coSel"><option value="">—</option></select></div>
 <div class="cfg-row"><span id="r2Path" style="font-size:8px;color:var(--mu)"></span></div>
+<div style="font-size:7px;color:var(--mu);padding:2px 0">Upload secret managed server-side</div>
 </div>
 <!-- Parse bar -->
 <div class="parse-bar hidden" id="parseBar"><div class="parse-track"><div class="parse-fill" id="parseFill" style="width:0"></div></div><div class="parse-lbl" id="parseLbl"></div></div>
@@ -435,12 +435,61 @@ async function cGet(k){const db=await openDB();return new Promise(ok=>{const r=d
 async function cSet(k,v){const db=await openDB();return new Promise((ok,no)=>{const tx=db.transaction('d','readwrite');tx.objectStore('d').put(v,k);tx.oncomplete=ok;tx.onerror=no})}
 
 // ═══════════════════════════════════════════════
+// R2 SERVER CONFIG (credentials from Coolify env vars)
+// ═══════════════════════════════════════════════
+let r2Cfg = {publicUrl:'https://data.aicreatesai.com', serverConfigured: false};
+let imJurisdictions = {};
+
+async function checkR2Status(){
+  try{
+    const r=await fetch('/api/r2/worker-status');
+    if(r.ok){const d=await r.json();r2Cfg.serverConfigured=d.configured;
+      $('r2ServerStatus').textContent=d.configured?'✓ Connected':'Not Configured';
+      $('r2ServerStatus').style.color=d.configured?'var(--gn)':'var(--or)';
+      if(d.configured)$('hR2').textContent='R2: ✅';
+    }
+  }catch(e){$('r2ServerStatus').textContent='Server Offline';$('r2ServerStatus').style.color='var(--rd)';}
+}
+
+function populateJurisdictions(juris){
+  imJurisdictions=juris;
+  const states=new Set();
+  Object.values(juris).forEach(j=>{if(j.state)states.add(j.state)});
+  const stSel=$('stSel');stSel.innerHTML='<option value="">—</option>';
+  states.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s.charAt(0).toUpperCase()+s.slice(1);stSel.appendChild(o)});
+  stSel.onchange=()=>updateCountyDropdown(stSel.value);
+}
+
+function updateCountyDropdown(state){
+  const coSel=$('coSel');coSel.innerHTML='<option value="">—</option>';
+  Object.entries(imJurisdictions).forEach(([key,j])=>{
+    if(j.state===state){const o=document.createElement('option');o.value=key;o.textContent=j.name||key;coSel.appendChild(o)}
+  });
+  coSel.onchange=()=>{$('r2Path').textContent=$('stSel').value+'/'+$('coSel').value};
+}
+
+// Listen for messages from parent (jurisdiction sync)
+window.addEventListener('message',function(evt){
+  if(!evt.data)return;
+  if(evt.data.type==='im-set-jurisdictions'){populateJurisdictions(evt.data.jurisdictions)}
+  if(evt.data.type==='im-set-jurisdiction'){
+    $('stSel').value=evt.data.state;
+    updateCountyDropdown(evt.data.state);
+    $('coSel').value=evt.data.jurisdictionKey;
+    $('r2Path').textContent=evt.data.state+'/'+evt.data.jurisdictionKey;
+  }
+  if(evt.data.type==='im-config'){
+    if(evt.data.r2PublicUrl){r2Cfg.publicUrl=evt.data.r2PublicUrl;$('pubUrl').value=r2Cfg.publicUrl}
+  }
+});
+
+// ═══════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════
 function getR2Key(){return $('stSel').value+'/'+$('coSel').value+'/traffic-inventory.csv'}
 function getLedgerKey(){return $('stSel').value+'/'+$('coSel').value+'/traffic-inventory-edits.json'}
-function saveCfg(){localStorage.setItem('aim3_cfg',JSON.stringify({pub:$('pubUrl').value,worker:$('workerUrl').value,secret:$('r2Secret').value,state:$('stSel').value,county:$('coSel').value}))}
-function loadCfg(){try{const c=JSON.parse(localStorage.getItem('aim3_cfg')||'{}');if(c.pub)$('pubUrl').value=c.pub;if(c.worker)$('workerUrl').value=c.worker;if(c.secret)$('r2Secret').value=c.secret;if(c.state)$('stSel').value=c.state;if(c.county)$('coSel').value=c.county}catch(e){}$('r2Path').textContent=$('stSel').value+'/'+$('coSel').value}
+function saveCfg(){localStorage.setItem('aim3_cfg',JSON.stringify({pub:$('pubUrl').value,state:$('stSel').value,county:$('coSel').value}))}
+function loadCfg(){try{const c=JSON.parse(localStorage.getItem('aim3_cfg')||'{}');if(c.pub){$('pubUrl').value=c.pub;r2Cfg.publicUrl=c.pub}if(c.state)$('stSel').value=c.state;if(c.county)$('coSel').value=c.county}catch(e){}$('r2Path').textContent=$('stSel').value+'/'+$('coSel').value}
 
 // ═══════════════════════════════════════════════
 // LOAD DATA
@@ -448,8 +497,8 @@ function loadCfg(){try{const c=JSON.parse(localStorage.getItem('aim3_cfg')||'{}'
 async function loadData(){
   const btn=$('loadBtn');btn.disabled=true;btn.textContent='⏳ Loading…';saveCfg();
   try{
-    const fk=getR2Key(),pub=$('pubUrl').value.replace(/\/$/,'');let csv=null;
-    try{const r=await fetch(pub+'/'+fk,{headers:{'X-Bucket':'CRASH_DATA'}});if(r.ok){csv=await r.text();toast('Loaded from R2','ok');$('hR2').textContent='R2: ✅'}}catch(e){}
+    const fk=getR2Key(),pub=r2Cfg.publicUrl.replace(/\/$/,'');let csv=null;
+    try{const r=await fetch(pub+'/'+fk);if(r.ok){csv=await r.text();toast('Loaded from R2','ok');$('hR2').textContent='R2: ✅'}}catch(e){}
     if(!csv){csv=await cGet(fk);if(csv)toast('Loaded from cache','warn')}
     if(!csv){toast('No data — upload CSV or check R2','err');btn.disabled=false;btn.textContent='📡 R2';return}
     await cSet(fk,csv).catch(()=>{});
@@ -464,7 +513,7 @@ function loadLocal(e){const f=e.target.files[0];if(!f)return;const r=new FileRea
 // ═══════════════════════════════════════════════
 async function loadLedger(){
   let local={};try{local=JSON.parse(localStorage.getItem('aim3_ledger')||'{}')}catch(e){}
-  try{const r=await fetch($('pubUrl').value.replace(/\/$/,'')+'/'+getLedgerKey(),{headers:{'X-Bucket':'CRASH_DATA'}});if(r.ok){const remote=await r.json();ledger={...remote};Object.entries(local).forEach(([id,ed])=>{if(!ledger[id]||(ed._ts&&(!ledger[id]._ts||ed._ts>ledger[id]._ts)))ledger[id]=ed});localStorage.setItem('aim3_ledger',JSON.stringify(ledger));toast('Merged '+Object.keys(ledger).length+' edits','ok');return}}catch(e){}
+  try{const r=await fetch(r2Cfg.publicUrl.replace(/\/$/,'')+'/'+getLedgerKey());if(r.ok){const remote=await r.json();ledger={...remote};Object.entries(local).forEach(([id,ed])=>{if(!ledger[id]||(ed._ts&&(!ledger[id]._ts||ed._ts>ledger[id]._ts)))ledger[id]=ed});localStorage.setItem('aim3_ledger',JSON.stringify(ledger));toast('Merged '+Object.keys(ledger).length+' edits','ok');return}}catch(e){}
   ledger=local;if(Object.keys(ledger).length)toast(Object.keys(ledger).length+' edits from local','inf');
 }
 function applyLedger(){
@@ -927,11 +976,11 @@ async function saveEdit(push){
   if(isNew){const a={id:editingId,mutcd:src.mutcd,name:src.name,class:src.class_val,speed:src.speed,lat:src.lat,lon:src.lon,first_seen:src.first_seen,signal_heads:src.signal_heads,condition:cond||'',_notes:notes,_next_inspection:ni,_inspector:insp,_edited:true,_editTs:entry._ts,_isNew:true};a._cat=getCategory(a);assets.push(a);toast('New asset added: '+src.name,'ok')}
   else{const a=assets.find(x=>x.id===editingId);if(a){if(cond)a.condition=cond;a._notes=notes;a._next_inspection=ni;a._inspector=insp;if(src.mutcd)a.mutcd=src.mutcd;if(src.name)a.name=src.name;if(src.class_val)a.class=src.class_val;if(src.speed)a.speed=src.speed;if(src.first_seen)a.first_seen=src.first_seen;if(src.lat)a.lat=src.lat;if(src.lon)a.lon=src.lon;if(src.signal_heads)a.signal_heads=src.signal_heads;a._cat=getCategory(a);a._edited=true;a._editTs=entry._ts}toast('Saved','ok')}
   localStorage.setItem('aim3_ledger',JSON.stringify(ledger));
-  if(push){const secret=$('r2Secret').value;if(!secret){toast('Upload secret required','err');return}
+  if(push){if(!r2Cfg.serverConfigured){toast('R2 server not configured','err');return}
     try{
       // CRITICAL: fetch remote ledger first, merge, then push — never overwrite
       let merged={...ledger};
-      try{const rf=await fetch($('pubUrl').value.replace(/\/$/,'')+'/'+getLedgerKey(),{headers:{'X-Bucket':'CRASH_DATA'}});
+      try{const rf=await fetch(r2Cfg.publicUrl.replace(/\/$/,'')+'/'+getLedgerKey());
         if(rf.ok){const remote=await rf.json();
           // Start with remote, then overlay local (local wins on conflicts by timestamp)
           Object.entries(remote).forEach(([id,red])=>{
@@ -942,7 +991,7 @@ async function saveEdit(push){
       }catch(e){/* remote fetch failed, push local only */}
       // Update local ledger with merged result
       ledger=merged;localStorage.setItem('aim3_ledger',JSON.stringify(ledger));
-      const r=await fetch($('workerUrl').value.replace(/\/$/,'')+'/'+getLedgerKey(),{method:'PUT',headers:{'Content-Type':'application/json','X-Upload-Secret':secret,'X-Bucket':'CRASH_DATA'},body:JSON.stringify(ledger)});
+      const r=await fetch('/api/r2/worker-upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({r2Key:getLedgerKey(),data:JSON.stringify(ledger),contentType:'application/json'})});
       if(r.ok)toast('Pushed '+Object.keys(ledger).length+' edits to R2 ✅','ok');else toast('R2 push failed: '+r.status,'err');
     }catch(e){toast('R2 error: '+e.message,'err')}}
   updateStats();buildSubFilters();showAll();closeEditPanel();
@@ -962,7 +1011,7 @@ function expPDF(){if(!filtered.length)return toast('No data','err');const{jsPDF}
 // ═══════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded',()=>{initMap();loadCfg()});
+document.addEventListener('DOMContentLoaded',()=>{initMap();loadCfg();checkR2Status();window.parent.postMessage({type:'im-ready'},'*')});
 </script>
 </body>
 </html>
