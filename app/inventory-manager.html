@@ -143,7 +143,7 @@ td{padding:4px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:hover
 <!-- ═══ SIDEBAR ═══ -->
 <div class="sidebar" id="sidebar">
 <div class="sb-top">
-<span class="sb-header-text">🛡️ CRASH LENS</span>
+<span class="sb-header-text">📋 Inventory Manager</span>
 <button class="sb-toggle" id="sbToggle" onclick="toggleSidebar()" title="Collapse">◀</button>
 </div>
 <div class="sb-content" id="sbContent">
@@ -157,10 +157,10 @@ td{padding:4px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:hover
 </div>
 <!-- Config (hidden) -->
 <div class="cfg-panel" id="cfgPanel">
-<div class="cfg-row"><label>R2 Public</label><input id="pubUrl" value="https://data.aicreatesai.com" placeholder="R2 Public URL"></div>
+<div class="cfg-row" style="display:none"><label>R2 Public</label><input id="pubUrl" value="https://data.aicreatesai.com" placeholder="R2 Public URL"></div>
 <div class="cfg-row"><label>Server</label><span id="r2ServerStatus" style="font-size:9px;color:var(--mu)">Checking...</span></div>
-<div class="cfg-row"><label>State</label><select id="stSel"><option value="">—</option></select></div>
-<div class="cfg-row"><label>County</label><select id="coSel"><option value="">—</option></select></div>
+<div class="cfg-row"><label>State</label><select id="stSel" disabled><option value="">—</option></select></div>
+<div class="cfg-row"><label>County</label><select id="coSel" disabled><option value="">—</option></select></div>
 <div class="cfg-row"><span id="r2Path" style="font-size:8px;color:var(--mu)"></span></div>
 <div style="font-size:7px;color:var(--mu);padding:2px 0">Upload secret managed server-side</div>
 </div>
@@ -224,14 +224,14 @@ td{padding:4px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:hover
 <div class="qf"><button onclick="grpQ('infra','all')">All</button><button onclick="grpQ('infra','none')">None</button></div></div>
 </div>
 </div>
-<div class="sb-footer">CRASH LENS · <a href="https://aidetective.com" target="_blank">AIDetective.com</a> · Data by <a href="https://www.mapillary.com" target="_blank">Mapillary</a></div>
+<div class="sb-footer">Data by <a href="https://www.mapillary.com" target="_blank">Mapillary</a></div>
 </div>
 
 <!-- ═══ MAIN ═══ -->
 <div class="main">
 <!-- Header -->
 <div class="hdr">
-<span class="logo">🛡️ CRASH LENS</span><span class="sep">|</span>
+<span class="logo">📋 Inventory Manager</span><span class="sep">|</span>
 <span class="stat"><b id="hTotal">0</b></span><span class="sep">·</span>
 <span class="stat"><b id="hFiltered">0</b> shown</span><span class="sep">·</span>
 <span class="stat"><b id="hEdited">0</b> edited</span><span class="sep">·</span>
@@ -473,11 +473,15 @@ window.addEventListener('message',function(evt){
   if(!evt.data)return;
   if(evt.data.type==='im-set-jurisdictions'){populateJurisdictions(evt.data.jurisdictions)}
   if(evt.data.type==='im-set-jurisdiction'){
+    const prevKey=$('stSel').value+'/'+$('coSel').value;
     $('stSel').value=evt.data.state;
     updateCountyDropdown(evt.data.state);
     $('coSel').value=evt.data.jurisdictionKey;
     $('r2Path').textContent=evt.data.state+'/'+evt.data.jurisdictionKey;
     saveCfg(); // Persist parent's selection to localStorage so it overrides stale defaults
+    // Auto-load data if jurisdiction actually changed (or first load)
+    const newKey=evt.data.state+'/'+evt.data.jurisdictionKey;
+    if(newKey!==prevKey||!assets.length){loadData()}
   }
   if(evt.data.type==='im-config'){
     if(evt.data.r2PublicUrl){r2Cfg.publicUrl=evt.data.r2PublicUrl;$('pubUrl').value=r2Cfg.publicUrl}
@@ -1007,7 +1011,7 @@ function dl(c,f,m){const b=new Blob([c],{type:m}),u=URL.createObjectURL(b),a=doc
 function expCSV(){if(!filtered.length)return toast('No data','err');const hdr=['id','mutcd','name','class','speed','lat','lon','first_seen','signal_heads','condition','notes','next_inspection','inspector','edited','edit_timestamp'];const rows=filtered.map(a=>[a.id,a.mutcd||getMUTCDCode(a),a.name||'',a.class||'',a.speed||'',a.lat,a.lon,a.first_seen||'',a.signal_heads||'',a.condition||'',a._notes||'',a._next_inspection||'',a._inspector||'',a._edited?'Y':'',a._editTs||''].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','));dl([hdr.join(','),...rows].join('\n'),'traffic_inventory_'+new Date().toISOString().split('T')[0]+'.csv','text/csv');toast('CSV exported','ok')}
 function expGeo(){if(!filtered.length)return toast('No data','err');const fc={type:'FeatureCollection',features:filtered.filter(a=>a.lat&&a.lon).map(a=>({type:'Feature',geometry:{type:'Point',coordinates:[a.lon,a.lat]},properties:{id:a.id,mutcd:getMUTCDCode(a),name:a.name,class:a.class,speed:a.speed,first_seen:a.first_seen,condition:a.condition||'',edited:!!a._edited}}))};dl(JSON.stringify(fc,null,2),'traffic_inventory.geojson','application/geo+json');toast('GeoJSON exported','ok')}
 function expKML(){if(!filtered.length)return toast('No data','err');const pm=filtered.filter(a=>a.lat&&a.lon).map(a=>'<Placemark><name>'+esc(a.name||'Asset')+'</name><description>'+getMUTCDCode(a)+'</description><Point><coordinates>'+a.lon+','+a.lat+',0</coordinates></Point></Placemark>').join('\n');dl('<?xml version="1.0"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Traffic Inventory</name>\n'+pm+'\n</Document></kml>','traffic_inventory.kml','application/vnd.google-earth.kml+xml');toast('KML exported','ok')}
-function expPDF(){if(!filtered.length)return toast('No data','err');const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape'});const pw=doc.internal.pageSize.getWidth();doc.setFillColor(30,64,175);doc.rect(0,0,pw,28,'F');doc.setTextColor(255);doc.setFontSize(14);doc.setFont('helvetica','bold');doc.text('CRASH LENS — Asset Inventory Report',pw/2,12,{align:'center'});doc.setFontSize(8);doc.setFont('helvetica','normal');doc.text(new Date().toLocaleDateString()+' | '+filtered.length.toLocaleString()+' assets',pw/2,20,{align:'center'});doc.setTextColor(0);doc.autoTable({startY:34,head:[['#','MUTCD','Name','Speed','Class','First Seen','Condition']],body:filtered.slice(0,1000).map((a,i)=>[i+1,getMUTCDCode(a),(a.name||'—').substring(0,25),a.speed||'—',(a.class||'').substring(0,30),a.first_seen||'—',a.condition||'Unknown']),styles:{fontSize:5.5,cellPadding:1.2},headStyles:{fillColor:[30,64,175]},margin:{left:8,right:8}});doc.save('traffic_inventory_'+new Date().toISOString().split('T')[0]+'.pdf');toast('PDF exported','ok')}
+function expPDF(){if(!filtered.length)return toast('No data','err');const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape'});const pw=doc.internal.pageSize.getWidth();doc.setFillColor(30,64,175);doc.rect(0,0,pw,28,'F');doc.setTextColor(255);doc.setFontSize(14);doc.setFont('helvetica','bold');doc.text('Asset Inventory Report',pw/2,12,{align:'center'});doc.setFontSize(8);doc.setFont('helvetica','normal');doc.text(new Date().toLocaleDateString()+' | '+filtered.length.toLocaleString()+' assets',pw/2,20,{align:'center'});doc.setTextColor(0);doc.autoTable({startY:34,head:[['#','MUTCD','Name','Speed','Class','First Seen','Condition']],body:filtered.slice(0,1000).map((a,i)=>[i+1,getMUTCDCode(a),(a.name||'—').substring(0,25),a.speed||'—',(a.class||'').substring(0,30),a.first_seen||'—',a.condition||'Unknown']),styles:{fontSize:5.5,cellPadding:1.2},headStyles:{fillColor:[30,64,175]},margin:{left:8,right:8}});doc.save('traffic_inventory_'+new Date().toISOString().split('T')[0]+'.pdf');toast('PDF exported','ok')}
 
 // ═══════════════════════════════════════════════
 // INIT
