@@ -1577,7 +1577,7 @@ async function runValidation() {
       if (!x || !y || x === '0' || y === '0' || parseFloat(x) === 0 || parseFloat(y) === 0) {
         APP.issues.push({
           idx: i, docNbr: getDoc(row), type: 'missing_gps', severity: 'error',
-          field: APP.detectedFields.x + ',' + APP.detectedFields.y,
+          field: 'x,y',
           message: 'Missing or zero GPS coordinates',
           currentValue: `lon=${x || 'empty'}, lat=${y || 'empty'}`,
           suggestedFix: null,
