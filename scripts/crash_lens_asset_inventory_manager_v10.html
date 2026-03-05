@@ -437,8 +437,8 @@ async function cSet(k,v){const db=await openDB();return new Promise((ok,no)=>{co
 // ═══════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════
-function getR2Key(){return $('stSel').value+'/'+$('coSel').value+'/traffic-inventory.csv'}
-function getLedgerKey(){return $('stSel').value+'/'+$('coSel').value+'/traffic-inventory-edits.json'}
+function getR2Key(){const st=$('stSel').value,co=$('coSel').value;if(!st||!co){toast('Select state & county first','warn');return null}return st+'/'+co+'/traffic-inventory.csv'}
+function getLedgerKey(){const st=$('stSel').value,co=$('coSel').value;if(!st||!co)return null;return st+'/'+co+'/traffic-inventory-edits.json'}
 function saveCfg(){localStorage.setItem('aim3_cfg',JSON.stringify({pub:$('pubUrl').value,worker:$('workerUrl').value,secret:$('r2Secret').value,state:$('stSel').value,county:$('coSel').value}))}
 function loadCfg(){
   try{
@@ -463,7 +463,7 @@ function loadCfg(){
       coSel.value=c.county;
     }
   }catch(e){}
-  $('r2Path').textContent=$('stSel').value+'/'+$('coSel').value;
+  _imUpdateR2Path();
 }
 
 // ═══════════════════════════════════════════════
@@ -472,7 +472,7 @@ function loadCfg(){
 async function loadData(){
   const btn=$('loadBtn');btn.disabled=true;btn.textContent='⏳ Loading…';saveCfg();
   try{
-    const fk=getR2Key(),pub=$('pubUrl').value.replace(/\/$/,'');let csv=null;
+    const fk=getR2Key();if(!fk){btn.disabled=false;btn.textContent='📥 Load Data';return}const pub=$('pubUrl').value.replace(/\/$/,'');let csv=null;
     try{const r=await fetch(pub+'/'+fk,{headers:{'X-Bucket':'CRASH_DATA'}});if(r.ok){csv=await r.text();toast('Loaded from R2','ok');$('hR2').textContent='R2: ✅'}}catch(e){}
     if(!csv){csv=await cGet(fk);if(csv)toast('Loaded from cache','warn')}
     if(!csv){toast('No data — upload CSV or check R2','err');btn.disabled=false;btn.textContent='📡 R2';return}
@@ -707,7 +707,8 @@ function renderMarkers(){
 async function searchAddr(){
   const q=$('mapSearch').value.trim();if(!q)return;
   try{
-    const stName=$('stSel').selectedOptions[0]?.textContent||'';
+    const stVal=$('stSel').value;
+    const stName=stVal?($('stSel').selectedOptions[0]?.textContent||''):'';
     const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q+(stName?', '+stName:'')));
     const d=await r.json();
     if(d.length>0){map.flyTo([parseFloat(d[0].lat),parseFloat(d[0].lon)],16,{duration:1});toast('📍 '+d[0].display_name.split(',').slice(0,2).join(','),'ok')}
@@ -989,6 +990,13 @@ function expPDF(){if(!filtered.length)return toast('No data','err');const{jsPDF}
 // ═══════════════════════════════════════════════
 const _imEmbedded=(window!==window.parent);
 let _imAllJurisdictions={};
+let _imByState={};
+let _imPendingJurisdiction=null; // Deferred im-set-jurisdiction if received before jurisdictions
+
+function _imUpdateR2Path(){
+  const st=$('stSel').value;const co=$('coSel').value;
+  $('r2Path').textContent=(st&&co)?st+'/'+co:'(select state & county)';
+}
 
 window.addEventListener('message',function(evt){
   if(!evt.data||!evt.data.type)return;
@@ -999,50 +1007,46 @@ window.addEventListener('message',function(evt){
     if(!incoming||typeof incoming!=='object')return;
     _imAllJurisdictions=incoming;
     // Group by state
-    const byState={};
+    _imByState={};
     Object.entries(incoming).forEach(([k,v])=>{
       const st=v.state||'unknown';
-      if(!byState[st])byState[st]={label:st.charAt(0).toUpperCase()+st.slice(1),counties:{}};
-      byState[st].counties[k]=v;
+      if(!_imByState[st])_imByState[st]={label:st.charAt(0).toUpperCase()+st.slice(1),counties:{}};
+      _imByState[st].counties[k]=v;
     });
     // Populate state dropdown
     const stSel=$('stSel');
     const prevSt=stSel.value;
     stSel.innerHTML='<option value="">— Select State —</option>';
-    Object.entries(byState).forEach(([stKey,stObj])=>{
+    Object.entries(_imByState).forEach(([stKey,stObj])=>{
       const o=document.createElement('option');
       o.value=stKey;o.textContent=stObj.label;
       stSel.appendChild(o);
     });
     if(prevSt&&stSel.querySelector('option[value="'+prevSt+'"]'))stSel.value=prevSt;
     // Rebuild county dropdown for current state
-    _imRebuildCountyDropdown(byState,stSel.value);
-    // Listen for state change to rebuild counties
-    stSel.onchange=function(){_imRebuildCountyDropdown(byState,stSel.value);saveCfg();$('r2Path').textContent=$('stSel').value+'/'+$('coSel').value};
+    _imRebuildCountyDropdown(stSel.value);
+    // Listen for state/county change
+    stSel.onchange=function(){_imRebuildCountyDropdown(stSel.value);_imUpdateR2Path();saveCfg()};
+    $('coSel').onchange=function(){_imUpdateR2Path();saveCfg()};
     console.log('[IM] Jurisdictions populated from parent:',Object.keys(incoming).length);
+    // Apply any deferred jurisdiction selection
+    if(_imPendingJurisdiction){
+      const p=_imPendingJurisdiction;_imPendingJurisdiction=null;
+      _imApplyJurisdiction(p.state,p.jurisdictionKey);
+    }
   }
 
   // Select a specific jurisdiction from parent
   if(evt.data.type==='im-set-jurisdiction'){
     const stKey=evt.data.state;
     const jKey=evt.data.jurisdictionKey;
-    if(stKey){
-      $('stSel').value=stKey;
-      // Trigger county rebuild
-      if(Object.keys(_imAllJurisdictions).length){
-        const byState={};
-        Object.entries(_imAllJurisdictions).forEach(([k,v])=>{
-          const st=v.state||'unknown';
-          if(!byState[st])byState[st]={label:st,counties:{}};
-          byState[st].counties[k]=v;
-        });
-        _imRebuildCountyDropdown(byState,stKey);
-      }
+    // Defer if jurisdictions not loaded yet
+    if(!Object.keys(_imAllJurisdictions).length){
+      _imPendingJurisdiction={state:stKey,jurisdictionKey:jKey};
+      console.log('[IM] Deferred jurisdiction selection (awaiting jurisdictions)');
+      return;
     }
-    if(jKey)$('coSel').value=jKey;
-    $('r2Path').textContent=$('stSel').value+'/'+$('coSel').value;
-    saveCfg();
-    console.log('[IM] Jurisdiction synced from parent:',stKey,jKey);
+    _imApplyJurisdiction(stKey,jKey);
   }
 
   // Receive R2 config from parent
@@ -1057,12 +1061,23 @@ window.addEventListener('message',function(evt){
   }
 });
 
-function _imRebuildCountyDropdown(byState,stateKey){
+function _imApplyJurisdiction(stKey,jKey){
+  if(stKey){
+    $('stSel').value=stKey;
+    _imRebuildCountyDropdown(stKey);
+  }
+  if(jKey)$('coSel').value=jKey;
+  _imUpdateR2Path();
+  saveCfg();
+  console.log('[IM] Jurisdiction synced from parent:',stKey,jKey);
+}
+
+function _imRebuildCountyDropdown(stateKey){
   const coSel=$('coSel');
   const prevCo=coSel.value;
   coSel.innerHTML='<option value="">— Select County —</option>';
-  if(!stateKey||!byState[stateKey])return;
-  Object.entries(byState[stateKey].counties).forEach(([k,v])=>{
+  if(!stateKey||!_imByState[stateKey])return;
+  Object.entries(_imByState[stateKey].counties).forEach(([k,v])=>{
     const o=document.createElement('option');
     o.value=k;o.textContent=v.name||k;
     coSel.appendChild(o);

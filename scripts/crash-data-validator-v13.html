@@ -3219,8 +3219,8 @@ window.addEventListener('message', function(evt) {
     // Rebuild dropdown grouped by state
     const preset = document.getElementById('jurisdictionPreset');
     if (preset) {
-      // Preserve custom option
-      const customOpt = preset.querySelector('option[value="custom"]');
+      // Save current selection so it can be restored after rebuild
+      const currentValue = preset.value;
       preset.innerHTML = '<option value="">— Select Jurisdiction —</option>';
       // Group by state
       const byState = {};
@@ -3240,11 +3240,12 @@ window.addEventListener('message', function(evt) {
         });
         preset.appendChild(grp);
       });
-      if (customOpt) preset.appendChild(customOpt);
-      else {
-        const co = document.createElement('option');
-        co.value = 'custom'; co.textContent = 'Custom Jurisdiction...';
-        preset.appendChild(co);
+      const co = document.createElement('option');
+      co.value = 'custom'; co.textContent = 'Custom Jurisdiction...';
+      preset.appendChild(co);
+      // Restore previous selection if still valid
+      if (currentValue && currentValue !== 'custom' && preset.querySelector('option[value="' + currentValue + '"]')) {
+        preset.value = currentValue;
       }
     }
     console.log('[Validator] Jurisdictions populated from parent:', Object.keys(JURISDICTIONS).length);
