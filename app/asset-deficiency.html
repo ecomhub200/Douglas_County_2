@@ -69,7 +69,7 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
 .map-stats{display:flex;gap:.8rem;align-items:center}
 .ms{text-align:center}.ms .v{font-size:1.1rem;font-weight:800;line-height:1}.ms .l{font-size:.5rem;color:var(--mu);text-transform:uppercase;letter-spacing:.04em}
 .ms.warrant .v{color:var(--er)}
-#defMap{height:calc(100vh - 240px);min-height:400px;max-height:700px;width:100%;background:#e2e8f0}
+#defMap{height:calc(100vh - 240px);min-height:350px;max-height:500px;width:100%;background:#e2e8f0}
 
 /* ── Map markers ── */
 .dm{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;border:2px solid rgba(255,255,255,.9);box-shadow:0 2px 6px rgba(0,0,0,.25);transition:transform .15s}
@@ -404,14 +404,68 @@ function setTierFilter(tier,btn){
 // ═══════════════════════════════════════════════════════════
 // MAP — Init immediately on page load
 // ═══════════════════════════════════════════════════════════
+let boundaryLayer=null,boundaryGeometry=null;
+const STATE_FIPS={'alabama':'01','alaska':'02','arizona':'04','arkansas':'05','california':'06','colorado':'08','connecticut':'09','delaware':'10','district_of_columbia':'11','florida':'12','georgia':'13','hawaii':'15','idaho':'16','illinois':'17','indiana':'18','iowa':'19','kansas':'20','kentucky':'21','louisiana':'22','maine':'23','maryland':'24','massachusetts':'25','michigan':'26','minnesota':'27','mississippi':'28','missouri':'29','montana':'30','nebraska':'31','nevada':'32','new_hampshire':'33','new_jersey':'34','new_mexico':'35','new_york':'36','north_carolina':'37','north_dakota':'38','ohio':'39','oklahoma':'40','oregon':'41','pennsylvania':'42','rhode_island':'44','south_carolina':'45','south_dakota':'46','tennessee':'47','texas':'48','utah':'49','vermont':'50','virginia':'51','washington':'53','west_virginia':'54','wisconsin':'55','wyoming':'56'};
+let _adJurisdiction=null;
+
 function initMap(){
   if(map)return;
-  map=L.map('defMap',{zoomControl:true,scrollWheelZoom:true}).setView([37.56,-77.46],11);
+  // Default to US center; will be updated when jurisdiction config arrives
+  const center=(_adJurisdiction&&_adJurisdiction.mapCenter)||[39.0,-98.0];
+  const zoom=(_adJurisdiction&&_adJurisdiction.mapZoom)||4;
+  map=L.map('defMap',{zoomControl:true,scrollWheelZoom:true}).setView(center,zoom);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OSM © CARTO',maxZoom:19}).addTo(map);
   clGrp=L.markerClusterGroup({maxClusterRadius:50,showCoverageOnHover:false,spiderfyOnMaxZoom:true,disableClusteringAtZoom:15});
   map.addLayer(clGrp);
   setTimeout(()=>map.invalidateSize(),100);
   setTimeout(()=>map.invalidateSize(),500);
+}
+
+// ═══════════════════════════════════════════════════════════
+// TigerWeb Boundary — jurisdiction-agnostic county boundary
+// ═══════════════════════════════════════════════════════════
+async function fetchTIGERBoundary(stateFips,countyFips){
+  const geoid=stateFips+countyFips.padStart(3,'0');
+  const urls=[
+    `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/86/query?where=GEOID%3D%27${geoid}%27&outFields=GEOID,NAME&f=geojson&outSR=4326`,
+    `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1/query?where=GEOID%3D%27${geoid}%27&outFields=GEOID,NAME&f=geojson&outSR=4326`
+  ];
+  for(const url of urls){
+    try{
+      const res=await fetch(url);if(!res.ok)continue;
+      const data=await res.json();
+      if(data.features&&data.features.length>0)return data.features[0].geometry;
+    }catch(e){continue}
+  }
+  throw new Error('Boundary not found for GEOID '+geoid);
+}
+
+async function loadBoundaryFromConfig(cfg){
+  if(!cfg||!cfg.fips||!map)return;
+  // Remove previous boundary
+  if(boundaryLayer){map.removeLayer(boundaryLayer);boundaryLayer=null}
+  boundaryGeometry=null;
+  // Extract state FIPS (first 2 digits) and county FIPS (remaining digits) from full FIPS
+  const fullFips=String(cfg.fips);
+  let stateFips,countyFips;
+  if(cfg.state&&STATE_FIPS[cfg.state]){
+    stateFips=STATE_FIPS[cfg.state];
+    countyFips=fullFips.length>2?fullFips.slice(stateFips.length):fullFips;
+  }else if(fullFips.length>=5){
+    stateFips=fullFips.slice(0,2);countyFips=fullFips.slice(2);
+  }else{log('Cannot determine state/county FIPS for boundary','wrn');return}
+  log('Fetching TIGER boundary (FIPS: '+stateFips+countyFips+')...','inf');
+  try{
+    boundaryGeometry=await fetchTIGERBoundary(stateFips,countyFips);
+    boundaryLayer=L.geoJSON({type:'Feature',geometry:boundaryGeometry},{
+      style:{color:'#059669',weight:3,fillColor:'#059669',fillOpacity:0.06,dashArray:null}
+    }).addTo(map);
+    // Fit map to boundary bounds
+    map.fitBounds(boundaryLayer.getBounds(),{padding:[30,30]});
+    log('Boundary loaded for '+stateFips+countyFips,'ok');
+  }catch(e){
+    log('Boundary unavailable: '+e.message,'wrn');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -977,8 +1031,15 @@ function renderAll(){
     requestAnimationFrame(()=>{inp.classList.add('collapsed')});
   }
   $('cfgToggle').classList.remove('hidden');$('cfgToggle').classList.remove('open');
-  if(DEFS.length){map.fitBounds(DEFS.map(d=>[d.lat,d.lng]),{padding:[40,40]});setTimeout(()=>map.invalidateSize(),200)}
+  if(DEFS.length){
+    map.fitBounds(DEFS.map(d=>[d.lat,d.lng]),{padding:[40,40]});
+    setTimeout(()=>map.invalidateSize(),200);
+    // Re-add boundary layer on top of markers if available
+    if(boundaryLayer)boundaryLayer.addTo(map);
+  }
   $('tierSummary').classList.remove('hidden');updateTierSummary();
+  // Scroll table into view so user can see it
+  setTimeout(()=>{$('tblSection').scrollIntoView({behavior:'smooth',block:'nearest'})},400);
 }
 function toggleConfig(){
   const btn=$('cfgToggle');
@@ -1459,12 +1520,19 @@ document.addEventListener('DOMContentLoaded',()=>{initMap()});
     // ── Receive jurisdiction config ──
     if(evt.data.type==='ad-config'&&evt.data.config){
       const cfg=evt.data.config;
+      _adJurisdiction=cfg;
       if(cfg.fips){const el=$('cFips');if(el)el.value=cfg.fips}
       // Populate R2 URLs for crash data and traffic inventory
       if(cfg.r2BaseUrl&&cfg.r2Path){
         const crEl=$('uCr');if(crEl)crEl.value=cfg.r2BaseUrl+'/'+cfg.r2Path+'/all_roads.csv';
         const inEl=$('uIn');if(inEl)inEl.value=cfg.r2BaseUrl+'/'+cfg.r2Path+'/traffic-inventory.csv';
       }
+      // Update map center to jurisdiction
+      if(cfg.mapCenter&&map){
+        map.setView(cfg.mapCenter,cfg.mapZoom||10);
+      }
+      // Fetch and display TigerWeb boundary
+      loadBoundaryFromConfig(cfg);
       log('Config: '+cfg.jurisdictionName+' (FIPS: '+cfg.fips+')','ok');
     }
   });

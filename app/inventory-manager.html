@@ -479,6 +479,14 @@ window.addEventListener('message',function(evt){
     $('coSel').value=evt.data.jurisdictionKey;
     $('r2Path').textContent=evt.data.state+'/'+evt.data.jurisdictionKey;
     saveCfg(); // Persist parent's selection to localStorage so it overrides stale defaults
+    // Update map center to jurisdiction
+    if(evt.data.mapCenter&&map){
+      map.setView(evt.data.mapCenter,evt.data.mapZoom||10);
+    }
+    // Fetch and display TigerWeb boundary
+    if(evt.data.fips){
+      imLoadBoundary(evt.data.fips,evt.data.stateKey||null);
+    }
     // Auto-load data if jurisdiction actually changed (or first load)
     const newKey=evt.data.state+'/'+evt.data.jurisdictionKey;
     if(newKey!==prevKey||!assets.length){loadData()}
@@ -700,6 +708,9 @@ function applyFilters(){
 // ═══════════════════════════════════════════════
 // MAP
 // ═══════════════════════════════════════════════
+let imBoundaryLayer=null,imBoundaryGeometry=null;
+const IM_STATE_FIPS={'alabama':'01','alaska':'02','arizona':'04','arkansas':'05','california':'06','colorado':'08','connecticut':'09','delaware':'10','district_of_columbia':'11','florida':'12','georgia':'13','hawaii':'15','idaho':'16','illinois':'17','indiana':'18','iowa':'19','kansas':'20','kentucky':'21','louisiana':'22','maine':'23','maryland':'24','massachusetts':'25','michigan':'26','minnesota':'27','mississippi':'28','missouri':'29','montana':'30','nebraska':'31','nevada':'32','new_hampshire':'33','new_jersey':'34','new_mexico':'35','new_york':'36','north_carolina':'37','north_dakota':'38','ohio':'39','oklahoma':'40','oregon':'41','pennsylvania':'42','rhode_island':'44','south_carolina':'45','south_dakota':'46','tennessee':'47','texas':'48','utah':'49','vermont':'50','virginia':'51','washington':'53','west_virginia':'54','wisconsin':'55','wyoming':'56'};
+
 function initMap(){
   if(map)return;
   map=L.map('assetMap',{zoomControl:true,scrollWheelZoom:true,preferCanvas:true}).setView([39.0,-98.0],4);
@@ -710,6 +721,52 @@ function initMap(){
   map.addLayer(clGrp);
   map.on('zoomend',()=>{$('mapZoom').textContent='Zoom: '+map.getZoom()});
   setTimeout(()=>map.invalidateSize(),200);setTimeout(()=>map.invalidateSize(),600);
+}
+
+// ═══════════════════════════════════════════════
+// TigerWeb Boundary — jurisdiction-agnostic county boundary
+// ═══════════════════════════════════════════════
+async function imFetchTIGERBoundary(stateFips,countyFips){
+  const geoid=stateFips+countyFips.padStart(3,'0');
+  const urls=[
+    `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/86/query?where=GEOID%3D%27${geoid}%27&outFields=GEOID,NAME&f=geojson&outSR=4326`,
+    `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1/query?where=GEOID%3D%27${geoid}%27&outFields=GEOID,NAME&f=geojson&outSR=4326`
+  ];
+  for(const url of urls){
+    try{
+      const res=await fetch(url);if(!res.ok)continue;
+      const data=await res.json();
+      if(data.features&&data.features.length>0)return data.features[0].geometry;
+    }catch(e){continue}
+  }
+  throw new Error('Boundary not found for GEOID '+geoid);
+}
+
+async function imLoadBoundary(fips,stateKey){
+  if(!fips||!map)return;
+  // Remove previous boundary
+  if(imBoundaryLayer){map.removeLayer(imBoundaryLayer);imBoundaryLayer=null}
+  imBoundaryGeometry=null;
+  // Extract state FIPS and county FIPS
+  const fullFips=String(fips);
+  let stateFips,countyFips;
+  if(stateKey&&IM_STATE_FIPS[stateKey]){
+    stateFips=IM_STATE_FIPS[stateKey];
+    countyFips=fullFips.length>2?fullFips.slice(stateFips.length):fullFips;
+  }else if(fullFips.length>=5){
+    stateFips=fullFips.slice(0,2);countyFips=fullFips.slice(2);
+  }else{console.warn('[IM] Cannot determine state/county FIPS for boundary');return}
+  console.log('[IM] Fetching TIGER boundary (FIPS: '+stateFips+countyFips+')...');
+  try{
+    imBoundaryGeometry=await imFetchTIGERBoundary(stateFips,countyFips);
+    imBoundaryLayer=L.geoJSON({type:'Feature',geometry:imBoundaryGeometry},{
+      style:{color:'#059669',weight:3,fillColor:'#059669',fillOpacity:0.06,dashArray:null}
+    }).addTo(map);
+    map.fitBounds(imBoundaryLayer.getBounds(),{padding:[30,30]});
+    toast('Boundary loaded','ok');
+  }catch(e){
+    console.warn('[IM] Boundary unavailable:',e.message);
+  }
 }
 
 function getMarkerIcon(row){
@@ -729,6 +786,8 @@ function renderMarkers(){
   $('mInfra').textContent=filtered.filter(a=>a._cat==='infra'||a._cat==='mark').length.toLocaleString();
   $('mEdited').textContent=filtered.filter(a=>a._edited).length.toLocaleString();
   if(markers.length>0){try{map.fitBounds(L.latLngBounds(markers.slice(0,5000).map(m=>m.getLatLng())),{padding:[30,30],maxZoom:14})}catch(e){}}
+  // Re-add boundary layer on top of markers
+  if(imBoundaryLayer)imBoundaryLayer.addTo(map);
 }
 
 // ═══════════════════════════════════════════════
