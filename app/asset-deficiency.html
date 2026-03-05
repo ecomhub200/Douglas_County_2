@@ -153,7 +153,7 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
 <div class="toast-c" id="tc"></div>
 <header class="app-h"><div class="hi">
   <div class="hb"><div class="hl">CL</div><div><h1>CRASH LENS — Sign &amp; Signal Deficiency v20</h1><small>MUTCD 11th Ed. • HPMS Cross-Validated FC • R2-1 Speed • BTS Enriched</small></div></div>
-  <div class="hp"><span class="hpi" id="pD">📋 No Data</span><span class="hpi" id="pC">🔍 0</span><span class="hpi" id="pS">Ready</span></div>
+  <div class="hp"><span class="hpi" id="pRoadType" style="background:rgba(59,130,246,.25);display:none" title="Road type filter from main app"></span><span class="hpi" id="pD">📋 No Data</span><span class="hpi" id="pC">🔍 0</span><span class="hpi" id="pS">Ready</span></div>
 </div></header>
 
 <div class="wrap">
@@ -1148,6 +1148,13 @@ document.addEventListener('DOMContentLoaded',()=>{initMap()});
       CRASH=evt.data.rows;
       procData(null,'crash','Parent App');
       log('Received '+CRASH.length+' crash records from app','ok');
+
+      // Display road type filter indicator from parent app
+      if(evt.data.roadTypeLabel){
+        var rtEl=$('pRoadType');
+        if(rtEl){rtEl.textContent='🛣️ '+evt.data.roadTypeLabel;rtEl.style.display=''}
+        log('Road type filter: '+evt.data.roadTypeLabel,'ok');
+      }
 
       // Auto-run analysis after a short delay to let config settle
       if(embedded&&CRASH.length>0){
