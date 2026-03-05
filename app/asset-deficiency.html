@@ -499,7 +499,7 @@ function tr(cc){const m={};cc.forEach(c=>{const r=rn(c.road);m[r]=(m[r]||0)+1});
 // ═══════════════════════════════════════════════════════════
 function initMap(){
   if(map)return;
-  map=L.map('defMap',{zoomControl:true,scrollWheelZoom:true}).setView([37.56,-77.46],11);
+  map=L.map('defMap',{zoomControl:true,scrollWheelZoom:true}).setView([39.0,-98.0],4);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OSM © CARTO',maxZoom:19}).addTo(map);
   clGrp=L.markerClusterGroup({maxClusterRadius:50,showCoverageOnHover:false,spiderfyOnMaxZoom:true,disableClusteringAtZoom:15});
   map.addLayer(clGrp);
@@ -1440,6 +1440,9 @@ document.addEventListener('DOMContentLoaded',()=>{initMap()});
         const crEl=$('uCr');if(crEl)crEl.value=cfg.r2BaseUrl+'/'+cfg.r2Path+'/all_roads.csv';
         const inEl=$('uIn');if(inEl)inEl.value=cfg.r2BaseUrl+'/'+cfg.r2Path+'/traffic-inventory.csv';
       }
+      // Recenter map to new jurisdiction
+      if(map&&cfg.mapCenter){map.setView(cfg.mapCenter,cfg.mapZoom||10)}
+      else if(map&&cfg.bbox){map.fitBounds([[cfg.bbox[1],cfg.bbox[0]],[cfg.bbox[3],cfg.bbox[2]]],{padding:[30,30]})}
       log('Config: '+cfg.jurisdictionName+' (FIPS: '+cfg.fips+')','ok');
     }
   });
