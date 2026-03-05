@@ -3209,6 +3209,49 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('message', function(evt) {
   if (!evt.data || !evt.data.type) return;
 
+  // Bulk-populate JURISDICTIONS and rebuild dropdown from parent
+  if (evt.data.type === 'validator-set-jurisdictions') {
+    const incoming = evt.data.jurisdictions;
+    if (!incoming || typeof incoming !== 'object') return;
+    // Clear existing and merge
+    Object.keys(JURISDICTIONS).forEach(k => delete JURISDICTIONS[k]);
+    Object.assign(JURISDICTIONS, incoming);
+    // Rebuild dropdown grouped by state
+    const preset = document.getElementById('jurisdictionPreset');
+    if (preset) {
+      // Save current selection so it can be restored after rebuild
+      const currentValue = preset.value;
+      preset.innerHTML = '<option value="">— Select Jurisdiction —</option>';
+      // Group by state
+      const byState = {};
+      Object.entries(JURISDICTIONS).forEach(([k, v]) => {
+        const st = v.state || 'unknown';
+        if (!byState[st]) byState[st] = [];
+        byState[st].push({ key: k, label: v.label || v.county || k });
+      });
+      Object.entries(byState).sort((a, b) => a[0].localeCompare(b[0])).forEach(([st, items]) => {
+        const grp = document.createElement('optgroup');
+        grp.label = st.charAt(0).toUpperCase() + st.slice(1);
+        items.sort((a, b) => a.label.localeCompare(b.label)).forEach(item => {
+          const o = document.createElement('option');
+          o.value = item.key;
+          o.textContent = item.label;
+          grp.appendChild(o);
+        });
+        preset.appendChild(grp);
+      });
+      const co = document.createElement('option');
+      co.value = 'custom'; co.textContent = 'Custom Jurisdiction...';
+      preset.appendChild(co);
+      // Restore previous selection if still valid
+      if (currentValue && currentValue !== 'custom' && preset.querySelector('option[value="' + currentValue + '"]')) {
+        preset.value = currentValue;
+      }
+    }
+    console.log('[Validator] Jurisdictions populated from parent:', Object.keys(JURISDICTIONS).length);
+    return;
+  }
+
   if (evt.data.type === 'validator-set-jurisdiction') {
     // Stop retry loop — parent responded
     window._jurisdictionReceived = true;
