@@ -150,14 +150,14 @@ td{padding:4px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:hover
 <!-- Data Source -->
 <div style="padding:6px;border-bottom:1px solid var(--bd)">
 <div style="display:flex;gap:4px;margin-bottom:6px">
-<button class="btn btn-p" onclick="loadData()" id="loadBtn" style="flex:1;padding:6px;font-size:11px">📡 Load from R2</button>
+<button class="btn btn-p" onclick="loadData()" id="loadBtn" style="flex:1;padding:6px;font-size:11px">📡 Load Data</button>
 <label style="cursor:pointer;padding:6px 10px;border:1px solid var(--bd);border-radius:5px;font-size:11px;font-weight:600;background:#fff;display:flex;align-items:center;gap:3px">📂 CSV<input type="file" accept=".csv" onchange="loadLocal(event)" hidden></label>
 </div>
-<button onclick="toggleCfg()" style="width:100%;padding:3px;border:1px solid var(--bd);border-radius:4px;background:#fff;cursor:pointer;font-size:9px;color:var(--mu)">⚙️ R2 Configuration <span id="cfgArrow">▶</span></button>
+<button onclick="toggleCfg()" style="width:100%;padding:3px;border:1px solid var(--bd);border-radius:4px;background:#fff;cursor:pointer;font-size:9px;color:var(--mu)">⚙️ Data Configuration <span id="cfgArrow">▶</span></button>
 </div>
 <!-- Config (hidden) -->
 <div class="cfg-panel" id="cfgPanel">
-<div class="cfg-row" style="display:none"><label>R2 Public</label><input id="pubUrl" value="https://data.aicreatesai.com" placeholder="R2 Public URL"></div>
+<div class="cfg-row" style="display:none"><label>Data Server</label><input id="pubUrl" value="https://data.aicreatesai.com" placeholder="R2 Public URL"></div>
 <div class="cfg-row"><label>Server</label><span id="r2ServerStatus" style="font-size:9px;color:var(--mu)">Checking...</span></div>
 <div class="cfg-row"><label>State</label><select id="stSel" disabled><option value="">—</option></select></div>
 <div class="cfg-row"><label>County</label><select id="coSel" disabled><option value="">—</option></select></div>
@@ -235,7 +235,7 @@ td{padding:4px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:hover
 <span class="stat"><b id="hTotal">0</b></span><span class="sep">·</span>
 <span class="stat"><b id="hFiltered">0</b> shown</span><span class="sep">·</span>
 <span class="stat"><b id="hEdited">0</b> edited</span><span class="sep">·</span>
-<span class="stat" id="hR2">R2: —</span>
+<span class="stat" id="hR2">Data: —</span>
 <div style="margin-left:auto;display:flex;gap:3px">
 <button class="btn btn-sm btn-o" onclick="expCSV()">CSV</button>
 <button class="btn btn-sm btn-o" onclick="expGeo()">GeoJSON</button>
@@ -309,7 +309,7 @@ td{padding:4px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:hover
 <div class="ef"><label>Notes</label><textarea id="edNotes" placeholder="Inspection notes…"></textarea></div>
 <div class="ef-row"><div class="ef"><label>Next Inspection</label><input type="date" id="edNI"></div><div class="ef"><label>Inspector</label><input id="edInsp" placeholder="Name or initials"></div></div>
 </div>
-<div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-ok" onclick="saveEdit(false)">💾 Save Local</button><button class="btn btn-wr" onclick="saveEdit(true)">☁️ Push R2</button><button class="btn btn-o" onclick="closeEditPanel()" style="margin-left:auto">Cancel</button></div>
+<div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-ok" onclick="saveEdit(false)">💾 Save Local</button><button class="btn btn-wr" onclick="saveEdit(true)">☁️ Push Data</button><button class="btn btn-o" onclick="closeEditPanel()" style="margin-left:auto">Cancel</button></div>
 </div>
 </div>
 
@@ -446,7 +446,7 @@ async function checkR2Status(){
     if(r.ok){const d=await r.json();r2Cfg.serverConfigured=d.configured;
       $('r2ServerStatus').textContent=d.configured?'✓ Connected':'Not Configured';
       $('r2ServerStatus').style.color=d.configured?'var(--gn)':'var(--or)';
-      if(d.configured)$('hR2').textContent='R2: ✅';
+      if(d.configured)$('hR2').textContent='Data: ✅';
     }
   }catch(e){$('r2ServerStatus').textContent='Server Offline';$('r2ServerStatus').style.color='var(--rd)';}
 }
@@ -511,13 +511,13 @@ async function loadData(){
   const btn=$('loadBtn');btn.disabled=true;btn.textContent='⏳ Loading…';saveCfg();
   try{
     const fk=getR2Key(),pub=r2Cfg.publicUrl.replace(/\/$/,'');let csv=null;
-    try{const r=await fetch(pub+'/'+fk);if(r.ok){csv=await r.text();toast('Loaded from R2','ok');$('hR2').textContent='R2: ✅'}}catch(e){}
+    try{const r=await fetch(pub+'/'+fk);if(r.ok){csv=await r.text();toast('Data loaded','ok');$('hR2').textContent='Data: ✅'}}catch(e){}
     if(!csv){csv=await cGet(fk);if(csv)toast('Loaded from cache','warn')}
-    if(!csv){toast('No data — upload CSV or check R2','err');btn.disabled=false;btn.textContent='📡 R2';return}
+    if(!csv){toast('No data — upload CSV or check server','err');btn.disabled=false;btn.textContent='📡 Load Data';return}
     await cSet(fk,csv).catch(()=>{});
     assets=await parseCSV(csv);await loadLedger();applyLedger();onDataLoaded();
   }catch(e){toast('Error: '+e.message,'err');console.error(e)}
-  btn.disabled=false;btn.textContent='📡 Load from R2';
+  btn.disabled=false;btn.textContent='📡 Load Data';
 }
 function loadLocal(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async ev=>{try{assets=await parseCSV(ev.target.result);await cSet(getR2Key(),ev.target.result).catch(()=>{});applyLedger();onDataLoaded();toast(assets.length.toLocaleString()+' assets — '+Object.keys(ledger).length+' edits preserved','ok')}catch(err){toast('Error: '+err.message,'err')}};r.readAsText(f)}
 
@@ -694,8 +694,8 @@ function applyFilters(){
   $('sFilter').textContent=filtered.length.toLocaleString();
   $('hFiltered').textContent=filtered.length.toLocaleString()+' shown';
   $('hEdited').textContent=assets.filter(a=>a._edited).length+' edited';
-  // Update sidebar counts from FILTERED data
-  const fc={};filtered.forEach(a=>{fc[a._cat]=(fc[a._cat]||0)+1});
+  // Update sidebar counts from ALL assets (not filtered) so other categories don't show 0
+  const fc={};assets.forEach(a=>{fc[a._cat]=(fc[a._cat]||0)+1});
   $('cntSpeed').textContent=(fc.speed||0).toLocaleString();
   $('cntReg').textContent=(fc.reg||0).toLocaleString();
   $('cntWarn').textContent=(fc.warn||0).toLocaleString();
@@ -1040,7 +1040,7 @@ async function saveEdit(push){
   if(isNew){const a={id:editingId,mutcd:src.mutcd,name:src.name,class:src.class_val,speed:src.speed,lat:src.lat,lon:src.lon,first_seen:src.first_seen,signal_heads:src.signal_heads,condition:cond||'',_notes:notes,_next_inspection:ni,_inspector:insp,_edited:true,_editTs:entry._ts,_isNew:true};a._cat=getCategory(a);assets.push(a);toast('New asset added: '+src.name,'ok')}
   else{const a=assets.find(x=>x.id===editingId);if(a){if(cond)a.condition=cond;a._notes=notes;a._next_inspection=ni;a._inspector=insp;if(src.mutcd)a.mutcd=src.mutcd;if(src.name)a.name=src.name;if(src.class_val)a.class=src.class_val;if(src.speed)a.speed=src.speed;if(src.first_seen)a.first_seen=src.first_seen;if(src.lat)a.lat=src.lat;if(src.lon)a.lon=src.lon;if(src.signal_heads)a.signal_heads=src.signal_heads;a._cat=getCategory(a);a._edited=true;a._editTs=entry._ts}toast('Saved','ok')}
   localStorage.setItem('aim3_ledger',JSON.stringify(ledger));
-  if(push){if(!r2Cfg.serverConfigured){toast('R2 server not configured','err');return}
+  if(push){if(!r2Cfg.serverConfigured){toast('Data server not configured','err');return}
     try{
       // CRITICAL: fetch remote ledger first, merge, then push — never overwrite
       let merged={...ledger};
@@ -1056,8 +1056,8 @@ async function saveEdit(push){
       // Update local ledger with merged result
       ledger=merged;localStorage.setItem('aim3_ledger',JSON.stringify(ledger));
       const r=await fetch('/api/r2/worker-upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({r2Key:getLedgerKey(),data:JSON.stringify(ledger),contentType:'application/json'})});
-      if(r.ok)toast('Pushed '+Object.keys(ledger).length+' edits to R2 ✅','ok');else toast('R2 push failed: '+r.status,'err');
-    }catch(e){toast('R2 error: '+e.message,'err')}}
+      if(r.ok)toast('Pushed '+Object.keys(ledger).length+' edits to server ✅','ok');else toast('Data push failed: '+r.status,'err');
+    }catch(e){toast('Data error: '+e.message,'err')}}
   updateStats();buildSubFilters();showAll();closeEditPanel();
 }
 function closeEditPanel(){editingId=null;$('editOverlay').classList.remove('open')}
