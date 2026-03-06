@@ -143,16 +143,12 @@ td{padding:4px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:hover
 <!-- ═══ SIDEBAR ═══ -->
 <div class="sidebar" id="sidebar">
 <div class="sb-top">
-<span class="sb-header-text">📋 Inventory Manager</span>
+<span class="sb-header-text"></span>
 <button class="sb-toggle" id="sbToggle" onclick="toggleSidebar()" title="Collapse">◀</button>
 </div>
 <div class="sb-content" id="sbContent">
 <!-- Data Source -->
 <div style="padding:6px;border-bottom:1px solid var(--bd)">
-<div style="display:flex;gap:4px;margin-bottom:6px">
-<button class="btn btn-p" onclick="loadData()" id="loadBtn" style="flex:1;padding:6px;font-size:11px">📡 Load Data</button>
-<label style="cursor:pointer;padding:6px 10px;border:1px solid var(--bd);border-radius:5px;font-size:11px;font-weight:600;background:#fff;display:flex;align-items:center;gap:3px">📂 CSV<input type="file" accept=".csv" onchange="loadLocal(event)" hidden></label>
-</div>
 <button onclick="toggleCfg()" style="width:100%;padding:3px;border:1px solid var(--bd);border-radius:4px;background:#fff;cursor:pointer;font-size:9px;color:var(--mu)">⚙️ Data Configuration <span id="cfgArrow">▶</span></button>
 </div>
 <!-- Config (hidden) -->
@@ -231,11 +227,9 @@ td{padding:4px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:hover
 <div class="main">
 <!-- Header -->
 <div class="hdr">
-<span class="logo">📋 Inventory Manager</span><span class="sep">|</span>
 <span class="stat"><b id="hTotal">0</b></span><span class="sep">·</span>
 <span class="stat"><b id="hFiltered">0</b> shown</span><span class="sep">·</span>
-<span class="stat"><b id="hEdited">0</b> edited</span><span class="sep">·</span>
-<span class="stat" id="hR2">Data: —</span>
+<span class="stat"><b id="hEdited">0</b> edited</span>
 <div style="margin-left:auto;display:flex;gap:3px">
 <button class="btn btn-sm btn-o" onclick="expCSV()">CSV</button>
 <button class="btn btn-sm btn-o" onclick="expGeo()">GeoJSON</button>
@@ -451,7 +445,6 @@ async function checkR2Status(){
     if(r.ok){const d=await r.json();r2Cfg.serverConfigured=d.configured;
       $('r2ServerStatus').textContent=d.configured?'✓ Connected':'Not Configured';
       $('r2ServerStatus').style.color=d.configured?'var(--gn)':'var(--or)';
-      if(d.configured)$('hR2').textContent='Data: ✅';
     }
   }catch(e){$('r2ServerStatus').textContent='Server Offline';$('r2ServerStatus').style.color='var(--rd)';}
 }
@@ -513,16 +506,15 @@ function loadCfg(){try{const c=JSON.parse(localStorage.getItem('aim3_cfg')||'{}'
 // LOAD DATA
 // ═══════════════════════════════════════════════
 async function loadData(){
-  const btn=$('loadBtn');btn.disabled=true;btn.textContent='⏳ Loading…';saveCfg();
+  saveCfg();
   try{
     const fk=getR2Key(),pub=r2Cfg.publicUrl.replace(/\/$/,'');let csv=null;
-    try{const r=await fetch(pub+'/'+fk);if(r.ok){csv=await r.text();toast('Data loaded','ok');$('hR2').textContent='Data: ✅'}}catch(e){}
+    try{const r=await fetch(pub+'/'+fk);if(r.ok){csv=await r.text();toast('Data loaded','ok')}}catch(e){}
     if(!csv){csv=await cGet(fk);if(csv)toast('Loaded from cache','warn')}
-    if(!csv){toast('No data — upload CSV or check server','err');btn.disabled=false;btn.textContent='📡 Load Data';return}
+    if(!csv){toast('No data — check server configuration','err');return}
     await cSet(fk,csv).catch(()=>{});
     assets=await parseCSV(csv);await loadLedger();applyLedger();onDataLoaded();
   }catch(e){toast('Error: '+e.message,'err');console.error(e)}
-  btn.disabled=false;btn.textContent='📡 Load Data';
 }
 function loadLocal(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async ev=>{try{assets=await parseCSV(ev.target.result);await cSet(getR2Key(),ev.target.result).catch(()=>{});applyLedger();onDataLoaded();toast(assets.length.toLocaleString()+' assets — '+Object.keys(ledger).length+' edits preserved','ok')}catch(err){toast('Error: '+err.message,'err')}};r.readAsText(f)}
 
