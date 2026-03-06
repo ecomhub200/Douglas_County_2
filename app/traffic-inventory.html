@@ -178,12 +178,10 @@
                     <div class="card">
                         <div class="card-header">
                             <span class="card-title">🔑 API Token</span>
-                            <span class="badge badge-warning" id="tokenStatus">Not Set</span>
+                            <span class="badge badge-warning" id="tokenStatus">Loading...</span>
                         </div>
-                        <div class="input-row">
-                            <input type="password" id="apiToken" placeholder="MLY|app_id|token">
-                            <button class="btn btn-primary btn-sm" onclick="saveToken()">Save</button>
-                            <button class="btn btn-ghost btn-sm" onclick="testToken()">Test</button>
+                        <div style="font-size:0.75rem;color:var(--text-muted);padding:0.25rem 0;">
+                            Token loaded from server configuration
                         </div>
                     </div>
                     <div class="card">
@@ -879,7 +877,7 @@
                     MAPILLARY_TO_KEY[mv] = key;
                 });
             });
-            initMap();populateJurisdictions();setupEventListeners();loadSavedToken();switchSeries('R');initSpeedFilterPanel();loadR2Config();
+            initMap();populateJurisdictions();setupEventListeners();loadApiToken();switchSeries('R');initSpeedFilterPanel();loadR2Config();
 
             // Listen for jurisdiction data and selection sync from parent app
             window.addEventListener('message', function(evt) {
@@ -944,16 +942,24 @@
             });
         }
 
-        function loadSavedToken(){if(apiToken){document.getElementById('apiToken').value=apiToken;updateTokenStatus(true);}}
-        function saveToken(){apiToken=document.getElementById('apiToken').value.trim();if(apiToken){localStorage.setItem('mapillary_token',apiToken);updateTokenStatus(true);showToast('Saved','success');}}
-        async function testToken(){
-            const t=document.getElementById('apiToken').value.trim();
-            if(!t)return showToast('Enter token','error');
-            try{const r=await fetch('https://graph.mapillary.com/map_features?fields=id&bbox=-77.45,37.55,-77.44,37.56&limit=1',{headers:{'Authorization':`OAuth ${t}`}});
-            if(r.ok){updateTokenStatus(true);showToast('Valid!','success');}else{updateTokenStatus(false);showToast('Invalid','error');}}
-            catch(e){showToast('Error','error');}
+        async function loadApiToken(){
+            try{
+                const r=await fetch('../config/api-keys.json');
+                if(!r.ok)throw new Error('HTTP '+r.status);
+                const keys=await r.json();
+                if(keys.mapillary?.accessToken){
+                    apiToken=keys.mapillary.accessToken;
+                    updateTokenStatus(true);
+                    console.log('[Traffic Inventory] Mapillary token loaded from server config');
+                    return;
+                }
+            }catch(e){console.warn('[Traffic Inventory] Config fetch failed:',e.message);}
+            // Fallback: localStorage for local development
+            const saved=localStorage.getItem('mapillary_token');
+            if(saved){apiToken=saved;updateTokenStatus(true);console.log('[Traffic Inventory] Mapillary token from localStorage fallback');}
+            else{updateTokenStatus(false);console.warn('[Traffic Inventory] No Mapillary token available');}
         }
-        function updateTokenStatus(v){const el=document.getElementById('tokenStatus');el.className=`badge ${v?'badge-success':'badge-warning'}`;el.textContent=v?'✓ Valid':'Not Set';}
+        function updateTokenStatus(v){const el=document.getElementById('tokenStatus');el.className=`badge ${v?'badge-success':'badge-warning'}`;el.textContent=v?'✓ Configured':'Not Configured';}
 
         function updateJurisdiction(){
             const v=document.getElementById('jurisdiction').value;
@@ -1094,7 +1100,7 @@
         }
 
         async function startDownload(){
-            if(!apiToken)return showToast('Set token','error');
+            if(!apiToken)return showToast('Mapillary token not configured. Contact administrator.','error');
             if(!currentJurisdiction)return showToast('Select jurisdiction','error');
             const selected=[];document.querySelectorAll('.asset-item input:checked').forEach(cb=>selected.push(cb.value));
             if(!selected.length)return showToast('Select assets','error');
