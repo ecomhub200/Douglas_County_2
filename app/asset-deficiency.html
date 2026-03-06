@@ -301,7 +301,7 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
       <th>#</th><th onclick="doSort('type')">Type ↕</th><th onclick="doSort('road')">Road ↕</th>
       <th onclick="doSort('fc')">FC ↕</th><th onclick="doSort('spd')">Spd ↕</th>
       <th onclick="doSort('cnt')">Qual ↕</th><th onclick="doSort('sev')">Severity ↕</th><th onclick="doSort('epdo')">EPDO ↕</th>
-      <th>Status</th><th>Why — Action Required</th>
+      <th onclick="doSort('crit')">Tier ↕</th><th>Status</th><th>Why — Action Required</th>
     </tr></thead><tbody id="tBody"></tbody></table>
   </div>
   <div class="tbl-footer">
@@ -1041,7 +1041,7 @@ function renderAll(){
   }
   $('tierSummary').classList.remove('hidden');updateTierSummary();
   // Scroll table into view so user can see it
-  setTimeout(()=>{$('tblSection').scrollIntoView({behavior:'smooth',block:'nearest'})},400);
+  setTimeout(()=>{$('tblSection').scrollIntoView({behavior:'smooth',block:'start'})},600);
 }
 function toggleConfig(){
   const btn=$('cfgToggle');
@@ -1461,6 +1461,8 @@ document.addEventListener('DOMContentLoaded',()=>{initMap()});
       const inp=$('inputSection');if(inp)inp.style.display='none';
       // Hide header entirely when embedded
       const hdr=document.querySelector('.app-h');if(hdr)hdr.style.display='none';
+      // Reduce map height so the results table is visible below it
+      var defMap=$('defMap');if(defMap)defMap.style.maxHeight='350px';
 
       // Create embedded config panel before the map section
       var cfgPanel=document.createElement('div');
