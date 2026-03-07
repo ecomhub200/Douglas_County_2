@@ -19,6 +19,7 @@ import sys
 import json
 import argparse
 import smtplib
+import uuid
 import urllib.request
 import urllib.error
 from email.mime.text import MIMEText
@@ -100,7 +101,10 @@ def send_via_brevo_api(to_email, subject, html_body, text_body):
         "subject": subject,
         "htmlContent": html_body,
         "textContent": text_body,
-        "tags": ["crash-lens", "transactional"]
+        "tags": ["crash-lens", "transactional"],
+        "headers": {
+            "X-Entity-Ref-ID": str(uuid.uuid4())
+        }
     })
 
     req = urllib.request.Request(
@@ -142,7 +146,6 @@ def send_via_brevo_smtp(to_email, subject, html_body, text_body):
     msg['From'] = f"CRASH LENS <{FROM_EMAIL}>"
     msg['To'] = to_email
     msg['Subject'] = subject
-    msg['X-Mailer'] = 'CRASH-LENS-Notifications/1.0'
 
     msg.attach(MIMEText(text_body, 'plain', CHARSET))
     msg.attach(MIMEText(html_body, 'html', CHARSET))
@@ -425,7 +428,7 @@ Data Source: Virginia DMV Crash Records
     """
 
     return {
-        'subject': f"[CRASH LENS] Your {frequency.title()} Crash Report - {datetime.now().strftime('%B %Y')}",
+        'subject': f"CRASH LENS - Your {frequency.title()} Crash Report - {datetime.now().strftime('%B %Y')}",
         'html': html_body,
         'text': text_body
     }
@@ -503,7 +506,7 @@ def generate_grant_alert_email(subscriber, upcoming_grants):
     """
 
     return {
-        'subject': f"[CRASH LENS] Grant Deadline Alert - {len(relevant_grants)} Upcoming",
+        'subject': f"CRASH LENS - Grant Deadline Alert - {len(relevant_grants)} Upcoming",
         'html': html_body,
         'text': f"Grant deadlines approaching: {', '.join(g['name'] for g in relevant_grants)}"
     }
@@ -602,7 +605,7 @@ def generate_weekly_digest_email(subscriber, crash_summary, upcoming_grants):
     """
 
     return {
-        'subject': f"[CRASH LENS] Weekly Safety Digest - {datetime.now().strftime('%B %d')}",
+        'subject': f"CRASH LENS - Weekly Safety Digest - {datetime.now().strftime('%B %d')}",
         'html': html_body,
         'text': f"Weekly digest for {datetime.now().strftime('%B %d, %Y')}"
     }
@@ -611,7 +614,7 @@ def generate_test_email(email):
     """Generate test email."""
     mode = "API" if BREVO_API_KEY else "SMTP"
     return {
-        'subject': "[CRASH LENS] Test Notification - Configuration Verified",
+        'subject': "CRASH LENS - Test Notification - Configuration Verified",
         'html': f"""
         <!DOCTYPE html>
         <html>

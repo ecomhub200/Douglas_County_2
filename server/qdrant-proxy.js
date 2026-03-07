@@ -148,8 +148,10 @@ function sendViaBrevoApi(recipients, subject, htmlBody, textBody, attachment, op
             htmlContent: htmlBody,
             textContent: textBody || '',
             headers: {
-                'List-Unsubscribe': '<mailto:unsubscribe@crashlens.aicreatesai.com?subject=unsubscribe>',
-                'X-Entity-Ref-ID': crypto.randomUUID()
+                'X-Entity-Ref-ID': crypto.randomUUID(),
+                ...(options.includeListHeaders ? {
+                    'List-Unsubscribe': '<mailto:unsubscribe@crashlens.aicreatesai.com?subject=unsubscribe>'
+                } : {})
             }
         };
 
