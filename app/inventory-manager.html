@@ -264,7 +264,7 @@ td{padding:4px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:hover
 <table><thead><tr>
 <th onclick="doSort('idx')">#</th><th onclick="doSort('cat')">CAT</th><th onclick="doSort('name')">SIGN</th>
 <th onclick="doSort('mutcd')">MUTCD</th><th onclick="doSort('speed')">SPD</th>
-<th onclick="doSort('first_seen')">FIRST SEEN</th><th onclick="doSort('cond')">COND</th><th>⚡</th>
+<th onclick="doSort('first_seen')">FIRST SEEN</th><th onclick="doSort('cond')">COND</th><th>SV</th><th>⚡</th>
 </tr><tr class="col-filters">
 <td></td>
 <td><select id="fCat" onchange="applyFilters()" style="width:100%;font-size:8px;padding:1px;border:1px solid var(--bd);border-radius:2px"><option value="">All</option></select></td>
@@ -273,7 +273,7 @@ td{padding:4px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}tr:hover
 <td><input id="fSpd" oninput="applyFilters()" placeholder="Filter…" style="width:100%;font-size:8px;padding:1px 3px;border:1px solid var(--bd);border-radius:2px"></td>
 <td></td>
 <td><select id="fCond" onchange="applyFilters()" style="width:100%;font-size:8px;padding:1px;border:1px solid var(--bd);border-radius:2px"><option value="">All</option><option value="Good">Good</option><option value="Fair">Fair</option><option value="Poor">Poor</option><option value="Missing">Missing</option><option value="Unknown">Unknown</option></select></td>
-<td></td>
+<td></td><td></td>
 </tr></thead><tbody id="tBody"></tbody></table>
 </div>
 <div class="pag" id="pagBtns"></div>
@@ -815,7 +815,7 @@ function buildPopup(a){
   if(a.signal_heads)h+='<div class="pop-row"><span class="k">Signal Heads</span><span class="val">'+esc(a.signal_heads)+'</span></div>';
   h+='<div class="pop-row"><span class="k">Lat / Lon</span><span class="val">'+a.lat.toFixed(5)+', '+a.lon.toFixed(5)+'</span></div>';
   if(a._notes)h+='<div class="pop-row"><span class="k">Notes</span><span class="val" style="white-space:normal;max-width:160px">'+esc(a._notes)+'</span></div>';
-  h+='</div><div class="pop-actions"><button class="btn btn-p btn-sm" onclick="openEdit(\''+a.id+'\')">✏️ Edit</button><button class="btn btn-o btn-sm" onclick="flyTo(\''+a.id+'\')">🎯 Zoom</button></div></div>';
+  h+='</div><div class="pop-actions"><button class="btn btn-p btn-sm" onclick="openEdit(\''+a.id+'\')">✏️ Edit</button><button class="btn btn-o btn-sm" onclick="flyTo(\''+a.id+'\')">🎯 Zoom</button><button class="btn btn-o btn-sm" onclick="openStreetView('+a.lat+','+a.lon+')">🛣️ Street View</button></div></div>';
   return h;
 }
 
@@ -847,6 +847,7 @@ function renderTable(){
     h+='<td style="font-family:\'JetBrains Mono\',monospace;font-size:10px">'+esc(mc)+'</td>';
     h+='<td>'+(a.speed||'—')+'</td><td>'+esc(a.first_seen||'—')+'</td>';
     h+='<td><span class="cond-badge cond-'+cond.toLowerCase()+'">'+cond+'</span></td>';
+    h+='<td><button class="btn btn-sm btn-o" onclick="event.stopPropagation();openStreetView('+a.lat+','+a.lon+')" title="Google Street View">🛣️</button></td>';
     h+='<td><button class="btn btn-sm btn-p" onclick="event.stopPropagation();openEdit(\''+a.id+'\')">✏️</button></td></tr>';
   });
   $('tBody').innerHTML=h;$('tblCount').textContent=filtered.length.toLocaleString();
@@ -985,6 +986,8 @@ function autoFillClass(){
 // FLY TO / EDIT / ADD NEW
 // ═══════════════════════════════════════════════
 function flyTo(id){const a=assets.find(x=>x.id===id);if(!a||!map)return;map.flyTo([a.lat,a.lon],18,{duration:.8});const mk=layersByAsset[id];if(mk)setTimeout(()=>{clGrp.zoomToShowLayer(mk,()=>{mk.openPopup()})},900)}
+
+function openStreetView(lat,lon){if(!lat||!lon)return;window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+lat+','+lon+'&heading=0','_blank')}
 
 function addNewAsset(){
   editingId='NEW_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
