@@ -452,7 +452,17 @@ async function loadBoundaryFromConfig(cfg){
   let stateFips,countyFips;
   if(cfg.state&&STATE_FIPS[cfg.state]){
     stateFips=STATE_FIPS[cfg.state];
-    countyFips=fullFips.length>2?fullFips.slice(stateFips.length):fullFips;
+    // Handle county-only FIPS (e.g., "035") vs full state+county FIPS (e.g., "08035")
+    if(fullFips.length<=3){
+      // County-only FIPS — use directly
+      countyFips=fullFips;
+    }else if(fullFips.startsWith(stateFips)){
+      // Full state+county FIPS — extract county portion
+      countyFips=fullFips.slice(stateFips.length);
+    }else{
+      // Fallback: assume first 2 chars are state FIPS
+      countyFips=fullFips.slice(2);
+    }
   }else if(fullFips.length>=5){
     stateFips=fullFips.slice(0,2);countyFips=fullFips.slice(2);
   }else{log('Cannot determine state/county FIPS for boundary','wrn');return}
