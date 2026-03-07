@@ -16,6 +16,7 @@ const url = require('url');
 const fs = require('fs');
 const path = require('path');
 const { S3Client, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const crypto = require('crypto');
 
 const PORT = process.env.PROXY_PORT || 3001;
 
@@ -132,7 +133,7 @@ function getCorsHeaders(origin) {
 // Brevo Email Helpers
 // =============================================================================
 
-function sendViaBrevoApi(recipients, subject, htmlBody, textBody, attachment) {
+function sendViaBrevoApi(recipients, subject, htmlBody, textBody, attachment, options = {}) {
     return new Promise((resolve, reject) => {
         // recipients can be a string (single email) or array of strings/objects
         const toList = Array.isArray(recipients)
@@ -140,12 +141,22 @@ function sendViaBrevoApi(recipients, subject, htmlBody, textBody, attachment) {
             : [{ email: recipients }];
 
         const emailPayload = {
-            sender: { email: NOTIFICATION_FROM_EMAIL, name: 'CRASH LENS' },
+            sender: { email: NOTIFICATION_FROM_EMAIL, name: options.senderName || 'CRASH LENS Reports' },
             to: toList,
+            replyTo: { email: 'support@aicreatesai.com', name: 'CRASH LENS Support' },
             subject: subject,
             htmlContent: htmlBody,
-            textContent: textBody || ''
+            textContent: textBody || '',
+            headers: {
+                'List-Unsubscribe': '<mailto:unsubscribe@crashlens.aicreatesai.com?subject=unsubscribe>',
+                'X-Entity-Ref-ID': crypto.randomUUID()
+            }
         };
+
+        // Tag for Brevo tracking/analytics
+        if (options.tag) {
+            emailPayload.tags = [options.tag];
+        }
 
         // Support PDF attachment: {content: base64String, name: 'report.pdf'}
         if (attachment && attachment.content && attachment.name) {
@@ -276,7 +287,7 @@ const server = http.createServer((req, res) => {
                 return;
             }
 
-            const { to, subject, html, text, attachment } = payload;
+            const { to, subject, html, text, attachment, tag } = payload;
             if (!to || !subject || !html) {
                 res.writeHead(400, corsHeaders);
                 res.end(JSON.stringify({ error: 'Missing required fields: to, subject, html' }));
@@ -286,7 +297,7 @@ const server = http.createServer((req, res) => {
             const recipientList = Array.isArray(to) ? to : [to];
             console.log(`[Brevo] Sending email to ${recipientList.length} recipient(s): "${subject}"${attachment ? ' [+PDF attachment]' : ''}`);
 
-            sendViaBrevoApi(recipientList, subject, html, text, attachment)
+            sendViaBrevoApi(recipientList, subject, html, text, attachment, { tag: tag || 'crash-report' })
                 .then(result => {
                     console.log(`[Brevo] Email sent successfully to ${recipientList.join(', ')}`);
                     res.writeHead(200, corsHeaders);
@@ -525,6 +536,135 @@ const server = http.createServer((req, res) => {
                 });
         }).catch(err => {
             console.error(`[R2 Upload] Body error: ${err.message}`);
+            res.writeHead(413, corsHeaders);
+            res.end(JSON.stringify({ error: 'Request too large', message: err.message }));
+        });
+        return;
+    }
+
+    // ---- R2 upload: upload PDF report for email download links ----
+    if (req.url === '/notify/upload-report' && req.method === 'POST') {
+        // Check if R2 Worker is configured (preferred for public URLs)
+        const hasR2Worker = !!(R2_WORKER_URL && R2_WORKER_SECRET);
+        const hasR2Direct = !!(CF_ACCOUNT_ID && CF_R2_ACCESS_KEY_ID && CF_R2_SECRET_ACCESS_KEY);
+
+        if (!hasR2Worker && !hasR2Direct) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({
+                error: 'R2 not configured',
+                message: 'R2 Worker or direct R2 credentials required for PDF hosting'
+            }));
+            return;
+        }
+
+        collectBody(req, 50 * 1024 * 1024).then(body => {
+            let payload;
+            try {
+                payload = JSON.parse(body);
+            } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { base64, filename } = payload;
+            if (!base64 || !filename) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Missing required fields: base64, filename' }));
+                return;
+            }
+
+            // Sanitize filename
+            const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const reportId = crypto.randomUUID();
+            const r2Key = `reports/${reportId}/${safeName}`;
+            const pdfBuffer = Buffer.from(base64, 'base64');
+
+            console.log(`[R2 Report] Uploading PDF: ${r2Key} (${(pdfBuffer.length / 1024).toFixed(1)} KB)`);
+
+            if (hasR2Worker) {
+                // Upload via R2 Worker (preferred - provides public URL)
+                const uploadUrl = `${R2_WORKER_URL.replace(/\/+$/, '')}/${r2Key}`;
+                const workerUrl = new URL(uploadUrl);
+
+                const uploadReq = https.request({
+                    hostname: workerUrl.hostname,
+                    port: 443,
+                    path: workerUrl.pathname,
+                    method: 'PUT',
+                    headers: {
+                        'X-Upload-Secret': R2_WORKER_SECRET,
+                        'Content-Type': 'application/pdf',
+                        'Content-Length': pdfBuffer.length
+                    }
+                }, (workerRes) => {
+                    let data = '';
+                    workerRes.on('data', chunk => { data += chunk; });
+                    workerRes.on('end', () => {
+                        if (workerRes.statusCode >= 200 && workerRes.statusCode < 300) {
+                            const downloadUrl = `${R2_WORKER_URL.replace(/\/+$/, '')}/${r2Key}`;
+                            console.log(`[R2 Report] Upload success: ${downloadUrl}`);
+                            res.writeHead(200, corsHeaders);
+                            res.end(JSON.stringify({
+                                success: true,
+                                downloadUrl,
+                                r2Key,
+                                size: pdfBuffer.length
+                            }));
+                        } else {
+                            console.error(`[R2 Report] Worker upload failed: ${workerRes.statusCode} ${data}`);
+                            res.writeHead(500, corsHeaders);
+                            res.end(JSON.stringify({ error: 'R2 Worker upload failed', message: data }));
+                        }
+                    });
+                });
+                uploadReq.on('error', (err) => {
+                    console.error(`[R2 Report] Worker request error: ${err.message}`);
+                    res.writeHead(500, corsHeaders);
+                    res.end(JSON.stringify({ error: 'R2 Worker request failed', message: err.message }));
+                });
+                uploadReq.write(pdfBuffer);
+                uploadReq.end();
+            } else {
+                // Upload via direct S3 API
+                const s3Client = new S3Client({
+                    region: 'auto',
+                    endpoint: `https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+                    credentials: {
+                        accessKeyId: CF_R2_ACCESS_KEY_ID,
+                        secretAccessKey: CF_R2_SECRET_ACCESS_KEY,
+                    }
+                });
+
+                const putCmd = new PutObjectCommand({
+                    Bucket: R2_BUCKET_NAME,
+                    Key: r2Key,
+                    Body: pdfBuffer,
+                    ContentType: 'application/pdf',
+                    ContentDisposition: `inline; filename="${safeName}"`,
+                });
+
+                s3Client.send(putCmd)
+                    .then(() => {
+                        // Direct S3 upload doesn't have a public URL by default
+                        // Return the key so the front-end can construct the Worker URL if available
+                        console.log(`[R2 Report] Direct upload success: ${r2Key}`);
+                        res.writeHead(200, corsHeaders);
+                        res.end(JSON.stringify({
+                            success: true,
+                            r2Key,
+                            size: pdfBuffer.length,
+                            message: 'Uploaded via direct R2. Configure R2_WORKER_URL for public download links.'
+                        }));
+                    })
+                    .catch(err => {
+                        console.error(`[R2 Report] Direct upload failed: ${err.message}`);
+                        res.writeHead(500, corsHeaders);
+                        res.end(JSON.stringify({ error: 'R2 upload failed', message: err.message }));
+                    });
+            }
+        }).catch(err => {
+            console.error(`[R2 Report] Body error: ${err.message}`);
             res.writeHead(413, corsHeaders);
             res.end(JSON.stringify({ error: 'Request too large', message: err.message }));
         });

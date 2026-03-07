@@ -141,13 +141,103 @@ Your sender email isn't verified in Brevo:
 1. Go to **Settings > Senders** in Brevo
 2. Add and verify `notifications@crashlens.aicreatesai.com`
 
-### Emails going to spam
-1. Verify your domain (not just the email) in Brevo
-2. Add SPF + DKIM DNS records
-3. Start with small volumes, then increase
+### Emails going to spam / quarantine (especially .gov recipients)
+
+Government email gateways (Microsoft Defender, Proofpoint, Barracuda) require **all three** DNS authentication records to pass. Missing any one of them causes quarantine with "bulk" tag.
+
+**Follow the Cloudflare DNS Configuration section below to fix this.**
+
+### PDF attachments blocked by government email
+
+Government security gateways often strip or sandbox PDF attachments from low-reputation senders. The application now automatically uploads PDFs to Cloudflare R2 and includes a **download link** in the email body as a fallback. Recipients can click the link even if the attachment is stripped.
+
+To enable this, ensure R2 Worker is configured (see `R2_WORKER_URL` and `R2_WORKER_SECRET` env vars).
 
 ### No emails received but no errors
 Check `data/subscribers.json` — subscribers need `"verified": true` and `"enabled": true`.
+
+## Cloudflare DNS Configuration (Required for Government Email Delivery)
+
+If your DNS is managed by **Cloudflare**, follow these exact steps. All four record types are **required** for reliable delivery to .gov addresses.
+
+### Prerequisites
+1. Log into **Brevo Dashboard → Settings → Senders, Domains & Dedicated IPs → Domains**
+2. Click **"Add a domain"** → enter `crashlens.aicreatesai.com`
+3. Brevo will display the exact DNS record values you need
+
+### Add DNS Records in Cloudflare
+
+Go to **Cloudflare Dashboard → DNS → Records** for the `aicreatesai.com` domain.
+
+> **CRITICAL**: All email DNS records must have proxy **toggled OFF** (gray cloud icon = "DNS only"). Cloudflare's orange-cloud proxy does NOT work with email authentication.
+
+#### Record 1: SPF (Sender Policy Framework)
+
+| Field | Value |
+|-------|-------|
+| Type | `TXT` |
+| Name | `crashlens` |
+| Content | `v=spf1 include:sendinblue.com ~all` |
+| TTL | Auto |
+| Proxy | **DNS only** (gray cloud) |
+
+> If an SPF record already exists for `crashlens.aicreatesai.com`, **merge** them into one record. Only ONE SPF record is allowed per domain. Example: `v=spf1 include:sendinblue.com include:_spf.google.com ~all`
+
+#### Record 2: DKIM (DomainKeys Identified Mail)
+
+| Field | Value |
+|-------|-------|
+| Type | `TXT` |
+| Name | *(from Brevo — typically `mail._domainkey.crashlens`)* |
+| Content | *(from Brevo — starts with `v=DKIM1; k=rsa; p=MIGf...`)* |
+| TTL | Auto |
+| Proxy | **DNS only** (gray cloud) |
+
+#### Record 3: DMARC (Domain-based Message Authentication)
+
+This is the **most commonly missed record** and the #1 reason government emails get quarantined.
+
+| Field | Value |
+|-------|-------|
+| Type | `TXT` |
+| Name | `_dmarc.crashlens` |
+| Content | `v=DMARC1; p=none; rua=mailto:dmarc@aicreatesai.com; pct=100; adkim=r; aspf=r` |
+| TTL | Auto |
+| Proxy | **DNS only** (gray cloud) |
+
+> Start with `p=none` (monitor mode). Once email authentication is confirmed passing, upgrade to `p=quarantine` and eventually `p=reject` for maximum protection.
+
+#### Record 4: Brevo Domain Verification
+
+| Field | Value |
+|-------|-------|
+| Type | `TXT` |
+| Name | `crashlens` |
+| Content | *(from Brevo — verification code like `brevo-code:xxxxxxxxxxxx`)* |
+| TTL | Auto |
+
+### Verify DNS Records
+
+1. After adding all records, go back to **Brevo → Domains** and click **"Verify"**
+2. DNS propagation is usually instant with Cloudflare but can take up to 24 hours
+3. Verify with command line:
+   ```bash
+   # Check SPF
+   dig TXT crashlens.aicreatesai.com +short
+
+   # Check DKIM
+   dig TXT mail._domainkey.crashlens.aicreatesai.com +short
+
+   # Check DMARC
+   dig TXT _dmarc.crashlens.aicreatesai.com +short
+   ```
+4. Use [mail-tester.com](https://www.mail-tester.com) to send a test email and verify your score (aim for 9+/10)
+
+### Cloudflare-Specific Warnings
+
+- **Never proxy email DNS records** — TXT, MX, and CNAME records for email authentication must always be "DNS only" (gray cloud)
+- **Email Routing conflict** — If Cloudflare Email Routing is enabled for the `crashlens` subdomain, ensure it doesn't override your MX/TXT records
+- **DNSSEC** — If DNSSEC is enabled on Cloudflare, ensure it's properly configured (Brevo recommends it for DMARC alignment)
 
 ## Cost
 
