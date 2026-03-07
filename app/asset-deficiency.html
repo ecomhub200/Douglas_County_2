@@ -163,6 +163,11 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
 /* ── NEW: Tier Summary Card ── */
 .tier-summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem}
 @media(max-width:700px){.tier-summary-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* ── Navigate to Warrants button ── */
+.nav-warrant-btn{display:inline-flex;align-items:center;gap:.2rem;padding:.2rem .45rem;font-size:.58rem;font-weight:700;border:1.5px solid var(--p);background:linear-gradient(135deg,#eff6ff,#dbeafe);color:var(--p);border-radius:4px;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:inherit}
+.nav-warrant-btn:hover{background:var(--p);color:#fff;transform:translateY(-1px);box-shadow:0 2px 6px rgba(30,64,175,.25)}
+.nav-warrant-btn .arrow{font-size:.7rem;transition:transform .15s}.nav-warrant-btn:hover .arrow{transform:translateX(2px)}
 </style>
 </head>
 <body>
@@ -303,7 +308,7 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
       <th>#</th><th onclick="doSort('type')">Type ↕</th><th onclick="doSort('road')">Road ↕</th>
       <th onclick="doSort('fc')">FC ↕</th><th onclick="doSort('spd')">Spd ↕</th>
       <th onclick="doSort('cnt')">Qual ↕</th><th onclick="doSort('sev')">Severity ↕</th><th onclick="doSort('epdo')">EPDO ↕</th>
-      <th onclick="doSort('crit')">Tier ↕</th><th>Status</th><th>Why — Action Required</th>
+      <th onclick="doSort('crit')">Tier ↕</th><th>Status</th><th>Why — Action Required</th><th style="text-align:center">Warrant</th>
     </tr></thead><tbody id="tBody"></tbody></table>
   </div>
   <div class="tbl-footer">
@@ -812,8 +817,10 @@ async function runAnalysis(){
     let dt=null;if(r['Crash Date']){dt=new Date(r['Crash Date']);if(isNaN(dt.getTime()))dt=null}
     const fc=r['Functional Class']||'',fcCode=pFC(fc),it=r['Intersection Type']||'',ct=(r['Collision Type']||'').toLowerCase(),tctl=(r['Traffic Control Type']||'').toLowerCase(),light=(r['Light Condition']||'').toLowerCase();
     let legs='4-leg';if(it.includes('Three'))legs='3-leg';else if(it.includes('Two'))legs='2-leg';else if(it.includes('Five'))legs='5-leg';
-    const isR=it.includes('Roundabout'),ia=r['Intersection Analysis']||'',isI=ia.includes('Intersection')&&!ia.startsWith('Not');
-    const weather=(r['Weather']||'').toLowerCase(),surface=(r['Surface Condition']||'').toLowerCase();
+    const isR=it.includes('Roundabout'),ia=r['Intersection Analysis']||'';
+    // Fallback: if 'Intersection Analysis' field is missing, infer from 'Intersection Type'
+    const isI=ia?(ia.includes('Intersection')&&!ia.startsWith('Not')):(it!==''&&!it.includes('Not')&&!it.includes('None')&&!it.includes('Non'));
+    const weather=(r['Weather']||r['Weather Condition']||'').toLowerCase(),surface=(r['Surface Condition']||r['Roadway Surface Condition']||'').toLowerCase();
     valid.push({lat,lng,ct,sev:r['Crash Severity']||'O',dt,light,tctl,legs,isInt:isI,isR,fc,fcCode,road:rn(r['RTE Name']),areaType:(r['Area Type']||'').toLowerCase(),animal:r['Animal Related?']==='Yes',ped:r['Pedestrian?']==='Yes',bike:r['Bike?']==='Yes',speed:r['Speed?']==='Yes',night:r['Night?']==='Yes',school:r['School Zone']&&(r['School Zone'].startsWith('1.')||r['School Zone'].startsWith('2.')),hasSig:tctl.includes('traffic signal'),hasStp:tctl.includes('stop sign'),rdDep:(r['RoadDeparture Type']||'')!=='NOT_RD'&&(r['RoadDeparture Type']||'')!=='',wet:surface.includes('wet')||weather.includes('rain')||weather.includes('snow')});
   }
   valid.forEach(c=>{c.lightPd=classifyLightPeriod(c)});
@@ -1241,6 +1248,19 @@ function buildPopup(d,idx){
   // ── COST ESTIMATOR + BCR ──
   h+=buildCostHTML(d);
 
+  // ── NAVIGATE TO WARRANTS (embedded mode) ──
+  const warrantNavTypes=['signal','stop','streetlight','crosswalk','ped','school'];
+  if(d.we&&warrantNavTypes.includes(d.type)&&window.parent!==window){
+    const wType=d.type==='stop'?'stopsign':d.type==='crosswalk'||d.type==='ped'||d.type==='school'?'pedestrian':d.type==='streetlight'?'streetlight':'signal';
+    const safeRoad=d.road.replace(/'/g,"\\'");
+    h+=`<div style="padding:.4rem .6rem;border-top:2px solid var(--p);background:linear-gradient(135deg,#eff6ff,#dbeafe);text-align:center">`;
+    h+=`<button class="nav-warrant-btn" onclick="navigateToWarrant('${safeRoad}','${wType}',${d.lat},${d.lng})" style="font-size:.7rem;padding:.35rem .7rem">`;
+    h+=`🔍 Detailed ${LBL[d.type]} Warrant Analysis <span class="arrow">→</span>`;
+    h+=`</button>`;
+    h+=`<div style="font-size:.48rem;color:var(--mu);margin-top:.2rem">Opens the Warrants tab for full MUTCD evaluation</div>`;
+    h+=`</div>`;
+  }
+
   h+=`</div>`;
   return h;
 }
@@ -1312,6 +1332,14 @@ function renderTable(){
     }
     h+=`<td><span class="status-badge ${d.we?'sb-met':'sb-mon'}">${d.we?'WARRANT':'Monitor'}</span></td>`;
     h+=`<td class="action-text">${action}</td>`;
+    // Warrant navigation column — only for warrant-eligible types with warrant met
+    const warrantTypes=['signal','stop','streetlight','crosswalk','ped','school'];
+    if(d.we&&warrantTypes.includes(d.type)){
+      const wType=d.type==='stop'?'stopsign':d.type==='crosswalk'||d.type==='ped'||d.type==='school'?'pedestrian':d.type==='streetlight'?'streetlight':'signal';
+      h+=`<td style="text-align:center"><button class="nav-warrant-btn" onclick="event.stopPropagation();navigateToWarrant('${d.road.replace(/'/g,"\\'")}','${wType}',${d.lat},${d.lng})" title="Open detailed ${LBL[d.type]} warrant analysis in Warrants tab">Analyze <span class="arrow">→</span></button></td>`;
+    }else{
+      h+=`<td style="text-align:center;color:var(--mu);font-size:.55rem">${d.we?'—':'—'}</td>`;
+    }
     h+=`</tr>`;
   });
   tbody.innerHTML=h;
@@ -1441,6 +1469,21 @@ function updateTierSummary(){
     h+=`</div>`;
   });
   cards.innerHTML=h;
+}
+
+// ═══════════════════════════════════════════════════════════
+// NAVIGATE TO WARRANTS — sends message to parent app
+// ═══════════════════════════════════════════════════════════
+function navigateToWarrant(roadName,warrantType,lat,lng){
+  if(window.parent===window){toast('Open in CrashLens app for warrant navigation','inf');return}
+  window.parent.postMessage({
+    type:'ad-navigate-warrant',
+    roadName:roadName,
+    warrantType:warrantType,
+    lat:lat,
+    lng:lng
+  },'*');
+  toast('Opening '+warrantType+' warrant analysis...','ok');
 }
 
 // ═══════════════════════════════════════════════════════════
