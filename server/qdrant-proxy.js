@@ -811,6 +811,166 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // ---- Subscriber Management: Save subscribers to R2 ----
+    if (req.url === '/api/subscribers/save' && req.method === 'POST') {
+        if (!R2_WORKER_URL || !R2_WORKER_SECRET) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({
+                error: 'R2 Worker not configured',
+                message: 'Set R2_WORKER_URL and R2_WORKER_SECRET environment variables'
+            }));
+            return;
+        }
+
+        collectBody(req).then(body => {
+            let payload;
+            try {
+                payload = JSON.parse(body);
+            } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { stateKey, jurisdiction, subscribers } = payload;
+
+            if (!stateKey || !jurisdiction || !Array.isArray(subscribers)) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Missing required fields: stateKey, jurisdiction, subscribers[]' }));
+                return;
+            }
+
+            // Deduplicate by email (case-insensitive) before saving
+            const seen = new Map();
+            const deduped = [];
+            for (const sub of subscribers) {
+                if (!sub.address) continue;
+                const key = sub.address.trim().toLowerCase();
+                if (!seen.has(key)) {
+                    seen.set(key, true);
+                    deduped.push({ ...sub, address: key });
+                }
+            }
+
+            const r2Key = `${stateKey}/${jurisdiction}/subscribers.json`;
+            const jsonData = JSON.stringify({
+                lastUpdated: new Date().toISOString(),
+                jurisdiction: jurisdiction,
+                stateKey: stateKey,
+                subscribers: deduped
+            }, null, 2);
+
+            const uploadUrl = `${R2_WORKER_URL.replace(/\/+$/, '')}/${r2Key}`;
+            const parsedUrl = new URL(uploadUrl);
+
+            console.log(`[Subscribers] Saving ${deduped.length} subscribers to R2: ${r2Key}`);
+
+            const workerReq = https.request({
+                hostname: parsedUrl.hostname,
+                port: 443,
+                path: parsedUrl.pathname + parsedUrl.search,
+                method: 'PUT',
+                headers: {
+                    'X-Upload-Secret': R2_WORKER_SECRET,
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(jsonData)
+                }
+            }, (workerRes) => {
+                let responseData = '';
+                workerRes.on('data', chunk => { responseData += chunk; });
+                workerRes.on('end', () => {
+                    if (workerRes.statusCode >= 200 && workerRes.statusCode < 300) {
+                        console.log(`[Subscribers] Save success: ${r2Key} (${deduped.length} subscribers)`);
+                        res.writeHead(200, corsHeaders);
+                        res.end(JSON.stringify({
+                            success: true,
+                            count: deduped.length,
+                            r2Key,
+                            savedAt: new Date().toISOString()
+                        }));
+                    } else {
+                        console.error(`[Subscribers] Save failed: HTTP ${workerRes.statusCode} - ${responseData}`);
+                        res.writeHead(workerRes.statusCode, corsHeaders);
+                        res.end(JSON.stringify({
+                            error: `R2 Worker returned HTTP ${workerRes.statusCode}`,
+                            message: responseData
+                        }));
+                    }
+                });
+            });
+
+            workerReq.on('error', (err) => {
+                console.error(`[Subscribers] Save error: ${err.message}`);
+                res.writeHead(502, corsHeaders);
+                res.end(JSON.stringify({ error: 'R2 Worker request failed', message: err.message }));
+            });
+
+            workerReq.write(jsonData);
+            workerReq.end();
+
+        }).catch(err => {
+            console.error(`[Subscribers] Body error: ${err.message}`);
+            res.writeHead(400, corsHeaders);
+            res.end(JSON.stringify({ error: 'Request body error', message: err.message }));
+        });
+        return;
+    }
+
+    // ---- Subscriber Management: Load subscribers from R2 ----
+    if (req.url.startsWith('/api/subscribers/load') && req.method === 'GET') {
+        const parsed = url.parse(req.url, true);
+        const stateKey = parsed.query.state;
+        const jurisdiction = parsed.query.jurisdiction;
+
+        if (!stateKey || !jurisdiction) {
+            res.writeHead(400, corsHeaders);
+            res.end(JSON.stringify({ error: 'Missing required query params: state, jurisdiction' }));
+            return;
+        }
+
+        const r2Key = `${stateKey}/${jurisdiction}/subscribers.json`;
+        const r2PublicUrl = `https://data.aicreatesai.com/${r2Key}`;
+
+        console.log(`[Subscribers] Loading from R2: ${r2Key}`);
+
+        https.get(r2PublicUrl, (r2Res) => {
+            let data = '';
+            r2Res.on('data', chunk => { data += chunk; });
+            r2Res.on('end', () => {
+                if (r2Res.statusCode === 200) {
+                    try {
+                        const parsed = JSON.parse(data);
+                        console.log(`[Subscribers] Loaded ${parsed.subscribers?.length || 0} subscribers from R2`);
+                        res.writeHead(200, corsHeaders);
+                        res.end(JSON.stringify({
+                            success: true,
+                            subscribers: parsed.subscribers || [],
+                            lastUpdated: parsed.lastUpdated || null
+                        }));
+                    } catch (e) {
+                        console.error(`[Subscribers] Parse error: ${e.message}`);
+                        res.writeHead(200, corsHeaders);
+                        res.end(JSON.stringify({ success: true, subscribers: [], lastUpdated: null }));
+                    }
+                } else if (r2Res.statusCode === 404) {
+                    // No subscribers file yet - return empty array
+                    console.log(`[Subscribers] No subscribers file found for ${r2Key}`);
+                    res.writeHead(200, corsHeaders);
+                    res.end(JSON.stringify({ success: true, subscribers: [], lastUpdated: null }));
+                } else {
+                    console.error(`[Subscribers] R2 fetch failed: HTTP ${r2Res.statusCode}`);
+                    res.writeHead(502, corsHeaders);
+                    res.end(JSON.stringify({ error: `R2 returned HTTP ${r2Res.statusCode}` }));
+                }
+            });
+        }).on('error', (err) => {
+            console.error(`[Subscribers] R2 fetch error: ${err.message}`);
+            res.writeHead(502, corsHeaders);
+            res.end(JSON.stringify({ error: 'Failed to fetch from R2', message: err.message }));
+        });
+        return;
+    }
+
     // ---- Nominatim geocoding proxy (avoids CORS from browser) ----
     if (req.url.startsWith('/geocode') && req.method === 'GET') {
         const parsed = url.parse(req.url, true);
