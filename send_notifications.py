@@ -511,6 +511,136 @@ def generate_grant_alert_email(subscriber, upcoming_grants):
         'text': f"Grant deadlines approaching: {', '.join(g['name'] for g in relevant_grants)}"
     }
 
+def generate_grant_summary_email(subscriber, upcoming_grants, crash_summary=None):
+    """Generate comprehensive grant summary email with locations and funding match."""
+    name = subscriber.get('name', 'Traffic Safety Professional')
+    grant_prefs = subscriber.get('grants', {})
+    include_deadlines = grant_prefs.get('includeDeadlines', True)
+    include_top_locations = grant_prefs.get('includeTopLocations', True)
+    include_funding_match = grant_prefs.get('includeFundingMatch', True)
+    frequency = grant_prefs.get('frequency', 'weekly')
+
+    # Deadline section
+    deadlines_html = ""
+    if include_deadlines and upcoming_grants:
+        for grant in upcoming_grants[:8]:
+            urgency_color = '#dc2626' if grant['days_until'] <= 7 else '#f59e0b' if grant['days_until'] <= 14 else '#0ea5e9' if grant['days_until'] <= 30 else '#059669'
+            deadlines_html += f"""
+            <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:10px;border-left:4px solid {urgency_color};">
+                <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div>
+                        <strong style="color:#1e293b;font-size:14px;">{grant['name']}</strong>
+                        <div style="color:#64748b;font-size:12px;margin-top:2px;">{grant['agency']}</div>
+                    </div>
+                    <span style="background:{urgency_color};color:white;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:bold;white-space:nowrap;">
+                        {grant['days_until']} days
+                    </span>
+                </div>
+                <div style="margin-top:8px;font-size:12px;color:#475569;">
+                    <strong>Deadline:</strong> {grant['deadline']}
+                    {f' &bull; <strong>Funding:</strong> {grant["funding"]}' if grant.get('funding') else ''}
+                </div>
+                {f'<a href="{grant["url"]}" style="color:#3b82f6;font-size:12px;margin-top:4px;display:inline-block;">View Details &rarr;</a>' if grant.get('url') else ''}
+            </div>"""
+        deadlines_html = f"""
+            <h3 style="color:#047857;font-size:16px;margin:20px 0 10px;border-bottom:2px solid #dcfce7;padding-bottom:6px;">
+                Upcoming Grant Deadlines ({len(upcoming_grants)} total)
+            </h3>
+            {deadlines_html}"""
+
+    # Crash statistics section
+    stats_html = ""
+    if crash_summary and include_top_locations:
+        stats_html = f"""
+            <h3 style="color:#047857;font-size:16px;margin:20px 0 10px;border-bottom:2px solid #dcfce7;padding-bottom:6px;">
+                Jurisdiction Crash Overview
+            </h3>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:15px;">
+                <div style="background:white;border:1px solid #fecaca;border-radius:8px;padding:12px;text-align:center;">
+                    <div style="font-size:22px;font-weight:bold;color:#dc2626;">{crash_summary['fatal']}</div>
+                    <div style="font-size:10px;color:#991b1b;">Fatal (K)</div>
+                </div>
+                <div style="background:white;border:1px solid #fed7aa;border-radius:8px;padding:12px;text-align:center;">
+                    <div style="font-size:22px;font-weight:bold;color:#ea580c;">{crash_summary['serious_injury']}</div>
+                    <div style="font-size:10px;color:#c2410c;">Serious Injury (A)</div>
+                </div>
+                <div style="background:white;border:1px solid #bfdbfe;border-radius:8px;padding:12px;text-align:center;">
+                    <div style="font-size:22px;font-weight:bold;color:#1e40af;">{crash_summary['epdo']:,}</div>
+                    <div style="font-size:10px;color:#1e3a5f;">EPDO Score</div>
+                </div>
+            </div>
+            <p style="font-size:12px;color:#64748b;margin:0;">
+                Total crashes: {crash_summary['total']:,} &bull;
+                KA crashes: {crash_summary['fatal'] + crash_summary['serious_injury']}
+            </p>"""
+
+    now_str = datetime.now().strftime('%B %d, %Y')
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#1e293b;max-width:650px;margin:0 auto;padding:20px;">
+
+        <div style="background:linear-gradient(135deg,#059669 0%,#047857 50%,#065f46 100%);padding:30px;border-radius:12px 12px 0 0;text-align:center;">
+            <h1 style="color:white;margin:0;font-size:22px;">Grant Opportunities Summary</h1>
+            <p style="color:rgba(255,255,255,0.9);margin:6px 0 0;font-size:13px;">Your {frequency.title()} CRASH LENS Report</p>
+            <p style="color:rgba(255,255,255,0.7);margin:4px 0 0;font-size:11px;">{now_str}</p>
+        </div>
+
+        <div style="background:#f8fafc;padding:25px;border:1px solid #e2e8f0;border-top:none;">
+            <p>Hello {name},</p>
+            <p style="font-size:14px;">Here is your {frequency} grant opportunities summary:</p>
+
+            {deadlines_html or '<p style="color:#64748b;font-style:italic;">No upcoming grant deadlines at this time.</p>'}
+
+            {stats_html}
+
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:15px;margin:20px 0;">
+                <p style="margin:0;font-size:13px;color:#047857;">
+                    <strong>Next Steps:</strong> Log in to CRASH LENS to view detailed location rankings,
+                    generate AI-powered grant applications, and prepare your submissions.
+                </p>
+            </div>
+            <div style="text-align:center;margin-top:15px;">
+                <a href="https://ecomhub200.github.io/Virginia/"
+                   style="display:inline-block;background:#059669;color:white;padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">
+                    Open Grants Tab
+                </a>
+            </div>
+        </div>
+
+        <div style="background:white;padding:18px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;text-align:center;font-size:11px;color:#94a3b8;">
+            <p style="margin:0 0 6px;">CRASH LENS - Traffic Safety Analysis Platform</p>
+            <p style="margin:0;">
+                You received this because you enabled {frequency} grant notifications.<br>
+                <a href="#" style="color:#3b82f6;">Manage Preferences</a>
+            </p>
+        </div>
+
+    </body>
+    </html>
+    """
+
+    text_body = f"""
+Grant Opportunities Summary - {now_str}
+
+Hello {name},
+
+{"Upcoming Deadlines:" if upcoming_grants else "No upcoming deadlines."}
+{chr(10).join(f"  - {g['name']} ({g['agency']}) - {g['days_until']} days until {g['deadline']}" for g in (upcoming_grants or [])[:8])}
+
+{"Crash Summary: " + str(crash_summary['total']) + " total crashes, EPDO: " + str(crash_summary['epdo']) if crash_summary else ""}
+
+Log in to CRASH LENS for full analysis: https://ecomhub200.github.io/Virginia/
+    """
+
+    grant_count = len(upcoming_grants) if upcoming_grants else 0
+    return {
+        'subject': f"CRASH LENS - {frequency.title()} Grant Summary - {grant_count} Opportunities - {datetime.now().strftime('%B %Y')}",
+        'html': html_body,
+        'text': text_body
+    }
+
 def generate_weekly_digest_email(subscriber, crash_summary, upcoming_grants):
     """Generate weekly digest email."""
     name = subscriber.get('name', 'Traffic Safety Professional')
@@ -670,9 +800,9 @@ def send_scheduled_reports():
     print(f"\nCompleted: {success_count}/{len(subscribers)} emails sent successfully")
 
 def send_grant_alerts():
-    """Send grant deadline alerts."""
+    """Send grant deadline alerts and grant summary emails."""
     print("\n" + "="*60)
-    print("CRASH LENS - Sending Grant Alerts")
+    print("CRASH LENS - Sending Grant Alerts & Summaries")
     print("="*60)
 
     subscribers = get_grant_subscribers()
@@ -685,27 +815,35 @@ def send_grant_alerts():
     upcoming_grants = load_grants_with_deadlines()
     print(f"Found {len(upcoming_grants)} grants with upcoming deadlines")
 
-    if not upcoming_grants:
-        print("No upcoming grant deadlines to alert about.")
-        return
+    crash_summary = load_crash_summary()
 
     success_count = 0
+    summary_count = 0
     for sub in subscribers:
-        if not sub.get('grants', {}).get('deadlineAlerts', False):
-            continue
-
         subscriber_email = sub.get('email')
         if not subscriber_email:
             print(f"[WARN] Skipping subscriber with missing email: {sub.get('id', 'unknown')}")
             continue
 
-        email_content = generate_grant_alert_email(sub, upcoming_grants)
-        if email_content:
-            if send_email(subscriber_email, email_content['subject'],
-                         email_content['html'], email_content['text']):
-                success_count += 1
+        grant_prefs = sub.get('grants', {})
 
-    print(f"\nCompleted: {success_count} grant alert emails sent")
+        # Send deadline alerts (existing behavior)
+        if grant_prefs.get('deadlineAlerts', False) and upcoming_grants:
+            email_content = generate_grant_alert_email(sub, upcoming_grants)
+            if email_content:
+                if send_email(subscriber_email, email_content['subject'],
+                             email_content['html'], email_content['text']):
+                    success_count += 1
+
+        # Send grant summary report (new behavior for scheduled summaries)
+        if grant_prefs.get('includeDeadlines') or grant_prefs.get('includeTopLocations') or grant_prefs.get('includeFundingMatch'):
+            email_content = generate_grant_summary_email(sub, upcoming_grants, crash_summary)
+            if email_content:
+                if send_email(subscriber_email, email_content['subject'],
+                             email_content['html'], email_content['text']):
+                    summary_count += 1
+
+    print(f"\nCompleted: {success_count} deadline alerts + {summary_count} grant summaries sent")
 
 def send_weekly_digest():
     """Send weekly digest to subscribers."""
