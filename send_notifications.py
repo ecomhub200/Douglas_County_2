@@ -799,6 +799,30 @@ def send_scheduled_reports():
 
     print(f"\nCompleted: {success_count}/{len(subscribers)} emails sent successfully")
 
+def _is_grant_summary_due(grant_prefs):
+    """Check if a subscriber's grant summary is due based on their frequency schedule."""
+    frequency = grant_prefs.get('frequency', 'weekly')
+    delivery_mode = grant_prefs.get('deliveryMode', 'recurring')
+    today = datetime.now()
+
+    if delivery_mode == 'once':
+        return True  # Send-once always triggers (caller handles dedup)
+
+    if frequency == 'weekly':
+        day_of_week = grant_prefs.get('dayOfWeek', 1)  # 0=Sun, 1=Mon, ...
+        # Python: Monday=0, JS: Sunday=0 — convert JS day to Python weekday
+        py_weekday = (day_of_week - 1) % 7  # JS Mon(1) → Python Mon(0)
+        return today.weekday() == py_weekday
+    elif frequency == 'monthly':
+        day_of_month = grant_prefs.get('dayOfMonth', 1)
+        return today.day == day_of_month
+    elif frequency == 'quarterly':
+        day_of_month = grant_prefs.get('dayOfMonth', 1)
+        quarter_start_months = [1, 4, 7, 10]
+        return today.month in quarter_start_months and today.day == day_of_month
+    else:
+        return True  # Unknown frequency — send to avoid missed notifications
+
 def send_grant_alerts():
     """Send grant deadline alerts and grant summary emails."""
     print("\n" + "="*60)
@@ -835,8 +859,9 @@ def send_grant_alerts():
                              email_content['html'], email_content['text']):
                     success_count += 1
 
-        # Send grant summary report (new behavior for scheduled summaries)
-        if grant_prefs.get('includeDeadlines') or grant_prefs.get('includeTopLocations') or grant_prefs.get('includeFundingMatch'):
+        # Send grant summary report only when subscriber's schedule is due
+        has_summary_content = grant_prefs.get('includeDeadlines') or grant_prefs.get('includeTopLocations') or grant_prefs.get('includeFundingMatch')
+        if has_summary_content and _is_grant_summary_due(grant_prefs):
             email_content = generate_grant_summary_email(sub, upcoming_grants, crash_summary)
             if email_content:
                 if send_email(subscriber_email, email_content['subject'],
