@@ -63,6 +63,9 @@ function getFirestore() {
     return firestoreDb;
 }
 
+// In-memory cache for forecast data (5-minute TTL)
+const forecastCache = new Map();
+
 // Map plan + billing cycle to Stripe Price ID
 function getStripePriceId(plan, billingCycle) {
     const priceMap = {
@@ -967,6 +970,116 @@ const server = http.createServer((req, res) => {
             console.error(`[Subscribers] R2 fetch error: ${err.message}`);
             res.writeHead(502, corsHeaders);
             res.end(JSON.stringify({ error: 'Failed to fetch from R2', message: err.message }));
+        });
+        return;
+    }
+
+    // ---- Forecast Data Proxy: Fetch forecast JSON from R2 CDN ----
+    // GET /api/forecasts/:state/:jurisdiction/:roadType
+    // Example: /api/forecasts/colorado/douglas/county_roads
+    const forecastMatch = req.url.match(/^\/api\/forecasts\/([a-z_]+)\/([a-z_]+)\/([a-z_]+)$/);
+    if (forecastMatch && req.method === 'GET') {
+        const [, state, jurisdiction, roadType] = forecastMatch;
+        const r2Key = `${state}/${jurisdiction}/forecasts_${roadType}.json`;
+        const r2PublicUrl = `https://data.aicreatesai.com/${r2Key}`;
+
+        // Check in-memory cache (5 minute TTL)
+        const cacheKey = r2Key;
+        const cached = forecastCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < 5 * 60 * 1000)) {
+            console.log(`[Forecasts] Cache hit: ${r2Key}`);
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' });
+            res.end(cached.data);
+            return;
+        }
+
+        console.log(`[Forecasts] Fetching from R2: ${r2Key}`);
+
+        https.get(r2PublicUrl, (r2Res) => {
+            let data = '';
+            r2Res.on('data', chunk => { data += chunk; });
+            r2Res.on('end', () => {
+                if (r2Res.statusCode === 200) {
+                    // Cache the response
+                    forecastCache.set(cacheKey, { data, timestamp: Date.now() });
+                    res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' });
+                    res.end(data);
+                } else if (r2Res.statusCode === 404) {
+                    res.writeHead(404, corsHeaders);
+                    res.end(JSON.stringify({
+                        error: 'Forecast not found',
+                        state,
+                        jurisdiction,
+                        roadType,
+                        message: `No forecast data available for ${jurisdiction} (${state}). Run the data pipeline to generate forecasts.`
+                    }));
+                } else {
+                    res.writeHead(502, corsHeaders);
+                    res.end(JSON.stringify({ error: `R2 returned HTTP ${r2Res.statusCode}` }));
+                }
+            });
+        }).on('error', (err) => {
+            console.error(`[Forecasts] R2 fetch error: ${err.message}`);
+            res.writeHead(502, corsHeaders);
+            res.end(JSON.stringify({ error: 'Failed to fetch forecast from R2', message: err.message }));
+        });
+        return;
+    }
+
+    // ---- Forecast Availability Check: Check which forecast files exist for a jurisdiction ----
+    // GET /api/forecasts/check/:state/:jurisdiction
+    const forecastCheckMatch = req.url.match(/^\/api\/forecasts\/check\/([a-z_]+)\/([a-z_]+)$/);
+    if (forecastCheckMatch && req.method === 'GET') {
+        const [, state, jurisdiction] = forecastCheckMatch;
+        const roadTypes = ['county_roads', 'no_interstate', 'all_roads'];
+        const prefix = `${state}/${jurisdiction}/forecasts_`;
+
+        console.log(`[Forecasts] Availability check: ${state}/${jurisdiction}`);
+
+        // Check each forecast file by making HEAD-like requests to CDN
+        let completed = 0;
+        const available = [];
+        const results = {};
+
+        roadTypes.forEach(rt => {
+            const r2Key = `${state}/${jurisdiction}/forecasts_${rt}.json`;
+            const r2Url = `https://data.aicreatesai.com/${r2Key}`;
+
+            // Use HEAD-like approach: just check status, abort body download
+            const checkReq = https.get(r2Url, (r2Res) => {
+                r2Res.resume(); // Discard body
+                results[rt] = r2Res.statusCode === 200;
+                if (r2Res.statusCode === 200) {
+                    available.push(`forecasts_${rt}.json`);
+                }
+                completed++;
+                if (completed === roadTypes.length) {
+                    res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        state,
+                        jurisdiction,
+                        available: available.length > 0,
+                        fileCount: available.length,
+                        files: available,
+                        byRoadType: results
+                    }));
+                }
+            });
+            checkReq.on('error', () => {
+                results[rt] = false;
+                completed++;
+                if (completed === roadTypes.length) {
+                    res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        state,
+                        jurisdiction,
+                        available: available.length > 0,
+                        fileCount: available.length,
+                        files: available,
+                        byRoadType: results
+                    }));
+                }
+            });
         });
         return;
     }
