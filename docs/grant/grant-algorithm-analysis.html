@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grant Algorithm Improvement Analysis</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.6; }
+.container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+h1 { font-size: 28px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+h2 { font-size: 22px; font-weight: 600; color: #1e40af; margin: 32px 0 16px; border-bottom: 2px solid #dbeafe; padding-bottom: 8px; }
+h3 { font-size: 17px; font-weight: 600; color: #334155; margin: 20px 0 10px; }
+.subtitle { color: #64748b; font-size: 16px; margin-bottom: 32px; }
+.card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+.card-red { border-left: 4px solid #ef4444; }
+.card-green { border-left: 4px solid #22c55e; }
+.card-blue { border-left: 4px solid #3b82f6; }
+.card-amber { border-left: 4px solid #f59e0b; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.badge-red { background: #fef2f2; color: #dc2626; }
+.badge-green { background: #f0fdf4; color: #16a34a; }
+.badge-blue { background: #eff6ff; color: #2563eb; }
+.badge-amber { background: #fffbeb; color: #d97706; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+th { background: #f1f5f9; padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #cbd5e1; }
+td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+tr:hover { background: #f8fafc; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 768px) { .comparison { grid-template-columns: 1fr; } }
+.flow-diagram { background: #f1f5f9; border-radius: 8px; padding: 20px; font-family: 'Courier New', monospace; font-size: 13px; white-space: pre-wrap; overflow-x: auto; }
+.metric { display: inline-flex; align-items: center; gap: 6px; margin: 4px 8px 4px 0; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot-red { background: #ef4444; }
+.dot-green { background: #22c55e; }
+.dot-blue { background: #3b82f6; }
+.dot-amber { background: #f59e0b; }
+code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'SF Mono', 'Courier New', monospace; }
+.formula { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; font-family: 'SF Mono', monospace; font-size: 14px; margin: 12px 0; }
+.section-number { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: #1e40af; color: white; border-radius: 50%; font-size: 14px; font-weight: 700; margin-right: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Grant-Ready Locations Algorithm: Improvement Analysis</h1>
+<p class="subtitle">From arbitrary weights to statistically-validated, evidence-based scoring</p>
+
+<!-- ============ CURRENT PROBLEMS ============ -->
+<h2><span class="section-number">1</span> Current Algorithm Weaknesses</h2>
+
+<div class="card card-red">
+<h3>10 Critical Issues Identified</h3>
+<table>
+<thead>
+<tr><th>#</th><th>Problem</th><th>Impact</th><th>Example</th></tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>No Statistical Significance Testing</strong></td>
+<td><span class="badge badge-red">High</span></td>
+<td>2/3 crashes impaired (67%) triggers 405d, but could be random noise. No binomial test.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>No Exposure Normalization</strong></td>
+<td><span class="badge badge-red">High</span></td>
+<td>High-ADT roads always rank higher even when their <em>rate</em> is safe. Volume ≠ danger.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>No Expected vs Observed Comparison</strong></td>
+<td><span class="badge badge-red">High</span></td>
+<td>SPORTS/HSM core method: PSI = Observed − Expected. Missing entirely.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>No Regression to Mean Correction</strong></td>
+<td><span class="badge badge-amber">Medium</span></td>
+<td>Random spike years inflate rankings. Empirical Bayes prevents this.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Arbitrary Weight Selection</strong></td>
+<td><span class="badge badge-amber">Medium</span></td>
+<td><code>vruPed=40</code> vs <code>vruBike=35</code> — no empirical basis. Changes rankings dramatically.</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>No B/C Ratio Estimation</strong></td>
+<td><span class="badge badge-red">High</span></td>
+<td>HSIP scores 35% on B/C ratio. Algorithm never estimates it.</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>No Equity Analysis</strong></td>
+<td><span class="badge badge-amber">Medium</span></td>
+<td>SS4A scores 20% on equity. No Census/CEJST overlay.</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>Arbitrary Pattern Thresholds</strong></td>
+<td><span class="badge badge-amber">Medium</span></td>
+<td>"impaired > 25%" triggers 405d — why 25%? Should compare to county baseline.</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>No Countermeasure Feasibility Check</strong></td>
+<td><span class="badge badge-amber">Medium</span></td>
+<td>Identifies problems but doesn't check if proven countermeasures (with CMFs) exist.</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>Grant Matching Too Broad</strong></td>
+<td><span class="badge badge-amber">Medium</span></td>
+<td>Almost every location matches HSIP (any K or A). Matching loses discriminative power.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============ IMPROVED ARCHITECTURE ============ -->
+<h2><span class="section-number">2</span> Improved Architecture: 4-Layer Approach</h2>
+
+<div class="flow-diagram">
+Raw Crash Data
+    │
+    ▼
+┌─────────────────────────────────────────────────┐
+│  LAYER 1: COUNTY BASELINES (run once, cache)    │
+│  Calculate county-wide rates for every pattern   │
+│  % impaired, % speed, % night, % angle, etc.    │
+│  Average crashes per intersection/segment        │
+└───────────────────────┬─────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────┐
+│  LAYER 2: STATISTICAL ANALYSIS (per location)   │
+│                                                  │
+│  ┌──────────────┐  ┌──────────────────────────┐ │
+│  │ ORI          │  │ Significance Testing     │ │
+│  │ Location %   │  │ Binomial test vs county  │ │
+│  │ ─────────    │  │ p-value &lt; 0.10 = real   │ │
+│  │ County %     │  │ pattern (not noise)      │ │
+│  └──────────────┘  └──────────────────────────┘ │
+│                                                  │
+│  ┌──────────────────────────────────────────┐   │
+│  │ PSI (Potential for Safety Improvement)    │   │
+│  │ Observed − Expected (Empirical Bayes)     │   │
+│  │ Locations with genuine excess crashes     │   │
+│  └──────────────────────────────────────────┘   │
+└───────────────────────┬─────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────┐
+│  LAYER 3: COUNTERMEASURE FEASIBILITY            │
+│  Pattern → Proven Countermeasure → CMF → Cost   │
+│  B/C Ratio = Annual Benefit / Annualized Cost   │
+│  Uses FHWA Proven Safety Countermeasures        │
+└───────────────────────┬─────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────┐
+│  LAYER 4: GRANT-SPECIFIC FIT SCORING            │
+│                                                  │
+│  HSIP: B/C(35) + Reduction(25) + SHSP(15)      │
+│  SS4A: Impact(30) + Equity(20) + Practice(20)   │
+│  402:  ProblemID(25) + Evidence(25) + Perf(20)  │
+│  405d: Eligibility(30) + Effect(25) + Coord(20) │
+│                                                  │
+│  Each scored 0-100 based on ACTUAL program NOFO │
+└───────────────────────┬─────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────┐
+│  COMPOSITE OUTPUT                                │
+│                                                  │
+│  Need Score ────── 0-100 (PSI + severity)       │
+│  Pattern Score ─── 0-100 (ORI + significance)   │
+│  Feasibility ───── 0-100 (B/C + CMF count)      │
+│  Grant Fit ─────── 0-100 per program             │
+│  Confidence ────── high / medium / low           │
+│  Reasons ───────── human-readable evidence       │
+└─────────────────────────────────────────────────┘
+</div>
+
+<!-- ============ KEY IMPROVEMENTS ============ -->
+<h2><span class="section-number">3</span> Key Improvements Explained</h2>
+
+<div class="comparison">
+<div class="card card-red">
+<h3>❌ Current: Arbitrary Thresholds</h3>
+<div class="formula">
+if (impairedPct > 25%) → 405d
+if (speedPct > 35%) → 402
+if (vru > 0 && K+A > 0) → SS4A
+</div>
+<p>Hard-coded percentages with no statistical basis. A location with 2/4 impaired (50%) scores high even though this could easily be random.</p>
+</div>
+<div class="card card-green">
+<h3>✅ Improved: Statistical Evidence</h3>
+<div class="formula">
+ORI = location_rate / county_rate
+p-value = binomial_test(observed, n, baseline)
+if (p &lt; 0.10 && ORI > 1.5) → significant
+</div>
+<p>Compare each location to the county average using Over-Representation Index. Only flag patterns that are <em>statistically significant</em> — not random noise.</p>
+</div>
+</div>
+
+<div class="comparison">
+<div class="card card-red">
+<h3>❌ Current: Additive Weighted Score</h3>
+<div class="formula">
+score = K^1.5 × 150
+      + A × 60
+      + ped × 40
+      + angle × 10
+      + speed × 15
+      ...
+</div>
+<p>Single score from arbitrary weights. Why is ped=40 and bike=35? Small weight changes cause dramatic re-ranking.</p>
+</div>
+<div class="card card-green">
+<h3>✅ Improved: Multi-Dimensional Scoring</h3>
+<div class="formula">
+needScore    = f(PSI, severity, volume)
+patternScore = f(ORI, significance, sample_size)
+feasibility  = f(B/C ratio, CMF availability)
+grantFit     = f(actual NOFO criteria weights)
+</div>
+<p>Four independent sub-scores, each with clear methodology. Engineers can see WHY a location ranks high and which dimension drives it.</p>
+</div>
+</div>
+
+<div class="comparison">
+<div class="card card-red">
+<h3>❌ Current: No Expected Crash Comparison</h3>
+<div class="formula">
+// Just counts crashes
+score += total × weight
+// High-volume roads always win
+</div>
+<p>A road with 100K ADT and 50 crashes ranks above a road with 5K ADT and 20 crashes, even though the second is far more dangerous per vehicle.</p>
+</div>
+<div class="card card-green">
+<h3>✅ Improved: PSI (SPORTS-Aligned)</h3>
+<div class="formula">
+expected = county_avg × ADT_adjustment
+EB_estimate = w × expected + (1-w) × observed
+PSI = EB_estimate - expected
+
+Locations with highest EXCESS rank first
+</div>
+<p>Empirical Bayes methodology used by VDOT SPORTS. Identifies locations with genuinely more crashes than expected — not just high volume.</p>
+</div>
+</div>
+
+<!-- ============ B/C ESTIMATION ============ -->
+<h2><span class="section-number">4</span> B/C Ratio Estimation (New for HSIP)</h2>
+
+<div class="card card-blue">
+<p>HSIP applications are scored 35% on B/C ratio — the single most important criterion. The improved algorithm estimates B/C for each location by:</p>
+
+<table>
+<thead>
+<tr><th>Detected Pattern</th><th>Countermeasure</th><th>CMF</th><th>Avg Cost</th><th>Target CRF</th></tr>
+</thead>
+<tbody>
+<tr><td>Angle (intersection)</td><td>Roundabout conversion</td><td>0.56</td><td>$350K</td><td>44%</td></tr>
+<tr><td>Angle (signalized)</td><td>Protected left-turn</td><td>0.75</td><td>$50K</td><td>25%</td></tr>
+<tr><td>Head-on (segment)</td><td>Median barrier/cable</td><td>0.56</td><td>$150K</td><td>44%</td></tr>
+<tr><td>Pedestrian</td><td>HAWK beacon</td><td>0.56</td><td>$250K</td><td>44%</td></tr>
+<tr><td>Pedestrian (lower cost)</td><td>Hi-vis crosswalk + lighting</td><td>0.69</td><td>$50K</td><td>31%</td></tr>
+<tr><td>Bicycle</td><td>Protected bike lane</td><td>0.55</td><td>$200K</td><td>45%</td></tr>
+<tr><td>Speed (segment)</td><td>Road diet</td><td>0.67</td><td>$100K</td><td>33%</td></tr>
+<tr><td>Night crashes</td><td>Intersection/segment lighting</td><td>0.62</td><td>$120K</td><td>38%</td></tr>
+<tr><td>Run-off-road</td><td>Rumble strips + clear zone</td><td>0.72</td><td>$80K</td><td>28%</td></tr>
+<tr><td>Wet road</td><td>High-friction surface</td><td>0.80</td><td>$200K</td><td>20%</td></tr>
+</tbody>
+</table>
+
+<div class="formula">
+Annual Benefit = Reduced_Crashes × Weighted_Crash_Cost
+  where Crash Cost: K=$12.8M, A=$526K, B=$155K, C=$78K, O=$12K (VDOT 2024)
+
+Annualized Cost = Project_Cost × CRF_factor(15yr, 4%)
+
+B/C Ratio = Annual_Benefit / Annualized_Cost
+</div>
+</div>
+
+<!-- ============ GRANT FIT SCORING ============ -->
+<h2><span class="section-number">5</span> Grant-Specific Fit Scoring (Mirrors Actual NOFO Criteria)</h2>
+
+<div class="card card-blue">
+<h3>HSIP (Virginia HSIP Application Criteria)</h3>
+<table>
+<tr><th>Criterion</th><th>Weight</th><th>How We Score It</th></tr>
+<tr><td>B/C Ratio</td><td>35%</td><td>CMF-based B/C estimation from detected patterns</td></tr>
+<tr><td>Crash Reduction Potential</td><td>25%</td><td>PSI: observed/expected ratio</td></tr>
+<tr><td>SHSP Alignment</td><td>15%</td><td>Count of statistically significant emphasis area patterns</td></tr>
+<tr><td>Systemic Applicability</td><td>15%</td><td>Number of applicable countermeasures with CMFs</td></tr>
+<tr><td>Project Readiness</td><td>10%</td><td>Pattern clarity (significant patterns = easier design)</td></tr>
+</table>
+</div>
+
+<div class="card card-green">
+<h3>SS4A (USDOT NOFO Criteria)</h3>
+<table>
+<tr><th>Criterion</th><th>Weight</th><th>How We Score It</th></tr>
+<tr><td>Safety Impact</td><td>30%</td><td>Fatal + serious injury + VRU crash concentration</td></tr>
+<tr><td>Equity</td><td>20%</td><td>VRU exposure as proxy (future: Census CEJST overlay)</td></tr>
+<tr><td>Effective Practices</td><td>20%</td><td>Safe System alignment via ORI (speed, VRU, visibility)</td></tr>
+<tr><td>Climate/Sustainability</td><td>10%</td><td>Multimodal safety improvements</td></tr>
+<tr><td>Collaboration</td><td>10%</td><td>Baseline (future: local agency data)</td></tr>
+<tr><td>Demonstrated Need</td><td>10%</td><td>PSI: exceeds expected crash frequency</td></tr>
+</table>
+</div>
+
+<div class="card card-amber">
+<h3>NHTSA 402 & 405d</h3>
+<table>
+<tr><th>Program</th><th>Key Differentiator</th><th>Statistical Test</th></tr>
+<tr><td>402 (Behavioral)</td><td>Speed/distracted ORI > 1.5 AND p < 0.10</td><td>Binomial test vs county speed rate</td></tr>
+<tr><td>405d (Impaired)</td><td>Impaired ORI > 2.0 AND p < 0.10</td><td>Binomial test vs county impaired rate + weekend-night correlation</td></tr>
+</table>
+<p style="margin-top:12px;">Both require <strong>statistically significant</strong> behavioral patterns — not just raw counts above arbitrary thresholds.</p>
+</div>
+
+<!-- ============ CONFIDENCE LEVELS ============ -->
+<h2><span class="section-number">6</span> Confidence System (New)</h2>
+
+<div class="card">
+<table>
+<thead>
+<tr><th>Confidence</th><th>Criteria</th><th>What It Means</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="badge badge-green">HIGH</span></td>
+<td>≥15 crashes AND ≥2 significant patterns</td>
+<td>Strong statistical evidence. Findings are robust and grant-ready.</td>
+</tr>
+<tr>
+<td><span class="badge badge-amber">MEDIUM</span></td>
+<td>≥8 crashes AND ≥1 significant pattern</td>
+<td>Reasonable evidence. Patterns likely real but could benefit from more data.</td>
+</tr>
+<tr>
+<td><span class="badge badge-red">LOW</span></td>
+<td>Below medium thresholds</td>
+<td>Limited evidence. Patterns may be noise. Use caution in grant applications.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============ INTEGRATION ============ -->
+<h2><span class="section-number">7</span> Integration Plan</h2>
+
+<div class="card card-green">
+<h3>Step-by-Step Integration (Preserves Existing UI)</h3>
+<table>
+<tr><th>Step</th><th>Action</th><th>Files</th></tr>
+<tr><td>1</td><td>Add all new functions from <code>improved-grant-algorithm.js</code> into <code>app/index.html</code></td><td>app/index.html</td></tr>
+<tr><td>2</td><td>Call <code>calculateCountyBaselines()</code> after crash data loads, store in <code>grantState.baselines</code></td><td>app/index.html</td></tr>
+<tr><td>3</td><td>Replace scoring calls inside <code>rankLocationsForGrants()</code> batch processing</td><td>app/index.html</td></tr>
+<tr><td>4</td><td>Add optional new columns to table: Need, Pattern, B/C, Confidence</td><td>app/index.html</td></tr>
+<tr><td>5</td><td>Update tooltip/hover to show evidence (ORI values, p-values, reasons)</td><td>app/index.html</td></tr>
+</table>
+
+<h3 style="margin-top:20px;">What Stays the Same</h3>
+<p>The UI structure, table layout, tier coloring, pagination, date filters, scoring profile dropdown, and ADT toggle all remain identical. The improvement is entirely in the <em>scoring engine</em> underneath.</p>
+
+<h3 style="margin-top:20px;">What Changes</h3>
+<p>Rankings become evidence-based. The score column now reflects genuine safety need + grant fit instead of arbitrary weighted sums. The "Best Match" column uses statistical evidence instead of hard-coded thresholds.</p>
+</div>
+
+<!-- ============ FUTURE ENHANCEMENTS ============ -->
+<h2><span class="section-number">8</span> Future Enhancement Opportunities</h2>
+
+<div class="card">
+<table>
+<thead>
+<tr><th>Enhancement</th><th>Data Needed</th><th>Impact</th></tr>
+</thead>
+<tbody>
+<tr><td>Full SPF Calibration</td><td>Virginia SPF coefficients by facility type</td><td><span class="badge badge-red">High</span> — Dramatically improves PSI accuracy</td></tr>
+<tr><td>Census Equity Overlay</td><td>CEJST / DOT Equitable Transportation data</td><td><span class="badge badge-red">High</span> — Required for competitive SS4A apps</td></tr>
+<tr><td>Real ADT Integration</td><td>VDOT traffic count database</td><td><span class="badge badge-red">High</span> — Enables true crash rates</td></tr>
+<tr><td>SHSP Spatial Overlay</td><td>Virginia SHSP emphasis area GIS layers</td><td><span class="badge badge-amber">Medium</span> — Improves HSIP alignment scoring</td></tr>
+<tr><td>Ped/Bike Exposure Data</td><td>Pedestrian/bicycle count data</td><td><span class="badge badge-amber">Medium</span> — VRU rate instead of count</td></tr>
+<tr><td>School/Work Zone Flags</td><td>School zone GIS layer</td><td><span class="badge badge-amber">Medium</span> — SS4A bonus for vulnerable locations</td></tr>
+</tbody>
+</table>
+</div>
+
+<div style="margin-top:40px; padding:20px; background:#eff6ff; border-radius:12px; text-align:center; color:#1e40af;">
+<strong>The complete production code is in <code>improved-grant-algorithm.js</code></strong><br>
+~800 lines of JavaScript ready to integrate into <code>app/index.html</code>
+</div>
+
+</div>
+</body>
+</html>
