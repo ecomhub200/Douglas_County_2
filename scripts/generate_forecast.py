@@ -311,10 +311,11 @@ def invoke_endpoint(session, series_dict, horizon):
 
 
 def generate_synthetic_forecast(series_dict, horizon):
-    """Generate plausible synthetic forecasts for dry-run / demo mode.
+    """Generate synthetic forecasts using Holt-Winters exponential smoothing.
 
-    Uses seasonal decomposition and noise to create realistic-looking
-    forecasts without calling the SageMaker endpoint.
+    Produces statistically grounded forecasts with proper prediction
+    intervals based on historical residual variance, regression-to-mean
+    dampening for low-count series, and widening CIs over the horizon.
     """
     import random
     random.seed(42)
@@ -325,56 +326,130 @@ def generate_synthetic_forecast(series_dict, horizon):
         if not values:
             continue
 
-        # Calculate base statistics
-        mean_val = sum(values) / len(values) if values else 0
-        recent_mean = sum(values[-6:]) / min(6, len(values))
-        std_val = (sum((v - mean_val) ** 2 for v in values) / len(values)) ** 0.5
+        n = len(values)
+        mean_val = sum(values) / n if n else 0
+        long_run_mean = mean_val
 
-        # Calculate monthly seasonality (if enough data)
-        monthly_factors = {}
-        if len(values) >= 12:
-            for i, (month_str, count) in enumerate(series):
-                m = int(month_str.split("-")[1])
-                if m not in monthly_factors:
-                    monthly_factors[m] = []
-                monthly_factors[m].append(count)
-            monthly_factors = {
-                m: sum(v) / len(v) / max(mean_val, 1)
-                for m, v in monthly_factors.items()
-            }
+        # --- Holt-Winters double exponential smoothing ---
+        # Additive trend + additive seasonality (period=12)
+        period = 12
 
-        # Detect trend from last 12 months
-        if len(values) >= 12:
-            first_half = sum(values[-12:-6]) / 6
-            second_half = sum(values[-6:]) / 6
-            trend_per_month = (second_half - first_half) / 6
+        # Calculate monthly seasonal indices (additive)
+        seasonal_indices = [0.0] * period
+        if n >= 2 * period:
+            monthly_buckets = defaultdict(list)
+            for month_str, count in series:
+                m = int(month_str.split("-")[1]) - 1  # 0-indexed
+                monthly_buckets[m].append(count)
+            for m in range(period):
+                if monthly_buckets[m]:
+                    seasonal_indices[m] = sum(monthly_buckets[m]) / len(monthly_buckets[m]) - mean_val
+
+        # Initialize level and trend from last 12 months
+        if n >= period:
+            # Deseasonalize for initialization
+            deseas = []
+            for month_str, v in series:
+                m = int(month_str.split("-")[1]) - 1
+                deseas.append(v - seasonal_indices[m])
+            level = sum(deseas[-period:]) / period
+            if n >= 2 * period:
+                prev_level = sum(deseas[-2 * period:-period]) / period
+                trend = (level - prev_level) / period
+            else:
+                trend = 0
         else:
-            trend_per_month = 0
+            level = mean_val
+            trend = 0
+
+        # Smoothing parameters
+        alpha = 0.3  # level
+        beta = 0.1   # trend
+        gamma = 0.15  # seasonal
+
+        # Run Holt-Winters on historical data to get fitted values and residuals
+        fitted = []
+        hw_level = level if n < period else sum(values[:period]) / period
+        hw_trend = trend
+        hw_seasonal = list(seasonal_indices)
+
+        # Initialize from first period
+        if n >= period:
+            hw_level = sum(values[:period]) / period
+            if n >= 2 * period:
+                hw_trend = sum(values[period:2*period]) / period - hw_level
+                hw_trend /= period
+            for i in range(period):
+                hw_seasonal[i] = values[i] - hw_level
+
+        # Forward pass
+        for i, (month_str, v) in enumerate(series):
+            m = int(month_str.split("-")[1]) - 1
+            if i < period:
+                fitted.append(hw_level + hw_seasonal[m])
+                continue
+            forecast_val = hw_level + hw_trend + hw_seasonal[m]
+            fitted.append(forecast_val)
+            # Update
+            new_level = alpha * (v - hw_seasonal[m]) + (1 - alpha) * (hw_level + hw_trend)
+            new_trend = beta * (new_level - hw_level) + (1 - beta) * hw_trend
+            hw_seasonal[m] = gamma * (v - new_level) + (1 - gamma) * hw_seasonal[m]
+            hw_level = new_level
+            hw_trend = new_trend
+
+        # Calculate residual standard error (for prediction intervals)
+        if len(fitted) > period:
+            residuals = [values[i] - fitted[i] for i in range(period, n)]
+            residual_var = sum(r ** 2 for r in residuals) / max(len(residuals) - 1, 1)
+            residual_se = residual_var ** 0.5
+        else:
+            residual_se = (sum((v - mean_val) ** 2 for v in values) / max(n - 1, 1)) ** 0.5
+
+        # Regression-to-mean dampening for low-count series
+        # Shrink recent trend toward long-run mean based on data availability
+        shrinkage = min(1.0, n / 36.0)  # Full weight only with 3+ years of data
+        dampened_level = shrinkage * hw_level + (1 - shrinkage) * long_run_mean
+        dampened_trend = shrinkage * hw_trend  # Trend shrinks toward zero
 
         # Generate future months
         last_month_str = series[-1][0]
         last_date = pd.Period(last_month_str, freq="M")
         future_months = [str(last_date + i + 1) for i in range(horizon)]
 
-        # Generate quantile forecasts
+        # Generate quantile forecasts with widening intervals
         p50 = []
+        p10 = []
+        p25 = []
+        p75 = []
+        p90 = []
+        means = []
+
         for i, fm in enumerate(future_months):
-            month_num = int(fm.split("-")[1])
-            seasonal = monthly_factors.get(month_num, 1.0)
-            base = recent_mean * seasonal + trend_per_month * (i + 1)
+            month_num = int(fm.split("-")[1]) - 1
+            # Point forecast: dampened level + dampened trend + seasonal
+            base = dampened_level + dampened_trend * (i + 1) + hw_seasonal[month_num]
             base = max(0, base)
             p50.append(round(base, 1))
 
-        # Generate other quantiles by spreading around p50
-        spread = max(std_val * 0.5, mean_val * 0.1)
+            # Prediction interval widens with sqrt(h) — standard for additive models
+            h_factor = (1 + i) ** 0.5
+            se_h = residual_se * h_factor
+
+            # Quantile offsets (normal approximation)
+            p10.append(round(max(0, base - 1.282 * se_h), 1))
+            p25.append(round(max(0, base - 0.674 * se_h), 1))
+            p75.append(round(base + 0.674 * se_h, 1))
+            p90.append(round(base + 1.282 * se_h, 1))
+            means.append(round(base + random.gauss(0, se_h * 0.02), 1))
+
         forecast = {
             "months": future_months,
-            "p10": [round(max(0, v - spread * 1.28 + random.gauss(0, spread * 0.1)), 1) for v in p50],
-            "p25": [round(max(0, v - spread * 0.67 + random.gauss(0, spread * 0.05)), 1) for v in p50],
+            "p10": p10,
+            "p25": p25,
             "p50": p50,
-            "p75": [round(v + spread * 0.67 + random.gauss(0, spread * 0.05), 1) for v in p50],
-            "p90": [round(v + spread * 1.28 + random.gauss(0, spread * 0.1), 1) for v in p50],
-            "mean": [round(v + random.gauss(0, spread * 0.03), 1) for v in p50],
+            "p75": p75,
+            "p90": p90,
+            "mean": means,
         }
         forecasts[sid] = forecast
 
@@ -1250,6 +1325,215 @@ def build_derived_metrics(matrices, summary, horizon, crash_pattern=None):
     return derived
 
 
+BACKTEST_HOLDOUT = 6  # months to hold out for backtesting
+
+
+def _calc_mape(actual, predicted):
+    """Calculate Mean Absolute Percentage Error, skipping zeros."""
+    pairs = [(a, p) for a, p in zip(actual, predicted) if a > 0]
+    if not pairs:
+        return None
+    return round(sum(abs(a - p) / a for a, p in pairs) / len(pairs) * 100, 1)
+
+
+def _calc_mae(actual, predicted):
+    """Calculate Mean Absolute Error."""
+    if not actual:
+        return None
+    return round(sum(abs(a - p) for a, p in zip(actual, predicted)) / len(actual), 1)
+
+
+def _calc_rmse(actual, predicted):
+    """Calculate Root Mean Squared Error."""
+    if not actual:
+        return None
+    mse = sum((a - p) ** 2 for a, p in zip(actual, predicted)) / len(actual)
+    return round(mse ** 0.5, 1)
+
+
+def _calc_directional_accuracy(actual, predicted):
+    """Calculate % of months where trend direction matches."""
+    if len(actual) < 2:
+        return None
+    correct = 0
+    total = len(actual) - 1
+    for i in range(1, len(actual)):
+        actual_dir = actual[i] - actual[i - 1]
+        pred_dir = predicted[i] - predicted[i - 1]
+        if (actual_dir >= 0 and pred_dir >= 0) or (actual_dir < 0 and pred_dir < 0):
+            correct += 1
+    return round(correct / total, 2) if total > 0 else None
+
+
+def _assign_grade(mape):
+    """Assign accuracy grade based on MAPE."""
+    if mape is None:
+        return "N/A"
+    if mape < 10:
+        return "A"
+    if mape < 20:
+        return "B"
+    if mape < 30:
+        return "C"
+    return "D"
+
+
+def backtest_forecast(df, call_endpoint, horizon=BACKTEST_HOLDOUT):
+    """Run hold-out backtesting on M01, M02, and M03 matrices.
+
+    Holds out the last `horizon` months of data, generates forecasts
+    using only the training portion, then compares with actual values.
+
+    Args:
+        df: Full crash DataFrame
+        call_endpoint: Endpoint function (real or synthetic, with temporal embedding)
+        horizon: Number of months to hold out (default: 6)
+
+    Returns:
+        dict with backtesting results including MAPE, MAE, RMSE, grades,
+        and actual vs predicted arrays for frontend overlay charts.
+    """
+    print(f"\n{'='*60}")
+    print(f"  BACKTESTING: Holding out last {horizon} months")
+    print(f"{'='*60}")
+
+    all_months = sorted(df["month"].unique())
+    if len(all_months) < horizon + 12:
+        print("  WARNING: Not enough history for backtesting. Skipping.")
+        return None
+
+    cutoff_months = all_months[-horizon:]
+    train_months = all_months[:-horizon]
+    df_train = df[df["month"].isin(train_months)]
+    df_test = df[df["month"].isin(cutoff_months)]
+
+    print(f"  Training: {len(train_months)} months ({train_months[0]} to {train_months[-1]})")
+    print(f"  Test: {len(cutoff_months)} months ({cutoff_months[0]} to {cutoff_months[-1]})")
+
+    results = {"holdoutMonths": horizon}
+
+    # --- M01: Total crash frequency ---
+    print("\n  [Backtest M01] Total crashes...")
+    train_series = build_monthly_series(df_train)
+    bt_forecasts = call_endpoint(train_series, horizon)
+    bt_fc = bt_forecasts.get("total", {})
+    predicted_m01 = bt_fc.get("p50", [])
+
+    # Actual test values
+    test_monthly = df_test.groupby("month").size()
+    actual_m01 = [int(test_monthly.get(m, 0)) for m in cutoff_months]
+
+    mape = _calc_mape(actual_m01, predicted_m01)
+    mae = _calc_mae(actual_m01, predicted_m01)
+    rmse = _calc_rmse(actual_m01, predicted_m01)
+    da = _calc_directional_accuracy(actual_m01, predicted_m01)
+    grade = _assign_grade(mape)
+
+    results["m01"] = {
+        "mape": mape, "mae": mae, "rmse": rmse,
+        "directionalAccuracy": da, "grade": grade,
+    }
+    print(f"    MAPE: {mape}%, MAE: {mae}, Grade: {grade}")
+
+    # Store actual vs predicted for overlay chart
+    results["actualVsPredicted"] = {
+        "m01": {
+            "months": [str(m) for m in cutoff_months],
+            "actual": actual_m01,
+            "predicted": [round(v, 1) for v in predicted_m01[:len(actual_m01)]],
+        }
+    }
+
+    # --- M02: Severity-level backtesting ---
+    print("\n  [Backtest M02] Severity levels...")
+    train_sev_series = build_monthly_series(df_train, group_col="severity")
+    for sev in ["K", "A", "B", "C", "O"]:
+        if sev not in train_sev_series:
+            train_sev_series[sev] = [(str(m), 0) for m in train_months]
+
+    bt_sev_forecasts = call_endpoint(train_sev_series, horizon)
+
+    m02_results = {}
+    for sev in ["K", "A", "B", "C", "O"]:
+        sev_predicted = bt_sev_forecasts.get(sev, {}).get("p50", [])
+        sev_test = df_test[df_test["severity"] == sev].groupby("month").size()
+        sev_actual = [int(sev_test.get(m, 0)) for m in cutoff_months]
+        sev_mape = _calc_mape(sev_actual, sev_predicted)
+        sev_grade = _assign_grade(sev_mape)
+        m02_results[sev] = {"mape": sev_mape, "grade": sev_grade}
+        print(f"    {sev}: MAPE={sev_mape}%, Grade={sev_grade}")
+
+    results["m02"] = m02_results
+
+    # --- M03: Corridor backtesting ---
+    print("\n  [Backtest M03] Corridors...")
+    if TOP_CORRIDORS:
+        route_col = "RTE Name" if "RTE Name" in df_train.columns else (
+            "RTE_NAME" if "RTE_NAME" in df_train.columns else None)
+        if route_col:
+            df_train_corr = df_train.copy()
+            corridor_map = {}
+            for _, row in df_train_corr.iterrows():
+                rte = str(row.get(route_col, "")).strip().upper()
+                for corr in TOP_CORRIDORS:
+                    if corr.upper() in rte or rte in corr.upper():
+                        corridor_map[row.name] = corr
+                        break
+            df_train_corr["corridor"] = df_train_corr.index.map(corridor_map)
+            df_train_corr = df_train_corr.dropna(subset=["corridor"])
+
+            df_test_corr = df_test.copy()
+            corridor_map_test = {}
+            for _, row in df_test_corr.iterrows():
+                rte = str(row.get(route_col, "")).strip().upper()
+                for corr in TOP_CORRIDORS:
+                    if corr.upper() in rte or rte in corr.upper():
+                        corridor_map_test[row.name] = corr
+                        break
+            df_test_corr["corridor"] = df_test_corr.index.map(corridor_map_test)
+            df_test_corr = df_test_corr.dropna(subset=["corridor"])
+
+            if not df_train_corr.empty:
+                train_corr_series = build_monthly_series(df_train_corr, group_col="corridor")
+                bt_corr_forecasts = call_endpoint(train_corr_series, horizon)
+
+                m03_results = {}
+                for corr in TOP_CORRIDORS:
+                    corr_predicted = bt_corr_forecasts.get(corr, {}).get("p50", [])
+                    corr_test = df_test_corr[df_test_corr["corridor"] == corr].groupby("month").size()
+                    corr_actual = [int(corr_test.get(m, 0)) for m in cutoff_months]
+                    corr_mape = _calc_mape(corr_actual, corr_predicted)
+                    corr_grade = _assign_grade(corr_mape)
+                    m03_results[corr] = {"mape": corr_mape, "grade": corr_grade}
+                    print(f"    {corr}: MAPE={corr_mape}%, Grade={corr_grade}")
+
+                results["m03"] = m03_results
+
+    # Overall grade (weighted: M01 50%, M02 avg 30%, M03 avg 20%)
+    grades_to_score = {"A": 1, "B": 2, "C": 3, "D": 4, "N/A": 3}
+    m01_score = grades_to_score.get(results["m01"]["grade"], 3)
+
+    m02_scores = [grades_to_score.get(v["grade"], 3) for v in m02_results.values() if v["grade"] != "N/A"]
+    m02_avg = sum(m02_scores) / max(len(m02_scores), 1) if m02_scores else 3
+
+    m03_results_dict = results.get("m03", {})
+    m03_scores = [grades_to_score.get(v["grade"], 3) for v in m03_results_dict.values() if v["grade"] != "N/A"]
+    m03_avg = sum(m03_scores) / max(len(m03_scores), 1) if m03_scores else 3
+
+    overall_score = m01_score * 0.5 + m02_avg * 0.3 + m03_avg * 0.2
+    if overall_score < 1.5:
+        results["overallGrade"] = "A"
+    elif overall_score < 2.5:
+        results["overallGrade"] = "B"
+    elif overall_score < 3.5:
+        results["overallGrade"] = "C"
+    else:
+        results["overallGrade"] = "D"
+
+    print(f"\n  Overall Backtest Grade: {results['overallGrade']} (score: {overall_score:.1f})")
+    return results
+
+
 def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_label=None):
     """Generate forecast for a single crash data file."""
     global TOP_CORRIDORS
@@ -1318,6 +1602,9 @@ def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_
     derived = build_derived_metrics(matrices, summary, horizon, crash_pattern=crash_pattern)
     print(f"  Derived metrics: {list(derived.keys())}")
 
+    # Run backtesting (hold out last 6 months, compare predicted vs actual)
+    backtesting = backtest_forecast(df, call_endpoint, horizon=BACKTEST_HOLDOUT)
+
     # Assemble final output
     output = {
         "generated": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
@@ -1339,6 +1626,9 @@ def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_
         "matrices": matrices,
         "derivedMetrics": derived,
     }
+
+    if backtesting:
+        output["backtesting"] = backtesting
 
     # Write output
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
