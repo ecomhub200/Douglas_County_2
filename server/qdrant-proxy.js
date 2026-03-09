@@ -228,6 +228,122 @@ function collectBody(req, maxSize = 15 * 1024 * 1024) {
 }
 
 // =============================================================================
+// Firebase Auth helper
+// =============================================================================
+
+async function verifyFirebaseToken(req) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new Error('Missing or invalid Authorization header');
+    }
+    const token = authHeader.split('Bearer ')[1];
+    const admin = require('firebase-admin');
+    // Ensure Firebase Admin is initialized
+    getFirestore();
+    const decoded = await admin.auth().verifyIdToken(token);
+    return { uid: decoded.uid, email: decoded.email };
+}
+
+// =============================================================================
+// Email Schedule helpers
+// =============================================================================
+
+// In-memory cache for due schedules (5-minute TTL)
+let scheduleCache = { data: null, loadedAt: 0 };
+const SCHEDULE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function calculateNextRunAt(schedule) {
+    const now = new Date();
+    const { frequency, dayOfWeek, dayOfMonth, time, timezone } = schedule;
+    const [hours, minutes] = (time || '08:00').split(':').map(Number);
+    const tz = timezone || 'America/New_York';
+
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, hour12: false,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+
+    // Start searching from 1 minute in the future
+    let candidate = new Date(now.getTime() + 60000);
+
+    for (let i = 0; i < 400; i++) {
+        const parts = formatter.formatToParts(candidate);
+        const p = {};
+        parts.forEach(({ type, value }) => { p[type] = parseInt(value, 10); });
+
+        const candidateDow = candidate.getDay(); // 0=Sun
+        const candidateDay = p.day;
+
+        let match = false;
+        if (frequency === 'daily') {
+            match = true;
+        } else if (frequency === 'weekly') {
+            match = candidateDow === (dayOfWeek != null ? dayOfWeek : 1);
+        } else if (frequency === 'monthly') {
+            match = candidateDay === (dayOfMonth || 1);
+        } else if (frequency === 'quarterly') {
+            match = candidateDay === (dayOfMonth || 1) && [1, 4, 7, 10].includes(p.month);
+        } else if (frequency === 'annual') {
+            match = candidateDay === (dayOfMonth || 1) && p.month === 1;
+        }
+
+        if (match) {
+            const dateStr = `${String(p.year)}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
+            // Convert target local time to UTC
+            const utcTest = new Date(dateStr);
+            const tzOffset = utcTest.getTime() - new Date(utcTest.toLocaleString('en-US', { timeZone: tz })).getTime();
+            const finalDate = new Date(new Date(dateStr + 'Z').getTime() + tzOffset);
+
+            if (finalDate > now) {
+                return finalDate.toISOString();
+            }
+        }
+
+        // Move to next day
+        candidate = new Date(candidate.getTime() + 24 * 60 * 60 * 1000);
+    }
+
+    // Fallback: 1 week from now
+    return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function buildScheduledEmailHtml(schedule) {
+    const appUrl = APP_URL || 'https://crashlens.aicreatesai.com';
+    const agency = schedule.agency || 'Your Agency';
+    const jurisdiction = schedule.jurisdiction || 'your jurisdiction';
+    const state = schedule.state || '';
+
+    return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+  <tr><td style="background:linear-gradient(135deg,#1a237e,#283593);padding:32px 40px;text-align:center;">
+    <h1 style="color:#ffffff;margin:0;font-size:24px;">CRASH LENS</h1>
+    <p style="color:#b3bef5;margin:8px 0 0;font-size:14px;">Scheduled Crash Analysis Report</p>
+  </td></tr>
+  <tr><td style="padding:32px 40px;">
+    <h2 style="color:#1a237e;margin:0 0 16px;font-size:20px;">${agency} — ${jurisdiction.charAt(0).toUpperCase() + jurisdiction.slice(1)}</h2>
+    <p style="color:#555;line-height:1.6;margin:0 0 24px;">Your scheduled ${schedule.frequency || 'periodic'} crash analysis report is ready for review. Click below to open the full interactive report in CRASH LENS.</p>
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+    <tr><td style="background:#1a237e;border-radius:6px;padding:14px 32px;">
+      <a href="${appUrl}/app/?state=${encodeURIComponent(state)}&jurisdiction=${encodeURIComponent(jurisdiction)}" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;">View Full Report in CRASH LENS</a>
+    </td></tr></table>
+    <p style="color:#888;font-size:13px;margin:0;">Report type: ${schedule.reportType || 'Comprehensive'} | Frequency: ${schedule.frequency || 'Weekly'}</p>
+  </td></tr>
+  <tr><td style="background:#f8f9fa;padding:20px 40px;text-align:center;border-top:1px solid #e8eaed;">
+    <p style="color:#999;font-size:12px;margin:0;">CRASH LENS by AI Creates AI &mdash; Traffic Safety Intelligence</p>
+    <p style="color:#bbb;font-size:11px;margin:4px 0 0;">To change your schedule, open CRASH LENS &gt; Reports &gt; Email Settings</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+// =============================================================================
 // HTTP Server
 // =============================================================================
 
@@ -815,7 +931,7 @@ const server = http.createServer((req, res) => {
     }
 
     // ---- Subscriber Management: Save subscribers to R2 ----
-    if (req.url === '/api/subscribers/save' && req.method === 'POST') {
+    if (req.url === '/subscribers/save' && req.method === 'POST') {
         if (!R2_WORKER_URL || !R2_WORKER_SECRET) {
             res.writeHead(503, corsHeaders);
             res.end(JSON.stringify({
@@ -920,7 +1036,7 @@ const server = http.createServer((req, res) => {
     }
 
     // ---- Subscriber Management: Load subscribers from R2 ----
-    if (req.url.startsWith('/api/subscribers/load') && req.method === 'GET') {
+    if (req.url.startsWith('/subscribers/load') && req.method === 'GET') {
         const parsed = url.parse(req.url, true);
         const stateKey = parsed.query.state;
         const jurisdiction = parsed.query.jurisdiction;
@@ -974,10 +1090,125 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // ---- Email Schedule CRUD: Save/List/Delete email schedules in Firestore ----
+
+    // POST /schedule/save — Create or update an email schedule
+    if (req.url === '/schedule/save' && req.method === 'POST') {
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const body = await collectBody(req);
+                const data = JSON.parse(body);
+
+                const db = getFirestore();
+                const scheduleId = data.scheduleId || crypto.randomUUID();
+                const now = new Date().toISOString();
+
+                const scheduleDoc = {
+                    enabled: data.enabled !== false,
+                    recipients: data.recipients || [],
+                    reportType: data.reportType || 'comprehensive',
+                    frequency: data.frequency || 'weekly',
+                    dayOfWeek: data.dayOfWeek != null ? data.dayOfWeek : 1,
+                    dayOfMonth: data.dayOfMonth || null,
+                    time: data.time || '08:00',
+                    timezone: data.timezone || 'America/New_York',
+                    jurisdiction: data.jurisdiction || '',
+                    state: data.state || '',
+                    agency: data.agency || '',
+                    updatedAt: now,
+                    lastSentAt: data.lastSentAt || null
+                };
+
+                // Only set createdAt on new documents
+                if (!data.scheduleId) {
+                    scheduleDoc.createdAt = now;
+                }
+
+                // Calculate next run time
+                scheduleDoc.nextRunAt = calculateNextRunAt(scheduleDoc);
+
+                await db.collection('users').doc(user.uid)
+                    .collection('emailSchedules').doc(scheduleId)
+                    .set(scheduleDoc, { merge: true });
+
+                // Invalidate schedule cache so cron picks up changes immediately
+                scheduleCache = { data: null, loadedAt: 0 };
+
+                console.log(`[Schedules] Saved schedule ${scheduleId} for user ${user.uid}`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({ success: true, scheduleId, nextRunAt: scheduleDoc.nextRunAt }));
+            } catch (err) {
+                console.error(`[Schedules] Save error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
+        return;
+    }
+
+    // GET /schedule/list — List active schedules for the authenticated user
+    if (req.url === '/schedule/list' && req.method === 'GET') {
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const db = getFirestore();
+
+                const snapshot = await db.collection('users').doc(user.uid)
+                    .collection('emailSchedules').get();
+
+                const schedules = [];
+                snapshot.forEach(doc => {
+                    schedules.push({ id: doc.id, ...doc.data() });
+                });
+
+                console.log(`[Schedules] Listed ${schedules.length} schedules for user ${user.uid}`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({ success: true, schedules }));
+            } catch (err) {
+                console.error(`[Schedules] List error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
+        return;
+    }
+
+    // DELETE /schedule/:id — Delete a specific schedule
+    const scheduleDeleteMatch = req.url.match(/^\/schedule\/([a-zA-Z0-9_-]+)$/);
+    if (scheduleDeleteMatch && req.method === 'DELETE') {
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const scheduleId = scheduleDeleteMatch[1];
+                const db = getFirestore();
+
+                await db.collection('users').doc(user.uid)
+                    .collection('emailSchedules').doc(scheduleId)
+                    .delete();
+
+                // Invalidate schedule cache
+                scheduleCache = { data: null, loadedAt: 0 };
+
+                console.log(`[Schedules] Deleted schedule ${scheduleId} for user ${user.uid}`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({ success: true }));
+            } catch (err) {
+                console.error(`[Schedules] Delete error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
+        return;
+    }
+
     // ---- Forecast Data Proxy: Fetch forecast JSON from R2 CDN ----
-    // GET /api/forecasts/:state/:jurisdiction/:roadType
-    // Example: /api/forecasts/colorado/douglas/county_roads
-    const forecastMatch = req.url.match(/^\/api\/forecasts\/([a-z_]+)\/([a-z_]+)\/([a-z_]+)$/);
+    // GET /forecasts/:state/:jurisdiction/:roadType (Nginx strips /api/ prefix)
+    // Example: /forecasts/colorado/douglas/county_roads
+    const forecastMatch = req.url.match(/^\/forecasts\/([a-z_]+)\/([a-z_]+)\/([a-z_]+)$/);
     if (forecastMatch && req.method === 'GET') {
         const [, state, jurisdiction, roadType] = forecastMatch;
         const r2Key = `${state}/${jurisdiction}/forecasts_${roadType}.json`;
@@ -1027,8 +1258,8 @@ const server = http.createServer((req, res) => {
     }
 
     // ---- Forecast Availability Check: Check which forecast files exist for a jurisdiction ----
-    // GET /api/forecasts/check/:state/:jurisdiction
-    const forecastCheckMatch = req.url.match(/^\/api\/forecasts\/check\/([a-z_]+)\/([a-z_]+)$/);
+    // GET /forecasts/check/:state/:jurisdiction (Nginx strips /api/ prefix)
+    const forecastCheckMatch = req.url.match(/^\/forecasts\/check\/([a-z_]+)\/([a-z_]+)$/);
     if (forecastCheckMatch && req.method === 'GET') {
         const [, state, jurisdiction] = forecastCheckMatch;
         const roadTypes = ['county_roads', 'no_interstate', 'all_roads'];
@@ -1724,4 +1955,115 @@ server.listen(PORT, '127.0.0.1', () => {
     } else {
         console.warn('[Stripe] WARNING: STRIPE_SECRET_KEY not set - /stripe endpoints will return 503');
     }
+
+    // Start email schedule cron if Firebase and Brevo are configured
+    if (process.env.FIREBASE_SERVICE_ACCOUNT && BREVO_API_KEY) {
+        startEmailScheduler();
+    } else {
+        console.warn('[Scheduler] WARNING: FIREBASE_SERVICE_ACCOUNT or BREVO_API_KEY not set - email scheduler disabled');
+    }
 });
+
+// =============================================================================
+// Email Schedule Cron Scheduler
+// =============================================================================
+
+async function loadDueSchedules() {
+    const now = Date.now();
+
+    // Return cached data if still fresh
+    if (scheduleCache.data && (now - scheduleCache.loadedAt) < SCHEDULE_CACHE_TTL) {
+        return scheduleCache.data;
+    }
+
+    try {
+        const db = getFirestore();
+        const nowISO = new Date().toISOString();
+
+        // Query all users' emailSchedules subcollections using collectionGroup
+        const snapshot = await db.collectionGroup('emailSchedules')
+            .where('enabled', '==', true)
+            .where('nextRunAt', '<=', nowISO)
+            .get();
+
+        const schedules = [];
+        snapshot.forEach(doc => {
+            schedules.push({
+                id: doc.id,
+                uid: doc.ref.parent.parent.id, // users/{uid}/emailSchedules/{id}
+                ...doc.data()
+            });
+        });
+
+        scheduleCache = { data: schedules, loadedAt: now };
+        return schedules;
+    } catch (err) {
+        console.error(`[Scheduler] Failed to load schedules: ${err.message}`);
+        return [];
+    }
+}
+
+async function processScheduledEmails() {
+    try {
+        const dueSchedules = await loadDueSchedules();
+        if (dueSchedules.length === 0) return;
+
+        console.log(`[Scheduler] Processing ${dueSchedules.length} due schedule(s)`);
+        const db = getFirestore();
+
+        for (const schedule of dueSchedules) {
+            try {
+                const recipients = schedule.recipients || [];
+                if (recipients.length === 0) {
+                    console.warn(`[Scheduler] Schedule ${schedule.id} has no recipients, skipping`);
+                    continue;
+                }
+
+                const subject = `CRASH LENS ${schedule.frequency || 'Scheduled'} Report — ${schedule.agency || schedule.jurisdiction || 'Crash Analysis'}`;
+                const htmlBody = buildScheduledEmailHtml(schedule);
+                const textBody = `Your scheduled CRASH LENS report is ready. Visit ${APP_URL}/app/ to view the full report.`;
+
+                // Send to each recipient individually
+                for (const recipient of recipients) {
+                    try {
+                        await sendViaBrevoApi(recipient, subject, htmlBody, textBody, null, {
+                            tag: 'scheduled-report',
+                            includeListHeaders: true
+                        });
+                        console.log(`[Scheduler] Sent to ${recipient} (schedule ${schedule.id})`);
+                    } catch (sendErr) {
+                        console.error(`[Scheduler] Failed to send to ${recipient}: ${sendErr.message}`);
+                    }
+                }
+
+                // Update lastSentAt and calculate next run
+                const now = new Date().toISOString();
+                const nextRunAt = calculateNextRunAt(schedule);
+
+                await db.collection('users').doc(schedule.uid)
+                    .collection('emailSchedules').doc(schedule.id)
+                    .update({ lastSentAt: now, nextRunAt });
+
+                console.log(`[Scheduler] Schedule ${schedule.id} processed, next run: ${nextRunAt}`);
+            } catch (scheduleErr) {
+                console.error(`[Scheduler] Error processing schedule ${schedule.id}: ${scheduleErr.message}`);
+            }
+        }
+
+        // Invalidate cache after processing so next check gets fresh data
+        scheduleCache = { data: null, loadedAt: 0 };
+    } catch (err) {
+        console.error(`[Scheduler] Error in processScheduledEmails: ${err.message}`);
+    }
+}
+
+function startEmailScheduler() {
+    const cron = require('node-cron');
+
+    // Run every minute to check for due schedules
+    cron.schedule('* * * * *', () => {
+        processScheduledEmails();
+    });
+
+    console.log('[Scheduler] Email scheduler started (checking every minute)');
+}
