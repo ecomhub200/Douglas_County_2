@@ -180,7 +180,7 @@
                             <span class="card-title">🔑 API Token</span>
                             <span class="badge badge-warning" id="tokenStatus">Loading...</span>
                         </div>
-                        <div style="font-size:0.75rem;color:var(--text-muted);padding:0.25rem 0;">
+                        <div style="font-size:0.75rem;color:var(--text-muted);padding:0.25rem 0;display:none;">
                             Token loaded from server configuration
                         </div>
                     </div>
@@ -510,7 +510,7 @@
             </div>
             <!-- Sidebar -->
             <div class="sidebar">
-                <div class="card r2-card">
+                <div class="card r2-card" style="display:none">
                     <div class="card-header"><span class="card-title">☁️ R2 Storage</span><span class="badge badge-r2" id="r2Status">Checking...</span></div>
                     <div style="margin-bottom:0.4rem"><label style="font-size:0.7rem;font-weight:600;color:var(--text-muted)">Public URL</label><input type="text" id="r2PublicUrl" value="https://data.aicreatesai.com" style="font-size:0.72rem"></div>
                     <div style="display:flex;gap:0.3rem"><button class="btn btn-r2 btn-sm" onclick="testR2()">🔗 Test</button><button class="btn btn-ghost btn-sm" onclick="saveR2Config()">💾 Save</button></div>
