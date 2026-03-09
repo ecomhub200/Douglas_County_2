@@ -170,7 +170,7 @@ function sendViaBrevoApi(recipients, subject, htmlBody, textBody, attachment, op
 
         const payload = JSON.stringify(emailPayload);
 
-        const options = {
+        const reqOptions = {
             hostname: 'api.brevo.com',
             port: 443,
             path: '/v3/smtp/email',
@@ -183,7 +183,7 @@ function sendViaBrevoApi(recipients, subject, htmlBody, textBody, attachment, op
             }
         };
 
-        const req = https.request(options, (res) => {
+        const req = https.request(reqOptions, (res) => {
             let data = '';
             res.on('data', chunk => { data += chunk; });
             res.on('end', () => {
