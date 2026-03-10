@@ -172,6 +172,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          # Force-add CSVs that are in .gitignore (data/*_all_roads.csv etc.)
+          CSV_PATH="${{ steps.download.outputs.csv_path }}"
+          if [ -n "$CSV_PATH" ] && [ -f "$CSV_PATH" ]; then
+            git add --force "$CSV_PATH"
+          fi
           git add ${{ env.DATA_DIR }}/ 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No new data to commit"
