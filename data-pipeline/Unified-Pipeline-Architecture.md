@@ -1255,16 +1255,91 @@ Jurisdiction keys are snake_case derived from county display names:
 
 ## 14. Unified Stage 7: Predict (Forecast)
 
-```bash
-python scripts/generate_forecast.py \
-  --all-road-types \
-  --jurisdiction ${JURISDICTION} \
-  --data-dir data/${DOT_NAME}/
-```
+### Overview
 
-Optional. Non-fatal. Produces 3 JSON files per jurisdiction with 6 prediction matrices (M01-M06). Requires AWS SageMaker credentials.
+Optional. Non-fatal. Produces 3 forecast JSON files per jurisdiction (one per road type) with 6 prediction matrices (M01-M06). Always uses real **Chronos-2 via AWS SageMaker** — there is no synthetic/dry-run mode.
 
 Forecasting runs **per county**. Region/MPO-level forecasts are not generated in this version — the region/MPO aggregate CSVs provide the raw data for future region-level forecasting if needed.
+
+### CLI Interface
+
+```bash
+python scripts/generate_forecast.py \
+  --state ${STATE} \
+  --all-road-types \
+  --jurisdiction ${JURISDICTION} \
+  --data-dir data/${DOT_NAME}/ \
+  --source r2
+```
+
+| Argument | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `--state` | Yes | — | State name (e.g., `virginia`, `colorado`). Loads EPDO weights from `states/{state}/config.json` |
+| `--all-road-types` | No | — | Generate forecasts for all 3 road types (county_roads, no_interstate, all_roads) |
+| `--jurisdiction` | Yes (with `--all-road-types`) | — | Jurisdiction name prefix for data files |
+| `--data-dir` | No | `data` | Directory containing road-type CSV files |
+| `--source` | No | `local` | `local` reads from data-dir; `r2` downloads validated CSVs from R2 CDN first |
+| `--data` | No | `data/crash_data.csv` | Path to crash CSV (single-file mode) |
+| `--output` | No | `data/forecasts.json` | Output JSON path (single-file mode) |
+| `--horizon` | No | `12` | Forecast horizon in months |
+
+### Jurisdiction-Agnostic Design
+
+The forecast script is fully state/jurisdiction-agnostic:
+
+1. **EPDO weights** are loaded from `states/{state}/config.json` at runtime (not hardcoded). Falls back to HSM standard weights (`K=462, A=62, B=12, C=5, O=1`) if the state config is missing.
+2. **Top corridors** are auto-detected from the data via `auto_detect_top_corridors()` — no hardcoded route names.
+3. **Data paths** are constructed from `--data-dir` and `--jurisdiction` arguments, not from fixed directory names.
+
+### R2 Data Sourcing (`--source r2`)
+
+When `--source r2` is specified, the script downloads the 3 road-type CSVs from the R2 CDN before processing:
+
+```
+https://data.aicreatesai.com/{state}/{jurisdiction}/county_roads.csv
+https://data.aicreatesai.com/{state}/{jurisdiction}/no_interstate.csv
+https://data.aicreatesai.com/{state}/{jurisdiction}/all_roads.csv
+```
+
+Files are saved locally as `{data-dir}/{jurisdiction}_{road_type}.csv` for processing. This ensures forecasts always use the latest validated data from R2 storage.
+
+### SageMaker Endpoint Pre-Check
+
+Before generating any forecasts, the script verifies the SageMaker endpoint (`crashlens-chronos2-endpoint`) is `InService`. If the endpoint is unavailable or not ready, the script exits with an error immediately rather than failing mid-forecast.
+
+### Pipeline Integration (Stage 5 in `pipeline.yml`)
+
+```python
+cmd = ['python', 'scripts/generate_forecast.py',
+       '--all-road-types', '--jurisdiction', j, '--data-dir', data_dir,
+       '--state', state, '--source', 'r2']
+```
+
+The pipeline passes `--state` from `needs.prepare.outputs.state` and uses `--source r2` to ensure forecasts are generated from the latest validated R2 data. Failures are non-fatal — the pipeline continues with remaining jurisdictions.
+
+### Output Files
+
+| Road Type | Output Filename | R2 Upload Key |
+|-----------|----------------|---------------|
+| County/City Roads | `forecasts_county_roads.json` | `{state}/{jurisdiction}/forecasts_county_roads.json` |
+| No Interstate | `forecasts_no_interstate.json` | `{state}/{jurisdiction}/forecasts_no_interstate.json` |
+| All Roads | `forecasts_all_roads.json` | `{state}/{jurisdiction}/forecasts_all_roads.json` |
+
+Each forecast JSON contains: `model: "amazon/chronos-2"`, state-specific `epdoWeights`, 6 prediction matrices (M01-M06), derived metrics, and backtesting results.
+
+### Example Commands
+
+```bash
+# Virginia — Henrico (R2 source)
+python scripts/generate_forecast.py \
+  --state virginia --all-road-types --jurisdiction henrico \
+  --data-dir data/VDOT --source r2
+
+# Colorado — Douglas (local source)
+python scripts/generate_forecast.py \
+  --state colorado --all-road-types --jurisdiction douglas \
+  --data-dir data/CDOT --source local
+```
 
 ---
 
@@ -1741,6 +1816,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
+          STATE="${{ needs.prepare.outputs.state }}"
           DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
           JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
 
@@ -1751,11 +1827,13 @@ jobs:
           echo "$JURISDICTIONS" | python3 -c "
           import json, sys, subprocess
           jurisdictions = json.load(sys.stdin)
+          state = '$STATE'
           data_dir = '$DATA_DIR'
           success = 0
           for j in jurisdictions:
               cmd = ['python', 'scripts/generate_forecast.py',
-                     '--all-road-types', '--jurisdiction', j, '--data-dir', data_dir]
+                     '--all-road-types', '--jurisdiction', j, '--data-dir', data_dir,
+                     '--state', state, '--source', 'r2']
               result = subprocess.run(cmd, capture_output=True)
               if result.returncode == 0:
                   success += 1

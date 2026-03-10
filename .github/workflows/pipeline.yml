@@ -347,6 +347,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
+          STATE="${{ needs.prepare.outputs.state }}"
           DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
           JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
 
@@ -357,11 +358,13 @@ jobs:
           echo "$JURISDICTIONS" | python3 -c "
           import json, sys, subprocess
           jurisdictions = json.load(sys.stdin)
+          state = '$STATE'
           data_dir = '$DATA_DIR'
           success = 0
           for j in jurisdictions:
               cmd = ['python', 'scripts/generate_forecast.py',
-                     '--all-road-types', '--jurisdiction', j, '--data-dir', data_dir]
+                     '--all-road-types', '--jurisdiction', j, '--data-dir', data_dir,
+                     '--state', state, '--source', 'r2']
               result = subprocess.run(cmd, capture_output=True)
               if result.returncode == 0:
                   success += 1
