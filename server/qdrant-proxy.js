@@ -1205,59 +1205,10 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // ---- Forecast Data Proxy: Fetch forecast JSON from R2 CDN ----
-    // GET /forecasts/:state/:jurisdiction/:roadType (Nginx strips /api/ prefix)
-    // Example: /forecasts/colorado/douglas/county_roads
-    const forecastMatch = req.url.match(/^\/forecasts\/([a-z_]+)\/([a-z_]+)\/([a-z_]+)$/);
-    if (forecastMatch && req.method === 'GET') {
-        const [, state, jurisdiction, roadType] = forecastMatch;
-        const r2Key = `${state}/${jurisdiction}/forecasts_${roadType}.json`;
-        const r2PublicUrl = `https://data.aicreatesai.com/${r2Key}`;
-
-        // Check in-memory cache (5 minute TTL)
-        const cacheKey = r2Key;
-        const cached = forecastCache.get(cacheKey);
-        if (cached && (Date.now() - cached.timestamp < 5 * 60 * 1000)) {
-            console.log(`[Forecasts] Cache hit: ${r2Key}`);
-            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' });
-            res.end(cached.data);
-            return;
-        }
-
-        console.log(`[Forecasts] Fetching from R2: ${r2Key}`);
-
-        https.get(r2PublicUrl, (r2Res) => {
-            let data = '';
-            r2Res.on('data', chunk => { data += chunk; });
-            r2Res.on('end', () => {
-                if (r2Res.statusCode === 200) {
-                    // Cache the response
-                    forecastCache.set(cacheKey, { data, timestamp: Date.now() });
-                    res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' });
-                    res.end(data);
-                } else if (r2Res.statusCode === 404) {
-                    res.writeHead(404, corsHeaders);
-                    res.end(JSON.stringify({
-                        error: 'Forecast not found',
-                        state,
-                        jurisdiction,
-                        roadType,
-                        message: `No forecast data available for ${jurisdiction} (${state}). Run the data pipeline to generate forecasts.`
-                    }));
-                } else {
-                    res.writeHead(502, corsHeaders);
-                    res.end(JSON.stringify({ error: `R2 returned HTTP ${r2Res.statusCode}` }));
-                }
-            });
-        }).on('error', (err) => {
-            console.error(`[Forecasts] R2 fetch error: ${err.message}`);
-            res.writeHead(502, corsHeaders);
-            res.end(JSON.stringify({ error: 'Failed to fetch forecast from R2', message: err.message }));
-        });
-        return;
-    }
-
     // ---- Forecast Availability Check: Check which forecast files exist for a jurisdiction ----
+    // IMPORTANT: This route MUST come before the data fetch route below, because
+    // /forecasts/check/:state/:jurisdiction would otherwise match the 3-segment
+    // pattern /forecasts/:state/:jurisdiction/:roadType (with state="check").
     // GET /forecasts/check/:state/:jurisdiction (Nginx strips /api/ prefix)
     const forecastCheckMatch = req.url.match(/^\/forecasts\/check\/([a-z_]+)\/([a-z_]+)$/);
     if (forecastCheckMatch && req.method === 'GET') {
@@ -1311,6 +1262,58 @@ const server = http.createServer((req, res) => {
                     }));
                 }
             });
+        });
+        return;
+    }
+
+    // ---- Forecast Data Proxy: Fetch forecast JSON from R2 CDN ----
+    // GET /forecasts/:state/:jurisdiction/:roadType (Nginx strips /api/ prefix)
+    // Example: /forecasts/colorado/douglas/county_roads
+    const forecastMatch = req.url.match(/^\/forecasts\/([a-z_]+)\/([a-z_]+)\/([a-z_]+)$/);
+    if (forecastMatch && req.method === 'GET') {
+        const [, state, jurisdiction, roadType] = forecastMatch;
+        const r2Key = `${state}/${jurisdiction}/forecasts_${roadType}.json`;
+        const r2PublicUrl = `https://data.aicreatesai.com/${r2Key}`;
+
+        // Check in-memory cache (5 minute TTL)
+        const cacheKey = r2Key;
+        const cached = forecastCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < 5 * 60 * 1000)) {
+            console.log(`[Forecasts] Cache hit: ${r2Key}`);
+            res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' });
+            res.end(cached.data);
+            return;
+        }
+
+        console.log(`[Forecasts] Fetching from R2: ${r2Key}`);
+
+        https.get(r2PublicUrl, (r2Res) => {
+            let data = '';
+            r2Res.on('data', chunk => { data += chunk; });
+            r2Res.on('end', () => {
+                if (r2Res.statusCode === 200) {
+                    // Cache the response
+                    forecastCache.set(cacheKey, { data, timestamp: Date.now() });
+                    res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' });
+                    res.end(data);
+                } else if (r2Res.statusCode === 404) {
+                    res.writeHead(404, corsHeaders);
+                    res.end(JSON.stringify({
+                        error: 'Forecast not found',
+                        state,
+                        jurisdiction,
+                        roadType,
+                        message: `No forecast data available for ${jurisdiction} (${state}). Run the data pipeline to generate forecasts.`
+                    }));
+                } else {
+                    res.writeHead(502, corsHeaders);
+                    res.end(JSON.stringify({ error: `R2 returned HTTP ${r2Res.statusCode}` }));
+                }
+            });
+        }).on('error', (err) => {
+            console.error(`[Forecasts] R2 fetch error: ${err.message}`);
+            res.writeHead(502, corsHeaders);
+            res.end(JSON.stringify({ error: 'Failed to fetch forecast from R2', message: err.message }));
         });
         return;
     }
