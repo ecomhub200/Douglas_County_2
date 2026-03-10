@@ -76,18 +76,31 @@ When working on this project, act as:
 - Make minimal, targeted changes
 - Preserve backward compatibility when possible
 - Test changes don't affect unrelated features
-- Keep the single-file architecture intact (`index.html`)
+- Follow the **modular architecture** — separate HTML, CSS, and JS into distinct files/modules
 
 ## Project-Specific Guidelines
 
 ### Architecture
 - This is a **browser-based crash analysis tool** for transportation agencies (multi-state)
-- Main application is in `app/index.html` (single-file SPA)
+- Main application is in `app/` directory (modular SPA — HTML, CSS, and JS are separated into distinct files/modules)
 - Marketing site is at root level (`index.html`, `pricing.html`, `features.html`, etc.)
 - Authentication via Firebase Auth (`assets/js/auth.js`) with Google OAuth + Email/Password
 - Payment processing via **Stripe Checkout** (redirect mode)
 - Configuration stored in `config.json` and `config/api-keys.json`
 - Data processing scripts in Python (`download_crash_data.py`, `download_grants_data.py`)
+
+### ⚠️ Modular Architecture (MANDATORY)
+
+The application **MUST NOT** be a single monolithic HTML file. All new code and refactoring must follow a modular structure:
+
+- **Separate HTML, CSS, and JavaScript** into distinct files
+- **JavaScript modules**: Break functionality into logical modules (e.g., `app/js/map.js`, `app/js/dashboard.js`, `app/js/cmf.js`, etc.)
+- **CSS files**: Organize styles by component or feature area (e.g., `app/css/map.css`, `app/css/dashboard.css`)
+- **HTML**: `app/index.html` should be the entry point that loads modules via `<script>` tags or ES module imports
+- **Do NOT inline large blocks of CSS or JavaScript** into HTML files
+- **Each tab/feature should have its own JS module** to keep files maintainable and under a reasonable size
+- When modifying existing code, **actively refactor monolithic sections into separate modules** when practical
+- Shared utilities, constants, and helper functions should live in dedicated shared modules (e.g., `app/js/utils.js`, `app/js/constants.js`)
 
 ### Hosting: Coolify (Docker)
 - **Docker container** running Nginx (static files, port 80) + Node.js API server (port 3001)
@@ -106,7 +119,9 @@ crash-lens/
 ├── contact.html            # Contact form
 ├── contact-sales.html      # Sales inquiry form
 ├── app/
-│   └── index.html          # Main crash analysis application (single-file SPA)
+│   ├── index.html          # Main crash analysis application (entry point)
+│   ├── css/                # Application stylesheets (modular CSS)
+│   └── js/                 # Application JavaScript modules
 ├── login/
 │   └── index.html          # Authentication page (sign in/sign up)
 ├── assets/
