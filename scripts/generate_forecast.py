@@ -2,11 +2,13 @@
 """
 Generate crash forecasts using Chronos-2 on Amazon SageMaker.
 
-Reads crash data from data/CDOT/*.csv, aggregates into monthly time series,
-sends to the Chronos-2 SageMaker endpoint, and writes forecasts to
-data/CDOT/forecasts*.json for the Crash Prediction tab in CRASH LENS.
+Jurisdiction-agnostic forecast generator for CRASH LENS. Reads crash data
+from local files or R2 CDN, aggregates into monthly time series, sends to
+the Chronos-2 SageMaker endpoint, and writes forecast JSONs for the Crash
+Prediction tab.
 
-Each DOT's prediction data is stored alongside its source data (e.g., data/CDOT/).
+Each DOT's prediction data is stored alongside its source data (e.g., data/VDOT/).
+EPDO weights are loaded from state-specific config at states/{state}/config.json.
 
 Temporal Embedding Layer
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -33,9 +35,9 @@ Prediction Matrices
   M06: Intersection vs Segment
 
 Usage:
-    python scripts/generate_forecast.py
-    python scripts/generate_forecast.py --horizon 12 --data data/crashes.csv
-    python scripts/generate_forecast.py --dry-run  # Generate sample data without endpoint
+    python scripts/generate_forecast.py --state virginia --all-road-types --jurisdiction henrico --data-dir data/VDOT
+    python scripts/generate_forecast.py --state colorado --all-road-types --jurisdiction douglas --data-dir data/CDOT --source r2
+    python scripts/generate_forecast.py --state virginia --data data/VDOT/henrico_all_roads.csv --output data/VDOT/forecasts.json
 
 Environment Variables:
     AWS_ACCESS_KEY_ID       - IAM user access key
@@ -85,13 +87,41 @@ def load_epdo_weights(config_path=None):
         print(f"[Config] Using default EPDO weights: {e}")
         return default_weights
 
-EPDO_WEIGHTS = load_epdo_weights()
+EPDO_WEIGHTS = {"K": 462, "A": 62, "B": 12, "C": 5, "O": 1}  # Default; overridden in main() from state config
 
-# Default top corridors (Douglas County, Colorado — used as fallback)
-DEFAULT_CORRIDORS = [
-    "I-25", "C-470", "S PARKER RD", "HWY 85", "LINCOLN AVE",
-    "FOUNDERS PKWY", "HWY 83", "E LINCOLN AVE", "HWY 86", "RIDGEGATE PKWY",
-]
+
+def download_from_r2(state, jurisdiction, data_dir):
+    """Download validated road-type CSVs from R2 CDN into data_dir."""
+    import urllib.request
+    CDN_BASE = "https://data.aicreatesai.com"
+    os.makedirs(data_dir, exist_ok=True)
+
+    for rt in ["county_roads", "no_interstate", "all_roads"]:
+        url = f"{CDN_BASE}/{state}/{jurisdiction}/{rt}.csv"
+        local_path = os.path.join(data_dir, f"{jurisdiction}_{rt}.csv")
+        print(f"  Downloading {url} → {local_path}")
+        try:
+            urllib.request.urlretrieve(url, local_path)
+            size = os.path.getsize(local_path)
+            print(f"    OK ({size:,} bytes)")
+        except Exception as e:
+            print(f"    SKIP: {e}")
+
+
+def check_sagemaker_endpoint(session, endpoint_name="crashlens-chronos2-endpoint"):
+    """Verify SageMaker endpoint is available before running forecasts."""
+    sm = session.client("sagemaker")
+    try:
+        resp = sm.describe_endpoint(EndpointName=endpoint_name)
+        status = resp["EndpointStatus"]
+        if status != "InService":
+            print(f"ERROR: SageMaker endpoint '{endpoint_name}' is {status}, not InService")
+            sys.exit(1)
+        print(f"[SageMaker] Endpoint '{endpoint_name}' is InService")
+    except Exception as e:
+        print(f"ERROR: Cannot reach SageMaker endpoint: {e}")
+        sys.exit(1)
+
 
 # Will be populated dynamically from data via auto_detect_top_corridors()
 TOP_CORRIDORS = []
@@ -115,8 +145,8 @@ def auto_detect_top_corridors(df, top_n=10):
     elif "RTE_NAME" in df.columns:
         route_col = "RTE_NAME"
     else:
-        print("  [AutoDetect] No route column found. Using default corridors.")
-        return DEFAULT_CORRIDORS[:top_n]
+        print("  [AutoDetect] No route column found. Returning empty corridor list.")
+        return []
 
     # Count crashes per route, filter out empty/unknown
     route_counts = df[route_col].value_counts()
@@ -126,8 +156,8 @@ def auto_detect_top_corridors(df, top_n=10):
     route_counts = route_counts[route_counts.index.notna()]
 
     if route_counts.empty:
-        print("  [AutoDetect] No valid routes found. Using default corridors.")
-        return DEFAULT_CORRIDORS[:top_n]
+        print("  [AutoDetect] No valid routes found. Returning empty corridor list.")
+        return []
 
     top_routes = route_counts.head(top_n).index.tolist()
     print(f"  [AutoDetect] Top {len(top_routes)} corridors by crash volume:")
@@ -1534,7 +1564,7 @@ def backtest_forecast(df, call_endpoint, horizon=BACKTEST_HOLDOUT):
     return results
 
 
-def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_label=None):
+def generate_single_forecast(csv_path, output_path, horizon, road_type_label=None):
     """Generate forecast for a single crash data file."""
     global TOP_CORRIDORS
     df = load_crash_data(csv_path)
@@ -1542,22 +1572,20 @@ def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_
     # Auto-detect top corridors from this jurisdiction's data
     TOP_CORRIDORS = auto_detect_top_corridors(df)
 
-    # Set up raw endpoint caller or synthetic generator
-    if dry_run:
-        raw_endpoint = lambda series, h: generate_synthetic_forecast(series, h)
-    else:
-        try:
-            import boto3
-        except ImportError:
-            print("ERROR: boto3 required for live mode. Use --dry-run for testing.")
-            sys.exit(1)
+    # Set up SageMaker endpoint caller (always real Chronos-2)
+    try:
+        import boto3
+    except ImportError:
+        print("ERROR: boto3 is required. Install with: pip install boto3")
+        sys.exit(1)
 
-        session = boto3.Session(
-            aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
-            aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
-            region_name=os.environ.get("AWS_REGION", "us-east-1"),
-        )
-        raw_endpoint = lambda series, h: invoke_endpoint(session, series, h)
+    session = boto3.Session(
+        aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.environ.get("AWS_REGION", "us-east-1"),
+    )
+    check_sagemaker_endpoint(session)
+    raw_endpoint = lambda series, h: invoke_endpoint(session, series, h)
 
     # Wrap with temporal embedding layer: seasonal decomposition for
     # high-count series, log1p for low-count series (K, A severity).
@@ -1608,7 +1636,7 @@ def generate_single_forecast(csv_path, output_path, horizon, dry_run, road_type_
     # Assemble final output
     output = {
         "generated": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "model": "amazon/chronos-2" if not dry_run else "synthetic-demo",
+        "model": "amazon/chronos-2",
         "horizon": horizon,
         "quantileLevels": QUANTILE_LEVELS,
         "epdoWeights": EPDO_WEIGHTS,
@@ -1665,27 +1693,42 @@ ROAD_TYPE_CONFIGS = {
 
 def main():
     parser = argparse.ArgumentParser(description="Generate crash forecasts with Chronos-2")
-    parser.add_argument("--data", default="data/CDOT/douglas_all_roads.csv", help="Path to crash CSV")
-    parser.add_argument("--output", default="data/CDOT/forecasts.json", help="Output JSON path")
+    parser.add_argument("--state", required=True,
+                        help="State name (e.g., virginia, colorado). Used for loading state-specific config.")
+    parser.add_argument("--data", default="data/crash_data.csv", help="Path to crash CSV")
+    parser.add_argument("--output", default="data/forecasts.json", help="Output JSON path")
     parser.add_argument("--horizon", type=int, default=DEFAULT_HORIZON, help="Forecast horizon (months)")
-    parser.add_argument("--dry-run", action="store_true", help="Generate synthetic forecasts without SageMaker")
+    parser.add_argument("--source", choices=["local", "r2"], default="local",
+                        help="Data source: 'local' reads from data-dir, 'r2' downloads from R2 CDN first")
     parser.add_argument("--all-road-types", action="store_true",
                         help="Generate forecasts for all 3 road type datasets (county_roads, no_interstate, all_roads)")
-    parser.add_argument("--jurisdiction", default="douglas",
-                        help="Jurisdiction name prefix for data files (default: douglas)")
-    parser.add_argument("--data-dir", default="data/CDOT",
-                        help="Directory containing road-type CSV files (default: data/CDOT)")
+    parser.add_argument("--jurisdiction", default=None,
+                        help="Jurisdiction name prefix for data files (required with --all-road-types)")
+    parser.add_argument("--data-dir", default="data",
+                        help="Directory containing road-type CSV files (default: data)")
     args = parser.parse_args()
 
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    if args.dry_run:
-        print("\n*** DRY RUN MODE — generating synthetic forecasts ***\n")
+    # Load state-specific EPDO weights
+    global EPDO_WEIGHTS
+    config_path = os.path.join(project_root, "states", args.state, "config.json")
+    EPDO_WEIGHTS = load_epdo_weights(config_path)
 
     if args.all_road_types:
+        if not args.jurisdiction:
+            print("ERROR: --jurisdiction is required when using --all-road-types")
+            sys.exit(1)
+
         # Generate forecasts for all 3 road type datasets
         data_dir = os.path.join(project_root, args.data_dir) if not os.path.isabs(args.data_dir) else args.data_dir
-        # Output forecast JSONs to the same directory as the input data (not hardcoded to CDOT)
+
+        # If source is R2, download validated CSVs from CDN first
+        if args.source == "r2":
+            print(f"\n[R2] Downloading validated CSVs for {args.state}/{args.jurisdiction}...")
+            download_from_r2(args.state, args.jurisdiction, data_dir)
+
+        # Output forecast JSONs to the same directory as the input data
         output_dir = data_dir
         generated = 0
 
@@ -1703,7 +1746,7 @@ def main():
             print(f"  Output: {out_file}")
             print(f"{'='*60}")
 
-            generate_single_forecast(csv_file, out_file, args.horizon, args.dry_run, road_type)
+            generate_single_forecast(csv_file, out_file, args.horizon, road_type)
             generated += 1
 
         print(f"\n{'='*60}")
@@ -1721,7 +1764,7 @@ def main():
                 road_type = rt
                 break
 
-        generate_single_forecast(csv_path, output_path, args.horizon, args.dry_run, road_type)
+        generate_single_forecast(csv_path, output_path, args.horizon, road_type)
 
     print("\nDone!")
 
