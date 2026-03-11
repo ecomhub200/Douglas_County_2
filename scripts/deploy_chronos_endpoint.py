@@ -107,10 +107,18 @@ def deploy_endpoint(session):
         from sagemaker import Session as SageMakerSession
 
         sm_session = SageMakerSession(boto_session=session)
+
+        # Get or create IAM execution role for SageMaker
+        # (IAM users can't be used as execution roles — must be an IAM role)
+        iam_client = session.client("iam")
+        role_arn = get_or_create_sagemaker_role(iam_client)
+        print(f"  Using execution role: {role_arn}")
+
         print(f"[1/3] Loading JumpStart model: {MODEL_ID}...")
 
         model = JumpStartModel(
             model_id=MODEL_ID,
+            role=role_arn,
             instance_type=INSTANCE_TYPE,
             sagemaker_session=sm_session,
         )
