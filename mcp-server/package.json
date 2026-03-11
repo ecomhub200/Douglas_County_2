@@ -1,0 +1,13 @@
+{
+  "name": "crashlens-mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Crash Lens MCP server — exposes crash data analysis tools to Claude Code and AI assistants",
+  "main": "index.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "csv-parse": "^5.6.0",
+    "zod": "^3.24.0"
+  }
+}
