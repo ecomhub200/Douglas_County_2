@@ -1,5 +1,5 @@
 {
-  "name": "@crashlens/mcp",
+  "name": "@crashlens_maq/mcp",
   "version": "1.0.0",
   "type": "module",
   "description": "CrashLens MCP server — AI-powered traffic safety crash data analysis for Claude Desktop. Analyze crash hotspots, severity patterns, signal warrants, and grant eligibility using natural language.",

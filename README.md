@@ -31,7 +31,7 @@ Paste the following into your config. Replace `YOUR_STATE` and `YOUR_JURISDICTIO
   "mcpServers": {
     "crashlens": {
       "command": "npx",
-      "args": ["-y", "@crashlens/mcp"],
+      "args": ["-y", "@crashlens_maq/mcp"],
       "env": {
         "CRASHLENS_STATE": "YOUR_STATE",
         "CRASHLENS_JURISDICTION": "YOUR_JURISDICTION"
@@ -63,7 +63,7 @@ Quit and reopen Claude Desktop. On first launch, the MCP server will **automatic
   "mcpServers": {
     "crashlens": {
       "command": "npx",
-      "args": ["-y", "@crashlens/mcp"],
+      "args": ["-y", "@crashlens_maq/mcp"],
       "env": {
         "CRASHLENS_STATE": "virginia",
         "CRASHLENS_JURISDICTION": "henrico"
@@ -79,7 +79,7 @@ Quit and reopen Claude Desktop. On first launch, the MCP server will **automatic
   "mcpServers": {
     "crashlens": {
       "command": "npx",
-      "args": ["-y", "@crashlens/mcp"],
+      "args": ["-y", "@crashlens_maq/mcp"],
       "env": {
         "CRASHLENS_STATE": "colorado",
         "CRASHLENS_JURISDICTION": "douglas",
@@ -96,7 +96,7 @@ Quit and reopen Claude Desktop. On first launch, the MCP server will **automatic
   "mcpServers": {
     "crashlens": {
       "command": "npx",
-      "args": ["-y", "@crashlens/mcp"],
+      "args": ["-y", "@crashlens_maq/mcp"],
       "env": {
         "CRASHLENS_STATE": "arizona",
         "CRASHLENS_JURISDICTION": "maricopa",
