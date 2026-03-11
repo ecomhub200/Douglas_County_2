@@ -34,7 +34,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install boto3 sagemaker
+        run: pip install boto3 "sagemaker>=2.200,<3"
 
       - name: Verify AWS credentials
         env:

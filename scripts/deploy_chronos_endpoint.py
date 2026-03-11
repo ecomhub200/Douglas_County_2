@@ -125,8 +125,9 @@ def deploy_endpoint(session):
         print(f"[3/3] Deployment initiated. Waiting for InService status...")
         return wait_for_endpoint(sm_client)
 
-    except ImportError:
-        print("WARNING: sagemaker SDK not installed. Trying boto3-only deployment...")
+    except ImportError as e:
+        print(f"WARNING: sagemaker JumpStart SDK not available: {e}")
+        print("Ensure sagemaker v2 is installed: pip install \"sagemaker>=2.200,<3\"")
         return deploy_with_boto3(session)
     except Exception as e:
         print(f"JumpStart deployment failed: {e}")
@@ -135,76 +136,23 @@ def deploy_endpoint(session):
 
 
 def deploy_with_boto3(session):
-    """Fallback deployment using raw boto3 (no SageMaker SDK)."""
-    sm_client = session.client("sagemaker")
-    region = session.region_name
+    """Fallback deployment using raw boto3 (no SageMaker SDK).
 
-    # Get the SageMaker execution role
-    iam = session.client("iam")
-    role_arn = get_or_create_sagemaker_role(iam)
-
-    # Use the HuggingFace Deep Learning Container for PyTorch inference
-    # This is the container that SageMaker JumpStart uses under the hood
-    image_uri = (
-        f"763104351884.dkr.ecr.{region}.amazonaws.com/"
-        f"pytorch-inference:2.1.0-cpu-py310-ubuntu20.04-sagemaker"
-    )
-
-    print(f"[1/4] Creating model '{MODEL_NAME}'...")
-    try:
-        sm_client.create_model(
-            ModelName=MODEL_NAME,
-            PrimaryContainer={
-                "Image": image_uri,
-                "ModelDataUrl": f"s3://jumpstart-cache-prod-{region}/pytorch-forecasting/chronos-2/model.tar.gz",
-                "Environment": {
-                    "SAGEMAKER_PROGRAM": "inference.py",
-                    "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
-                    "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
-                },
-            },
-            ExecutionRoleArn=role_arn,
-        )
-    except ClientError as e:
-        if "Cannot create already existing model" in str(e):
-            print(f"  Model '{MODEL_NAME}' already exists, reusing.")
-        else:
-            raise
-
-    print(f"[2/4] Creating endpoint config '{ENDPOINT_CONFIG_NAME}'...")
-    try:
-        sm_client.create_endpoint_config(
-            EndpointConfigName=ENDPOINT_CONFIG_NAME,
-            ProductionVariants=[
-                {
-                    "VariantName": "AllTraffic",
-                    "ModelName": MODEL_NAME,
-                    "InstanceType": INSTANCE_TYPE,
-                    "InitialInstanceCount": INITIAL_INSTANCE_COUNT,
-                    "InitialVariantWeight": 1.0,
-                }
-            ],
-        )
-    except ClientError as e:
-        if "Cannot create already existing endpoint configuration" in str(e):
-            print(f"  Config '{ENDPOINT_CONFIG_NAME}' already exists, reusing.")
-        else:
-            raise
-
-    print(f"[3/4] Creating endpoint '{ENDPOINT_NAME}'...")
-    try:
-        sm_client.create_endpoint(
-            EndpointName=ENDPOINT_NAME,
-            EndpointConfigName=ENDPOINT_CONFIG_NAME,
-        )
-    except ClientError as e:
-        if "Cannot create already existing endpoint" in str(e):
-            print(f"  Endpoint '{ENDPOINT_NAME}' already exists.")
-        else:
-            raise
-
-    print(f"[4/4] Waiting for InService status...")
-    return wait_for_endpoint(sm_client)
+    NOTE: Chronos-2 deployment requires the SageMaker JumpStart SDK (sagemaker v2)
+    which automatically resolves container images and model artifacts. The boto3-only
+    fallback cannot deploy Chronos-2 because the model artifacts and container URIs
+    are managed internally by JumpStart. Install sagemaker v2:
+        pip install "sagemaker>=2.200,<3"
+    """
+    print("ERROR: boto3-only deployment is not supported for Chronos-2.")
+    print("Chronos-2 requires the SageMaker JumpStart SDK (sagemaker v2) which")
+    print("automatically resolves container images and model artifact locations.")
+    print("")
+    print("Fix: Install sagemaker SDK v2:")
+    print('  pip install "sagemaker>=2.200,<3"')
+    print("")
+    print("Then re-run with --action deploy.")
+    return False
 
 
 def get_or_create_sagemaker_role(iam_client):
