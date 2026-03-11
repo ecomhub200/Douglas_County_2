@@ -41,6 +41,7 @@ const DEV_PROJECT_ROOT = resolve(__dirname, '..');
 const CRASHLENS_STATE = process.env.CRASHLENS_STATE || '';
 const CRASHLENS_JURISDICTION = process.env.CRASHLENS_JURISDICTION || '';
 const CRASHLENS_ROAD_TYPE = process.env.CRASHLENS_ROAD_TYPE || 'all_roads';
+const CRASHLENS_API_KEY = process.env.CRASHLENS_API_KEY || '';
 const IS_STANDALONE = !!(CRASHLENS_STATE && CRASHLENS_JURISDICTION);
 
 // Create MCP server
@@ -172,13 +173,26 @@ async function main() {
 
   // Initialize data loader based on mode
   if (IS_STANDALONE) {
+    // Require API key in standalone mode
+    if (!CRASHLENS_API_KEY) {
+      console.error('[CrashLens MCP] ERROR: CRASHLENS_API_KEY is required.');
+      console.error('[CrashLens MCP] Get your API key at https://crashlens.aicreatesai.com → My Account → API Keys');
+      console.error('[CrashLens MCP] Add it to your Claude Desktop config:');
+      console.error('[CrashLens MCP]   "env": { "CRASHLENS_API_KEY": "your-key-here" }');
+      process.exit(1);
+    }
+
     console.error(`[CrashLens MCP] Standalone mode: ${CRASHLENS_STATE}/${CRASHLENS_JURISDICTION} (${CRASHLENS_ROAD_TYPE})`);
     try {
-      await dataLoader.initStandalone(CRASHLENS_STATE, CRASHLENS_JURISDICTION, CRASHLENS_ROAD_TYPE);
+      await dataLoader.initStandalone(CRASHLENS_STATE, CRASHLENS_JURISDICTION, CRASHLENS_ROAD_TYPE, CRASHLENS_API_KEY);
     } catch (err) {
-      console.error(`[CrashLens MCP] Failed to initialize standalone mode: ${err.message}`);
-      console.error('[CrashLens MCP] Check that CRASHLENS_STATE and CRASHLENS_JURISDICTION are correct.');
-      console.error('[CrashLens MCP] Example: CRASHLENS_STATE=virginia CRASHLENS_JURISDICTION=henrico');
+      console.error(`[CrashLens MCP] Failed to initialize: ${err.message}`);
+      if (err.message.includes('API key') || err.message.includes('Subscription')) {
+        console.error('[CrashLens MCP] Check your API key at https://crashlens.aicreatesai.com → My Account → API Keys');
+      } else {
+        console.error('[CrashLens MCP] Check that CRASHLENS_STATE and CRASHLENS_JURISDICTION are correct.');
+        console.error('[CrashLens MCP] Example: CRASHLENS_STATE=virginia CRASHLENS_JURISDICTION=henrico');
+      }
       process.exit(1);
     }
   } else {

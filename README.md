@@ -14,17 +14,21 @@ The CrashLens MCP (Model Context Protocol) server lets you use **Claude Desktop*
 - [Claude Desktop](https://claude.ai/download) installed
 - An active [CrashLens](https://crashlens.aicreatesai.com) subscription
 
-### Quick Setup (3 Steps)
+### Quick Setup (4 Steps)
 
-#### Step 1: Open Claude Desktop Config
+#### Step 1: Get Your API Key
+
+Log into [CrashLens](https://crashlens.aicreatesai.com/app/) → click your **profile icon** (top right) → **My Account** → **API Keys** tab → **Generate API Key** → **Copy** the key.
+
+#### Step 2: Open Claude Desktop Config
 
 Open **Claude Desktop** → **Settings** (gear icon) → **Developer** → **Edit Config**
 
 This opens the `claude_desktop_config.json` file.
 
-#### Step 2: Add the CrashLens MCP Server
+#### Step 3: Add the CrashLens MCP Server
 
-Paste the following into your config. Replace `YOUR_STATE` and `YOUR_JURISDICTION` with your values (see table below):
+Paste the following into your config. Replace the placeholder values with your API key, state, and jurisdiction:
 
 ```json
 {
@@ -34,16 +38,19 @@ Paste the following into your config. Replace `YOUR_STATE` and `YOUR_JURISDICTIO
       "args": ["-y", "@crashlens_maq/mcp"],
       "env": {
         "CRASHLENS_STATE": "YOUR_STATE",
-        "CRASHLENS_JURISDICTION": "YOUR_JURISDICTION"
+        "CRASHLENS_JURISDICTION": "YOUR_JURISDICTION",
+        "CRASHLENS_API_KEY": "YOUR_API_KEY"
       }
     }
   }
 }
 ```
 
+> **Tip:** The API Keys tab in the web app shows a ready-to-copy config snippet with your key and jurisdiction pre-filled.
+
 > If you already have other MCP servers in your config, just add the `"crashlens"` entry inside the existing `"mcpServers"` object.
 
-#### Step 3: Restart Claude Desktop
+#### Step 4: Restart Claude Desktop
 
 Quit and reopen Claude Desktop. On first launch, the MCP server will **automatically download** your jurisdiction's crash data (~30 seconds one-time download). You'll see a hammer icon when tools are ready.
 
@@ -53,6 +60,7 @@ Quit and reopen Claude Desktop. On first launch, the MCP server will **automatic
 |---------------------|----------|---------|-------------|
 | `CRASHLENS_STATE` | Yes | — | State name (lowercase, underscore for spaces) |
 | `CRASHLENS_JURISDICTION` | Yes | — | County/jurisdiction name (lowercase) |
+| `CRASHLENS_API_KEY` | Yes | — | Your API key from My Account → API Keys |
 | `CRASHLENS_ROAD_TYPE` | No | `all_roads` | Road filter: `all_roads`, `county_roads`, or `no_interstate` |
 
 ### Example Configurations
@@ -66,7 +74,8 @@ Quit and reopen Claude Desktop. On first launch, the MCP server will **automatic
       "args": ["-y", "@crashlens_maq/mcp"],
       "env": {
         "CRASHLENS_STATE": "virginia",
-        "CRASHLENS_JURISDICTION": "henrico"
+        "CRASHLENS_JURISDICTION": "henrico",
+        "CRASHLENS_API_KEY": "clmcp_your_key_here"
       }
     }
   }
@@ -83,6 +92,7 @@ Quit and reopen Claude Desktop. On first launch, the MCP server will **automatic
       "env": {
         "CRASHLENS_STATE": "colorado",
         "CRASHLENS_JURISDICTION": "douglas",
+        "CRASHLENS_API_KEY": "clmcp_your_key_here",
         "CRASHLENS_ROAD_TYPE": "county_roads"
       }
     }
@@ -100,6 +110,7 @@ Quit and reopen Claude Desktop. On first launch, the MCP server will **automatic
       "env": {
         "CRASHLENS_STATE": "arizona",
         "CRASHLENS_JURISDICTION": "maricopa",
+        "CRASHLENS_API_KEY": "clmcp_your_key_here",
         "CRASHLENS_ROAD_TYPE": "no_interstate"
       }
     }
@@ -200,6 +211,9 @@ Once connected, ask Claude natural language questions about your crash data:
 | Issue | Solution |
 |-------|----------|
 | Tools not showing up | Restart Claude Desktop after saving config. Check that Node.js 18+ is installed (`node --version`). |
+| "API key required" error | Generate an API key at crashlens.aicreatesai.com → My Account → API Keys, then add `CRASHLENS_API_KEY` to your config. |
+| "Invalid API key" error | Verify your key at My Account → API Keys. If you regenerated it, update your config with the new key. |
+| "Subscription inactive" error | Your CrashLens subscription may have expired. Renew at crashlens.aicreatesai.com/pricing. |
 | Download fails | Verify your state/jurisdiction values match your CrashLens subscription. Check internet connection. |
 | Wrong jurisdiction data | Every tool response includes a `dataContext` field showing the active jurisdiction — verify it matches your expectation. |
 | Slow first startup | First launch downloads crash data (~10-50 MB depending on jurisdiction). Subsequent launches are instant. |
