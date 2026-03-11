@@ -1993,6 +1993,22 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // ---- Unknown route guard ----
+    // Only proxy to Qdrant if the request has a ?path= parameter (Qdrant query).
+    // All other unmatched routes get a proper 404 JSON response instead of
+    // being forwarded to Qdrant (which returns HTML error pages).
+    const parsedUrl = url.parse(req.url, true);
+    if (!parsedUrl.query.path) {
+        console.warn(`[Server] Unknown route: ${req.method} ${req.url}`);
+        res.writeHead(404, corsHeaders);
+        res.end(JSON.stringify({
+            error: 'Not found',
+            message: `No handler for ${req.method} ${req.url}`,
+            hint: 'If you expected this endpoint to exist, the server may need to be redeployed.'
+        }));
+        return;
+    }
+
     // ---- Qdrant proxy (existing) ----
 
     // Check if Qdrant is configured
