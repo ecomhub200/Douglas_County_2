@@ -21,12 +21,15 @@ import { interpolateThreshold, getLaneConfig, getReductionFactor, WARRANT_1_CURV
 import { scoreGrantEligibility } from './lib/grant-ranking.js';
 import * as dataLoader from './lib/data-loader.js';
 
-// Resolve project root (parent of mcp-server/)
+// Resolve paths
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = resolve(__dirname, '..');
+const DEV_PROJECT_ROOT = resolve(__dirname, '..');
 
-// Initialize data loader
-dataLoader.init(PROJECT_ROOT);
+// Detect standalone vs dev mode from environment variables
+const CRASHLENS_STATE = process.env.CRASHLENS_STATE || '';
+const CRASHLENS_JURISDICTION = process.env.CRASHLENS_JURISDICTION || '';
+const CRASHLENS_ROAD_TYPE = process.env.CRASHLENS_ROAD_TYPE || 'all_roads';
+const IS_STANDALONE = !!(CRASHLENS_STATE && CRASHLENS_JURISDICTION);
 
 // Create MCP server
 const server = new McpServer({
@@ -569,7 +572,24 @@ async function main() {
   const transport = new StdioServerTransport();
   console.error('[CrashLens MCP] Starting server...');
 
-  // Pre-load data
+  // Initialize data loader based on mode
+  if (IS_STANDALONE) {
+    console.error(`[CrashLens MCP] Standalone mode: ${CRASHLENS_STATE}/${CRASHLENS_JURISDICTION} (${CRASHLENS_ROAD_TYPE})`);
+    try {
+      await dataLoader.initStandalone(CRASHLENS_STATE, CRASHLENS_JURISDICTION, CRASHLENS_ROAD_TYPE);
+    } catch (err) {
+      console.error(`[CrashLens MCP] Failed to initialize standalone mode: ${err.message}`);
+      console.error('[CrashLens MCP] Check that CRASHLENS_STATE and CRASHLENS_JURISDICTION are correct.');
+      console.error('[CrashLens MCP] Example: CRASHLENS_STATE=virginia CRASHLENS_JURISDICTION=henrico');
+      process.exit(1);
+    }
+  } else {
+    // Dev/legacy mode: use parent directory as project root
+    dataLoader.init(DEV_PROJECT_ROOT);
+    console.error('[CrashLens MCP] Dev mode: using local project data');
+  }
+
+  // Pre-load and aggregate data
   try {
     dataLoader.loadCrashData();
     dataLoader.buildAggregates();

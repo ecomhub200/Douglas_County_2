@@ -1,12 +1,19 @@
 /**
  * CrashLens Data Loader — loads and caches crash data, grants, configs
+ * Supports two modes:
+ *   - Legacy/dev mode: reads from local project directory
+ *   - Standalone mode: auto-downloads from R2 cloud storage to ~/.crashlens/
  */
 
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync, createWriteStream } from 'fs';
 import { resolve, join } from 'path';
+import { homedir } from 'os';
+import https from 'https';
 import { parse } from 'csv-parse/sync';
 import { COL, CRASH_PATTERN_REGEX } from './constants.js';
 import { isYes } from './epdo.js';
+
+const R2_BASE_URL = 'https://data.aicreatesai.com';
 
 // Cached data store
 let _crashData = null;
@@ -15,12 +22,128 @@ let _aggregates = null;
 let _config = null;
 let _stateConfigs = {};
 let _projectRoot = null;
+let _standaloneMode = false;
+let _standaloneInfo = null;
 
 /**
- * Initialize the data loader with project root path.
+ * Initialize the data loader with project root path (legacy/dev mode).
  */
 export function init(projectRoot) {
   _projectRoot = projectRoot;
+}
+
+/**
+ * Initialize standalone mode — downloads data from R2 if needed.
+ * @param {string} state - State name (e.g., "colorado", "virginia")
+ * @param {string} jurisdiction - Jurisdiction name (e.g., "douglas", "henrico")
+ * @param {string} roadType - Road type filter (e.g., "all_roads", "county_roads", "no_interstate")
+ */
+export async function initStandalone(state, jurisdiction, roadType = 'all_roads') {
+  _standaloneMode = true;
+  _standaloneInfo = { state, jurisdiction, roadType };
+
+  const cacheDir = join(homedir(), '.crashlens', state.toLowerCase(), jurisdiction.toLowerCase());
+  const dataDir = join(cacheDir, 'data');
+  mkdirSync(dataDir, { recursive: true });
+
+  _projectRoot = cacheDir;
+
+  // Download crash data CSV if not cached
+  const csvFile = `${roadType}.csv`;
+  const csvPath = join(dataDir, csvFile);
+
+  // Create a symlink/copy as all_roads.csv for the data loader
+  // The data loader always reads data/all_roads.csv regardless of road type
+  const targetPath = join(dataDir, 'all_roads.csv');
+
+  if (!existsSync(csvPath)) {
+    const r2Url = `${R2_BASE_URL}/${state.toLowerCase()}/${jurisdiction.toLowerCase()}/${csvFile}`;
+    console.error(`[CrashLens MCP] Downloading crash data from ${r2Url}...`);
+    console.error(`[CrashLens MCP] This is a one-time download. Caching to ${csvPath}`);
+    await downloadFile(r2Url, csvPath);
+    console.error(`[CrashLens MCP] Download complete.`);
+  } else {
+    console.error(`[CrashLens MCP] Using cached data: ${csvPath}`);
+  }
+
+  // If road type is not all_roads, copy/link as all_roads.csv for data loader compatibility
+  if (roadType !== 'all_roads' && csvPath !== targetPath) {
+    const content = readFileSync(csvPath);
+    writeFileSync(targetPath, content);
+  } else if (roadType === 'all_roads' && !existsSync(targetPath) && existsSync(csvPath)) {
+    // all_roads.csv IS the file, nothing extra needed
+  }
+
+  // Generate minimal config.json if not present
+  const configPath = join(cacheDir, 'config.json');
+  if (!existsSync(configPath)) {
+    const minimalConfig = {
+      appName: 'CRASH LENS',
+      version: '1.0.0',
+      standalone: true,
+      activeState: state,
+      activeJurisdiction: jurisdiction,
+      activeRoadType: roadType
+    };
+    writeFileSync(configPath, JSON.stringify(minimalConfig, null, 2));
+  }
+
+  console.error(`[CrashLens MCP] Standalone mode: ${state}/${jurisdiction} (${roadType})`);
+}
+
+/**
+ * Download a file from a URL to a local path.
+ */
+function downloadFile(url, destPath) {
+  return new Promise((resolve, reject) => {
+    const file = createWriteStream(destPath);
+    let totalBytes = 0;
+
+    const request = https.get(url, (response) => {
+      // Follow redirects
+      if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+        file.close();
+        return downloadFile(response.headers.location, destPath).then(resolve).catch(reject);
+      }
+
+      if (response.statusCode !== 200) {
+        file.close();
+        reject(new Error(`Download failed: HTTP ${response.statusCode} for ${url}. Check that your state (CRASHLENS_STATE) and jurisdiction (CRASHLENS_JURISDICTION) are correct.`));
+        return;
+      }
+
+      const contentLength = parseInt(response.headers['content-length'] || '0', 10);
+      if (contentLength) {
+        console.error(`[CrashLens MCP] File size: ${(contentLength / 1024 / 1024).toFixed(1)} MB`);
+      }
+
+      response.on('data', (chunk) => {
+        totalBytes += chunk.length;
+        if (contentLength && totalBytes % (1024 * 1024) < chunk.length) {
+          const pct = ((totalBytes / contentLength) * 100).toFixed(0);
+          console.error(`[CrashLens MCP] Downloading... ${pct}% (${(totalBytes / 1024 / 1024).toFixed(1)} MB)`);
+        }
+      });
+
+      response.pipe(file);
+
+      file.on('finish', () => {
+        file.close();
+        console.error(`[CrashLens MCP] Downloaded ${(totalBytes / 1024 / 1024).toFixed(1)} MB`);
+        resolve();
+      });
+    });
+
+    request.on('error', (err) => {
+      file.close();
+      reject(new Error(`Download failed: ${err.message}. Check your internet connection.`));
+    });
+
+    request.setTimeout(120000, () => {
+      request.destroy();
+      reject(new Error('Download timed out after 120 seconds.'));
+    });
+  });
 }
 
 /**
@@ -42,13 +165,32 @@ function getRoot() {
 }
 
 /**
+ * Check if running in standalone mode.
+ */
+export function isStandaloneMode() {
+  return _standaloneMode;
+}
+
+/**
+ * Get standalone mode info (state, jurisdiction, roadType).
+ */
+export function getStandaloneInfo() {
+  return _standaloneInfo;
+}
+
+/**
  * Load and parse crash CSV data.
  */
 export function loadCrashData() {
   if (_crashData) return _crashData;
 
   const root = getRoot();
-  const csvPath = join(root, 'data', 'all_roads.csv');
+  // In standalone mode, try the specific road type file first, fall back to all_roads.csv
+  const roadType = _standaloneInfo?.roadType || 'all_roads';
+  let csvPath = join(root, 'data', `${roadType}.csv`);
+  if (!existsSync(csvPath)) {
+    csvPath = join(root, 'data', 'all_roads.csv');
+  }
   if (!existsSync(csvPath)) {
     console.error(`[CrashLens MCP] Crash data file not found: ${csvPath}`);
     _crashData = [];
@@ -352,12 +494,20 @@ export function getDataContext() {
   const years = Object.keys(agg.byYear).sort();
   const jurisdictionList = Array.from(jurisdictions).sort();
 
-  return {
+  const ctx = {
     jurisdiction: jurisdictionList.length === 1 ? jurisdictionList[0] : jurisdictionList.join(', '),
     totalRecords: rows.length,
     dateRange: years.length > 0 ? `${years[0]}-${years[years.length - 1]}` : 'unknown',
     dataYears: years.length
   };
+
+  if (_standaloneInfo) {
+    ctx.state = _standaloneInfo.state;
+    ctx.jurisdictionKey = _standaloneInfo.jurisdiction;
+    ctx.roadType = _standaloneInfo.roadType;
+  }
+
+  return ctx;
 }
 
 /**

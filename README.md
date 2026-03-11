@@ -6,74 +6,142 @@ A browser-based crash analysis system for transportation agencies. Supports mult
 
 ## CrashLens MCP Server (for Claude Desktop)
 
-The CrashLens MCP (Model Context Protocol) server lets you use AI assistants like **Claude Desktop** to query and analyze your crash data using natural language.
+The CrashLens MCP (Model Context Protocol) server lets you use **Claude Desktop** to query and analyze your crash data using natural language. It supports **all 50 US states**, any jurisdiction, and multiple road type filters.
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v18 or later
 - [Claude Desktop](https://claude.ai/download) installed
+- An active [CrashLens](https://crashlens.aicreatesai.com) subscription
 
-### Step 1: Install Dependencies
+### Quick Setup (3 Steps)
 
-Open a terminal and navigate to the `mcp-server` directory:
+#### Step 1: Open Claude Desktop Config
 
-```bash
-cd mcp-server
-npm install
-```
+Open **Claude Desktop** → **Settings** (gear icon) → **Developer** → **Edit Config**
 
-### Step 2: Add CrashLens to Claude Desktop
+This opens the `claude_desktop_config.json` file.
 
-1. Open **Claude Desktop**
-2. Go to **Settings** (gear icon) > **Developer** > **Edit Config**
-3. This opens the `claude_desktop_config.json` file. Add the `crashlens` entry inside the `"mcpServers"` object:
+#### Step 2: Add the CrashLens MCP Server
 
-**Windows:**
+Paste the following into your config. Replace `YOUR_STATE` and `YOUR_JURISDICTION` with your values (see table below):
 
 ```json
 {
   "mcpServers": {
     "crashlens": {
-      "command": "node",
-      "args": [
-        "C:\\path\\to\\your\\project\\mcp-server\\index.js"
-      ]
+      "command": "npx",
+      "args": ["-y", "@crashlens/mcp"],
+      "env": {
+        "CRASHLENS_STATE": "YOUR_STATE",
+        "CRASHLENS_JURISDICTION": "YOUR_JURISDICTION"
+      }
     }
   }
 }
 ```
 
-**macOS / Linux:**
+> If you already have other MCP servers in your config, just add the `"crashlens"` entry inside the existing `"mcpServers"` object.
 
+#### Step 3: Restart Claude Desktop
+
+Quit and reopen Claude Desktop. On first launch, the MCP server will **automatically download** your jurisdiction's crash data (~30 seconds one-time download). You'll see a hammer icon when tools are ready.
+
+### Configuration Options
+
+| Environment Variable | Required | Default | Description |
+|---------------------|----------|---------|-------------|
+| `CRASHLENS_STATE` | Yes | — | State name (lowercase, underscore for spaces) |
+| `CRASHLENS_JURISDICTION` | Yes | — | County/jurisdiction name (lowercase) |
+| `CRASHLENS_ROAD_TYPE` | No | `all_roads` | Road filter: `all_roads`, `county_roads`, or `no_interstate` |
+
+### Example Configurations
+
+**Henrico County, Virginia (all roads):**
 ```json
 {
   "mcpServers": {
     "crashlens": {
-      "command": "node",
-      "args": [
-        "/path/to/your/project/mcp-server/index.js"
-      ]
+      "command": "npx",
+      "args": ["-y", "@crashlens/mcp"],
+      "env": {
+        "CRASHLENS_STATE": "virginia",
+        "CRASHLENS_JURISDICTION": "henrico"
+      }
     }
   }
 }
 ```
 
-> **Important:** Replace the path with the actual absolute path to `mcp-server/index.js` on your machine. The MCP server automatically detects the project root (parent of `mcp-server/`) and loads crash data from `data/all_roads.csv`.
+**Douglas County, Colorado (county roads only):**
+```json
+{
+  "mcpServers": {
+    "crashlens": {
+      "command": "npx",
+      "args": ["-y", "@crashlens/mcp"],
+      "env": {
+        "CRASHLENS_STATE": "colorado",
+        "CRASHLENS_JURISDICTION": "douglas",
+        "CRASHLENS_ROAD_TYPE": "county_roads"
+      }
+    }
+  }
+}
+```
 
-### Step 3: Restart Claude Desktop
+**Maricopa County, Arizona (no interstate):**
+```json
+{
+  "mcpServers": {
+    "crashlens": {
+      "command": "npx",
+      "args": ["-y", "@crashlens/mcp"],
+      "env": {
+        "CRASHLENS_STATE": "arizona",
+        "CRASHLENS_JURISDICTION": "maricopa",
+        "CRASHLENS_ROAD_TYPE": "no_interstate"
+      }
+    }
+  }
+}
+```
 
-After saving the config, **quit and reopen Claude Desktop**. You should see a hammer icon indicating MCP tools are connected.
+### Finding Your State and Jurisdiction Values
 
-### Step 4: Start Using It
+Use the **same state and jurisdiction names shown in the CrashLens web app** when you upload or select your data. Format: lowercase, replace spaces with underscores.
 
-You can now ask Claude questions like:
+| State | Jurisdiction | `CRASHLENS_STATE` | `CRASHLENS_JURISDICTION` |
+|-------|-------------|-------------------|--------------------------|
+| Virginia | Henrico County | `virginia` | `henrico` |
+| Virginia | Fairfax County | `virginia` | `fairfax` |
+| Colorado | Douglas County | `colorado` | `douglas` |
+| Colorado | Denver County | `colorado` | `denver` |
+| Texas | Harris County | `texas` | `harris` |
+| California | Los Angeles County | `california` | `los_angeles` |
+| Florida | Miami-Dade County | `florida` | `miami_dade` |
+| New York | New York City | `new_york` | `new_york_city` |
 
-- *"What are the top crash hotspot intersections?"*
-- *"Show me the crash profile for I-25"*
-- *"Which locations have the highest EPDO scores?"*
-- *"Are there any over-represented crash patterns on Highway 85?"*
+### Road Type Options
+
+| Value | Description |
+|-------|-------------|
+| `all_roads` | All crashes on all road types (default) |
+| `county_roads` | Only crashes on local/county-maintained roads |
+| `no_interstate` | All crashes except interstate highways |
+
+### What You Can Ask Claude
+
+Once connected, ask Claude natural language questions about your crash data:
+
+- *"What are the top 10 crash hotspot intersections?"*
+- *"Show me the crash profile for Broad Street"*
+- *"Which locations have the most fatal and serious injury crashes?"*
+- *"Are there any over-represented crash patterns on Route 1?"*
+- *"Calculate EPDO for 2 fatal, 5 serious injury, 10 minor, 20 possible, and 100 PDO crashes"*
 - *"Evaluate signal warrant for an intersection with 500 major and 150 minor volume"*
-- *"Score grant eligibility for Route 470"*
+- *"Score grant eligibility for Highway 85"*
+- *"Search for HSIP grants"*
 
 ### Available MCP Tools
 
@@ -92,32 +160,24 @@ You can now ask Claude questions like:
 | `search_grants` | Search available traffic safety grants by program, keyword, or status |
 | `get_jurisdiction_info` | Get jurisdiction metadata, state configs, and EPDO weights |
 
-### Example Claude Desktop Config (Full)
+### Data Caching
 
-If you already have other MCP servers configured, just add the `"crashlens"` entry alongside them:
-
-```json
-{
-  "mcpServers": {
-    "crashlens": {
-      "command": "node",
-      "args": [
-        "C:\\Users\\YourName\\projects\\crash-lens\\mcp-server\\index.js"
-      ]
-    },
-    "other-server": {
-      "command": "npx",
-      "args": ["-y", "@some/other-mcp-server"]
-    }
-  }
-}
-```
+- Crash data is downloaded once and cached locally at `~/.crashlens/{state}/{jurisdiction}/`
+- Subsequent launches use cached data (instant startup)
+- To force a fresh download, delete the cache folder:
+  - **Windows:** `rmdir /s %USERPROFILE%\.crashlens`
+  - **macOS/Linux:** `rm -rf ~/.crashlens`
 
 ### Troubleshooting
 
-- **Tools not showing up?** Make sure the path to `index.js` is correct and absolute. Restart Claude Desktop after any config change.
-- **"Crash data file not found"?** Ensure `data/all_roads.csv` exists in the project root (parent of `mcp-server/`).
-- **Wrong jurisdiction data?** Each tool response includes a `dataContext` field showing which jurisdiction and date range is loaded — check this to confirm you're analyzing the right dataset.
+| Issue | Solution |
+|-------|----------|
+| Tools not showing up | Restart Claude Desktop after saving config. Check that Node.js 18+ is installed (`node --version`). |
+| Download fails | Verify your state/jurisdiction values match your CrashLens subscription. Check internet connection. |
+| Wrong jurisdiction data | Every tool response includes a `dataContext` field showing the active jurisdiction — verify it matches your expectation. |
+| Slow first startup | First launch downloads crash data (~10-50 MB depending on jurisdiction). Subsequent launches are instant. |
+| Want to switch jurisdictions | Update `CRASHLENS_STATE` and `CRASHLENS_JURISDICTION` in your config and restart Claude Desktop. |
+| Need to refresh data | Delete `~/.crashlens/` and restart Claude Desktop to re-download. |
 
 ---
 
