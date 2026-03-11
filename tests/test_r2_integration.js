@@ -727,7 +727,7 @@ async function runAllTests() {
         resetR2State();
         await loadR2Manifest(mockFetchSuccess(VALID_MANIFEST));
         const result = resolveDataUrl('../data/CDOT/douglas_all_roads.csv');
-        assertContains(result, 'r2.dev', '39. After successful load, URL contains r2.dev');
+        assertContains(result, 'data.aicreatesai.com', '39. After successful load, URL contains data.aicreatesai.com');
         assertContains(result, 'colorado/douglas/all_roads.csv', '39b. URL contains correct R2 key');
     }
 
@@ -855,7 +855,7 @@ async function runAllTests() {
         r2State.manifest = VALID_MANIFEST;
 
         const result1 = resolveDataUrl('../data/CDOT/douglas_all_roads.csv');
-        assertContains(result1, 'r2.dev', '49a. First resolve works');
+        assertContains(result1, 'data.aicreatesai.com', '49a. First resolve works');
 
         r2State.manifest = null;
         const result2 = resolveDataUrl('../data/CDOT/douglas_all_roads.csv');
@@ -864,7 +864,7 @@ async function runAllTests() {
 
         r2State.manifest = VALID_MANIFEST;
         const result3 = resolveDataUrl('../data/CDOT/douglas_all_roads.csv');
-        assertContains(result3, 'r2.dev', '49c. After manifest restored, resolves again');
+        assertContains(result3, 'data.aicreatesai.com', '49c. After manifest restored, resolves again');
     }
 
     // Test 50
