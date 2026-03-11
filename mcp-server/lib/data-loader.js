@@ -11,6 +11,8 @@ import { isYes } from './epdo.js';
 // Cached data store
 let _crashData = null;
 let _grantData = null;
+let _cmfData = null;
+let _cmfMetadata = null;
 let _aggregates = null;
 let _config = null;
 let _stateConfigs = {};
@@ -333,6 +335,55 @@ export function analyzeCrashPatterns(crashes) {
   }
 
   return patterns;
+}
+
+/**
+ * Load CMF (Crash Modification Factor) database.
+ */
+export function loadCMFData() {
+  if (_cmfData) return _cmfData;
+
+  const root = getRoot();
+  const jsonPath = join(root, 'data', 'cmf_processed.json');
+  if (!existsSync(jsonPath)) {
+    console.error(`[CrashLens MCP] CMF data file not found: ${jsonPath}`);
+    _cmfData = { records: [], categories: [], indexes: {} };
+    return _cmfData;
+  }
+
+  _cmfData = JSON.parse(readFileSync(jsonPath, 'utf-8'));
+  console.error(`[CrashLens MCP] Loaded ${_cmfData.records.length} CMF records`);
+  return _cmfData;
+}
+
+/**
+ * Get CMF records array.
+ */
+export function getCMFRecords() {
+  return loadCMFData().records;
+}
+
+/**
+ * Get CMF categories array.
+ */
+export function getCMFCategories() {
+  return loadCMFData().categories;
+}
+
+/**
+ * Get CMF metadata (stats, version info).
+ */
+export function getCMFMetadata() {
+  if (_cmfMetadata) return _cmfMetadata;
+
+  const root = getRoot();
+  const metaPath = join(root, 'data', 'cmf_metadata.json');
+  if (!existsSync(metaPath)) {
+    return loadCMFData().stats || {};
+  }
+
+  _cmfMetadata = JSON.parse(readFileSync(metaPath, 'utf-8'));
+  return _cmfMetadata;
 }
 
 /**
