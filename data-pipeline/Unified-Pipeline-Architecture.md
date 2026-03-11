@@ -1,10 +1,10 @@
 # Crash Lens — Unified Pipeline Architecture
 
-**Version:** 5.0
-**Last Updated:** February 2026
-**Purpose:** Replace 40+ separate workflows with a two-workflow system: state-specific download/convert workflows (with scope dropdowns) that automatically trigger a single unified processing pipeline. The conversion step produces a Virginia-compatible CSV with standardized columns plus any unmapped state-specific columns appended at the end with a `_{state}_` prefix. Validation and geocoding use incremental caching to process only new/changed records.
+**Version:** 6.0
+**Last Updated:** March 2026
+**Purpose:** Replace 40+ separate workflows with a two-workflow system: state-specific download/convert workflows (with scope dropdowns) that automatically trigger a single unified processing pipeline. The conversion step produces a Virginia-compatible CSV with standardized columns plus any unmapped state-specific columns appended at the end with a `_{state}_` prefix. Validation and geocoding are handled separately on Cloudflare Workers.
 
-**Design Decision:** State-specific download + merge + convert workflows (with state/scope/jurisdiction dropdowns) → auto-trigger unified `pipeline.yml` starting at Validate.
+**Design Decision:** State-specific download + merge + convert workflows (with state/scope/jurisdiction dropdowns) → auto-trigger unified `pipeline.yml` starting at Init Cache.
 
 **Architecture Boundary:** Everything needed to produce a Virginia-compatible CSV is state-specific. Everything after that is unified.
 
@@ -21,14 +21,15 @@
 5. [State-Specific Workflow Template](#5-state-specific-workflow-template)
 6. [Layer 2: Scope Resolver](#6-layer-2-scope-resolver)
 7. [Layer 3: Unified Processing Pipeline](#7-layer-3-unified-processing)
-8. [Unified Stage 1: Validate (QA/QC)](#8-stage-1-validate)
-9. [Unified Stage 2: Geocode + Save Statewide CSV](#9-stage-2-geocode)
-10. [Unified Stage 3: Split by Jurisdiction](#10-stage-3-split-by-jurisdiction)
-11. [Unified Stage 4: Split by Road Type](#11-stage-4-split-by-road-type)
-12. [Unified Stage 5: Aggregate by Scope (CSV)](#12-stage-5-aggregate-by-scope)
-13. [Unified Stage 6: Upload to R2](#13-stage-6-upload-to-r2)
-14. [Unified Stage 7: Predict (Forecast)](#14-stage-7-predict)
-15. [Unified Stage 8: Manifest Update & Git Commit](#15-stage-8-manifest-update)
+8. [Validation and Geocoding (Cloudflare Workers)](#8-validation-and-geocoding)
+9. [Unified Stage 0: Init Cache](#9-stage-0-init-cache)
+10. [Unified Stage 1: Split by Jurisdiction](#10-stage-1-split-by-jurisdiction)
+11. [Unified Stage 2: Split by Road Type](#11-stage-2-split-by-road-type)
+12. [Unified Stage 3: Aggregate by Scope (CSV)](#12-stage-3-aggregate-by-scope)
+13. [Unified Stage 4: Upload to R2](#13-stage-4-upload-to-r2)
+14. [Unified Stage 5: Predict (Forecast)](#14-stage-5-predict)
+14b. [Unified Stage 5b: Upload Forecast JSONs](#14b-stage-5b-upload-forecasts)
+15. [Unified Stage 6: Manifest Update & Git Commit](#15-stage-6-manifest-update)
 16. [Unified Workflow YAML (pipeline.yml)](#16-unified-workflow-yaml)
 17. [Scope Resolver Script](#17-scope-resolver-script)
 18. [Configuration Per State](#18-configuration-per-state)
@@ -63,13 +64,13 @@ When the processing pipeline changes (add a stage, fix upload logic, change a fl
 ### The Solution
 
 **State-specific workflows** (one per state) handle Download + Merge + Convert and then **auto-trigger** `pipeline.yml`.
-**Unified pipeline.yml** handles Validate → Geocode → [Save Statewide CSV] → Split Jurisdiction → Split Road Type → Aggregate by Scope (CSV) → Upload → Predict → Manifest.
+**Unified pipeline.yml** handles Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest.
 
 | Before | After |
 |--------|-------|
 | 40 workflow files | 1 per state (download/convert) + 1 unified (pipeline.yml) |
 | download-{state}-crash-data.yml × 30 | `download-{state}.yml` (download + merge + convert + auto-trigger) |
-| process-{state}-data.yml × 3 | `pipeline.yml` (unified, starts at Validate) |
+| process-{state}-data.yml × 3 | `pipeline.yml` (unified, starts at Init Cache) |
 | batch-all-jurisdictions.yml × 1 | — (merged into pipeline.yml) |
 | Adding a new state = write workflow + download script + config | Adding a new state = copy workflow template + write download/convert script + config |
 
@@ -88,14 +89,14 @@ When the processing pipeline changes (add a stage, fix upload logic, change a fl
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                    UNIFIED PIPELINE ARCHITECTURE v5                    │
+│                    UNIFIED PIPELINE ARCHITECTURE v6                    │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  USER INPUT (via state-specific workflow dropdown)                    │
 │  ├─ state:      virginia | colorado | maryland | ...   (auto-set)    │
 │  ├─ scope:      jurisdiction | region | mpo | statewide              │
 │  ├─ selection:  dropdown populated from hierarchy.json               │
-│  └─ options:    skip_validation, skip_geocode, skip_forecasts        │
+│  └─ options:    skip_forecasts, dry_run                              │
 │                          ↓                                           │
 │  ╔══════════════════════════════════════════════════════════════╗     │
 │  ║  LAYER 1: STATE-SPECIFIC WORKFLOW                           ║     │
@@ -114,18 +115,16 @@ When the processing pipeline changes (add a stage, fix upload logic, change a fl
 │  │  LAYER 2: UNIFIED PIPELINE (pipeline.yml)                    │    │
 │  │  Input: Virginia-compatible CSV + scope metadata             │    │
 │  │                                                              │    │
-│  │  Stage 1: VALIDATE (QA/QC on full dataset)                  │    │
-│  │  Stage 2: GEOCODE (fill missing GPS on full dataset)        │    │
-│  │  ── STATEWIDE VALIDATED+GEOCODED CSV saved here ──          │    │
-│  │  Stage 3: SPLIT BY JURISDICTION (if batch mode)             │    │
-│  │  Stage 4: SPLIT BY ROAD TYPE (3 CSVs per jurisdiction)      │    │
-│  │  Stage 5: AGGREGATE BY SCOPE (CSV — region/MPO/statewide)   │    │
-│  │       ├─ Region CSV = concat all member county rows          │    │
-│  │       ├─ MPO CSV = concat all member county rows             │    │
-│  │       └─ Statewide CSV = already exists from Stage 2         │    │
-│  │  Stage 6: UPLOAD all CSVs to R2                              │    │
-│  │  Stage 7: PREDICT (SageMaker Chronos-2 — optional)          │    │
-│  │  Stage 8: MANIFEST UPDATE + GIT COMMIT                      │    │
+│  │  NOTE: Validation and geocoding handled on Cloudflare        │    │
+│  │                                                              │    │
+│  │  Stage 0: INIT CACHE (state-isolated cache setup)            │    │
+│  │  Stage 1: SPLIT BY JURISDICTION (if batch mode)              │    │
+│  │  Stage 2: SPLIT BY ROAD TYPE (3 CSVs per jurisdiction)       │    │
+│  │  Stage 3: AGGREGATE BY SCOPE (CSV — region/MPO/statewide)    │    │
+│  │  Stage 4: UPLOAD all CSVs to R2                              │    │
+│  │  Stage 5: PREDICT (SageMaker Chronos-2 — optional)           │    │
+│  │  Stage 5b: UPLOAD forecast JSONs to R2                       │    │
+│  │  Stage 6: MANIFEST UPDATE + GIT COMMIT                       │    │
 │  └──────────────────────────────────────────────────────────────┘    │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
@@ -134,25 +133,20 @@ When the processing pipeline changes (add a stage, fix upload logic, change a fl
 ### The Key Boundary
 
 **State-specific workflow** = Download + Merge + Convert → produce Virginia-compatible CSV → auto-trigger pipeline.yml.
-**Unified pipeline.yml** = Validate → Geocode → [Statewide CSV saved] → Split Jurisdiction → Split Road Type → Aggregate by Scope (CSV) → Upload → Predict → Manifest.
+**Unified pipeline.yml** = Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Upload Forecasts → Manifest.
+**Note:** Validation and geocoding are handled separately on Cloudflare Workers, not in the pipeline.
 
-### Why Validate and Geocode Run BEFORE Split
+### Validation and Geocoding
 
-In v4, Validate and Geocode run on the **full statewide CSV** before splitting into jurisdictions. This is more efficient:
-
-- **Validate once** on the full dataset catches systemic issues (wrong date format, missing severity column) in one pass rather than repeating the same checks per jurisdiction.
-- **Geocode once** on the full dataset means the geocoding cache is built in a single pass. Neighboring jurisdictions share road networks, so geocoding statewide catches more matches.
-- **Split after** means each jurisdiction CSV inherits the validated + geocoded data.
-
-For single jurisdiction mode, the CSV is small enough that this order doesn't matter — it still validates and geocodes the single file first, then "splits" it (which is a no-op for one jurisdiction).
+In v6, Validate and Geocode are **no longer part of the pipeline**. They are handled separately on Cloudflare Workers. The pipeline assumes input CSVs are already validated and geocoded. This simplifies the pipeline and reduces GitHub Actions runtime.
 
 ### Two Processing Modes
 
 **Mode A: Single Jurisdiction**
-User picks one county from the dropdown. The state workflow downloads and converts data for that county. Pipeline validates → geocodes → splits (no-op) → uploads.
+User picks one county from the dropdown. The state workflow downloads and converts data for that county. Pipeline initializes cache → splits by road type → uploads.
 
 **Mode B: Batch (Region / MPO / Statewide)**
-User picks a region, MPO, or "statewide." The state workflow downloads the full statewide dataset, merges and converts to Virginia format. Pipeline validates the full dataset → geocodes the full dataset → splits into jurisdictions → splits by road type → uploads.
+User picks a region, MPO, or "statewide." The state workflow downloads the full statewide dataset, merges and converts to Virginia format. Pipeline initializes cache → splits into jurisdictions → splits by road type → aggregates → uploads.
 
 ---
 
@@ -192,7 +186,7 @@ State behavior is controlled by configuration files:
 
 ### 3.5 Every Stage Is Skippable and Non-Fatal
 
-Each processing stage can be skipped via flag (`--skip-validation`, `--skip-geocode`, `--skip-forecasts`). Stages that fail log warnings but don't kill the pipeline.
+Each processing stage can be skipped via flag (`--skip-forecasts`). Stages that fail log warnings but don't kill the pipeline. The `dry_run` flag prevents uploads and commits.
 
 ### 3.6 Download Script Interface Contract
 
@@ -222,7 +216,7 @@ The output CSV from `state_adapter.py` uses these exact column names. The first 
 | # | Column | Type | Description |
 |---|--------|------|-------------|
 | 1 | `Document Nbr` | string | Unique crash ID |
-| 2 | `Crash Date` | string | Date of crash (state format, validated in Stage 1) |
+| 2 | `Crash Date` | string | Date of crash (state format, validated on Cloudflare) |
 | 3 | `Crash Year` | string | Year extracted from crash date |
 | 4 | `Crash Military Time` | string (HHMM) | 24h time of crash |
 | 5 | `Crash Severity` | string | K / A / B / C / O (KABCO scale) |
@@ -331,25 +325,25 @@ Aggregation produces **CSV files** (not JSON). A region or MPO aggregate CSV con
 
 This means if a user processes just the Hampton Roads region, they get `hampton_roads_all_roads.csv`, `hampton_roads_no_interstate.csv`, and `hampton_roads_county_roads.csv` — each containing all crash records from the 11 member counties. Same format as any county CSV, just bigger.
 
-### 3.8 Statewide CSV as Key Intermediate Artifact
+### 3.8 Statewide CSV as Input Artifact
 
-After Stage 2 (Geocode) and before Stage 3 (Split), the pipeline always saves a **statewide validated + geocoded CSV**. This is the single source of truth for the state. All county, region, and MPO CSVs are derived from it:
+The state-specific download workflow produces a **statewide Virginia-compatible CSV** (or a single jurisdiction CSV). This is the input to the pipeline. All county, region, and MPO CSVs are derived from it:
 
 ```
-Download + Convert → raw statewide CSV
+Download + Convert → Virginia-compatible statewide CSV
     ↓
-Validate → Geocode → STATEWIDE VALIDATED+GEOCODED CSV (saved + gzipped)
-    ↓
-Split by Jurisdiction → county CSVs (filtered rows from statewide)
+Init Cache → Split by Jurisdiction → county CSVs
 Split by Road Type → 3 files per county
 Aggregate by Scope → region/MPO CSVs (concat county rows)
 ```
 
 For **Virginia** (bulk download): The download script produces one statewide CSV directly. Simple.
 
-For **Colorado** (yearly archives): The download script downloads year-by-year (2021.csv, 2022.csv, etc.), merges them into one statewide CSV, then converts. The incremental cache means only new years need validation/geocoding — but the statewide CSV always contains all years accumulated.
+For **Colorado** (yearly archives): The download script downloads year-by-year (2021.csv, 2022.csv, etc.), merges them into one statewide CSV, then converts.
 
-For states where users download only one county at a time: No statewide CSV is created; the single county CSV goes through validation + geocoding directly.
+For states where users download only one county at a time: No statewide CSV is created; the single county CSV goes directly through the pipeline.
+
+**Note:** Validation and geocoding are handled separately on Cloudflare Workers before the data reaches the pipeline.
 
 ### 3.9 Hierarchy Drives Scope Resolution
 
@@ -498,18 +492,6 @@ on:
           # - gwrc
           # - tjpdc
           # - rrpdc
-
-      skip_validation:
-        description: 'Skip validation in pipeline'
-        required: false
-        default: false
-        type: boolean
-
-      skip_geocode:
-        description: 'Skip geocoding in pipeline'
-        required: false
-        default: false
-        type: boolean
 
       skip_forecasts:
         description: 'Skip forecast generation in pipeline'
@@ -672,8 +654,6 @@ jobs:
                 scope: '${{ needs.download-convert.outputs.scope }}',
                 selection: '${{ needs.download-convert.outputs.selection }}',
                 data_source: '${{ needs.download-convert.outputs.statewide_path }}',
-                skip_validation: '${{ github.event.inputs.skip_validation }}',
-                skip_geocode: '${{ github.event.inputs.skip_geocode }}',
                 skip_forecasts: '${{ github.event.inputs.skip_forecasts }}',
                 dry_run: 'false'
               }
@@ -777,162 +757,93 @@ Output: {
 
 ### 7.1 Stage Sequence
 
-The unified pipeline has **8 stages**. It receives Virginia-compatible CSVs from the state-specific workflow and handles all generic processing.
+The unified pipeline has **7 stages** (0-6, plus 5b). It receives Virginia-compatible CSVs from the state-specific workflow and handles all generic processing.
 
-**New in v5:** Validate and Geocode run on the full dataset BEFORE splitting. After geocoding, the statewide validated+geocoded CSV is saved as a key intermediate artifact. Aggregation now produces CSVs (not JSON). Stage order reordered: Aggregate before Upload so all CSVs (county + region + MPO) are uploaded together.
+**New in v6:** Validate and Geocode are no longer in the pipeline — they are handled separately on Cloudflare Workers. Stage 0 (Init Cache) added for state-isolated cache setup. Statewide gzip upload removed. Forecast JSON upload split into its own step (5b). Split by road type now uses dedicated `scripts/split_road_type.py`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│          UNIFIED PROCESSING PIPELINE (pipeline.yml)                  │
+│          UNIFIED PROCESSING PIPELINE v6 (pipeline.yml)              │
 │          Input: Virginia-compatible CSV from state workflow          │
 │          Triggered automatically by state workflow                   │
+│          NOTE: Validation & geocoding handled on Cloudflare          │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  Stage 1:  VALIDATE (QA/QC on full dataset — statewide or single)  │
+│  Stage 0:  INIT CACHE (state-isolated cache directory setup)        │
 │       ↓                                                             │
-│  Stage 2:  GEOCODE (fill missing GPS on full dataset)              │
-│       ↓                                                             │
-│  ── SAVE: Statewide Validated+Geocoded CSV (+ gzip) ──             │
-│       ↓                                                             │
-│  Stage 3:  SPLIT BY JURISDICTION (if batch mode)                    │
+│  Stage 1:  SPLIT BY JURISDICTION (if batch mode)                    │
 │       ↓    (scripts/split_jurisdictions.py)                         │
 │                                                                     │
 │  ┌─── FOR EACH JURISDICTION ───────────────────────────────────┐    │
-│  │  Stage 4:  SPLIT BY ROAD TYPE (3 CSVs per jurisdiction)     │    │
+│  │  Stage 2:  SPLIT BY ROAD TYPE (3 CSVs per jurisdiction)     │    │
+│  │            (scripts/split_road_type.py)                      │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │       ↓                                                             │
-│  Stage 5:  AGGREGATE BY SCOPE (CSV — concat county rows)           │
-│       ├─ If statewide: ALL region CSVs + ALL MPO CSVs              │
-│       ├─ If region:    selected region CSV (3 road-type splits)    │
-│       ├─ If mpo:       selected MPO CSV (3 road-type splits)      │
-│       └─ If jurisdiction: nothing (county CSVs are enough)         │
+│  Stage 3:  AGGREGATE BY SCOPE (CSV — concat county rows)           │
+│       ├─ State-level aggregates (scripts/aggregate_by_scope.py)    │
+│       └─ Federal cross-state aggregates (statewide scope only)     │
 │       ↓                                                             │
-│  Stage 6:  UPLOAD ALL CSVs to R2                                    │
-│       ├─ 6a: County CSVs (3 per jurisdiction)                      │
-│       ├─ 6b: Region/MPO aggregate CSVs (3 per group)              │
-│       ├─ 6c: Statewide gzip (if batch mode)                       │
-│       └─ 6d: Forecast JSONs                                        │
+│  Stage 4:  UPLOAD ALL CSVs to R2                                    │
+│       ├─ 4a: County CSVs (3 per jurisdiction)                      │
+│       ├─ 4b: Region/MPO aggregate CSVs (3 per group)              │
+│       └─ 4c: Federal aggregate CSVs (statewide scope only)        │
 │       ↓                                                             │
-│  Stage 7:  PREDICT (SageMaker Chronos-2 forecasts — optional)       │
+│  Stage 5:  PREDICT (SageMaker Chronos-2 forecasts — optional)       │
 │       ↓                                                             │
-│  Stage 8:  MANIFEST UPDATE + GIT COMMIT                             │
+│  Stage 5b: UPLOAD FORECAST JSONs to R2                              │
+│       ↓                                                             │
+│  Stage 6:  MANIFEST UPDATE + GIT COMMIT                             │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 7.2 What Changed From v3 → v5
+### 7.2 What Changed From v5 → v6
 
-| v3 (8 stages) | v5 (8 stages — reordered + CSV aggregates) |
+| v5 (8 stages) | v6 (7 stages — validation/geocoding on Cloudflare) |
 |----------------|---------------------------|
-| Stage 1: Split by Jurisdiction | Stage 1: Validate (moved up, runs on full dataset) |
-| Stage 2: Validate | Stage 2: Geocode (moved up, runs on full dataset) |
-| Stage 3: Geocode | ── SAVE statewide validated+geocoded CSV ── |
-| Stage 4: Split by Road Type | Stage 3: Split by Jurisdiction |
-| Stage 5: Upload | Stage 4: Split by Road Type |
-| Stage 6: Predict | Stage 5: Aggregate by Scope (NEW — CSV, not JSON) |
-| Stage 7: Aggregates (JSON) | Stage 6: Upload ALL CSVs to R2 |
-| Stage 8: Manifest | Stage 7: Predict (moved after upload) |
-| | Stage 8: Manifest |
+| Stage 1: Validate | — (moved to Cloudflare Workers) |
+| Stage 2: Geocode | — (moved to Cloudflare Workers) |
+| ── SAVE statewide CSV ── | — (removed) |
+| Stage 3: Split by Jurisdiction | Stage 0: Init Cache (NEW) |
+| Stage 4: Split by Road Type | Stage 1: Split by Jurisdiction |
+| Stage 5: Aggregate by Scope | Stage 2: Split by Road Type |
+| Stage 6: Upload ALL CSVs to R2 | Stage 3: Aggregate by Scope (CSV) |
+| Stage 7: Predict | Stage 4: Upload CSVs to R2 |
+| Stage 8: Manifest | Stage 5: Predict (SageMaker Chronos-2) |
+| | Stage 5b: Upload Forecast JSONs (NEW) |
+| | Stage 6: Manifest Update + Git Commit |
 
-**Key changes in v5:** Validate and Geocode run before Split for efficiency. Statewide validated+geocoded CSV saved as intermediate artifact. Aggregation now produces CSVs (concat county rows into region/MPO files) instead of JSON summaries. Aggregate before Upload so all CSVs ship together. State workflows have dropdown UIs and auto-trigger pipeline.yml. Caching is state-isolated and update-frequency-aware.
+**Key changes in v6:** Validate and Geocode moved to Cloudflare Workers — no longer in pipeline. Stage 0 (Init Cache) added. Statewide gzip upload removed. Forecast JSON upload split into its own step (5b). Split by road type now uses dedicated `scripts/split_road_type.py` instead of `process_crash_data.py --split-only`. Pipeline inputs simplified (no `skip_validation`/`skip_geocode`).
 
 ---
 
-## 8. Unified Stage 1: Validate (QA/QC)
+## 8. Validation and Geocoding (Cloudflare Workers)
 
-Runs on the **full dataset** (statewide CSV or single jurisdiction CSV) before splitting.
+In v6, Validate and Geocode are **no longer part of the pipeline**. They are handled separately on Cloudflare Workers. The pipeline assumes input CSVs are already validated and geocoded. This simplifies the pipeline and reduces GitHub Actions runtime.
+
+**For reference**, the previous pipeline (v5) included:
+- **Stage 1 (Validate):** QA/QC on the full dataset — coordinate bounds, severity values, date ranges, mandatory fields, duplicates. Used incremental caching with state-isolated hash files.
+- **Stage 2 (Geocode):** Fill missing GPS coordinates using node lookup, Nominatim/OSM, and persistent cache. Used state-isolated geocoding cache.
+
+Both stages now run on Cloudflare Workers with the same logic but better performance and cost characteristics. See Appendix G for the cache architecture that was used in v5 (still relevant for the Cloudflare implementation).
+
+---
+
+## 9. Unified Stage 0: Init Cache
+
+### What It Does
+
+Initializes a state-isolated cache directory for the pipeline run. Each state's cache is fully independent.
 
 ```bash
-python validation/run_validation.py \
-  --input data/${DOT_NAME}/${INPUT_CSV} \
-  --state ${STATE} \
-  --cache-dir .cache/${STATE}/validation
+python scripts/init_cache.py --state ${STATE}
 ```
 
-Checks: coordinate bounds, severity values, date ranges, mandatory fields, duplicates, transposed coordinates. Auto-corrects where possible. Non-fatal — validation failures produce warnings but don't stop the pipeline.
-
-### Incremental Validation Cache (State-Isolated)
-
-Instead of re-validating the entire dataset every time, the validator uses a **state-specific cache** to identify and process only **new or changed records**. Each state's cache is fully isolated — running Colorado never touches Virginia's cache.
-
-```
-.cache/
-  virginia/
-    validation/
-      validated_hashes.json     ← { "Document Nbr": "row_hash", ... }
-      cache_manifest.json       ← { state, update_frequency, last_run, next_expected, ... }
-  colorado/
-    validation/
-      validated_hashes.json
-      cache_manifest.json
-```
-
-**How it works:**
-1. For each row, compute a hash of the full row content (all standard columns only — unmapped `_{state}_` columns excluded from hash so raw data format changes don't trigger re-validation).
-2. Look up the row's `Document Nbr` in `.cache/{state}/validation/validated_hashes.json`.
-3. If the hash matches → skip (already validated). If hash differs or is new → validate.
-4. After validation, update `validated_hashes.json` with new/changed hashes.
-5. Update `cache_manifest.json` with run timestamp and stats.
-6. Validation report shows: "Validated 1,200 new records (skipped 23,500 cached)."
-
-**Cache invalidation:** The `--force-validate` flag ignores the cache and revalidates everything. The cache is also automatically invalidated if the state's `config.json` changes (different validation rules). See Appendix G for full cache architecture including state isolation and update frequency awareness.
+This ensures cache directories exist and are properly structured before subsequent stages run.
 
 ---
 
-## 9. Unified Stage 2: Geocode
-
-Runs on the **full dataset** before splitting. Building the geocoding cache on the full statewide CSV means neighboring jurisdictions benefit from shared road network lookups.
-
-```bash
-python scripts/process_crash_data.py \
-  --input data/${DOT_NAME}/${INPUT_CSV} \
-  --state ${STATE} \
-  --geocode-only \
-  --cache-dir .cache/${STATE}/geocode \
-  -f
-```
-
-Three strategies: node lookup → Nominatim/OSM → persistent cache. Target: 95%+ GPS coverage. Non-fatal.
-
-### Incremental Geocoding Cache (State-Isolated)
-
-Geocoding is the most expensive stage (API rate limits, processing time). Each state has its own isolated geocoding cache — Virginia's road network lookups are stored separately from Colorado's. Running the pipeline for Colorado will never overwrite Virginia's geocode cache.
-
-```
-.cache/
-  virginia/
-    geocode/
-      geocode_cache.json        ← { "location_key": { "x", "y", "method", "confidence", "cached_at" }, ... }
-      geocoded_records.json     ← { "Document Nbr": "location_key_hash", ... }
-      cache_manifest.json       ← { state, update_frequency, last_run, cache_size, hit_rate, ... }
-  colorado/
-    geocode/
-      geocode_cache.json
-      geocoded_records.json
-      cache_manifest.json
-```
-
-**How it works:**
-1. For each row, check if `x` (longitude) and `y` (latitude) already have valid coordinates → skip geocoding.
-2. If coordinates are missing, build a **location key** from available fields: `{RTE Name}|{Node}|{Physical Juris Name}|{RNS MP}`.
-3. Look up the location key in `.cache/{state}/geocode/geocode_cache.json`. If found → use cached coordinates.
-4. If not in cache → run the 3-strategy geocoding: node lookup → Nominatim/OSM → interpolation.
-5. Store the result in the **state's own** `geocode_cache.json` for future runs.
-6. Track which `Document Nbr` records have been geocoded in `geocoded_records.json`.
-7. Update `cache_manifest.json` with run stats and next expected update.
-
-**Cache benefits:**
-- **State isolation**: Virginia geocode cache persists across Colorado pipeline runs and vice versa.
-- **First run** (statewide): All records geocoded, cache built. Slow (hours for large states).
-- **Subsequent runs** (incremental data): Only new records (new crash reports) need geocoding. Cache hits for existing locations.
-- **Cross-jurisdiction sharing**: A road that appears in multiple jurisdictions within the same state is geocoded once and cached.
-- **Update-frequency aware**: The cache knows when to expect new data and optimizes accordingly (see Appendix G).
-
-**Cache invalidation:** The `--force-geocode` flag ignores the cache and re-geocodes everything for that state only. Useful when road network data is updated. See Appendix G for full cache architecture.
-
----
-
-## 10. Unified Stage 3: Split by Jurisdiction
+## 10. Unified Stage 1: Split by Jurisdiction
 
 ### When It Runs
 
@@ -940,7 +851,7 @@ Only in batch mode (scope = region, mpo, or statewide). Skipped in single jurisd
 
 ### What It Does
 
-Takes the validated + geocoded statewide CSV and splits it into per-jurisdiction files.
+Takes the statewide CSV and splits it into per-jurisdiction files.
 
 ```bash
 python scripts/split_jurisdictions.py \
@@ -952,14 +863,14 @@ python scripts/split_jurisdictions.py \
 
 ### Output
 
-- `data/{DOT_NAME}/{jurisdiction}_all_roads.csv` — per jurisdiction (validated + geocoded)
+- `data/{DOT_NAME}/{jurisdiction}_all_roads.csv` — per jurisdiction
 - `data/{DOT_NAME}/.split_report.json` — statistics
 
 ---
 
-## 11. Unified Stage 4: Split by Road Type
+## 11. Unified Stage 2: Split by Road Type
 
-Produces 3 filtered CSVs per jurisdiction:
+Produces 3 filtered CSVs per jurisdiction using `scripts/split_road_type.py`:
 
 | File | Contents |
 |------|----------|
@@ -971,7 +882,7 @@ Config-driven — reads from `states/{state}/config.json` → `roadSystems.split
 
 ---
 
-## 12. Unified Stage 5: Aggregate by Scope (CSV)
+## 12. Unified Stage 3: Aggregate by Scope (CSV)
 
 ### What This Stage Does
 
@@ -982,7 +893,7 @@ After splitting into county CSVs and road-type CSVs, this stage builds **region 
 Generate region + MPO CSVs for ALL regions and ALL MPOs:
 
 ```bash
-python scripts/generate_aggregate_csvs.py \
+python scripts/aggregate_by_scope.py \
   --state ${STATE} \
   --scope statewide \
   --data-dir data/${DOT_NAME}/ \
@@ -997,14 +908,14 @@ Produces (for each region and MPO, 3 road-type splits each):
 - `data/{DOT_NAME}/_mpo/{mpo_id}/{mpo_id}_no_interstate.csv`
 - `data/{DOT_NAME}/_mpo/{mpo_id}/{mpo_id}_county_roads.csv`
 
-The **statewide CSV** already exists from Stage 2 (the validated+geocoded CSV saved after geocoding). No need to regenerate it.
+The statewide CSV already exists as the input from the state-specific download workflow. No need to regenerate it.
 
 ### If scope = region
 
 Generate CSV for the selected region only:
 
 ```bash
-python scripts/generate_aggregate_csvs.py \
+python scripts/aggregate_by_scope.py \
   --state ${STATE} \
   --scope region \
   --selection ${SELECTION} \
@@ -1024,7 +935,7 @@ Each file = concatenation of the corresponding road-type CSV from all member cou
 Generate CSV for the selected MPO only:
 
 ```bash
-python scripts/generate_aggregate_csvs.py \
+python scripts/aggregate_by_scope.py \
   --state ${STATE} \
   --scope mpo \
   --selection ${SELECTION} \
@@ -1039,7 +950,7 @@ Produces:
 
 ### If scope = jurisdiction
 
-No aggregate needed — county CSVs from Stage 4 are the final output.
+No aggregate needed — county CSVs from Stage 2 are the final output.
 
 ### How Aggregation Works (Algorithm)
 
@@ -1072,11 +983,13 @@ This is a simple concatenation — same columns, just more rows. The frontend ca
 
 ---
 
-## 13. Unified Stage 6: Upload to R2
+## 13. Unified Stage 4: Upload to R2
 
 The upload stage uses the existing **reusable action** at `.github/actions/upload-r2/action.yml`, which provides: 3-attempt retry with exponential backoff, automatic content-type detection (text/csv, application/json, application/gzip), gzip `Content-Encoding` for transparent browser decompression, MD5 hashing, and automatic `data/r2-manifest.json` updates. For local/manual uploads, `scripts/upload-to-r2.py` provides the same functionality via boto3.
 
-### 6a: Upload County Jurisdiction CSVs
+**Note:** In v6, the statewide gzip upload was removed — validation and geocoding are handled on Cloudflare Workers.
+
+### 4a: Upload County Jurisdiction CSVs
 
 ```bash
 # Generate the file manifest (local_path → r2_key pairs)
@@ -1112,7 +1025,7 @@ print(f'County CSVs: {success} ok, {failed} fail')
 "
 ```
 
-### 6b: Upload Region/MPO Aggregate CSVs
+### 4b: Upload Region/MPO Aggregate CSVs
 
 ```bash
 # Upload region aggregate CSVs (concat of member county rows)
@@ -1142,19 +1055,22 @@ for DIR in data/${DOT_NAME}/_mpo/*/; do
 done
 ```
 
-### 6c: Upload Statewide Gzip (Batch Mode Only)
+### 4c: Upload Federal Aggregate CSVs (Statewide Scope Only)
 
 ```bash
-# Statewide validated+geocoded CSV, gzipped for efficient storage
-# Content-Encoding: gzip enables transparent browser decompression
-aws s3 cp data/${DOT_NAME}/${STATE}_statewide_all_roads.csv.gz \
-  s3://crash-lens-data/${STATE}/_state/statewide_all_roads.csv.gz \
-  --endpoint-url ${R2_ENDPOINT} \
-  --content-type "application/gzip" \
-  --content-encoding "gzip"
+# Federal cross-state aggregate CSVs
+if [ "$SCOPE" = "statewide" ]; then
+  find "data/_federal" -name "*.csv" | while read f; do
+    R2_KEY="_federal/${f#data/_federal/}"
+    aws s3 cp "$f" "s3://crash-lens-data/$R2_KEY" \
+      --endpoint-url ${R2_ENDPOINT} \
+      --content-type "text/csv" \
+      --only-show-errors || true
+  done
+fi
 ```
 
-### 6d: Upload Raw Annual CSVs (State-Specific Workflows)
+### 4d: Upload Raw Annual CSVs (State-Specific Workflows)
 
 ```bash
 # Colorado: raw annual CSVs uploaded to {state}/{jurisdiction}/raw/{year}.csv
@@ -1186,7 +1102,7 @@ crash-lens-data/
   ── Per-State (×51: 50 states + DC; also NYC as special sub-state) ──
   {state}/                                     ← e.g., colorado/, virginia/, maryland/
     _state/                                    ← Statewide raw data
-      statewide_all_roads.csv.gz               ← validated+geocoded full state (gzip)
+      statewide_all_roads.csv.gz               ← full state CSV (gzip, legacy — no longer uploaded by pipeline v6)
     _statewide/                                ← Statewide aggregate metadata
       snapshots/                               ← Statewide data snapshots
     _region/{region_id}/                       ← DOT region/district aggregates
@@ -1253,7 +1169,7 @@ Jurisdiction keys are snake_case derived from county display names:
 
 ---
 
-## 14. Unified Stage 7: Predict (Forecast)
+## 14. Unified Stage 5: Predict (Forecast)
 
 ### Overview
 
@@ -1343,16 +1259,33 @@ python scripts/generate_forecast.py \
 
 ---
 
-## 15. Unified Stage 8: Manifest Update & Git Commit
+## 14b. Unified Stage 5b: Upload Forecast JSONs to R2
+
+After forecast generation, the forecast JSON files are uploaded to R2 in a separate step from the main CSV upload (Stage 4). This separation allows the forecast upload to be skipped independently via `skip_forecasts`.
+
+```bash
+# For each jurisdiction and road type, upload forecast JSON
+for j in ${JURISDICTIONS}; do
+  for rt in county_roads no_interstate all_roads; do
+    aws s3 cp "${DATA_DIR}/${j}/forecasts_${rt}.json" \
+      "s3://crash-lens-data/${R2_PREFIX}/${j}/forecasts_${rt}.json" \
+      --endpoint-url ${R2_ENDPOINT} \
+      --content-type "application/json" \
+      --only-show-errors || true
+  done
+done
+```
+
+---
+
+## 15. Unified Stage 6: Manifest Update & Git Commit
 
 ### What Gets Committed
 
 | File | Purpose |
 |------|---------|
 | `data/r2-manifest.json` | Version 3 manifest — tracks every R2 file's size, MD5, upload time, gzip metadata, local path mapping. The frontend uses `r2BaseUrl` + file key to construct CDN URLs |
-| `data/.validation/` | Validation reports |
 | `data/{DOT_NAME}/.split_report.json` | Split statistics |
-| `data/{DOT_NAME}/.geocode_cache.json` | Geocoding cache (persist across runs) |
 
 ### R2 Manifest Structure (`data/r2-manifest.json`)
 
@@ -1390,10 +1323,8 @@ Version 3 added: `contentEncoding` and `uncompressedSize` fields for gzipped sta
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
 
-git add data/r2-manifest.json
-git add data/.validation/ 2>/dev/null || true
-git add data/${DOT_NAME}/.split_report.json 2>/dev/null || true
-git add data/${DOT_NAME}/.geocode_cache.json 2>/dev/null || true
+git add data/r2-manifest.json 2>/dev/null || true
+git add data/*/.split_report.json 2>/dev/null || true
 
 if ! git diff --cached --quiet; then
   SCOPE="${SCOPE}"
@@ -1417,13 +1348,15 @@ fi
 
 ```yaml
 # ==============================================================================
-# Crash Lens — Unified Pipeline v4
+# Crash Lens — Unified Pipeline v6
 # ==============================================================================
 # Processes Virginia-compatible CSVs through the generic pipeline.
 # Auto-triggered by state-specific download workflows.
 #
-# Stage order: Validate → Geocode → [Save Statewide CSV] → Split Jurisdiction →
-#              Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest
+# Stage order: Init Cache → Split Jurisdiction → Split Road Type →
+#              Aggregate (CSV) → Upload → Predict → Manifest
+#
+# NOTE: Validation and Geocoding are handled separately on Cloudflare.
 #
 # Scope-aware: generates region/MPO aggregate CSVs based on user selection.
 # ==============================================================================
@@ -1464,22 +1397,10 @@ on:
         default: ''
         type: string
 
-      skip_validation:
-        description: 'Skip validation step'
-        required: false
-        default: 'false'
-        type: string
-
-      skip_geocode:
-        description: 'Skip geocoding step'
-        required: false
-        default: 'false'
-        type: string
-
       skip_forecasts:
         description: 'Skip forecast generation'
         required: false
-        default: 'true'
+        default: 'false'
         type: string
 
       dry_run:
@@ -1571,7 +1492,7 @@ jobs:
           fi
 
   # ============================================================
-  # JOB 2: Process (Stages 1-8)
+  # JOB 2: Process (Stages 0-6)
   # ============================================================
   process:
     name: "Process (${{ needs.prepare.outputs.state }})"
@@ -1589,52 +1510,23 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pandas requests openpyxl awscli
-          pip install -r validation/requirements.txt 2>/dev/null || true
 
-      # ── Stage 1: Validate (on full dataset) ──
-      - name: "Stage 1: Validate"
-        if: github.event.inputs.skip_validation != 'true'
+      # ── Stage 0: Initialize Cache ──
+      - name: "Stage 0: Initialize cache"
         run: |
-          INPUT_CSV="${{ needs.prepare.outputs.input_csv }}"
           STATE="${{ needs.prepare.outputs.state }}"
 
           echo "=========================================="
-          echo "Stage 1: Validate full dataset"
-          echo "Input: $INPUT_CSV"
+          echo "Stage 0: Initialize state-isolated cache"
+          echo "State: $STATE"
           echo "=========================================="
 
-          python validation/run_validation.py \
-            --input "$INPUT_CSV" \
-            --state "$STATE" \
-            --cache-dir ".cache/$STATE/validation" || {
-            echo "WARNING: Validation had issues (non-fatal)"
-          }
+          python scripts/init_cache.py --state "$STATE"
 
-      # ── Stage 2: Geocode (on full dataset) ──
-      - name: "Stage 2: Geocode"
-        if: github.event.inputs.skip_geocode != 'true'
-        timeout-minutes: 60
-        run: |
-          INPUT_CSV="${{ needs.prepare.outputs.input_csv }}"
-          STATE="${{ needs.prepare.outputs.state }}"
-          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
-
-          echo "=========================================="
-          echo "Stage 2: Geocode full dataset"
-          echo "=========================================="
-
-          python scripts/process_crash_data.py \
-            --input "$INPUT_CSV" \
-            --state "$STATE" \
-            --output-dir "$DATA_DIR" \
-            --cache-dir ".cache/$STATE/geocode" \
-            --geocode-only \
-            -f || {
-            echo "WARNING: Geocoding had issues (non-fatal)"
-          }
-
-      # ── Stage 3: Split by Jurisdiction (batch mode only) ──
-      - name: "Stage 3: Split by jurisdiction"
+      # ── Stage 1: Split by Jurisdiction (batch mode only) ──
+      # NOTE: Validation (old Stage 1) and Geocoding (old Stage 2) are now
+      #       handled separately on Cloudflare Workers.
+      - name: "Stage 1: Split by jurisdiction"
         if: needs.prepare.outputs.download_mode == 'statewide'
         run: |
           STATE="${{ needs.prepare.outputs.state }}"
@@ -1643,10 +1535,17 @@ jobs:
           JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
 
           echo "=========================================="
-          echo "Stage 3: Split validated+geocoded CSV into jurisdictions"
+          echo "Stage 1: Split CSV into jurisdictions"
           echo "=========================================="
 
-          ARGS="--state $STATE --input $INPUT_CSV --output-dir $DATA_DIR"
+          SPLIT_INPUT="$INPUT_CSV"
+
+          if [ -z "$SPLIT_INPUT" ] || [ ! -f "$SPLIT_INPUT" ]; then
+            echo "WARNING: No input CSV found for splitting"
+            exit 0
+          fi
+
+          ARGS="--state $STATE --input $SPLIT_INPUT --output-dir $DATA_DIR"
 
           JCOUNT="${{ needs.prepare.outputs.jurisdiction_count }}"
           TOTAL_STATE=$(python scripts/resolve_scope.py --state $STATE --scope statewide --json | \
@@ -1659,40 +1558,28 @@ jobs:
 
           python scripts/split_jurisdictions.py $ARGS
 
-      # ── Stage 4: Split by Road Type ──
-      - name: "Stage 4: Split by road type"
+      # ── Stage 2: Split by Road Type ──
+      - name: "Stage 2: Split by road type"
         run: |
           STATE="${{ needs.prepare.outputs.state }}"
           DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
           JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
 
           echo "=========================================="
-          echo "Stage 4: Split by road type (3 CSVs per jurisdiction)"
+          echo "Stage 2: Split by road type (3 CSVs per jurisdiction)"
           echo "=========================================="
 
-          echo "$JURISDICTIONS" | python3 -c "
-          import json, sys, subprocess
-          jurisdictions = json.load(sys.stdin)
-          state = '$STATE'
-          data_dir = '$DATA_DIR'
-          success = 0
-          for j in jurisdictions:
-              f = f'{data_dir}/{j}_all_roads.csv'
-              print(f'  Splitting: {j}...')
-              result = subprocess.run([
-                  'python', 'scripts/process_crash_data.py',
-                  '-i', f, '-s', state, '-j', j, '-o', data_dir,
-                  '--split-only'
-              ], capture_output=True)
-              if result.returncode == 0:
-                  success += 1
-              else:
-                  print(f'    WARNING: Split failed for {j} (non-fatal)')
-          print(f'Split: {success}/{len(jurisdictions)} jurisdictions')
-          "
+          JURIS_LIST=$(echo "$JURISDICTIONS" | python3 -c "import json,sys; print(' '.join(json.load(sys.stdin)))")
 
-      # ── Stage 5: Aggregate by Scope (CSV) ──
-      - name: "Stage 5: Aggregate by scope (CSV)"
+          python scripts/split_road_type.py \
+            --state "$STATE" \
+            --jurisdictions $JURIS_LIST \
+            --data-dir "$DATA_DIR" || {
+            echo "WARNING: Road-type split had issues (non-fatal)"
+          }
+
+      # ── Stage 3: Aggregate by Scope (CSV) ──
+      - name: "Stage 3: Aggregate by scope (CSV)"
         if: github.event.inputs.dry_run != 'true'
         run: |
           STATE="${{ needs.prepare.outputs.state }}"
@@ -1701,11 +1588,10 @@ jobs:
           DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
 
           echo "=========================================="
-          echo "Stage 5: Aggregate by scope (scope=$SCOPE, format=CSV)"
+          echo "Stage 3: Aggregate by scope (scope=$SCOPE, format=CSV)"
           echo "=========================================="
 
           # Scope-aware CSV aggregation
-          # Produces CSV files by concatenating member county rows
           python scripts/aggregate_by_scope.py \
             --state "$STATE" \
             --scope "$SCOPE" \
@@ -1721,13 +1607,14 @@ jobs:
             python scripts/aggregate_by_scope.py \
               --federal \
               --output-format csv \
+              --data-dir "$DATA_DIR" \
               --output-dir data || {
               echo "WARNING: Federal aggregates failed (non-fatal)"
             }
           fi
 
-      # ── Stage 6: Upload to R2 ──
-      - name: "Stage 6: Upload to R2"
+      # ── Stage 4: Upload to R2 ──
+      - name: "Stage 4: Upload to R2"
         if: github.event.inputs.dry_run != 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
@@ -1742,10 +1629,10 @@ jobs:
           R2_BUCKET="crash-lens-data"
 
           echo "=========================================="
-          echo "Stage 6: Upload to R2 (all CSVs)"
+          echo "Stage 4: Upload to R2 (all CSVs)"
           echo "=========================================="
 
-          # 6a: Upload jurisdiction CSVs (county-level road-type splits)
+          # 4a: Upload jurisdiction CSVs (county-level road-type splits)
           MANIFEST=$(python scripts/split_jurisdictions.py \
             --state "$STATE" --r2-manifest --r2-prefix "$R2_PREFIX" --output-dir "$DATA_DIR")
 
@@ -1777,7 +1664,7 @@ jobs:
           print(f'County CSV upload: {success} ok, {failed} fail, {skipped} skip')
           "
 
-          # 6b: Upload region/MPO aggregate CSVs
+          # 4b: Upload region/MPO aggregate CSVs
           find "$DATA_DIR" -path "*/_region/*" -name "*.csv" -o -path "*/_mpo/*" -name "*.csv" 2>/dev/null | while read f; do
             REL="${f#$DATA_DIR/}"
             R2_KEY="$R2_PREFIX/$REL"
@@ -1787,7 +1674,7 @@ jobs:
               --only-show-errors || echo "  WARN: failed to upload $R2_KEY"
           done
 
-          # 6c: Upload federal aggregate CSVs (statewide scope only)
+          # 4c: Upload federal aggregate CSVs (statewide scope only)
           if [ "$SCOPE" = "statewide" ]; then
             find "data/_federal" -name "*.csv" 2>/dev/null | while read f; do
               R2_KEY="_federal/${f#data/_federal/}"
@@ -1798,17 +1685,10 @@ jobs:
             done
           fi
 
-          # 6d: Upload statewide gzip (batch mode only)
-          GZ="$DATA_DIR/${STATE}_statewide_all_roads.csv.gz"
-          if [ -f "$GZ" ]; then
-            aws s3 cp "$GZ" "s3://$R2_BUCKET/$R2_PREFIX/_state/statewide_all_roads.csv.gz" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --content-type "application/gzip" \
-              --content-encoding "gzip"
-          fi
+          # NOTE: Statewide gzip upload removed — validation/geocoding handled on Cloudflare
 
-      # ── Stage 7: Predict (Forecasts) ──
-      - name: "Stage 7: Generate forecasts"
+      # ── Stage 5: Predict (Forecasts) ──
+      - name: "Stage 5: Generate forecasts"
         if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
         timeout-minutes: 60
         env:
@@ -1821,7 +1701,7 @@ jobs:
           JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
 
           echo "=========================================="
-          echo "Stage 7: Forecast generation (per county only)"
+          echo "Stage 5: Forecast generation (per county only)"
           echo "=========================================="
 
           echo "$JURISDICTIONS" | python3 -c "
@@ -1842,8 +1722,68 @@ jobs:
           print(f'Forecasts: {success}/{len(jurisdictions)} jurisdictions')
           "
 
-      # ── Stage 8: Commit ──
-      - name: "Stage 8: Commit manifest and metadata"
+      # ── Stage 5b: Upload forecast JSONs to R2 ──
+      - name: "Stage 5b: Upload forecast JSONs to R2"
+        if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
+          JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+
+          echo "=========================================="
+          echo "Stage 5b: Upload forecast JSONs to R2"
+          echo "=========================================="
+
+          UPLOADED=0
+          SKIPPED=0
+
+          echo "$JURISDICTIONS" | python3 -c "
+          import json, sys, subprocess, os
+
+          jurisdictions = json.load(sys.stdin)
+          data_dir = '$DATA_DIR'
+          r2_prefix = '$R2_PREFIX'
+          endpoint = '$R2_ENDPOINT'
+          bucket = '$R2_BUCKET'
+          uploaded = 0
+          skipped = 0
+
+          for j in jurisdictions:
+              for rt in ['county_roads', 'no_interstate', 'all_roads']:
+                  local_path = os.path.join(data_dir, f'forecasts_{rt}.json')
+                  # Also check jurisdiction-prefixed path
+                  if not os.path.exists(local_path):
+                      local_path = os.path.join(data_dir, j, f'forecasts_{rt}.json')
+                  if not os.path.exists(local_path):
+                      skipped += 1
+                      continue
+
+                  r2_key = f'{r2_prefix}/{j}/forecasts_{rt}.json'
+                  try:
+                      subprocess.run([
+                          'aws', 's3', 'cp', local_path, f's3://{bucket}/{r2_key}',
+                          '--endpoint-url', endpoint,
+                          '--content-type', 'application/json',
+                          '--only-show-errors'
+                      ], check=True, capture_output=True, timeout=120)
+                      size = os.path.getsize(local_path)
+                      print(f'  Uploaded: {r2_key} ({size:,} bytes)')
+                      uploaded += 1
+                  except Exception as e:
+                      print(f'  FAIL: {r2_key}: {e}')
+
+          print(f'Forecast upload: {uploaded} uploaded, {skipped} skipped')
+          "
+
+      # ── Stage 6: Commit ──
+      - name: "Stage 6: Commit manifest and metadata"
         if: github.event.inputs.dry_run != 'true'
         run: |
           STATE="${{ needs.prepare.outputs.state }}"
@@ -1855,9 +1795,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add data/r2-manifest.json 2>/dev/null || true
-          git add data/.validation/ 2>/dev/null || true
           git add data/*/.split_report.json 2>/dev/null || true
-          git add data/*/.geocode_cache.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No metadata changes to commit"
@@ -1890,7 +1828,7 @@ jobs:
           echo "| Scope | $SCOPE ($SELECTION) |" >> $GITHUB_STEP_SUMMARY
           echo "| Jurisdictions | ${{ needs.prepare.outputs.jurisdiction_count }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Stages | Validate → Geocode → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stages | Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest |" >> $GITHUB_STEP_SUMMARY
 ```
 
 ---
@@ -2190,7 +2128,7 @@ state:
 ### Step 5: Test Pipeline (1 hour)
 - [ ] Run state workflow: scope=jurisdiction, selection={test_county}
 - [ ] Verify pipeline.yml auto-triggered
-- [ ] Verify all 8 stages complete
+- [ ] Verify all 7 stages (0-6) complete
 - [ ] Test in browser: select new state → data loads
 
 ### Step 6: Go Live
@@ -2205,7 +2143,7 @@ state:
 
 ## Appendix A: Current vs Unified Comparison
 
-| Aspect | Current (40 Workflows) | Unified v5 |
+| Aspect | Current (40 Workflows) | Unified v6 |
 |--------|----------------------|------------|
 | Workflow files | 40 | 1 per state + 1 pipeline.yml |
 | User interface | Manual workflow_dispatch | Dropdown: scope + jurisdiction/region/MPO |
@@ -2298,7 +2236,6 @@ All aggregates are **CSV files** — they contain the same Virginia-standard col
 |-------|-------------------------------|---------|
 | `statewide` | All region CSVs (3 road types × N regions) | `{state}/_region/{id}/{id}_all_roads.csv` etc. |
 | `statewide` | All MPO CSVs (3 road types × N MPOs) | `{state}/_mpo/{id}/{id}_all_roads.csv` etc. |
-| `statewide` | Statewide combined CSV (gzip) | `{state}/_state/statewide_all_roads.csv.gz` |
 | `statewide` | Federal cross-state CSV | `_federal/all_states_all_roads.csv` |
 | `region` | Region CSV (3 road types) | `{state}/_region/{selection}/{selection}_all_roads.csv` etc. |
 | `region` | Region member county CSVs | `{state}/{county}/...` (already uploaded) |
@@ -2313,19 +2250,18 @@ User picks: scope=region, selection=hampton_roads
      ↓
 State workflow: downloads statewide, converts to Virginia format
      ↓
-Pipeline Stage 1 (Validate): validates full statewide CSV (incremental cache)
-Pipeline Stage 2 (Geocode): geocodes full statewide CSV (incremental cache)
-     → saves statewide validated+geocoded CSV as intermediate artifact
-Pipeline Stage 3 (Split Jurisdiction): splits into 11 Hampton Roads counties
-Pipeline Stage 4 (Split Road Type): 3 CSVs × 11 = 33 county files
-Pipeline Stage 5 (Aggregate CSV):
+Pipeline Stage 0 (Init Cache): initializes state-isolated cache
+Pipeline Stage 1 (Split Jurisdiction): splits into 11 Hampton Roads counties
+Pipeline Stage 2 (Split Road Type): 3 CSVs × 11 = 33 county files
+Pipeline Stage 3 (Aggregate CSV):
   → concat 11 counties into hampton_roads_all_roads.csv
   → concat 11 counties into hampton_roads_no_interstate.csv
   → concat 11 counties into hampton_roads_county_roads.csv
   → does NOT generate other regions or full statewide aggregates
-Pipeline Stage 6 (Upload): uploads 33 county CSVs + 3 region CSVs to R2
-Pipeline Stage 7 (Predict): generates forecasts for 11 counties (not region)
-Pipeline Stage 8 (Manifest): commits manifest + metadata
+Pipeline Stage 4 (Upload): uploads 33 county CSVs + 3 region CSVs to R2
+Pipeline Stage 5 (Predict): generates forecasts for 11 counties (not region)
+Pipeline Stage 5b (Upload Forecasts): uploads forecast JSONs to R2
+Pipeline Stage 6 (Manifest): commits manifest + metadata
 ```
 
 ---
@@ -2760,4 +2696,4 @@ The cache uses `update_schedule` to detect unexpected situations:
 
 ---
 
-*End of Document — Crash Lens Unified Pipeline Architecture v5.0*
+*End of Document — Crash Lens Unified Pipeline Architecture v6.0*
