@@ -143,8 +143,9 @@ Once connected, ask Claude natural language questions about your crash data:
 - *"Score grant eligibility for Highway 85"*
 - *"Search for HSIP grants"*
 
-### Available MCP Tools
+### Available MCP Tools (22)
 
+**Crash Data (5)**
 | Tool | Description |
 |------|-------------|
 | `query_crashes` | Query crash records with flexible filters (route, severity, date, weather, factors) |
@@ -152,13 +153,39 @@ Once connected, ask Claude natural language questions about your crash data:
 | `calculate_epdo` | Calculate EPDO score from severity counts with state-specific weights |
 | `analyze_hotspots` | Identify and rank hotspot locations by EPDO, total, KA severity, or per-year rate |
 | `build_crash_profile` | Generate detailed crash profile with temporal patterns, collision types, weather |
+
+**Analysis (4)**
+| Tool | Description |
+|------|-------------|
 | `calculate_baselines` | Calculate county-wide baseline crash rates for statistical comparison |
 | `analyze_over_representation` | Calculate Over-Representation Index (ORI) vs county baselines |
+| `analyze_crash_trends` | Analyze temporal trends: year-over-year changes, severity trends, time-of-day and day-of-week patterns |
+| `compare_locations` | Side-by-side comparison of two locations — crash counts, severity, patterns, EPDO, and ORI |
+
+**CMF / Countermeasures (3)**
+| Tool | Description |
+|------|-------------|
+| `search_cmf_database` | Search the FHWA CMF Clearinghouse database of 808 countermeasures |
+| `recommend_countermeasures` | Analyze a location and automatically recommend best-matching FHWA countermeasures |
+| `calculate_combined_cmf` | Calculate combined effect of multiple countermeasures using FHWA successive CMF method |
+
+**Safety (3)**
+| Tool | Description |
+|------|-------------|
+| `analyze_safety_category` | Analyze crashes for a systemic safety focus category (pedestrian, speed, nighttime, curve, etc.) |
+| `get_safety_overview` | Overview of all 21 systemic safety categories ranked by frequency and severity |
+| `run_before_after_study` | Before/after crash study with naive comparison and Empirical Bayes methods |
+
+**Infrastructure & Discovery (7)**
+| Tool | Description |
+|------|-------------|
 | `evaluate_signal_warrant` | Evaluate MUTCD signal warrant criteria based on traffic volumes |
 | `score_grant_eligibility` | Score location for HSIP, SS4A, 402, and 405d grant funding eligibility |
 | `get_forecasts` | Get crash forecasts for a state/jurisdiction |
 | `search_grants` | Search available traffic safety grants by program, keyword, or status |
 | `get_jurisdiction_info` | Get jurisdiction metadata, state configs, and EPDO weights |
+| `list_locations` | List available routes and intersections with crash counts |
+| `get_data_quality` | Assess data quality and completeness metrics for the crash dataset |
 
 ### Data Caching
 
