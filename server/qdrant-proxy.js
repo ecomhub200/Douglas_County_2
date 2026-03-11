@@ -1869,122 +1869,127 @@ const server = http.createServer((req, res) => {
 
     // POST /mcp/validate-key — validate API key for MCP server (no Firebase Auth needed)
     if (req.url === '/mcp/validate-key' && req.method === 'POST') {
-        try {
-            const body = JSON.parse(await readBody(req));
-            const { apiKey } = body;
+        (async () => {
+            try {
+                const rawBody = await collectBody(req);
+                const { apiKey } = JSON.parse(rawBody);
 
-            if (!apiKey || typeof apiKey !== 'string') {
-                res.writeHead(400, corsHeaders);
-                res.end(JSON.stringify({ authorized: false, reason: 'Missing apiKey' }));
-                return;
-            }
-
-            const db = getFirestore();
-            const snapshot = await db.collection('users')
-                .where('mcpApiKey', '==', apiKey)
-                .limit(1)
-                .get();
-
-            if (snapshot.empty) {
-                console.log(`[MCP] Invalid API key attempted: ${apiKey.substring(0, 10)}...`);
-                res.writeHead(401, corsHeaders);
-                res.end(JSON.stringify({ authorized: false, reason: 'Invalid API key' }));
-                return;
-            }
-
-            const userDoc = snapshot.docs[0];
-            const userData = userDoc.data();
-
-            // Check subscription status (mirrors client-side hasActiveSubscription logic)
-            const plan = userData.plan || 'trial';
-            const status = userData.subscriptionStatus || '';
-            const trialEndsAt = userData.trialEndsAt;
-            const currentPeriodEnd = userData.currentPeriodEnd;
-            const now = new Date();
-
-            let subscriptionActive = false;
-            if (status === 'pending_verification') {
-                subscriptionActive = false;
-            } else if (plan === 'trial') {
-                if (trialEndsAt) {
-                    const trialEnd = trialEndsAt.toDate ? trialEndsAt.toDate() : new Date(trialEndsAt);
-                    subscriptionActive = trialEnd > now;
-                } else {
-                    subscriptionActive = false;
+                if (!apiKey || typeof apiKey !== 'string') {
+                    res.writeHead(400, corsHeaders);
+                    res.end(JSON.stringify({ authorized: false, reason: 'Missing apiKey' }));
+                    return;
                 }
-            } else {
-                subscriptionActive = ['active', 'trialing', 'past_due'].includes(status);
-            }
 
-            if (!subscriptionActive) {
-                console.log(`[MCP] Inactive subscription for user ${userDoc.id} (plan=${plan}, status=${status})`);
-                res.writeHead(403, corsHeaders);
-                res.end(JSON.stringify({ authorized: false, reason: 'Subscription inactive or expired' }));
-                return;
-            }
+                const db = getFirestore();
+                const snapshot = await db.collection('users')
+                    .where('mcpApiKey', '==', apiKey)
+                    .limit(1)
+                    .get();
 
-            console.log(`[MCP] API key validated for user ${userDoc.id} (${userData.email}, plan=${plan})`);
-            res.writeHead(200, corsHeaders);
-            res.end(JSON.stringify({
-                authorized: true,
-                plan,
-                email: userData.email
-            }));
-        } catch (err) {
-            console.error(`[MCP] validate-key error: ${err.message}`);
-            res.writeHead(500, corsHeaders);
-            res.end(JSON.stringify({ authorized: false, reason: 'Server error' }));
-        }
+                if (snapshot.empty) {
+                    console.log(`[MCP] Invalid API key attempted: ${apiKey.substring(0, 10)}...`);
+                    res.writeHead(401, corsHeaders);
+                    res.end(JSON.stringify({ authorized: false, reason: 'Invalid API key' }));
+                    return;
+                }
+
+                const userDoc = snapshot.docs[0];
+                const userData = userDoc.data();
+
+                // Check subscription status (mirrors client-side hasActiveSubscription logic)
+                const plan = userData.plan || 'trial';
+                const status = userData.subscriptionStatus || '';
+                const trialEndsAt = userData.trialEndsAt;
+                const now = new Date();
+
+                let subscriptionActive = false;
+                if (status === 'pending_verification') {
+                    subscriptionActive = false;
+                } else if (plan === 'trial') {
+                    if (trialEndsAt) {
+                        const trialEnd = trialEndsAt.toDate ? trialEndsAt.toDate() : new Date(trialEndsAt);
+                        subscriptionActive = trialEnd > now;
+                    } else {
+                        subscriptionActive = false;
+                    }
+                } else {
+                    subscriptionActive = ['active', 'trialing', 'past_due'].includes(status);
+                }
+
+                if (!subscriptionActive) {
+                    console.log(`[MCP] Inactive subscription for user ${userDoc.id} (plan=${plan}, status=${status})`);
+                    res.writeHead(403, corsHeaders);
+                    res.end(JSON.stringify({ authorized: false, reason: 'Subscription inactive or expired' }));
+                    return;
+                }
+
+                console.log(`[MCP] API key validated for user ${userDoc.id} (${userData.email}, plan=${plan})`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({
+                    authorized: true,
+                    plan,
+                    email: userData.email
+                }));
+            } catch (err) {
+                console.error(`[MCP] validate-key error: ${err.message}`);
+                res.writeHead(500, corsHeaders);
+                res.end(JSON.stringify({ authorized: false, reason: 'Server error' }));
+            }
+        })();
         return;
     }
 
     // POST /mcp/generate-key — generate a new MCP API key (requires Firebase Auth)
     if (req.url === '/mcp/generate-key' && req.method === 'POST') {
-        try {
-            const user = await verifyFirebaseToken(req);
-            const db = getFirestore();
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const db = getFirestore();
 
-            // Generate key: clmcp_ prefix + 32 hex chars
-            const apiKey = 'clmcp_' + crypto.randomBytes(16).toString('hex');
+                // Generate key: clmcp_ prefix + 32 hex chars
+                const apiKey = 'clmcp_' + crypto.randomBytes(16).toString('hex');
 
-            await db.collection('users').doc(user.uid).update({
-                mcpApiKey: apiKey,
-                mcpApiKeyCreatedAt: new Date().toISOString()
-            });
+                await db.collection('users').doc(user.uid).update({
+                    mcpApiKey: apiKey,
+                    mcpApiKeyCreatedAt: new Date().toISOString()
+                });
 
-            console.log(`[MCP] API key generated for user ${user.uid} (${user.email})`);
-            res.writeHead(200, corsHeaders);
-            res.end(JSON.stringify({ apiKey }));
-        } catch (err) {
-            console.error(`[MCP] generate-key error: ${err.message}`);
-            const status = err.message.includes('Authorization') ? 401 : 500;
-            res.writeHead(status, corsHeaders);
-            res.end(JSON.stringify({ error: err.message }));
-        }
+                console.log(`[MCP] API key generated for user ${user.uid} (${user.email})`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({ apiKey }));
+            } catch (err) {
+                console.error(`[MCP] generate-key error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
         return;
     }
 
     // POST /mcp/revoke-key — revoke MCP API key (requires Firebase Auth)
     if (req.url === '/mcp/revoke-key' && req.method === 'POST') {
-        try {
-            const user = await verifyFirebaseToken(req);
-            const db = getFirestore();
-            const admin = require('firebase-admin');
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const db = getFirestore();
+                const admin = require('firebase-admin');
 
-            await db.collection('users').doc(user.uid).update({
-                mcpApiKey: admin.firestore.FieldValue.delete(),
-                mcpApiKeyCreatedAt: admin.firestore.FieldValue.delete()
-            });
+                await db.collection('users').doc(user.uid).update({
+                    mcpApiKey: admin.firestore.FieldValue.delete(),
+                    mcpApiKeyCreatedAt: admin.firestore.FieldValue.delete()
+                });
 
-            console.log(`[MCP] API key revoked for user ${user.uid} (${user.email})`);
-            res.writeHead(200, corsHeaders);
-            res.end(JSON.stringify({ success: true }));
-        } catch (err) {
-            console.error(`[MCP] revoke-key error: ${err.message}`);
-            const status = err.message.includes('Authorization') ? 401 : 500;
-            res.writeHead(status, corsHeaders);
-            res.end(JSON.stringify({ error: err.message }));
-        }
+                console.log(`[MCP] API key revoked for user ${user.uid} (${user.email})`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({ success: true }));
+            } catch (err) {
+                console.error(`[MCP] revoke-key error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
         return;
     }
 
