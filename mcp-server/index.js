@@ -76,7 +76,7 @@ server.tool(
     }));
 
     return {
-      content: [{ type: 'text', text: JSON.stringify({ total, returned: results.length, limit, crashes: results }, null, 2) }]
+      content: [{ type: 'text', text: JSON.stringify({ dataContext: dataLoader.getDataContext(), total, returned: results.length, limit, crashes: results }, null, 2) }]
     };
   }
 );
@@ -104,6 +104,7 @@ server.tool(
 
     return {
       content: [{ type: 'text', text: JSON.stringify({
+        dataContext: dataLoader.getDataContext(),
         total: crashes.length,
         severity: { K: simple.K, A: simple.A, B: simple.B, C: simple.C, O: simple.O },
         epdo: profile.epdo,
@@ -192,6 +193,7 @@ server.tool(
     const limit = params.limit || 20;
     return {
       content: [{ type: 'text', text: JSON.stringify({
+        dataContext: dataLoader.getDataContext(),
         type: params.type,
         totalLocations: Object.keys(sourceData).length,
         qualifyingLocations: hotspots.length,
@@ -231,6 +233,7 @@ server.tool(
 
     return {
       content: [{ type: 'text', text: JSON.stringify({
+        dataContext: dataLoader.getDataContext(),
         location: { route: params.route || null, node: params.node || null },
         profile
       }, null, 2) }]
@@ -255,7 +258,7 @@ server.tool(
     }
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(baselines, null, 2) }]
+      content: [{ type: 'text', text: JSON.stringify({ dataContext: dataLoader.getDataContext(), ...baselines }, null, 2) }]
     };
   }
 );
@@ -289,6 +292,7 @@ server.tool(
 
     return {
       content: [{ type: 'text', text: JSON.stringify({
+        dataContext: dataLoader.getDataContext(),
         location: { route: params.route || null, node: params.node || null },
         crashCount: crashes.length,
         patterns,
@@ -388,6 +392,7 @@ server.tool(
 
     return {
       content: [{ type: 'text', text: JSON.stringify({
+        dataContext: dataLoader.getDataContext(),
         location: { route: params.route || null, node: params.node || null },
         crashCount: crashes.length,
         scoringProfile: params.scoring_profile || 'balanced',
@@ -416,6 +421,7 @@ server.tool(
 
     return {
       content: [{ type: 'text', text: JSON.stringify({
+        dataContext: dataLoader.getDataContext(),
         state: params.state,
         jurisdiction: params.jurisdiction,
         roadType: params.road_type || 'all_roads',
@@ -465,6 +471,7 @@ server.tool(
 
     return {
       content: [{ type: 'text', text: JSON.stringify({
+        dataContext: dataLoader.getDataContext(),
         total: grants.length,
         grants: grants.slice(0, 50)
       }, null, 2) }]
@@ -529,7 +536,7 @@ server.resource(
   async (uri) => {
     const summary = dataLoader.getDataSummary();
     return {
-      contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(summary, null, 2) }]
+      contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ dataContext: dataLoader.getDataContext(), ...summary }, null, 2) }]
     };
   }
 );
@@ -566,7 +573,8 @@ async function main() {
   try {
     dataLoader.loadCrashData();
     dataLoader.buildAggregates();
-    console.error('[CrashLens MCP] Data loaded successfully');
+    const ctx = dataLoader.getDataContext();
+    console.error(`[CrashLens MCP] Data loaded: ${ctx.jurisdiction} — ${ctx.totalRecords} records (${ctx.dateRange})`);
   } catch (err) {
     console.error('[CrashLens MCP] Warning: Could not pre-load data:', err.message);
   }
