@@ -22,7 +22,7 @@ export function registerAnalysisTools(server, { COL, calcEPDO, buildLocationCras
       }
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(baselines, null, 2) }]
+        content: [{ type: 'text', text: JSON.stringify({ dataContext: dataLoader.getDataContext(), ...baselines }, null, 2) }]
       };
     }
   );
@@ -54,6 +54,7 @@ export function registerAnalysisTools(server, { COL, calcEPDO, buildLocationCras
 
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           location: { route: params.route || null, node: params.node || null },
           crashCount: crashes.length,
           patterns,
@@ -92,6 +93,7 @@ export function registerAnalysisTools(server, { COL, calcEPDO, buildLocationCras
 
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           totalCrashes: crashes.length,
           location: { route: params.route || null, node: params.node || null },
           severityTrend,
@@ -154,6 +156,7 @@ export function registerAnalysisTools(server, { COL, calcEPDO, buildLocationCras
 
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           locationA: a,
           locationB: b,
           comparison: {

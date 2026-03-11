@@ -31,6 +31,7 @@ export function registerCMFTools(server, { searchCMF, recommendCountermeasures, 
       const results = searchCMF(records, params);
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           totalInDatabase: records.length,
           returned: results.length,
           filters: {
@@ -76,6 +77,7 @@ export function registerCMFTools(server, { searchCMF, recommendCountermeasures, 
 
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           location: { route: params.route || null, node: params.node || null },
           crashCount: crashes.length,
           epdo: profile.epdo,

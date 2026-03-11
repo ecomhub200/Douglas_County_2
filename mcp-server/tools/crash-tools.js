@@ -46,7 +46,7 @@ export function registerCrashTools(server, { COL, calcEPDO, getStateEPDOWeights,
       }));
 
       return {
-        content: [{ type: 'text', text: JSON.stringify({ total, returned: results.length, limit, crashes: results }, null, 2) }]
+        content: [{ type: 'text', text: JSON.stringify({ dataContext: dataLoader.getDataContext(), total, returned: results.length, limit, crashes: results }, null, 2) }]
       };
     }
   );
@@ -72,6 +72,7 @@ export function registerCrashTools(server, { COL, calcEPDO, getStateEPDOWeights,
 
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           total: crashes.length,
           severity: { K: simple.K, A: simple.A, B: simple.B, C: simple.C, O: simple.O },
           epdo: profile.epdo,
@@ -156,6 +157,7 @@ export function registerCrashTools(server, { COL, calcEPDO, getStateEPDOWeights,
       const limit = params.limit || 20;
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           type: params.type,
           totalLocations: Object.keys(sourceData).length,
           qualifyingLocations: hotspots.length,
@@ -192,6 +194,7 @@ export function registerCrashTools(server, { COL, calcEPDO, getStateEPDOWeights,
 
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           location: { route: params.route || null, node: params.node || null },
           profile
         }, null, 2) }]

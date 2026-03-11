@@ -92,6 +92,7 @@ export function registerInfrastructureTools(server, { COL, calcEPDO, getStateEPD
 
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           location: { route: params.route || null, node: params.node || null },
           crashCount: crashes.length,
           scoringProfile: params.scoring_profile || 'balanced',
@@ -118,6 +119,7 @@ export function registerInfrastructureTools(server, { COL, calcEPDO, getStateEPD
 
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           state: params.state,
           jurisdiction: params.jurisdiction,
           roadType: params.road_type || 'all_roads',
@@ -165,6 +167,7 @@ export function registerInfrastructureTools(server, { COL, calcEPDO, getStateEPD
 
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           total: grants.length,
           grants: grants.slice(0, 50)
         }, null, 2) }]

@@ -8,6 +8,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -32,12 +33,15 @@ import { registerCMFTools } from './tools/cmf-tools.js';
 import { registerSafetyTools } from './tools/safety-tools.js';
 import { registerInfrastructureTools } from './tools/infrastructure-tools.js';
 
-// Resolve project root (parent of mcp-server/)
+// Resolve paths
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = resolve(__dirname, '..');
+const DEV_PROJECT_ROOT = resolve(__dirname, '..');
 
-// Initialize data loader
-dataLoader.init(PROJECT_ROOT);
+// Detect standalone vs dev mode from environment variables
+const CRASHLENS_STATE = process.env.CRASHLENS_STATE || '';
+const CRASHLENS_JURISDICTION = process.env.CRASHLENS_JURISDICTION || '';
+const CRASHLENS_ROAD_TYPE = process.env.CRASHLENS_ROAD_TYPE || 'all_roads';
+const IS_STANDALONE = !!(CRASHLENS_STATE && CRASHLENS_JURISDICTION);
 
 // Create MCP server
 const server = new McpServer({
@@ -82,7 +86,7 @@ server.resource(
   async (uri) => {
     const summary = dataLoader.getDataSummary();
     return {
-      contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(summary, null, 2) }]
+      contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ dataContext: dataLoader.getDataContext(), ...summary }, null, 2) }]
     };
   }
 );
@@ -166,12 +170,30 @@ async function main() {
   const transport = new StdioServerTransport();
   console.error('[CrashLens MCP] Starting server v2.0.0 (22 tools, 6 resources)...');
 
-  // Pre-load data
+  // Initialize data loader based on mode
+  if (IS_STANDALONE) {
+    console.error(`[CrashLens MCP] Standalone mode: ${CRASHLENS_STATE}/${CRASHLENS_JURISDICTION} (${CRASHLENS_ROAD_TYPE})`);
+    try {
+      await dataLoader.initStandalone(CRASHLENS_STATE, CRASHLENS_JURISDICTION, CRASHLENS_ROAD_TYPE);
+    } catch (err) {
+      console.error(`[CrashLens MCP] Failed to initialize standalone mode: ${err.message}`);
+      console.error('[CrashLens MCP] Check that CRASHLENS_STATE and CRASHLENS_JURISDICTION are correct.');
+      console.error('[CrashLens MCP] Example: CRASHLENS_STATE=virginia CRASHLENS_JURISDICTION=henrico');
+      process.exit(1);
+    }
+  } else {
+    // Dev/legacy mode: use parent directory as project root
+    dataLoader.init(DEV_PROJECT_ROOT);
+    console.error('[CrashLens MCP] Dev mode: using local project data');
+  }
+
+  // Pre-load and aggregate data
   try {
     dataLoader.loadCrashData();
     dataLoader.buildAggregates();
     dataLoader.loadCMFData();
-    console.error('[CrashLens MCP] Data loaded successfully (crash + CMF)');
+    const ctx = dataLoader.getDataContext();
+    console.error(`[CrashLens MCP] Data loaded: ${ctx.jurisdiction} — ${ctx.totalRecords} records (${ctx.dateRange}), CMF: ${dataLoader.getCMFRecords().length} countermeasures`);
   } catch (err) {
     console.error('[CrashLens MCP] Warning: Could not pre-load data:', err.message);
   }

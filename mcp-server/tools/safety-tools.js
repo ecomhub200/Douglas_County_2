@@ -65,6 +65,7 @@ export function registerSafetyTools(server, { analyzeSafetyCategory, analyzeAllC
 
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           totalCrashes: crashes.length,
           categoriesAnalyzed: categories.length,
           sortedBy: sortBy,
@@ -117,6 +118,7 @@ export function registerSafetyTools(server, { analyzeSafetyCategory, analyzeAllC
 
       return {
         content: [{ type: 'text', text: JSON.stringify({
+          dataContext: dataLoader.getDataContext(),
           location: { route: params.route || null, node: params.node || null },
           ...result
         }, null, 2) }]
