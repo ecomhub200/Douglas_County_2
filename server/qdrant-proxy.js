@@ -1949,10 +1949,10 @@ const server = http.createServer((req, res) => {
                 // Generate key: clmcp_ prefix + 32 hex chars
                 const apiKey = 'clmcp_' + crypto.randomBytes(16).toString('hex');
 
-                await db.collection('users').doc(user.uid).update({
+                await db.collection('users').doc(user.uid).set({
                     mcpApiKey: apiKey,
                     mcpApiKeyCreatedAt: new Date().toISOString()
-                });
+                }, { merge: true });
 
                 console.log(`[MCP] API key generated for user ${user.uid} (${user.email})`);
                 res.writeHead(200, corsHeaders);
