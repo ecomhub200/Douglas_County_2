@@ -13,6 +13,7 @@ CL.safety = CL.safety || {};
 CL.ai = CL.ai || {};
 CL.data = CL.data || {};
 CL.spatial = CL.spatial || {};
+CL.upload = CL.upload || {};
 CL.utils = CL.utils || {};
 
 // Module loading tracker (for debugging)
