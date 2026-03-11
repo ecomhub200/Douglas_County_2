@@ -109,6 +109,10 @@ def deploy_endpoint(session):
         else:
             raise
 
+    # Clean up any orphaned endpoint configs/models from previous failed deploys.
+    # JumpStart uses the endpoint name as the config name, so clean both variants.
+    _cleanup_stale_resources(sm_client)
+
     # Try JumpStart deployment
     try:
         from sagemaker.jumpstart.model import JumpStartModel
@@ -156,11 +160,12 @@ def deploy_endpoint(session):
 
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "")
-            if "ResourceLimitExceeded" in str(e) or error_code == "ResourceLimitExceeded":
+            error_msg = str(e)
+
+            if "ResourceLimitExceeded" in error_msg or error_code == "ResourceLimitExceeded":
                 print(f"  QUOTA LIMIT: {instance_type} has 0 quota in this account/region.")
                 if idx < len(instance_types_to_try) - 1:
                     print(f"  Trying next instance type...")
-                    # Clean up any partially created resources before retrying
                     _cleanup_partial_deploy(sm_client)
                     continue
                 else:
@@ -171,34 +176,124 @@ def deploy_endpoint(session):
                     print(f"    3. Request increase for 'ml.m5.xlarge for endpoint usage'")
                     print(f"    4. Request at least 1 instance")
                     return False
+            elif "Cannot create already existing" in error_msg:
+                print(f"  Stale resource detected. Cleaning up and retrying...")
+                _cleanup_partial_deploy(sm_client)
+                time.sleep(5)
+                # Retry same instance type after cleanup
+                try:
+                    model = JumpStartModel(
+                        model_id=MODEL_ID,
+                        role=role_arn,
+                        instance_type=instance_type,
+                        sagemaker_session=sm_session,
+                    )
+                    predictor = model.deploy(
+                        endpoint_name=ENDPOINT_NAME,
+                        initial_instance_count=INITIAL_INSTANCE_COUNT,
+                        wait=False,
+                    )
+                    print(f"[3/3] Deployment initiated with {instance_type}. Waiting for InService...")
+                    return wait_for_endpoint(sm_client)
+                except Exception as retry_e:
+                    print(f"  Retry also failed: {retry_e}")
+                    return False
             else:
                 print(f"  Deployment failed: {e}")
                 return False
         except Exception as e:
-            print(f"  Deployment failed: {e}")
-            return False
+            error_msg = str(e)
+            if "Cannot create already existing" in error_msg:
+                print(f"  Stale resource detected. Cleaning up and retrying...")
+                _cleanup_partial_deploy(sm_client)
+                time.sleep(5)
+                try:
+                    model = JumpStartModel(
+                        model_id=MODEL_ID,
+                        role=role_arn,
+                        instance_type=instance_type,
+                        sagemaker_session=sm_session,
+                    )
+                    predictor = model.deploy(
+                        endpoint_name=ENDPOINT_NAME,
+                        initial_instance_count=INITIAL_INSTANCE_COUNT,
+                        wait=False,
+                    )
+                    print(f"[3/3] Deployment initiated with {instance_type}. Waiting for InService...")
+                    return wait_for_endpoint(sm_client)
+                except Exception as retry_e:
+                    print(f"  Retry also failed: {retry_e}")
+                    return False
+            else:
+                print(f"  Deployment failed: {e}")
+                return False
 
     return False
 
 
-def _cleanup_partial_deploy(sm_client):
-    """Clean up partially created model/config resources before retrying with a different instance."""
-    for resource, func, name in [
-        ("Endpoint", sm_client.delete_endpoint, ENDPOINT_NAME),
-        ("Config", sm_client.delete_endpoint_config, ENDPOINT_CONFIG_NAME),
-    ]:
+def _cleanup_stale_resources(sm_client):
+    """Clean up orphaned endpoint configs and models from previous failed deploys.
+
+    JumpStart uses the endpoint name as the endpoint config name, which differs
+    from our ENDPOINT_CONFIG_NAME constant. We must clean up both variants.
+    """
+    # Config names that JumpStart or our script may have created
+    config_names = list(set([ENDPOINT_CONFIG_NAME, ENDPOINT_NAME]))
+    for config_name in config_names:
         try:
-            if resource == "Endpoint":
-                func(EndpointName=name)
-            else:
-                func(EndpointConfigName=name)
+            sm_client.describe_endpoint_config(EndpointConfigName=config_name)
+            print(f"  Deleting orphaned endpoint config: {config_name}")
+            sm_client.delete_endpoint_config(EndpointConfigName=config_name)
         except ClientError:
-            pass  # Resource doesn't exist, that's fine
-    # Also try to delete any model created by JumpStart (uses auto-generated names)
+            pass  # Doesn't exist, that's fine
+
+    # Also clean up any stale model objects (JumpStart auto-names may vary)
     try:
+        sm_client.describe_model(ModelName=MODEL_NAME)
+        print(f"  Deleting orphaned model: {MODEL_NAME}")
         sm_client.delete_model(ModelName=MODEL_NAME)
     except ClientError:
         pass
+
+    # JumpStart may also create models with auto-generated names containing the endpoint name
+    try:
+        models = sm_client.list_models(NameContains="crashlens-chronos2", MaxResults=10)
+        for m in models.get("Models", []):
+            name = m["ModelName"]
+            print(f"  Deleting stale model: {name}")
+            sm_client.delete_model(ModelName=name)
+    except ClientError:
+        pass
+
+    time.sleep(2)
+
+
+def _cleanup_partial_deploy(sm_client):
+    """Clean up partially created model/config resources before retrying with a different instance."""
+    # Delete endpoint
+    try:
+        sm_client.delete_endpoint(EndpointName=ENDPOINT_NAME)
+    except ClientError:
+        pass
+
+    # Delete endpoint configs (both our name and JumpStart's name which uses the endpoint name)
+    for config_name in set([ENDPOINT_CONFIG_NAME, ENDPOINT_NAME]):
+        try:
+            sm_client.delete_endpoint_config(EndpointConfigName=config_name)
+        except ClientError:
+            pass
+
+    # Delete any models matching our prefix
+    try:
+        models = sm_client.list_models(NameContains="crashlens-chronos2", MaxResults=10)
+        for m in models.get("Models", []):
+            try:
+                sm_client.delete_model(ModelName=m["ModelName"])
+            except ClientError:
+                pass
+    except ClientError:
+        pass
+
     time.sleep(2)
 
 
@@ -343,24 +438,40 @@ def delete_endpoint(session):
 
     print(f"\nDeleting endpoint resources...")
 
-    for resource, func, name in [
-        ("Endpoint", sm_client.delete_endpoint, ENDPOINT_NAME),
-        ("Config", sm_client.delete_endpoint_config, ENDPOINT_CONFIG_NAME),
-        ("Model", sm_client.delete_model, MODEL_NAME),
-    ]:
+    # Delete endpoint
+    try:
+        sm_client.delete_endpoint(EndpointName=ENDPOINT_NAME)
+        print(f"  Deleted Endpoint: {ENDPOINT_NAME}")
+    except ClientError as e:
+        if "Could not find" in str(e) or "does not exist" in str(e):
+            print(f"  Endpoint '{ENDPOINT_NAME}' not found (already deleted).")
+        else:
+            print(f"  Error deleting Endpoint: {e}")
+
+    # Delete endpoint configs (both our name and JumpStart's auto-name)
+    for config_name in set([ENDPOINT_CONFIG_NAME, ENDPOINT_NAME]):
         try:
-            if resource == "Endpoint":
-                func(EndpointName=name)
-            elif resource == "Config":
-                func(EndpointConfigName=name)
-            else:
-                func(ModelName=name)
-            print(f"  Deleted {resource}: {name}")
+            sm_client.delete_endpoint_config(EndpointConfigName=config_name)
+            print(f"  Deleted Config: {config_name}")
         except ClientError as e:
             if "Could not find" in str(e) or "does not exist" in str(e):
-                print(f"  {resource} '{name}' not found (already deleted).")
+                print(f"  Config '{config_name}' not found (already deleted).")
             else:
-                print(f"  Error deleting {resource}: {e}")
+                print(f"  Error deleting Config: {e}")
+
+    # Delete all models matching our prefix
+    try:
+        models = sm_client.list_models(NameContains="crashlens-chronos2", MaxResults=10)
+        for m in models.get("Models", []):
+            try:
+                sm_client.delete_model(ModelName=m["ModelName"])
+                print(f"  Deleted Model: {m['ModelName']}")
+            except ClientError as e:
+                print(f"  Error deleting Model {m['ModelName']}: {e}")
+        if not models.get("Models"):
+            print(f"  No models found matching 'crashlens-chronos2'.")
+    except ClientError as e:
+        print(f"  Error listing models: {e}")
 
     print("Cleanup complete.")
 
