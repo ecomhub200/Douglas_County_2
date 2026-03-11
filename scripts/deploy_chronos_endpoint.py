@@ -38,9 +38,17 @@ ENDPOINT_NAME = "crashlens-chronos2-endpoint"
 MODEL_NAME = "crashlens-chronos2-model"
 ENDPOINT_CONFIG_NAME = "crashlens-chronos2-config"
 
-# Use CPU instance for cost efficiency (serverless-like usage pattern)
-# ml.m5.xlarge: 4 vCPU, 16 GB RAM — sufficient for Chronos-2 (120M params)
-INSTANCE_TYPE = "ml.m5.xlarge"
+# Instance types to try, in order of preference.
+# New AWS accounts often have 0 quota for many instance types.
+# We try multiple types to find one that works.
+INSTANCE_TYPES = [
+    "ml.m5.xlarge",   # 4 vCPU, 16 GB — best for Chronos-2
+    "ml.m5.large",    # 2 vCPU, 8 GB — sufficient, cheaper
+    "ml.c5.xlarge",   # 4 vCPU, 8 GB — compute-optimized
+    "ml.c5.large",    # 2 vCPU, 4 GB — minimal compute
+    "ml.m4.xlarge",   # 4 vCPU, 16 GB — older generation
+]
+INSTANCE_TYPE = os.environ.get("SAGEMAKER_INSTANCE_TYPE", INSTANCE_TYPES[0])
 INITIAL_INSTANCE_COUNT = 1
 
 # Chronos-2 model from HuggingFace via SageMaker JumpStart
@@ -101,46 +109,97 @@ def deploy_endpoint(session):
         else:
             raise
 
-    # Try JumpStart deployment first
+    # Try JumpStart deployment
     try:
         from sagemaker.jumpstart.model import JumpStartModel
         from sagemaker import Session as SageMakerSession
-
-        sm_session = SageMakerSession(boto_session=session)
-
-        # Get or create IAM execution role for SageMaker
-        # (IAM users can't be used as execution roles — must be an IAM role)
-        iam_client = session.client("iam")
-        role_arn = get_or_create_sagemaker_role(iam_client)
-        print(f"  Using execution role: {role_arn}")
-
-        print(f"[1/3] Loading JumpStart model: {MODEL_ID}...")
-
-        model = JumpStartModel(
-            model_id=MODEL_ID,
-            role=role_arn,
-            instance_type=INSTANCE_TYPE,
-            sagemaker_session=sm_session,
-        )
-
-        print(f"[2/3] Deploying to endpoint: {ENDPOINT_NAME}...")
-        predictor = model.deploy(
-            endpoint_name=ENDPOINT_NAME,
-            initial_instance_count=INITIAL_INSTANCE_COUNT,
-            wait=False,  # Don't block — we'll poll ourselves
-        )
-
-        print(f"[3/3] Deployment initiated. Waiting for InService status...")
-        return wait_for_endpoint(sm_client)
-
     except ImportError as e:
-        print(f"WARNING: sagemaker JumpStart SDK not available: {e}")
-        print("Ensure sagemaker v2 is installed: pip install \"sagemaker>=2.200,<3\"")
-        return deploy_with_boto3(session)
-    except Exception as e:
-        print(f"JumpStart deployment failed: {e}")
-        print("Trying boto3-only deployment as fallback...")
-        return deploy_with_boto3(session)
+        print(f"ERROR: sagemaker JumpStart SDK not available: {e}")
+        print("Install sagemaker v2: pip install \"sagemaker>=2.200,<3\"")
+        return False
+
+    sm_session = SageMakerSession(boto_session=session)
+
+    # Get or create IAM execution role for SageMaker
+    # (IAM users can't be used as execution roles — must be an IAM role)
+    iam_client = session.client("iam")
+    role_arn = get_or_create_sagemaker_role(iam_client)
+    print(f"  Using execution role: {role_arn}")
+
+    # Build list of instance types to try
+    # If SAGEMAKER_INSTANCE_TYPE env var is set, try only that one
+    if os.environ.get("SAGEMAKER_INSTANCE_TYPE"):
+        instance_types_to_try = [os.environ["SAGEMAKER_INSTANCE_TYPE"]]
+    else:
+        instance_types_to_try = INSTANCE_TYPES
+
+    for idx, instance_type in enumerate(instance_types_to_try):
+        print(f"\n[1/3] Loading JumpStart model: {MODEL_ID} (instance: {instance_type})...")
+
+        try:
+            model = JumpStartModel(
+                model_id=MODEL_ID,
+                role=role_arn,
+                instance_type=instance_type,
+                sagemaker_session=sm_session,
+            )
+
+            print(f"[2/3] Deploying to endpoint: {ENDPOINT_NAME}...")
+            predictor = model.deploy(
+                endpoint_name=ENDPOINT_NAME,
+                initial_instance_count=INITIAL_INSTANCE_COUNT,
+                wait=False,  # Don't block — we'll poll ourselves
+            )
+
+            print(f"[3/3] Deployment initiated with {instance_type}. Waiting for InService...")
+            return wait_for_endpoint(sm_client)
+
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+            if "ResourceLimitExceeded" in str(e) or error_code == "ResourceLimitExceeded":
+                print(f"  QUOTA LIMIT: {instance_type} has 0 quota in this account/region.")
+                if idx < len(instance_types_to_try) - 1:
+                    print(f"  Trying next instance type...")
+                    # Clean up any partially created resources before retrying
+                    _cleanup_partial_deploy(sm_client)
+                    continue
+                else:
+                    print(f"\n  ERROR: All instance types exhausted. No quota available.")
+                    print(f"  You must request a quota increase in AWS Service Quotas:")
+                    print(f"    1. Go to https://console.aws.amazon.com/servicequotas/")
+                    print(f"    2. Search for 'Amazon SageMaker'")
+                    print(f"    3. Request increase for 'ml.m5.xlarge for endpoint usage'")
+                    print(f"    4. Request at least 1 instance")
+                    return False
+            else:
+                print(f"  Deployment failed: {e}")
+                return False
+        except Exception as e:
+            print(f"  Deployment failed: {e}")
+            return False
+
+    return False
+
+
+def _cleanup_partial_deploy(sm_client):
+    """Clean up partially created model/config resources before retrying with a different instance."""
+    for resource, func, name in [
+        ("Endpoint", sm_client.delete_endpoint, ENDPOINT_NAME),
+        ("Config", sm_client.delete_endpoint_config, ENDPOINT_CONFIG_NAME),
+    ]:
+        try:
+            if resource == "Endpoint":
+                func(EndpointName=name)
+            else:
+                func(EndpointConfigName=name)
+        except ClientError:
+            pass  # Resource doesn't exist, that's fine
+    # Also try to delete any model created by JumpStart (uses auto-generated names)
+    try:
+        sm_client.delete_model(ModelName=MODEL_NAME)
+    except ClientError:
+        pass
+    time.sleep(2)
 
 
 def deploy_with_boto3(session):
