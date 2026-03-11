@@ -14,6 +14,9 @@ import { COL, CRASH_PATTERN_REGEX } from './constants.js';
 import { isYes } from './epdo.js';
 
 const R2_BASE_URL = 'https://data.aicreatesai.com';
+const API_BASE_URL = 'https://crashlens.aicreatesai.com/api';
+const VALIDATION_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const VALIDATION_OFFLINE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days for offline grace
 
 // Cached data store
 let _crashData = null;
@@ -35,12 +38,13 @@ export function init(projectRoot) {
 }
 
 /**
- * Initialize standalone mode — downloads data from R2 if needed.
+ * Initialize standalone mode — validates API key and downloads data from R2 if needed.
  * @param {string} state - State name (e.g., "colorado", "virginia")
  * @param {string} jurisdiction - Jurisdiction name (e.g., "douglas", "henrico")
  * @param {string} roadType - Road type filter (e.g., "all_roads", "county_roads", "no_interstate")
+ * @param {string} apiKey - CrashLens API key for authentication
  */
-export async function initStandalone(state, jurisdiction, roadType = 'all_roads') {
+export async function initStandalone(state, jurisdiction, roadType = 'all_roads', apiKey = '') {
   _standaloneMode = true;
   _standaloneInfo = { state, jurisdiction, roadType };
 
@@ -49,6 +53,11 @@ export async function initStandalone(state, jurisdiction, roadType = 'all_roads'
   mkdirSync(dataDir, { recursive: true });
 
   _projectRoot = cacheDir;
+
+  // Validate API key (with caching to avoid hitting server every startup)
+  if (apiKey) {
+    await validateApiKey(apiKey, cacheDir);
+  }
 
   // Download crash data CSV if not cached
   const csvFile = `${roadType}.csv`;
@@ -91,6 +100,135 @@ export async function initStandalone(state, jurisdiction, roadType = 'all_roads'
   }
 
   console.error(`[CrashLens MCP] Standalone mode: ${state}/${jurisdiction} (${roadType})`);
+}
+
+/**
+ * Validate API key against the CrashLens server.
+ * Caches validation result for 24 hours to avoid hitting server on every startup.
+ * Allows offline use for up to 7 days with cached validation.
+ */
+async function validateApiKey(apiKey, cacheDir) {
+  const validatedPath = join(cacheDir, '.validated');
+
+  // Check cached validation
+  if (existsSync(validatedPath)) {
+    try {
+      const cached = JSON.parse(readFileSync(validatedPath, 'utf-8'));
+      const age = Date.now() - cached.timestamp;
+
+      if (cached.apiKeyHash === hashKey(apiKey)) {
+        if (age < VALIDATION_CACHE_TTL) {
+          console.error('[CrashLens MCP] API key validated (cached)');
+          return;
+        }
+        // Cache expired but within offline grace period — try to re-validate but don't fail
+        if (age < VALIDATION_OFFLINE_TTL) {
+          try {
+            await callValidateEndpoint(apiKey);
+            writeCachedValidation(validatedPath, apiKey);
+            return;
+          } catch (err) {
+            console.error(`[CrashLens MCP] WARNING: Could not re-validate API key (${err.message}). Using cached validation.`);
+            return;
+          }
+        }
+      }
+    } catch {
+      // Invalid cache file, re-validate
+    }
+  }
+
+  // No valid cache — must validate online
+  try {
+    const result = await callValidateEndpoint(apiKey);
+    if (!result.authorized) {
+      const reason = result.reason || 'Unknown reason';
+      if (reason.includes('Subscription')) {
+        throw new Error(`Subscription inactive or expired. Renew at https://crashlens.aicreatesai.com/pricing`);
+      }
+      throw new Error(`Invalid API key. Check your key at https://crashlens.aicreatesai.com → My Account → API Keys`);
+    }
+    writeCachedValidation(validatedPath, apiKey);
+    console.error(`[CrashLens MCP] API key validated (plan: ${result.plan})`);
+  } catch (err) {
+    // If server unreachable and we have cached data, allow offline use
+    if (err.message.includes('ECONNREFUSED') || err.message.includes('ENOTFOUND') || err.message.includes('timed out')) {
+      if (existsSync(join(cacheDir, 'data'))) {
+        console.error(`[CrashLens MCP] WARNING: Could not validate API key (server unreachable). Using cached data.`);
+        return;
+      }
+    }
+    throw err;
+  }
+}
+
+/**
+ * Call the validate-key endpoint on the CrashLens server.
+ */
+function callValidateEndpoint(apiKey) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({ apiKey });
+    const urlObj = new URL(`${API_BASE_URL}/mcp/validate-key`);
+
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 443,
+      path: urlObj.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          resolve(parsed);
+        } catch {
+          reject(new Error(`Invalid response from validation server: ${data.substring(0, 100)}`));
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      reject(err);
+    });
+
+    req.setTimeout(15000, () => {
+      req.destroy();
+      reject(new Error('API key validation timed out'));
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+/**
+ * Simple hash of API key for cache comparison (don't store raw key on disk).
+ */
+function hashKey(apiKey) {
+  let hash = 0;
+  for (let i = 0; i < apiKey.length; i++) {
+    const char = apiKey.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString(16);
+}
+
+/**
+ * Write cached validation result.
+ */
+function writeCachedValidation(path, apiKey) {
+  writeFileSync(path, JSON.stringify({
+    timestamp: Date.now(),
+    apiKeyHash: hashKey(apiKey)
+  }));
 }
 
 /**
