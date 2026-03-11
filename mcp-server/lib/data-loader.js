@@ -336,6 +336,31 @@ export function analyzeCrashPatterns(crashes) {
 }
 
 /**
+ * Get jurisdiction context for the currently loaded dataset.
+ * Included in all tool responses so AI knows which dataset it's working with.
+ */
+export function getDataContext() {
+  const rows = loadCrashData();
+  const agg = buildAggregates();
+
+  const jurisdictions = new Set();
+  for (const row of rows) {
+    const j = row[COL.JURISDICTION];
+    if (j) jurisdictions.add(j);
+  }
+
+  const years = Object.keys(agg.byYear).sort();
+  const jurisdictionList = Array.from(jurisdictions).sort();
+
+  return {
+    jurisdiction: jurisdictionList.length === 1 ? jurisdictionList[0] : jurisdictionList.join(', '),
+    totalRecords: rows.length,
+    dateRange: years.length > 0 ? `${years[0]}-${years[years.length - 1]}` : 'unknown',
+    dataYears: years.length
+  };
+}
+
+/**
  * Get a summary of the loaded data.
  */
 export function getDataSummary() {
