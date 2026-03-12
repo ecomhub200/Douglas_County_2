@@ -68,6 +68,13 @@ STATE_SIGNATURES = {
                      'alcohol_involved', 'drug_involved', 'motorcycle_involved'],
         'display_name': 'Delaware (DelDOT)',
         'config_dir': 'delaware'
+    },
+    'delaware_csv': {
+        'required': ['CRASH DATETIME', 'CRASH CLASSIFICATION DESCRIPTION', 'LATITUDE', 'LONGITUDE'],
+        'optional': ['MANNER OF IMPACT DESCRIPTION', 'WEATHER 1 DESCRIPTION', 'COUNTY NAME',
+                     'ALCOHOL INVOLVED', 'DRUG INVOLVED', 'MOTORCYCLE INVOLVED'],
+        'display_name': 'Delaware (DelDOT CSV)',
+        'config_dir': 'delaware'
     }
 }
 
@@ -1239,6 +1246,10 @@ class DelawareNormalizer(BaseNormalizer):
     Data source: Socrata SODA API (data.delaware.gov, dataset 827n-m6xc)
     Crash-level dataset — no person-level injury detail available.
 
+    Handles TWO field name formats:
+    - Socrata JSON API: lowercase_with_underscores (crash_datetime)
+    - CSV/Excel export: UPPERCASE WITH SPACES (CRASH DATETIME)
+
     Key limitations:
     - Severity: 3 levels only (Fatal/Injury/PDO) → mapped to K/A/O per FHWA guidance
     - No route/road name field → RTE Name empty (deferred to geocoding pipeline)
@@ -1246,29 +1257,47 @@ class DelawareNormalizer(BaseNormalizer):
     - No node/intersection ID → empty (deferred)
     """
 
-    # Crash classification → KABCO severity
+    # Map from lowercase Socrata API names to UPPERCASE CSV/Excel names
+    # Used to normalize field access across both formats
+    _FIELD_ALIASES = {
+        'crash_datetime': 'CRASH DATETIME',
+        'crash_classification_description': 'CRASH CLASSIFICATION DESCRIPTION',
+        'crash_classification_code': 'CRASH CLASSIFICATION CODE',
+        'manner_of_impact_description': 'MANNER OF IMPACT DESCRIPTION',
+        'weather_1_description': 'WEATHER 1 DESCRIPTION',
+        'lighting_condition_description': 'LIGHTING CONDITION DESCRIPTION',
+        'road_surface_description': 'ROAD SURFACE DESCRIPTION',
+        'latitude': 'LATITUDE',
+        'longitude': 'LONGITUDE',
+        'county_name': 'COUNTY NAME',
+        'pedestrian_involved': 'PEDESTRIAN INVOLVED',
+        'bicycled_involved': 'BICYCLED INVOLVED',
+        'alcohol_involved': 'ALCOHOL INVOLVED',
+        'drug_involved': 'DRUG INVOLVED',
+        'motorcycle_involved': 'MOTORCYCLE INVOLVED',
+        'seatbelt_used': 'SEATBELT USED',
+        'work_zone': 'WORK ZONE',
+        'primary_contributing_circumstance_code': 'PRIMARY CONTRIBUTING CIRCUMSTANCE CODE',
+        'day_of_week_description': 'DAY OF WEEK DESCRIPTION',
+        'year': 'YEAR',
+        'school_bus_involved_code': 'SCHOOL BUS INVOLVED CODE',
+    }
+
+    # Crash classification → KABCO severity (case-insensitive via .strip().lower())
     # Per FHWA standard: when only crash-level severity is available,
     # "Personal Injury" → A (conservative; encompasses A/B/C)
     SEVERITY_MAP = {
-        'Fatal Crash': 'K',
-        'FATAL CRASH': 'K',
         'fatal crash': 'K',
-        'Personal Injury Crash': 'A',
-        'PERSONAL INJURY CRASH': 'A',
+        'fatality crash': 'K',       # actual value in Delaware data
         'personal injury crash': 'A',
-        'Property Damage Crash': 'O',
-        'PROPERTY DAMAGE CRASH': 'O',
         'property damage crash': 'O',
-        'Property Damage Only': 'O',
+        'property damage only': 'O',  # alternate wording
+        'non-reportable': 'O',        # below-threshold crashes
     }
 
     # Lighting values that indicate darkness (for Night? flag)
-    DARKNESS_VALUES = {
-        'Dark - Lighted', 'Dark - Not Lighted', 'Dark - Unknown Lighting',
-        'dark - lighted', 'dark - not lighted', 'dark - unknown lighting',
-        'DARK - LIGHTED', 'DARK - NOT LIGHTED', 'DARK - UNKNOWN LIGHTING',
-        'Dark-Lighted', 'Dark-Not Lighted', 'Dark-Unknown',
-    }
+    # Compared case-insensitively
+    DARKNESS_KEYWORDS = {'dark'}  # any lighting value containing 'dark'
 
     # Delaware contributing circumstance codes that indicate speed-related
     SPEED_CODES = {
@@ -1281,15 +1310,97 @@ class DelawareNormalizer(BaseNormalizer):
     }
 
     def _get(self, row: Dict[str, str], primary: str, alt: str = '') -> str:
-        """Get field value trying primary name first, then alternate."""
+        """Get field value trying lowercase API name, then UPPERCASE CSV name, then alt."""
         val = (row.get(primary) or '').strip()
+        if not val:
+            # Try UPPERCASE alias
+            upper_alias = self._FIELD_ALIASES.get(primary, '')
+            if upper_alias:
+                raw = row.get(upper_alias)
+                val = str(raw).strip() if raw is not None else ''
         if not val and alt:
-            val = (row.get(alt) or '').strip()
+            raw = row.get(alt)
+            val = str(raw).strip() if raw is not None else ''
+            if not val:
+                upper_alias = self._FIELD_ALIASES.get(alt, '')
+                if upper_alias:
+                    raw = row.get(upper_alias)
+                    val = str(raw).strip() if raw is not None else ''
+        # Treat 'NA', 'None', 'nan' as empty
+        if val in ('NA', 'None', 'nan', 'N/A', 'null'):
+            return ''
         return val
 
     def _is_truthy(self, value: str) -> bool:
-        """Check if a Delaware boolean field value is truthy."""
+        """Check if a Delaware boolean field value is truthy (Y/N or Yes/No)."""
         return value.upper() in ('YES', 'TRUE', 'Y', '1') if value else False
+
+    def _parse_datetime(self, raw_datetime: str) -> tuple:
+        """Parse Delaware datetime into (date_part, time_part, year_part).
+
+        Handles multiple formats:
+        - ISO: 2023-01-15T14:30:00.000 (Socrata JSON API)
+        - Named month: 2012 Apr 29 05:32:00 PM (Excel/CSV export)
+        - Fallback: space-separated or slash-separated dates
+        """
+        from datetime import datetime as dt
+
+        date_part = ''
+        time_part = ''
+        year_part = ''
+
+        if not raw_datetime:
+            return date_part, time_part, year_part
+
+        # Format 1: ISO (from Socrata JSON API)
+        if 'T' in raw_datetime:
+            parts = raw_datetime.split('T')
+            date_part = parts[0]
+            time_str = parts[1].split('.')[0] if len(parts) > 1 else ''
+            time_part = time_str.replace(':', '')[:4]
+            year_part = date_part[:4] if len(date_part) >= 4 else ''
+            return date_part, time_part, year_part
+
+        # Format 2: Named month with AM/PM (from Excel/CSV export)
+        # "2012 Apr 29 05:32:00 PM"
+        try:
+            parsed = dt.strptime(raw_datetime, '%Y %b %d %I:%M:%S %p')
+            date_part = parsed.strftime('%Y-%m-%d')
+            time_part = parsed.strftime('%H%M')
+            year_part = str(parsed.year)
+            return date_part, time_part, year_part
+        except (ValueError, TypeError):
+            pass
+
+        # Format 3: Other named month variants
+        for fmt in ('%Y %B %d %I:%M:%S %p', '%m/%d/%Y %H:%M:%S', '%m/%d/%Y %I:%M:%S %p'):
+            try:
+                parsed = dt.strptime(raw_datetime, fmt)
+                date_part = parsed.strftime('%Y-%m-%d')
+                time_part = parsed.strftime('%H%M')
+                year_part = str(parsed.year)
+                return date_part, time_part, year_part
+            except (ValueError, TypeError):
+                continue
+
+        # Fallback: try to extract what we can
+        tokens = raw_datetime.split()
+        if tokens:
+            first = tokens[0]
+            if '-' in first:
+                date_part = first
+                year_part = first[:4] if len(first) >= 4 else ''
+            elif '/' in first:
+                date_part = first
+                dparts = first.split('/')
+                if len(dparts) == 3:
+                    year_part = dparts[2][:4]
+            elif first.isdigit() and len(first) == 4:
+                year_part = first
+                date_part = raw_datetime.split(' ')[0:3]
+                date_part = ' '.join(date_part) if len(date_part) >= 3 else first
+
+        return date_part, time_part, year_part
 
     def _build_composite_id(self, row: Dict[str, str], date_str: str, time_str: str) -> str:
         """Generate composite crash ID from datetime + coordinates."""
@@ -1297,7 +1408,7 @@ class DelawareNormalizer(BaseNormalizer):
         lon = self._get(row, 'longitude')
         lat_part = lat.replace('.', '').replace('-', '')[:6] if lat else '000000'
         lon_part = lon.replace('.', '').replace('-', '')[:6] if lon else '000000'
-        date_compact = date_str.replace('-', '').replace('/', '')[:8] if date_str else '00000000'
+        date_compact = date_str.replace('-', '').replace('/', '').replace(' ', '')[:8] if date_str else '00000000'
         time_compact = time_str[:4] if time_str else '0000'
         return f"DE-{date_compact}-{time_compact}-{lat_part}-{lon_part}"
 
@@ -1306,28 +1417,7 @@ class DelawareNormalizer(BaseNormalizer):
 
         # --- Date/Time ---
         raw_datetime = self._get(row, 'crash_datetime')
-        date_part = ''
-        time_part = ''
-        year_part = ''
-
-        if 'T' in raw_datetime:
-            # ISO format: 2023-01-15T14:30:00.000
-            parts = raw_datetime.split('T')
-            date_part = parts[0]
-            time_str = parts[1].split('.')[0] if len(parts) > 1 else ''
-            time_part = time_str.replace(':', '')[:4]
-            year_part = date_part[:4] if len(date_part) >= 4 else ''
-        elif raw_datetime:
-            date_part = raw_datetime.split(' ')[0]
-            if len(raw_datetime.split(' ')) > 1:
-                time_str = raw_datetime.split(' ')[1]
-                time_part = time_str.replace(':', '')[:4]
-            if '-' in date_part:
-                year_part = date_part[:4]
-            elif '/' in date_part:
-                dparts = date_part.split('/')
-                if len(dparts) == 3:
-                    year_part = dparts[2][:4]
+        date_part, time_part, year_part = self._parse_datetime(raw_datetime)
 
         n['Crash Date'] = date_part
         n['Crash Year'] = year_part or self._get(row, 'year', '')
@@ -1336,9 +1426,9 @@ class DelawareNormalizer(BaseNormalizer):
         # --- ID (composite key) ---
         n['Document Nbr'] = self._build_composite_id(row, date_part, time_part)
 
-        # --- Severity ---
+        # --- Severity (case-insensitive lookup) ---
         raw_severity = self._get(row, 'crash_classification_description')
-        severity = self.SEVERITY_MAP.get(raw_severity, 'O')
+        severity = self.SEVERITY_MAP.get(raw_severity.lower(), 'O')
         n['Crash Severity'] = severity
         n['K_People'] = '1' if severity == 'K' else '0'
         n['A_People'] = '1' if severity == 'A' else '0'
@@ -1400,8 +1490,8 @@ class DelawareNormalizer(BaseNormalizer):
         # Work Zone
         n['Work Zone Related'] = 'Yes' if self._is_truthy(self._get(row, 'work_zone')) else 'No'
 
-        # Night (derived from lighting condition)
-        n['Night?'] = 'Yes' if raw_light in self.DARKNESS_VALUES else 'No'
+        # Night (derived from lighting condition — keyword-based for robustness)
+        n['Night?'] = 'Yes' if 'dark' in raw_light.lower() else 'No'
 
         # Speed & Distracted (derived from contributing circumstance code)
         contrib_code = self._get(row, 'primary_contributing_circumstance_code')
@@ -1461,6 +1551,7 @@ _NORMALIZERS = {
     'maryland': MarylandNormalizer,
     'maryland_statewide': MarylandNormalizer,
     'delaware': DelawareNormalizer,
+    'delaware_csv': DelawareNormalizer,
 }
 
 
