@@ -63,6 +63,13 @@ def retry_request(url, params=None, max_retries=MAX_RETRIES):
     for attempt in range(max_retries):
         try:
             resp = requests.get(url, params=params, timeout=120)
+            if resp.status_code == 400:
+                # Log the Socrata error body for debugging
+                try:
+                    err_body = resp.json()
+                    log.error(f"  Socrata 400 error: {json.dumps(err_body, indent=2)}")
+                except Exception:
+                    log.error(f"  Socrata 400 body: {resp.text[:500]}")
             resp.raise_for_status()
             return resp
         except requests.exceptions.RequestException as e:
@@ -93,22 +100,80 @@ def health_check():
         return False
 
 
-def build_where_clause(jurisdiction_key, years):
+def discover_fields(base_url):
+    """Fetch 1 record to discover actual API field names."""
+    log.info("  Discovering API field names...")
+    resp = retry_request(base_url, params={"$limit": 1})
+    data = resp.json()
+    if data and len(data) > 0:
+        fields = list(data[0].keys())
+        log.info(f"  Discovered {len(fields)} fields: {fields}")
+        return fields, data[0]
+    return [], {}
+
+
+def resolve_county_field(sample_record):
+    """Detect the correct county field name from a sample record.
+
+    Socrata field names vary by dataset — could be county_name, county_desc,
+    county, etc. This checks the sample record for likely county fields.
+    """
+    # Candidate field names in order of preference
+    candidates = [
+        "county_name", "county_desc", "county", "county_description",
+        "cnty_name", "cnty_desc", "jurisdiction",
+    ]
+    for candidate in candidates:
+        if candidate in sample_record:
+            log.info(f"  County field detected: '{candidate}' = '{sample_record[candidate]}'")
+            return candidate
+
+    # Fallback: search for any field containing 'county' in name
+    for field, value in sample_record.items():
+        if "county" in field.lower() and isinstance(value, str) and value:
+            log.info(f"  County field found by search: '{field}' = '{value}'")
+            return field
+
+    log.warning("  No county field detected in sample record!")
+    return None
+
+
+def resolve_datetime_field(sample_record):
+    """Detect the correct datetime field name from a sample record."""
+    candidates = [
+        "crash_datetime", "crash_date", "acc_date", "date", "datetime",
+        "crash_date_time", "incident_date",
+    ]
+    for candidate in candidates:
+        if candidate in sample_record:
+            log.info(f"  Datetime field detected: '{candidate}' = '{sample_record[candidate]}'")
+            return candidate
+
+    for field, value in sample_record.items():
+        if ("date" in field.lower() or "time" in field.lower()) and isinstance(value, str) and "T" in str(value):
+            log.info(f"  Datetime field found by search: '{field}' = '{value}'")
+            return field
+
+    log.warning("  No datetime field detected in sample record!")
+    return None
+
+
+def build_where_clause(jurisdiction_key, years, county_field, datetime_field):
     """Build SoQL $where clause for filtering."""
     clauses = []
 
-    # Jurisdiction filter (county_name field in Delaware dataset)
-    if jurisdiction_key and jurisdiction_key in JURISDICTIONS:
-        county_name = JURISDICTIONS[jurisdiction_key]["county_name"]
-        clauses.append(f"county_name='{county_name}'")
+    # Jurisdiction filter
+    if jurisdiction_key and jurisdiction_key in JURISDICTIONS and county_field:
+        county_value = JURISDICTIONS[jurisdiction_key]["county_name"]
+        clauses.append(f"{county_field}='{county_value}'")
 
-    # Year filter (crash_datetime is a floating_timestamp in Socrata)
-    if years:
+    # Year filter
+    if years and datetime_field:
         year_clauses = []
         for year in years:
             start = f"{year}-01-01T00:00:00.000"
             end = f"{year}-12-31T23:59:59.999"
-            year_clauses.append(f"(crash_datetime>='{start}' AND crash_datetime<='{end}')")
+            year_clauses.append(f"({datetime_field}>='{start}' AND {datetime_field}<='{end}')")
         if len(year_clauses) == 1:
             clauses.append(year_clauses[0])
         else:
@@ -119,7 +184,16 @@ def build_where_clause(jurisdiction_key, years):
 
 def download_data(jurisdiction_key, years):
     """Download crash data from Socrata API with pagination."""
-    where_clause = build_where_clause(jurisdiction_key, years)
+    # Step 1: Discover actual field names from a sample record
+    fields, sample = discover_fields(SOCRATA_BASE_URL)
+    if not fields:
+        log.error("Could not discover fields — API returned no records")
+        return []
+
+    county_field = resolve_county_field(sample)
+    datetime_field = resolve_datetime_field(sample)
+
+    where_clause = build_where_clause(jurisdiction_key, years, county_field, datetime_field)
 
     log.info(f"Downloading Delaware crash data...")
     if jurisdiction_key and jurisdiction_key in JURISDICTIONS:
@@ -131,6 +205,8 @@ def download_data(jurisdiction_key, years):
         log.info(f"  Years: {', '.join(str(y) for y in years)}")
     if where_clause:
         log.info(f"  SoQL filter: $where={where_clause}")
+    else:
+        log.info(f"  No SoQL filter (downloading all records)")
 
     all_records = []
     offset = 0
