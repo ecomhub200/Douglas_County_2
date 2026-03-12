@@ -276,14 +276,17 @@ def download_from_arcgis(config, jurisdiction_config):
     logger.info(f"Attempting download from ArcGIS REST API for {name}...")
 
     # Build WHERE clauses for this jurisdiction
+    # Order matters: Physical_Juris_Name is tried first because it captures ALL
+    # roads within a jurisdiction's boundaries (including Interstate, State Hwy).
+    # Juris_Code may only match locally-maintained roads, giving partial results.
     where_clauses = []
-
-    if juris_code:
-        where_clauses.append(f"Juris_Code = '{juris_code}' OR Juris_Code = {juris_code}")
 
     if name_patterns:
         for pattern in name_patterns:
             where_clauses.append(f"Physical_Juris_Name LIKE '%{pattern}%'")
+
+    if juris_code:
+        where_clauses.append(f"Juris_Code = '{juris_code}' OR Juris_Code = {juris_code}")
 
     if fips:
         where_clauses.append(f"COUNTYFP = '{fips}' OR FIPS = '{fips}'")
