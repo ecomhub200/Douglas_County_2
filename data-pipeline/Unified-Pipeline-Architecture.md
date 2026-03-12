@@ -876,9 +876,97 @@ Produces 3 filtered CSVs per jurisdiction using `scripts/split_road_type.py`:
 |------|----------|
 | `{jurisdiction}_county_roads.csv` | Local/county roads only |
 | `{jurisdiction}_no_interstate.csv` | Everything except interstates |
-| `{jurisdiction}_all_roads.csv` | Complete dataset |
+| `{jurisdiction}_all_roads.csv` | Complete dataset (no filtering) |
 
 Config-driven — reads from `states/{state}/config.json` → `roadSystems.splitConfig`.
+
+### How Road-Type Filtering Works
+
+The `all_roads.csv` file must contain **ALL roads** for a jurisdiction (Interstate, State Hwy, County, City, Federal). The download workflow must always use `--filter allRoads` to ensure this. The road-type splitting then happens in Stage 2, producing `county_roads.csv` and `no_interstate.csv` from the complete `all_roads.csv`.
+
+### splitConfig — Filtering Methods
+
+Each state defines its own `splitConfig` in `states/{state}/config.json` → `roadSystems.splitConfig`. The config specifies which column and method to use for each filter. **Each state may use different columns and methods** depending on their DOT data structure.
+
+#### Available Methods
+
+| Method | Description | Used By |
+|--------|-------------|---------|
+| `system_column` | Filters by a road classification column (e.g., SYSTEM). Include/exclude by exact value match. | Default fallback |
+| `ownership` | Filters by road ownership column (e.g., "2. County Hwy Agency"). Best when the data has an explicit ownership field. | Virginia (county_roads) |
+| `functional_class` | Filters by functional classification column (e.g., exclude "1-Interstate (A,1)"). Best when SYSTEM column doesn't distinguish Interstate vs non-Interstate reliably. | Virginia (interstate exclusion) |
+| `agency_id` | Filters by agency ID codes specific to each jurisdiction (e.g., "DSO" for Douglas County). Used when road ownership is encoded as agency codes. | Colorado |
+| `column_value` | Generic include/exclude by any column value. Alias for `system_column` behavior but can target any column. | Generic |
+
+#### Virginia Example (Ownership + Functional Class)
+
+```json
+"splitConfig": {
+  "countyRoads": {
+    "method": "ownership",
+    "column": "Ownership",
+    "includeValues": ["2. County Hwy Agency"]
+  },
+  "interstateExclusion": {
+    "method": "functional_class",
+    "column": "Functional Class",
+    "excludeValues": ["1-Interstate (A,1)"]
+  }
+}
+```
+
+- **county_roads**: Keeps only rows where Ownership = "2. County Hwy Agency"
+- **no_interstate**: Keeps all rows EXCEPT where Functional Class = "1-Interstate (A,1)" (blanks are kept)
+
+#### Colorado Example (Agency ID + System Code)
+
+```json
+"splitConfig": {
+  "countyRoads": {
+    "method": "agency_id",
+    "column": "_co_agency_id",
+    "agencyMap": {
+      "douglas": ["DSO"],
+      "arapahoe": ["ASO"]
+    }
+  },
+  "interstateExclusion": {
+    "method": "column_value",
+    "column": "_co_system_code",
+    "excludeValues": ["Interstate Highway"]
+  }
+}
+```
+
+#### How to Determine the Right Method for a New State
+
+1. **Get sample data** from the state DOT and open it in a spreadsheet
+2. **Identify the jurisdiction column** (e.g., Physical Juris Name, County) — filter to one jurisdiction and confirm you get ALL road types
+3. **For county_roads filter**: Find the column that distinguishes county-owned roads from state/federal roads:
+   - If there's an **Ownership** column → use `ownership` method
+   - If there's a **SYSTEM** column with values like "NonVDOT", "Local" → use `system_column` method
+   - If there's an **agency ID** column → use `agency_id` method
+4. **For interstate exclusion**: Find the column that identifies Interstate roads:
+   - If there's a **Functional Class** column with an Interstate value → use `functional_class` method
+   - If the **SYSTEM** column has "Interstate" → use `system_column` method
+5. **Validate** by comparing automated output file sizes against manually filtered reference files
+
+### Critical Pitfalls
+
+| Pitfall | What Goes Wrong | How to Avoid |
+|---------|----------------|--------------|
+| Download filter defaults to `countyOnly` | `all_roads.csv` only contains county roads (~50% of data missing) | Always pass `--filter allRoads` in download workflow |
+| SYSTEM column doesn't match Ownership semantics | County roads filter includes/excludes wrong roads | Use the column that the state DOT uses for road ownership classification |
+| ArcGIS API WHERE clause stops at first partial match | Jurisdiction filter misses Interstate/State Hwy roads because `Juris_Code` only covers local roads | Order WHERE clauses to try `Physical_Juris_Name` first (broadest match) |
+| `split_jurisdictions.py` and `split_road_type.py` use different filtering | Inconsistent results depending on pipeline path | Both scripts now read `splitConfig` from state config when available |
+
+### Scripts Involved
+
+| Script | Role | Config Source |
+|--------|------|---------------|
+| `scripts/split_road_type.py` | Splits individual jurisdiction's `all_roads.csv` → 3 variants | `states/{state}/config.json` → `roadSystems.splitConfig` |
+| `scripts/split_jurisdictions.py` | Splits statewide CSV → per-jurisdiction CSVs with 3 road-type variants | Same `splitConfig` (preferred) or falls back to `config.json` → `filterProfiles` |
+| `download_crash_data.py` | Downloads and optionally filters during download | `config.json` → `filterProfiles` (must use `allRoads` for `_all_roads.csv`) |
 
 ---
 
