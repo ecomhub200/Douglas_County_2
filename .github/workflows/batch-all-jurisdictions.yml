@@ -1,16 +1,20 @@
 # ==============================================================================
-# Batch All Jurisdictions — Statewide Download + Pipeline Trigger
+# Batch All Jurisdictions — Statewide Download + R2 Upload + Pipeline Trigger
 # ==============================================================================
-# Downloads statewide crash data for any US state, then delegates all processing
-# (split, road-type split, aggregate, upload, forecasts, manifest) to pipeline.yml.
+# Downloads statewide crash data for any US state, uploads to R2 (Cloudflare),
+# then delegates all processing to batch-pipeline.yml.
 #
 # This is the statewide counterpart to state-specific download workflows
 # (e.g., download-virginia.yml) which handle single jurisdiction/region/mpo scopes.
 #
-# Flow: Download → Merge → Convert → Commit → Trigger pipeline.yml (scope=statewide)
+# Flow: Download → Merge → Convert → Upload to R2 → Trigger batch-pipeline.yml
+#
+# WHY R2 instead of git commit?
+#   Statewide CSVs (700MB+) exceed GitHub's 100MB file size limit.
+#   R2 has no file size limit and avoids bloating the git repo.
 #
 # For single-jurisdiction updates, use the state-specific download workflow instead.
-# For reprocessing without re-downloading, trigger pipeline.yml directly.
+# For reprocessing without re-downloading, trigger batch-pipeline.yml directly.
 # ==============================================================================
 
 name: "Batch All Jurisdictions"
@@ -120,6 +124,7 @@ jobs:
       csv_path: ${{ steps.finalize.outputs.csv_path }}
       total_records: ${{ steps.finalize.outputs.total_records }}
       data_dir: ${{ steps.download.outputs.data_dir }}
+      r2_data_key: ${{ steps.r2_upload.outputs.r2_data_key }}
 
     steps:
       - uses: actions/checkout@v4
@@ -331,43 +336,69 @@ jobs:
           echo "csv_path=$CSV_PATH" >> $GITHUB_OUTPUT
           echo "total_records=$((TOTAL - 1))" >> $GITHUB_OUTPUT
 
-      # ── Commit downloaded data ──
-      - name: "Commit downloaded data"
+      # ── Upload statewide CSV to R2 (replaces git commit) ──
+      # Statewide CSVs (700MB+) exceed GitHub's 100MB limit.
+      # Upload to R2 instead; batch-pipeline.yml will download from R2.
+      - name: "Upload statewide CSV to R2"
+        id: r2_upload
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
         run: |
           STATE="${{ github.event.inputs.state }}"
           CSV_PATH="${{ steps.finalize.outputs.csv_path }}"
+          TOTAL="${{ steps.finalize.outputs.total_records }}"
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+          R2_KEY="${STATE}/statewide/${STATE}_statewide_all_roads.csv"
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "=========================================="
+          echo "Uploading statewide CSV to R2"
+          echo "  Local: $CSV_PATH"
+          echo "  R2:    s3://$R2_BUCKET/$R2_KEY"
+          echo "  Records: $TOTAL"
+          echo "=========================================="
 
-          # Force-add CSVs that may be in .gitignore
-          if [ -n "$CSV_PATH" ] && [ -f "$CSV_PATH" ]; then
-            git add --force "$CSV_PATH"
+          if [ -z "$CSV_PATH" ] || [ ! -f "$CSV_PATH" ]; then
+            echo "::error::No CSV to upload"
+            exit 1
           fi
 
-          if git diff --cached --quiet; then
-            echo "No new data to commit"
-          else
-            TOTAL="${{ steps.finalize.outputs.total_records }}"
-            git commit -m "data: ${STATE} statewide download (${TOTAL} records, $(date -u '+%Y-%m-%d'))"
+          # Upload with retry
+          for i in 1 2 3 4; do
+            if aws s3 cp "$CSV_PATH" "s3://$R2_BUCKET/$R2_KEY" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type "text/csv" \
+              --only-show-errors; then
+              echo "Upload succeeded"
+              break
+            fi
+            echo "Upload failed (attempt $i/4), retrying in $((2 ** i))s..."
+            sleep $((2 ** i))
+          done
 
-            for i in 1 2 3 4; do
-              if git push origin main; then
-                echo "Push succeeded"
-                break
-              fi
-              echo "Push failed (attempt $i/4), retrying in $((2 ** i))s..."
-              sleep $((2 ** i))
-              git fetch origin main
-              git rebase origin/main || git pull --no-edit origin main
-            done
+          # Verify upload
+          SIZE=$(aws s3api head-object \
+            --bucket "$R2_BUCKET" \
+            --key "$R2_KEY" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --query 'ContentLength' --output text 2>/dev/null || echo "0")
+
+          if [ "$SIZE" = "0" ]; then
+            echo "::error::R2 upload verification failed"
+            exit 1
           fi
+
+          SIZE_MB=$((SIZE / 1048576))
+          echo "Verified: $R2_KEY (${SIZE_MB}MB on R2)"
+          echo "r2_data_key=$R2_KEY" >> $GITHUB_OUTPUT
 
   # ============================================================
-  # JOB 2: Trigger unified pipeline (scope=statewide)
+  # JOB 2: Trigger batch pipeline (scope=statewide, data from R2)
   # ============================================================
   trigger-pipeline:
-    name: "Trigger pipeline"
+    name: "Trigger batch pipeline"
     needs: download
     if: github.event.inputs.skip_pipeline != 'true'
     runs-on: ubuntu-latest
@@ -378,27 +409,27 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const state = '${{ needs.download.outputs.state }}';
-            const csvPath = '${{ needs.download.outputs.csv_path }}';
+            const r2DataKey = '${{ needs.download.outputs.r2_data_key }}';
             const skipForecasts = '${{ github.event.inputs.skip_forecasts }}';
             const dryRun = '${{ github.event.inputs.dry_run }}';
 
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: 'pipeline.yml',
+              workflow_id: 'batch-pipeline.yml',
               ref: 'main',
               inputs: {
                 state: state,
                 scope: 'statewide',
                 selection: '',
-                data_source: csvPath,
+                r2_data_key: r2DataKey,
                 skip_forecasts: skipForecasts || 'false',
                 dry_run: dryRun || 'false'
               }
             });
 
-            console.log(`Pipeline triggered for ${state} (statewide)`);
-            console.log(`  CSV: ${csvPath}`);
+            console.log(`Batch pipeline triggered for ${state} (statewide)`);
+            console.log(`  R2 key: ${r2DataKey}`);
             console.log(`  Skip forecasts: ${skipForecasts}`);
             console.log(`  Dry run: ${dryRun}`);
 
@@ -406,14 +437,16 @@ jobs:
         run: |
           STATE="${{ needs.download.outputs.state }}"
           TOTAL="${{ needs.download.outputs.total_records }}"
+          R2_KEY="${{ needs.download.outputs.r2_data_key }}"
           echo "## Batch All Jurisdictions Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| State | $STATE |" >> $GITHUB_STEP_SUMMARY
           echo "| Total Records | ${TOTAL:-N/A} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Pipeline Triggered | ✅ scope=statewide |" >> $GITHUB_STEP_SUMMARY
+          echo "| R2 Upload | $R2_KEY |" >> $GITHUB_STEP_SUMMARY
+          echo "| Batch Pipeline | Triggered (scope=statewide) |" >> $GITHUB_STEP_SUMMARY
           echo "| Skip Forecasts | ${{ github.event.inputs.skip_forecasts }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Pipeline will handle: Split → Road Type Split → Aggregate → Upload → Forecasts → Manifest" >> $GITHUB_STEP_SUMMARY
+          echo "Batch pipeline: R2 Download → Split → Road Type Split → Aggregate → Upload → Forecasts → Manifest" >> $GITHUB_STEP_SUMMARY
