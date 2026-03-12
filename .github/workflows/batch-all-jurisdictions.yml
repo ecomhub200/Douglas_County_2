@@ -157,7 +157,9 @@ jobs:
           STATEWIDE=""
 
           if [ "$STATE" = "virginia" ]; then
-            ARGS="--output-dir data --save-statewide --filter allRoads"
+            # --jurisdiction is required by the script as a seed; --save-statewide
+            # captures the full statewide dataset before jurisdiction filtering
+            ARGS="--output-dir data --jurisdiction henrico --save-statewide --filter allRoads"
             if [ "$FORCE" = "true" ]; then
               ARGS="$ARGS --force-download"
             fi
