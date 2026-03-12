@@ -743,7 +743,7 @@ def main():
     jurisdiction_config = get_jurisdiction_config(config, jurisdiction_id)
 
     # Get filter profile
-    filter_id = args.filter or config.get('defaults', {}).get('filterProfile', 'countyOnly')
+    filter_id = args.filter or config.get('defaults', {}).get('filterProfile', 'allRoads')
     filter_profiles = config.get('filterProfiles', {})
     filter_profile = filter_profiles.get(filter_id, filter_profiles.get('countyOnly', {}))
 

@@ -109,6 +109,16 @@ def filter_county_roads(rows, headers, split_config):
         else:
             return rows
 
+    elif method == 'ownership':
+        col = county_config.get('column', 'Ownership')
+        include_values = county_config.get('includeValues', ['2. County Hwy Agency'])
+        if col not in col_idx:
+            logger.warning(f"  Column '{col}' not found for ownership-based county roads filter")
+            return rows
+        idx = col_idx[col]
+        include_upper = {v.upper() for v in include_values}
+        return [r for r in rows if r[idx].strip().upper() in include_upper]
+
     return rows
 
 
@@ -137,6 +147,17 @@ def filter_no_interstate(rows, headers, split_config):
             return rows
         idx = col_idx[col]
         exclude_upper = {v.upper() for v in exclude_values}
+        return [r for r in rows if r[idx].strip().upper() not in exclude_upper]
+
+    elif method == 'functional_class':
+        col = interstate_config.get('column', 'Functional Class')
+        exclude_values = interstate_config.get('excludeValues', ['1-Interstate (A,1)'])
+        if col not in col_idx:
+            logger.warning(f"  Column '{col}' not found for functional class interstate exclusion")
+            return rows
+        idx = col_idx[col]
+        exclude_upper = {v.upper() for v in exclude_values}
+        # Include rows where value is NOT in exclude list (including blank/empty values)
         return [r for r in rows if r[idx].strip().upper() not in exclude_upper]
 
     return rows

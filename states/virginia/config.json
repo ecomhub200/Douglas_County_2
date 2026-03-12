@@ -133,14 +133,14 @@
     "splitConfig": {
       "_description": "Config-driven split logic for stage_split in process_crash_data.py",
       "countyRoads": {
-        "method": "system_column",
-        "column": "SYSTEM",
-        "includeValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT"]
+        "method": "ownership",
+        "column": "Ownership",
+        "includeValues": ["2. County Hwy Agency"]
       },
       "interstateExclusion": {
-        "method": "system_column",
-        "column": "SYSTEM",
-        "excludeValues": ["Interstate"]
+        "method": "functional_class",
+        "column": "Functional Class",
+        "excludeValues": ["1-Interstate (A,1)"]
       }
     },
 

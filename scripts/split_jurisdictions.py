@@ -234,12 +234,60 @@ def standardize_columns_virginia(df):
         return df
 
 
+def _apply_split_config_filter(df, suffix, split_config):
+    """Apply splitConfig-based filtering (ownership, functional_class, etc.) to a DataFrame."""
+    if suffix == 'county_roads':
+        county_config = split_config.get('countyRoads', {})
+        method = county_config.get('method', 'system_column')
+        col = county_config.get('column', 'SYSTEM')
+        if col not in df.columns:
+            logger.warning(f"  Column '{col}' not found for county roads filter (method={method})")
+            return df.copy()
+        if method == 'ownership':
+            include_values = county_config.get('includeValues', [])
+            include_upper = {v.upper() for v in include_values}
+            mask = df[col].astype(str).str.strip().str.upper().isin(include_upper)
+            return df[mask].copy()
+        elif method in ('system_column', 'column_value'):
+            include_values = county_config.get('includeValues', [])
+            include_upper = {v.upper() for v in include_values}
+            mask = df[col].astype(str).str.strip().str.upper().isin(include_upper)
+            return df[mask].copy()
+        elif method == 'agency_id':
+            agency_map = county_config.get('agencyMap', {})
+            all_ids = set()
+            for ids in agency_map.values():
+                all_ids.update(ids)
+            mask = df[col].astype(str).str.strip().isin(all_ids)
+            return df[mask].copy()
+
+    elif suffix == 'no_interstate':
+        interstate_config = split_config.get('interstateExclusion', {})
+        method = interstate_config.get('method', 'system_column')
+        col = interstate_config.get('column', 'SYSTEM')
+        if col not in df.columns:
+            logger.warning(f"  Column '{col}' not found for interstate exclusion (method={method})")
+            return df.copy()
+        exclude_values = interstate_config.get('excludeValues', [])
+        exclude_upper = {v.upper() for v in exclude_values}
+        # Include rows where value is NOT in exclude list (including blank/empty)
+        mask = ~df[col].astype(str).str.strip().str.upper().isin(exclude_upper)
+        return df[mask].copy()
+
+    return df.copy()
+
+
 def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
-                skip_validation=False, skip_geocode=False):
+                skip_validation=False, skip_geocode=False, state_config=None):
     """Split statewide dataframe into per-jurisdiction CSVs with 3 road-type variants."""
     filter_profiles = get_filter_profiles(config)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Check if state config has splitConfig (preferred over filterProfiles)
+    split_config = None
+    if state_config:
+        split_config = state_config.get('roadSystems', {}).get('splitConfig', None)
 
     # The 3 road-type filter mappings
     road_type_map = {
@@ -289,8 +337,12 @@ def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
         detail = {'status': 'success', 'records': len(jdf), 'files': {}}
 
         for suffix, profile_key in road_type_map.items():
-            profile = filter_profiles.get(profile_key, {})
-            filtered = filter_by_road_system(jdf, profile)
+            if split_config and suffix != 'all_roads':
+                # Use state config splitConfig (ownership, functional_class, etc.)
+                filtered = _apply_split_config_filter(jdf, suffix, split_config)
+            else:
+                profile = filter_profiles.get(profile_key, {})
+                filtered = filter_by_road_system(jdf, profile)
 
             output_path = output_dir / f"{file_jid}_{suffix}.csv"
             detail['files'][suffix] = len(filtered)
@@ -442,7 +494,7 @@ def main():
     # Split
     results = split_state(
         df, args.state, config, jurisdictions,
-        output_dir, dry_run=args.dry_run
+        output_dir, dry_run=args.dry_run, state_config=state_config
     )
 
     # Write results report

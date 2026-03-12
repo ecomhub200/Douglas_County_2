@@ -155,11 +155,11 @@ jobs:
           fi
 
           if [ "$MODE" = "statewide" ]; then
-            ARGS="$ARGS --save-statewide"
+            ARGS="$ARGS --save-statewide --filter allRoads"
             python download_crash_data.py $ARGS
             CSV_PATH="${{ env.DATA_DIR }}/virginia_statewide_all_roads.csv"
           else
-            ARGS="$ARGS --jurisdiction $SELECTION"
+            ARGS="$ARGS --jurisdiction $SELECTION --filter allRoads"
             python download_crash_data.py $ARGS
             CSV_PATH="${{ env.DATA_DIR }}/${SELECTION}_all_roads.csv"
           fi
