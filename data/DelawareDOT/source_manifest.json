@@ -1,15 +1,29 @@
 {
   "_description": "DelDOT crash data registry. 3 jurisdictions available.",
-  "_updated": "2026-02-15",
+  "_updated": "2026-03-12",
   "source": {
-    "name": "Delaware Department of Transportation",
+    "name": "Delaware Department of Safety and Homeland Security",
     "base_url": "https://data.delaware.gov",
     "api_url": "https://data.delaware.gov/resource/827n-m6xc.json",
     "file_format": "JSON/CSV"
   },
   "jurisdiction_filters": {
     "_description": "All 3 Delaware counties. FIPS codes are 5-digit (state 10 + 3-digit county).",
-    "_placeholder": "Populate with all 3 jurisdictions and FIPS codes"
+    "kent": {
+      "fips": "10001",
+      "county_name": "Kent",
+      "soql_filter": "county_name='Kent'"
+    },
+    "new_castle": {
+      "fips": "10003",
+      "county_name": "New Castle",
+      "soql_filter": "county_name='New Castle'"
+    },
+    "sussex": {
+      "fips": "10005",
+      "county_name": "Sussex",
+      "soql_filter": "county_name='Sussex'"
+    }
   },
   "api": {
     "endpoint": "https://data.delaware.gov/resource/827n-m6xc.json",

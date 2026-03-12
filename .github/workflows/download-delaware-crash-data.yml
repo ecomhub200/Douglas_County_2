@@ -4,15 +4,20 @@ name: Download Delaware Crash Data
 # Modeled after download-cdot-crash-data.yml
 
 on:
-  # schedule:
-    # - cron: '0 11 1 * *'     # DISABLED — re-enable when pipeline is ready (see data/cdot/github_action_activation_plan.md)
+  schedule:
+    - cron: '0 11 1 * *'     # 1st of every month at 11:00 UTC
   workflow_dispatch:
     inputs:
       jurisdiction:
-        description: 'Jurisdiction to filter to'
+        description: 'County to filter to (kent, new_castle, sussex)'
         required: false
-        default: 'statewide'
-        type: string
+        default: 'sussex'
+        type: choice
+        options:
+          - sussex
+          - kent
+          - new_castle
+          - statewide
       years:
         description: 'Space-separated years to download'
         required: false
@@ -54,7 +59,7 @@ jobs:
         id: build-args
         run: |
           ARGS="--data-dir data/DelawareDOT"
-          JURISDICTION="${{ github.event.inputs.jurisdiction || 'statewide' }}"
+          JURISDICTION="${{ github.event.inputs.jurisdiction || 'sussex' }}"
           ARGS="$ARGS --jurisdiction $JURISDICTION"
           YEARS="${{ github.event.inputs.years }}"
           if [ -n "$YEARS" ]; then

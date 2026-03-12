@@ -2616,6 +2616,60 @@
       ],
       "state": "VA"
     },
+    "de_kent": {
+      "name": "Kent County",
+      "type": "county",
+      "fips": "001",
+      "state": "DE",
+      "namePatterns": [
+        "Kent",
+        "Kent County"
+      ],
+      "mapCenter": [
+        39.15,
+        -75.52
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "de_new_castle": {
+      "name": "New Castle County",
+      "type": "county",
+      "fips": "003",
+      "state": "DE",
+      "namePatterns": [
+        "New Castle",
+        "New Castle County"
+      ],
+      "mapCenter": [
+        39.6,
+        -75.6
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false
+    },
+    "de_sussex": {
+      "name": "Sussex County",
+      "type": "county",
+      "fips": "005",
+      "state": "DE",
+      "namePatterns": [
+        "Sussex",
+        "Sussex County"
+      ],
+      "mapCenter": [
+        38.68,
+        -75.38
+      ],
+      "mapZoom": 10,
+      "maintainsOwnRoads": false,
+      "bbox": [
+        -75.65,
+        38.45,
+        -75.05,
+        38.95
+      ]
+    },
     "danville": {
       "name": "Danville City",
       "type": "city",
@@ -4625,8 +4679,8 @@
       "name": "Delaware",
       "abbreviation": "DE",
       "dotName": "DelDOT",
-      "defaultJurisdiction": null,
-      "dataDir": null,
+      "defaultJurisdiction": "de_sussex",
+      "dataDir": "DelawareDOT",
       "r2Prefix": "delaware",
       "appSubtitle": "Delaware Crash Analysis Tool"
     },
