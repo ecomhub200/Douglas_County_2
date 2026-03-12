@@ -86,19 +86,19 @@ on:
         default: false
 
       skip_pipeline:
-        description: 'Skip pipeline trigger (download only)'
+        description: 'Skip batch pipeline (download + R2 upload only)'
         required: false
         type: boolean
         default: false
 
       skip_forecasts:
-        description: 'Skip forecast generation in pipeline'
+        description: 'Skip forecast generation in batch pipeline'
         required: false
         type: boolean
         default: false
 
       dry_run:
-        description: 'Dry run (no uploads, no commits in pipeline)'
+        description: 'Dry run (no uploads, no commits in batch pipeline)'
         required: false
         type: boolean
         default: false
