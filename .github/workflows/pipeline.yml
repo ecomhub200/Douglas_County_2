@@ -18,13 +18,10 @@ on:
   workflow_dispatch:
     inputs:
       state:
-        description: 'State to process'
+        description: 'State to process (e.g., virginia, colorado, alaska)'
         required: true
-        type: choice
-        options:
-          - virginia
-          - colorado
-          - maryland
+        type: string
+        default: 'virginia'
 
       scope:
         description: 'Processing scope'
