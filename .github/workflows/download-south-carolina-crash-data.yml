@@ -23,9 +23,15 @@ on:
         required: false
         type: boolean
         default: false
+      skip_pipeline:
+        description: 'Skip pipeline trigger (download only)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  actions: write
 
 env:
   R2_STATE_PREFIX: south_carolina
@@ -34,6 +40,8 @@ env:
 jobs:
   download-south-carolina-data:
     runs-on: ubuntu-latest
+    outputs:
+      jurisdiction: ${{ steps.build-args.outputs.jurisdiction }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -151,3 +159,29 @@ jobs:
           | CSVs uploaded to R2 | ${UPLOADED} |
           | Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
           EOF
+
+  # Trigger unified pipeline
+  trigger-pipeline:
+    name: "Trigger pipeline"
+    needs: download-south-carolina-data
+    if: github.event.inputs.skip_pipeline != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pipeline.yml',
+              ref: 'main',
+              inputs: {
+                state: 'south_carolina',
+                scope: 'jurisdiction',
+                selection: '${{ needs.download-south-carolina-data.outputs.jurisdiction }}',
+                data_source: '',
+                skip_forecasts: 'false'
+              }
+            });
+            console.log('Pipeline triggered for South Carolina');
