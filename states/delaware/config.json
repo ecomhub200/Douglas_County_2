@@ -1,0 +1,185 @@
+{
+  "state": {
+    "name": "Delaware",
+    "abbreviation": "DE",
+    "fips": "10",
+    "dotName": "DelDOT",
+    "dotFullName": "Delaware Department of Transportation",
+    "dataSystemName": "Socrata SODA API",
+    "dataPortalUrl": "https://data.delaware.gov",
+    "coordinateBounds": {
+      "latMin": 38.4,
+      "latMax": 39.9,
+      "lonMin": -75.8,
+      "lonMax": -75.0
+    }
+  },
+
+  "columnMapping": {
+    "_description": "Maps Delaware Socrata/Excel column names to internal field codes. Delaware has 3-tier severity and NO road name field.",
+
+    "ID": null,
+    "DATE": "crash_datetime",
+    "TIME": null,
+    "SEVERITY": "crash_classification_description",
+    "K": null,
+    "A": null,
+    "B": null,
+    "C": null,
+    "O": null,
+    "COLLISION": "manner_of_impact_description",
+    "WEATHER": "weather_1_description",
+    "LIGHT": "lighting_condition_description",
+    "SURFACE": "road_surface_description",
+    "ALIGNMENT": null,
+    "ROAD_DESC": null,
+    "ROUTE": null,
+    "ROAD_SYSTEM": null,
+    "X": "longitude",
+    "Y": "latitude",
+    "JURISDICTION": "county_name",
+    "PED": "pedestrian_involved",
+    "BIKE": "bicycled_involved",
+    "ALCOHOL": "alcohol_involved",
+    "DRUG": "drug_involved",
+    "MOTORCYCLE": "motorcycle_involved",
+    "WORKZONE": "work_zone",
+    "SEATBELT": "seatbelt_used"
+  },
+
+  "alternateColumnNames": {
+    "_description": "Excel/sample file uses uppercase with spaces; Socrata API uses lowercase with underscores",
+    "crash_datetime": "CRASH DATETIME",
+    "crash_classification_description": "CRASH CLASSIFICATION DESCRIPTION",
+    "manner_of_impact_description": "MANNER OF IMPACT DESCRIPTION",
+    "weather_1_description": "WEATHER 1 DESCRIPTION",
+    "lighting_condition_description": "LIGHTING CONDITION DESCRIPTION",
+    "road_surface_description": "ROAD SURFACE DESCRIPTION",
+    "latitude": "LATITUDE",
+    "longitude": "LONGITUDE",
+    "county_name": "COUNTY NAME",
+    "pedestrian_involved": "PEDESTRIAN INVOLVED",
+    "bicycled_involved": "BICYCLED INVOLVED",
+    "alcohol_involved": "ALCOHOL INVOLVED",
+    "drug_involved": "DRUG INVOLVED",
+    "motorcycle_involved": "MOTORCYCLE INVOLVED",
+    "work_zone": "WORK ZONE",
+    "seatbelt_used": "SEATBELT USED"
+  },
+
+  "derivedFields": {
+    "_description": "Delaware provides 3-tier crash-level severity (Fatal/Injury/PDO). No individual injury counts (A/B/C breakdown unavailable).",
+    "SEVERITY": {
+      "method": "crash_classification",
+      "column": "crash_classification_description",
+      "mapping": {
+        "Fatality Crash": "K",
+        "Personal Injury Crash": "B",
+        "Property Damage Only": "O",
+        "Non-Reportable": "O"
+      }
+    },
+    "ROUTE": {
+      "method": "reverse_geocode",
+      "note": "Delaware crash data has NO road name field. Requires reverse geocoding from lat/lon or manual enrichment."
+    }
+  },
+
+  "missingFields": {
+    "_description": "Fields NOT available in Delaware public crash data",
+    "unavailable": [
+      "Road/Route Name (RTE Name)",
+      "Road System Classification (SYSTEM)",
+      "Intersection Node",
+      "Milepost",
+      "Traffic Control Type",
+      "Functional Class",
+      "Area Type",
+      "Facility Type",
+      "Road Ownership",
+      "Road Alignment",
+      "Speed Involved flag",
+      "Hit-and-Run flag",
+      "Distracted Driving flag",
+      "Drowsy Driving flag",
+      "Driver Age (Young/Senior flags)",
+      "First Harmful Event",
+      "Vehicle Count"
+    ],
+    "enrichmentOptions": {
+      "reverseGeocoding": "Use Nominatim/OSM to derive road names from lat/lon coordinates",
+      "roadNetworkOverlay": "Snap crash points to DelDOT road network shapefile for route names and functional class"
+    }
+  },
+
+  "roadSystems": {
+    "_description": "Road system not available in raw data; default to NonVDOT secondary until reverse geocoding enriches with route classification",
+    "values": {
+      "Interstate": {
+        "category": "interstate",
+        "isStateDOT": true,
+        "isInterstate": true,
+        "displayName": "Interstate",
+        "standardizedSystem": "Interstate"
+      },
+      "US Route": {
+        "category": "us_route",
+        "isStateDOT": true,
+        "isInterstate": false,
+        "displayName": "US Route",
+        "standardizedSystem": "Primary"
+      },
+      "State Route": {
+        "category": "state",
+        "isStateDOT": true,
+        "isInterstate": false,
+        "displayName": "State Route",
+        "standardizedSystem": "Primary"
+      },
+      "County Road": {
+        "category": "local",
+        "isStateDOT": false,
+        "isInterstate": false,
+        "displayName": "County Road",
+        "standardizedSystem": "NonVDOT secondary"
+      },
+      "Local Road": {
+        "category": "local",
+        "isStateDOT": false,
+        "isInterstate": false,
+        "displayName": "Local Road",
+        "standardizedSystem": "NonVDOT secondary"
+      }
+    }
+  },
+
+  "filterProfiles": {
+    "all_roads": {
+      "label": "All Roads",
+      "filter": null,
+      "description": "All crash records regardless of road type"
+    },
+    "county_roads": {
+      "label": "County-Maintained Roads",
+      "filter": {
+        "excludeSystems": ["Interstate"]
+      },
+      "description": "Excludes Interstate highways"
+    },
+    "no_interstate": {
+      "label": "No Interstate",
+      "filter": {
+        "excludeSystems": ["Interstate"]
+      },
+      "description": "All roads except Interstate"
+    }
+  },
+
+  "epdoWeights": {
+    "K": 462,
+    "A": 62,
+    "B": 12,
+    "C": 5,
+    "O": 1
+  }
+}

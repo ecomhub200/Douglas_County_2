@@ -13,6 +13,7 @@ Supported states:
   - Virginia (TREDS) - passthrough, already in internal format
   - Colorado (CDOT) - full column mapping + severity derivation
   - Maryland (ACRS) - MoCo county portal + statewide portal normalization
+  - Delaware (DelDOT) - Socrata API + Excel format, 3-tier severity, no road names
 
 Adding a new state:
   1. Create states/{state}/config.json with columnMapping + derivedFields
@@ -61,6 +62,18 @@ STATE_SIGNATURES = {
         'optional': ['acc_date', 'collision_type_desc', 'weather_desc', 'light_desc'],
         'display_name': 'Maryland (ACRS - Statewide)',
         'config_dir': 'maryland'
+    },
+    'delaware': {
+        'required': ['crash_classification_description', 'county_name', 'manner_of_impact_description'],
+        'optional': ['crash_datetime', 'latitude', 'longitude', 'weather_1_description', 'lighting_condition_description'],
+        'display_name': 'Delaware (DelDOT)',
+        'config_dir': 'delaware'
+    },
+    'delaware_excel': {
+        'required': ['CRASH CLASSIFICATION DESCRIPTION', 'COUNTY NAME', 'MANNER OF IMPACT DESCRIPTION'],
+        'optional': ['CRASH DATETIME', 'LATITUDE', 'LONGITUDE', 'WEATHER 1 DESCRIPTION', 'LIGHTING CONDITION DESCRIPTION'],
+        'display_name': 'Delaware (DelDOT - Excel)',
+        'config_dir': 'delaware'
     }
 }
 
@@ -1221,12 +1234,300 @@ class MarylandNormalizer(BaseNormalizer):
         return n
 
 
+class DelawareNormalizer(BaseNormalizer):
+    """Delaware DelDOT data normalizer — converts to Virginia-compatible VDOT format.
+
+    Delaware's public crash data (Socrata API) has 3-tier severity (Fatal/Injury/PDO)
+    and NO road name field. Coordinates are available for most records.
+
+    Handles both Socrata API field names (lowercase, underscored) and the Excel
+    sample format (uppercase with spaces).
+    """
+
+    # Severity: 3-tier crash-level classification (same limitation as Maryland)
+    SEVERITY_MAP = {
+        'Fatality Crash': 'K',
+        'fatality crash': 'K',
+        'Personal Injury Crash': 'B',
+        'personal injury crash': 'B',
+        'Property Damage Only': 'O',
+        'property damage only': 'O',
+        'Non-Reportable': 'O',
+        'non-reportable': 'O',
+    }
+
+    # Manner of Impact → VDOT numbered collision type
+    COLLISION_VDOT_MAP = {
+        'Front to rear': '1. Rear End',
+        'front to rear': '1. Rear End',
+        'Angle': '2. Angle',
+        'angle': '2. Angle',
+        'Rear to side': '2. Angle',
+        'rear to side': '2. Angle',
+        'Front to front': '3. Head On',
+        'front to front': '3. Head On',
+        'Sideswipe, same direction': '4. Sideswipe - Same Direction',
+        'sideswipe, same direction': '4. Sideswipe - Same Direction',
+        'Sideswipe, opposite direction': '5. Sideswipe - Opposite Direction',
+        'sideswipe, opposite direction': '5. Sideswipe - Opposite Direction',
+        'Not a collision between two vehicles': '14. Fixed Object',
+        'not a collision between two vehicles': '14. Fixed Object',
+        'Rear to rear': '16. Other',
+        'rear to rear': '16. Other',
+        'Other': '16. Other',
+        'other': '16. Other',
+        'Unknown': '16. Other',
+        'unknown': '16. Other',
+    }
+
+    # Weather → VDOT numbered format
+    WEATHER_VDOT_MAP = {
+        'Clear': '1. No Adverse Condition (Clear/Cloudy)',
+        'clear': '1. No Adverse Condition (Clear/Cloudy)',
+        'Cloudy': '1. No Adverse Condition (Clear/Cloudy)',
+        'cloudy': '1. No Adverse Condition (Clear/Cloudy)',
+        'Rain': '5. Rain',
+        'rain': '5. Rain',
+        'Snow': '4. Snow',
+        'snow': '4. Snow',
+        'Blowing Snow': '4. Snow',
+        'blowing snow': '4. Snow',
+        'Sleet, Hail (freezing rain or drizzle)': '6. Sleet/Hail/Freezing',
+        'sleet, hail (freezing rain or drizzle)': '6. Sleet/Hail/Freezing',
+        'Fog, Smog, Smoke': '3. Fog/Smog/Smoke',
+        'fog, smog, smoke': '3. Fog/Smog/Smoke',
+        'Severe Crosswinds': '8. Severe Crosswinds',
+        'severe crosswinds': '8. Severe Crosswinds',
+    }
+
+    # Lighting → VDOT numbered format
+    LIGHT_VDOT_MAP = {
+        'Daylight': '2. Daylight',
+        'daylight': '2. Daylight',
+        'Dark-Lighted': '4. Darkness - Road Lighted',
+        'dark-lighted': '4. Darkness - Road Lighted',
+        'Dark-Not Lighted': '5. Darkness - Road Not Lighted',
+        'dark-not lighted': '5. Darkness - Road Not Lighted',
+        'Dark-Unknown Lighting': '6. Dark - Unknown',
+        'dark-unknown lighting': '6. Dark - Unknown',
+        'Dawn': '1. Dawn',
+        'dawn': '1. Dawn',
+        'Dusk': '3. Dusk',
+        'dusk': '3. Dusk',
+    }
+
+    DARKNESS_VALUES = {
+        'Dark-Lighted', 'Dark-Not Lighted', 'Dark-Unknown Lighting',
+        'dark-lighted', 'dark-not lighted', 'dark-unknown lighting',
+    }
+
+    # Road Surface → VDOT numbered format
+    SURFACE_VDOT_MAP = {
+        'Dry': '1. Dry', 'dry': '1. Dry',
+        'Wet': '2. Wet', 'wet': '2. Wet',
+        'Snow': '3. Snow', 'snow': '3. Snow',
+        'Slush': '4. Slush', 'slush': '4. Slush',
+        'Ice/Frost': '5. Ice', 'ice/frost': '5. Ice',
+        'Mud, Dirt, Gravel': '6. Sand/Mud/Dirt/Oil/Gravel',
+        'mud, dirt, gravel': '6. Sand/Mud/Dirt/Oil/Gravel',
+        'Water (standing, moving)': '7. Water',
+        'water (standing, moving)': '7. Water',
+    }
+
+    # Month abbreviation lookup for Delaware datetime format
+    MONTH_MAP = {
+        'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+        'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+        'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12',
+    }
+
+    def _get(self, row: Dict[str, str], *keys: str) -> str:
+        """Get field value trying multiple key names (Socrata lowercase vs Excel uppercase)."""
+        for key in keys:
+            val = (row.get(key) or '').strip()
+            if val and val != 'NA':
+                return val
+        return ''
+
+    def _parse_datetime(self, raw: str) -> Tuple[str, str, str]:
+        """Parse Delaware datetime formats.
+
+        Formats observed:
+          - "2012 Apr 29 05:32:00 PM" (Excel sample)
+          - "2023-01-15T14:30:00.000" (Socrata ISO 8601)
+
+        Returns (date_str, military_time_HHMM, year).
+        """
+        if not raw:
+            return '', '', ''
+
+        # ISO 8601 from Socrata API
+        if 'T' in raw:
+            parts = raw.split('T')
+            date_part = parts[0]  # 2023-01-15
+            time_str = parts[1].split('.')[0] if len(parts) > 1 else ''
+            military = time_str.replace(':', '')[:4]  # 143000 → 1430
+            year = date_part[:4]
+            return date_part, military, year
+
+        # Delaware Excel format: "2012 Apr 29 05:32:00 PM"
+        try:
+            tokens = raw.split()
+            if len(tokens) >= 4:
+                year = tokens[0]
+                month = self.MONTH_MAP.get(tokens[1], '01')
+                day = tokens[2].zfill(2)
+                date_part = f"{year}-{month}-{day}"
+
+                # Parse 12-hour time to military
+                time_str = tokens[3] if len(tokens) > 3 else '00:00:00'
+                ampm = tokens[4].upper() if len(tokens) > 4 else ''
+                h, m = time_str.split(':')[:2]
+                h = int(h)
+                if ampm == 'PM' and h != 12:
+                    h += 12
+                elif ampm == 'AM' and h == 12:
+                    h = 0
+                military = f"{h:02d}{int(m):02d}"
+                return date_part, military, year
+        except (ValueError, IndexError):
+            pass
+
+        return raw, '', ''
+
+    def _yn_flag(self, row: Dict[str, str], *keys: str) -> str:
+        """Convert Y/N/Yes/No field to 'Yes'/'No'."""
+        val = self._get(row, *keys).upper()
+        return 'Yes' if val in ('Y', 'YES', 'TRUE', '1') else 'No'
+
+    _id_counter = 0
+
+    def normalize_row(self, row: Dict[str, str]) -> Dict[str, str]:
+        n = {}
+
+        # --- ID (not in dataset — generate composite key) ---
+        raw_dt = self._get(row, 'crash_datetime', 'CRASH DATETIME')
+        lat = self._get(row, 'latitude', 'LATITUDE')
+        lon = self._get(row, 'longitude', 'LONGITUDE')
+        DelawareNormalizer._id_counter += 1
+        dt_slug = raw_dt.replace(' ', '_').replace(':', '') if raw_dt else 'NODATE'
+        n['Document Nbr'] = f"DE-{dt_slug}_{lat}_{lon}_{DelawareNormalizer._id_counter}"
+
+        # --- Date/Time ---
+        date_part, military, year = self._parse_datetime(raw_dt)
+        n['Crash Date'] = date_part
+        n['Crash Year'] = year or self._get(row, 'year', 'YEAR')
+        n['Crash Military Time'] = military
+
+        # --- Severity (3-tier → KABCO) ---
+        raw_sev = self._get(row, 'crash_classification_description', 'CRASH CLASSIFICATION DESCRIPTION')
+        severity = self.SEVERITY_MAP.get(raw_sev, 'O')
+        n['Crash Severity'] = severity
+        n['K_People'] = '1' if severity == 'K' else '0'
+        n['A_People'] = '0'  # Not distinguishable in Delaware data
+        n['B_People'] = '1' if severity == 'B' else '0'
+        n['C_People'] = '0'  # Not distinguishable in Delaware data
+
+        # --- Collision Type ---
+        raw_collision = self._get(row, 'manner_of_impact_description', 'MANNER OF IMPACT DESCRIPTION')
+        n['Collision Type'] = self.COLLISION_VDOT_MAP.get(raw_collision, '16. Other')
+
+        # --- Weather ---
+        raw_weather = self._get(row, 'weather_1_description', 'WEATHER 1 DESCRIPTION')
+        n['Weather Condition'] = self.WEATHER_VDOT_MAP.get(raw_weather, raw_weather or '1. No Adverse Condition (Clear/Cloudy)')
+
+        # --- Light ---
+        raw_light = self._get(row, 'lighting_condition_description', 'LIGHTING CONDITION DESCRIPTION')
+        n['Light Condition'] = self.LIGHT_VDOT_MAP.get(raw_light, raw_light or '2. Daylight')
+
+        # --- Surface Condition ---
+        raw_surface = self._get(row, 'road_surface_description', 'ROAD SURFACE DESCRIPTION')
+        n['Roadway Surface Condition'] = self.SURFACE_VDOT_MAP.get(raw_surface, raw_surface or '1. Dry')
+
+        # --- Road Alignment (not in dataset) ---
+        n['Roadway Alignment'] = '1. Straight - Level'
+
+        # --- Roadway Description (not in dataset) ---
+        n['Roadway Description'] = ''
+
+        # --- Intersection Type (not in dataset) ---
+        n['Intersection Type'] = '1. Not at Intersection'
+
+        # --- Relation to Roadway ---
+        n['Relation To Roadway'] = '8. Non-Intersection'
+
+        # --- Route & Location (NOT IN DATASET — requires reverse geocoding) ---
+        n['RTE Name'] = ''
+        n['SYSTEM'] = 'NonVDOT secondary'
+        n['Node'] = ''
+        n['RNS MP'] = ''
+
+        # --- Coordinates (x=longitude, y=latitude per Virginia convention) ---
+        n['x'] = lon
+        n['y'] = lat
+
+        # --- Jurisdiction ---
+        n['Physical Juris Name'] = self._get(row, 'county_name', 'COUNTY NAME')
+
+        # --- Boolean flags (Delaware has direct Y/N fields) ---
+        n['Pedestrian?'] = self._yn_flag(row, 'pedestrian_involved', 'PEDESTRIAN INVOLVED')
+        n['Bike?'] = self._yn_flag(row, 'bicycled_involved', 'BICYCLED INVOLVED')
+        n['Alcohol?'] = self._yn_flag(row, 'alcohol_involved', 'ALCOHOL INVOLVED')
+        n['Speed?'] = 'No'  # Not in dataset
+        n['Hitrun?'] = 'No'  # Not in dataset
+        n['Motorcycle?'] = self._yn_flag(row, 'motorcycle_involved', 'MOTORCYCLE INVOLVED')
+        n['Night?'] = 'Yes' if raw_light in self.DARKNESS_VALUES else 'No'
+        n['Distracted?'] = 'No'  # Not in dataset
+        n['Drowsy?'] = 'No'  # Not in dataset
+        n['Drug Related?'] = self._yn_flag(row, 'drug_involved', 'DRUG INVOLVED')
+        n['Young?'] = 'No'  # Not in dataset (no driver age)
+        n['Senior?'] = 'No'  # Not in dataset (no driver age)
+        n['Unrestrained?'] = 'No' if self._yn_flag(row, 'seatbelt_used', 'SEATBELT USED') == 'Yes' else 'Yes'
+        n['School Zone'] = self._yn_flag(row, 'school_bus_involved_description', 'SCHOOL BUS INVOLVED DESCRIPTION')
+        n['Work Zone Related'] = self._yn_flag(row, 'work_zone', 'WORK ZONE')
+
+        # --- Traffic Control (not in dataset) ---
+        n['Traffic Control Type'] = ''
+        n['Traffic Control Status'] = ''
+
+        # --- Infrastructure fields (not in dataset) ---
+        n['Functional Class'] = ''
+        n['Area Type'] = ''
+        n['Facility Type'] = ''
+        n['Ownership'] = ''
+
+        # --- First Harmful Event (not in dataset) ---
+        n['First Harmful Event'] = ''
+        n['First Harmful Event Loc'] = ''
+
+        # --- Vehicle Count (not in dataset) ---
+        n['Vehicle Count'] = ''
+
+        # --- Injury counts ---
+        n['Persons Injured'] = ''
+        n['Pedestrians Killed'] = '0'
+        n['Pedestrians Injured'] = '0'
+
+        # --- Source tracking ---
+        n['_source_state'] = 'delaware'
+        n['_de_classification_code'] = self._get(row, 'crash_classification_code', 'CRASH CLASSIFICATION CODE')
+        n['_de_manner_of_impact_code'] = self._get(row, 'manner_of_impact_code', 'MANNER OF IMPACT CODE')
+        n['_de_county_code'] = self._get(row, 'county_code', 'COUNTY CODE')
+        n['_de_contributing_circumstance'] = self._get(row, 'primary_contributing_circumstance_description', 'PRIMARY CONTRIBUTING CIRCUMSTANCE DESCRIPTION')
+        n['_de_collision_on_private_property'] = self._get(row, 'collision_on_private_property', 'COLLISION ON PRIVATE PROPERTY')
+        n['_de_day_of_week'] = self._get(row, 'day_of_week_description', 'DAY OF WEEK DESCRIPTION')
+
+        return n
+
+
 # --- Normalizer Registry ---
 _NORMALIZERS = {
     'colorado': ColoradoNormalizer,
     'virginia': VirginiaNormalizer,
     'maryland': MarylandNormalizer,
     'maryland_statewide': MarylandNormalizer,
+    'delaware': DelawareNormalizer,
+    'delaware_excel': DelawareNormalizer,
 }
 
 

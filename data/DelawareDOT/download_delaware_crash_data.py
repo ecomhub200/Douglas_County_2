@@ -25,6 +25,11 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+# Add project root and scripts dir to path for state_adapter import
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(_PROJECT_ROOT / 'scripts'))
+sys.path.insert(0, str(_PROJECT_ROOT))
+
 try:
     import requests
 except ImportError:
@@ -283,6 +288,8 @@ Available jurisdictions:
                         help="Test API connectivity and exit")
     parser.add_argument("--force", action="store_true",
                         help="Force re-download even if output file already exists")
+    parser.add_argument("--normalize", "-n", action="store_true",
+                        help="Normalize downloaded data to CRASH LENS VDOT standard format")
     args = parser.parse_args()
 
     if args.health_check:
@@ -326,6 +333,45 @@ Available jurisdictions:
     log.info(f"  Output: {saved}")
     log.info(f"  Elapsed: {elapsed:.1f}s")
     log.info("=" * 60)
+
+    # --- Optional: Normalize to CRASH LENS VDOT standard format ---
+    if args.normalize:
+        log.info("=" * 60)
+        log.info("Normalizing to CRASH LENS VDOT standard format...")
+        log.info("=" * 60)
+        try:
+            from state_adapter import convert_file
+            # Determine input (may be gzipped)
+            normalize_input = str(output_path)
+            if args.gzip and not os.path.exists(normalize_input) and os.path.exists(normalize_input + ".gz"):
+                import shutil
+                # Decompress temporarily for normalization
+                with gzip.open(normalize_input + ".gz", 'rt', encoding='utf-8') as fin:
+                    with open(normalize_input, 'w', encoding='utf-8') as fout:
+                        shutil.copyfileobj(fin, fout)
+
+            normalized_path = str(output_path).replace('.csv', '_normalized.csv')
+            state_detected, total, with_gps = convert_file(
+                normalize_input, normalized_path, state='delaware',
+                source_filename=os.path.basename(str(output_path))
+            )
+            log.info(f"  Normalized: {total:,} rows ({with_gps:,} with GPS)")
+            log.info(f"  Output: {normalized_path}")
+
+            # Gzip the normalized file if requested
+            if args.gzip:
+                gz_norm = normalized_path + ".gz"
+                with open(normalized_path, 'rb') as f_in:
+                    with gzip.open(gz_norm, 'wb') as f_out:
+                        f_out.write(f_in.read())
+                os.remove(normalized_path)
+                log.info(f"  Compressed: {gz_norm}")
+        except ImportError:
+            log.warning("Could not import state_adapter — skipping normalization")
+            log.warning("Ensure scripts/state_adapter.py is in the Python path")
+        except Exception as e:
+            log.error(f"Normalization failed: {e}")
+            raise
 
 
 if __name__ == "__main__":

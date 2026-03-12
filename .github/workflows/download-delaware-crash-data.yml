@@ -81,6 +81,39 @@ jobs:
           echo "=========================================="
           python data/DelawareDOT/download_delaware_crash_data.py ${{ steps.build-args.outputs.args }}
 
+      - name: Normalize to CRASH LENS format (VDOT standard)
+        id: normalize
+        run: |
+          echo "=========================================="
+          echo "Normalizing Delaware data to VDOT format"
+          echo "=========================================="
+          JURISDICTION="${{ steps.build-args.outputs.jurisdiction }}"
+          # Find the raw download file (could be .csv or .csv.gz)
+          RAW_CSV=""
+          for f in data/DelawareDOT/${JURISDICTION}*_crashes.csv; do
+            [ -f "$f" ] && RAW_CSV="$f" && break
+          done
+          # Decompress if only .gz exists
+          if [ -z "$RAW_CSV" ]; then
+            for f in data/DelawareDOT/${JURISDICTION}*_crashes.csv.gz; do
+              [ -f "$f" ] && gunzip -k "$f" && RAW_CSV="${f%.gz}" && break
+            done
+          fi
+          if [ -z "$RAW_CSV" ] || [ ! -f "$RAW_CSV" ]; then
+            echo "WARNING: No raw CSV found to normalize"
+            echo "normalized=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "  Input: $RAW_CSV"
+          python scripts/process_crash_data.py \
+            --input "$RAW_CSV" \
+            --state delaware \
+            --jurisdiction "$JURISDICTION" \
+            --convert-only
+          echo "  Normalization complete"
+          echo "normalized=true" >> $GITHUB_OUTPUT
+          ls -lh data/DelawareDOT/*.csv* 2>/dev/null
+
       - name: Generate download statistics
         id: stats
         run: |
