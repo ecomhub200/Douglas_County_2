@@ -112,12 +112,13 @@ This is the most critical file. Every pipeline script reads it. Copy the structu
     },
     "splitConfig": {
       "countyRoads": {
-        "method": "system_column | column_value | agency_id",
+        "method": "ownership | system_column | agency_id | column_value",
         "column": "{column_to_filter_on}",
-        "includeValues": ["{values_for_county_roads}"]
+        "includeValues": ["{values_for_county_roads}"],
+        "agencyMap": "{only_for_agency_id_method}"
       },
       "interstateExclusion": {
-        "method": "system_column | column_value",
+        "method": "functional_class | system_column | column_value",
         "column": "{column_to_filter_on}",
         "excludeValues": ["{interstate_values}"]
       }
@@ -183,7 +184,21 @@ This is the most critical file. Every pipeline script reads it. Copy the structu
 - `"injury_hierarchy"` — Colorado pattern: multiple injury count columns (Injury 04=K, Injury 03=A, etc.), derive highest severity
 - `"report_type_map"` — Maryland pattern: map report types like "Fatal Crash" → K, "Injury Crash" → B, "Property Damage Crash" → O
 
-**Road systems**: Look at the raw data's road classification column. Map each unique value to one of the 3 standardized categories: `"NonVDOT secondary"` (local), `"Primary"` or `"Secondary"` (state), `"Interstate"`.
+**Road systems**: Look at the raw data's road classification columns. Map each unique value to one of the 3 standardized categories: `"NonVDOT secondary"` (local), `"Primary"` or `"Secondary"` (state), `"Interstate"`.
+
+**splitConfig** (CRITICAL — determines how `county_roads.csv` and `no_interstate.csv` are produced):
+
+1. Open a sample CSV in a spreadsheet. Filter to one jurisdiction. Confirm you see ALL road types (Interstate, State, County, City).
+2. **For county_roads**: Find the column that best identifies county/locally-owned roads:
+   - **Ownership column** (e.g., "2. County Hwy Agency") → use `method: "ownership"`. This is the most accurate when available (Virginia pattern).
+   - **SYSTEM column** (e.g., "NonVDOT secondary") → use `method: "system_column"`. Simpler but may not perfectly match ownership semantics.
+   - **Agency ID column** (e.g., "DSO" for Douglas Sheriff's Office) → use `method: "agency_id"` with an `agencyMap` (Colorado pattern).
+3. **For interstate exclusion**: Find the column that identifies Interstate roads:
+   - **Functional Class column** (e.g., "1-Interstate (A,1)") → use `method: "functional_class"`. Most precise for excluding interstates (Virginia pattern).
+   - **SYSTEM column** (e.g., "Interstate") → use `method: "system_column"`. Works when SYSTEM reliably identifies interstates.
+4. **Validate**: Run the split script and compare output file sizes against manually filtered reference files from a spreadsheet. If sizes don't match, the wrong column/values are being used.
+
+**Common mistake**: The SYSTEM column may seem correct but can give different results than Ownership or Functional Class. Always verify against manual filtering from the state DOT's raw data.
 
 **EPDO weights**: Use FHWA/HSM standard (K:462, A:62, B:12, C:5, O:1) unless the state DOT publishes their own crash cost weights.
 
@@ -196,6 +211,16 @@ This is the most critical file. Every pipeline script reads it. Copy the structu
 | Direct severity | `states/virginia/config.json` | `SEVERITY` maps to a single column |
 | Derived severity | `states/colorado/config.json` | `SEVERITY` is null, derived from injury counts |
 | Dual data source | `states/maryland/config.json` | Has `ID_ALT`, `DATE_ALT` for alternate field names |
+
+### splitConfig Reference Implementations
+
+| Pattern | Example State | countyRoads Method | interstateExclusion Method |
+|---------|---------------|--------------------|-----------------------------|
+| Ownership + Functional Class | Virginia (`states/virginia/config.json`) | `ownership` on `Ownership` column, value `"2. County Hwy Agency"` | `functional_class` on `Functional Class` column, exclude `"1-Interstate (A,1)"` |
+| Agency ID + System Code | Colorado (`states/colorado/config.json`) | `agency_id` on `_co_agency_id` column with `agencyMap` per jurisdiction | `column_value` on `_co_system_code` column, exclude `"Interstate Highway"` |
+| SYSTEM column (simple) | Default fallback | `system_column` on `SYSTEM` column, include `["NonVDOT secondary"]` | `system_column` on `SYSTEM` column, exclude `["Interstate"]` |
+
+**When in doubt**: Use the Ownership-based approach if the state's data has an Ownership column. It is the most semantically accurate for identifying county-owned roads. If not available, use the SYSTEM column approach but **always validate against manually filtered reference data**.
 
 ---
 
@@ -614,6 +639,10 @@ jobs:
         id: download
         run: |
           # Call state-specific download script
+          # CRITICAL: Always use --filter allRoads to ensure all_roads.csv
+          # contains ALL road types (Interstate, State Hwy, County, City, Federal).
+          # Road-type splitting happens in Stage 2 (split_road_type.py), NOT here.
+          #
           # Output must be at: ${{ env.DATA_DIR }}/{jurisdiction}_all_roads.csv
           # or: ${{ env.DATA_DIR }}/{state}_statewide_all_roads.csv
           #
@@ -856,7 +885,11 @@ When onboarding is complete, you should have touched exactly these files:
 |---------|-------|-----|
 | `resolve_scope.py` fails with "not in config.json" | `config.json` → `states.{state}` missing `dataDir` | Set `dataDir` (Step 8) |
 | `validate_data.py` reports "out of bounds" | Wrong `coordinateBounds` in config | Check lat/lon bounds for the state |
-| `split_road_type.py` puts everything in "all_roads" | `splitConfig` column doesn't match normalized output | Check that `splitConfig.column` matches the VDOT-standardized column name (`SYSTEM` for system_column method) |
+| `split_road_type.py` puts everything in "all_roads" | `splitConfig` column doesn't match normalized output | Check that `splitConfig.column` matches the VDOT-standardized column name (e.g., `Ownership`, `Functional Class`, `SYSTEM`) |
+| `all_roads.csv` is too small (missing Interstate/State roads) | Download script used `countyOnly` filter instead of `allRoads` | Always pass `--filter allRoads` in download workflow. Check `download_crash_data.py` default filter. |
+| `county_roads.csv` has wrong row count | SYSTEM column doesn't match Ownership semantics | Switch splitConfig to use `ownership` method with the state's ownership column values |
+| `no_interstate.csv` includes/excludes wrong roads | SYSTEM column doesn't reliably identify interstates | Switch splitConfig to use `functional_class` method with the state's functional class interstate value |
+| ArcGIS API returns partial jurisdiction data | WHERE clause tries `Juris_Code` first, which may only match local roads | Reorder WHERE clauses to try `Physical_Juris_Name` first (captures ALL road types within jurisdiction) |
 | State adapter detects wrong state | Detection signature columns overlap with another state | Make `required` columns more specific (add more unique columns) |
 | Pipeline Stage 3 skips splitting | `download_mode` is `individual` not `statewide` | Only triggers when >3 jurisdictions. Single jurisdiction runs skip this stage. |
 | Geocoding hits rate limit | Too many missing coordinates | Set `cache_config.geocode_ttl_days` higher, ensure GPS columns are populated |
