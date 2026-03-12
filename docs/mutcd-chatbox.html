@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MUTCD Assistant — CRASH LENS</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --amber: #fbbf24;
+    --amber-dim: rgba(251,191,36,0.08);
+    --amber-border: rgba(251,191,36,0.15);
+    --amber-glow: rgba(251,191,36,0.12);
+    --green: #34d399;
+    --red: #f87171;
+    --slate-50: #f8fafc;
+    --slate-200: #e2e8f0;
+    --slate-300: #cbd5e1;
+    --slate-400: #94a3b8;
+    --slate-500: #64748b;
+    --slate-600: #475569;
+    --slate-700: #334155;
+    --slate-800: #1e293b;
+    --slate-900: #0f172a;
+    --slate-950: #0b1120;
+    --blue: #60a5fa;
+    --purple: #a78bfa;
+    --font: 'DM Sans', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font);
+    background: linear-gradient(180deg, var(--slate-950) 0%, var(--slate-900) 100%);
+    color: var(--slate-200);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ─── Scrollbar ─────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.18); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.3); }
+
+  /* ─── Animations ────────────────────────────────────────────── */
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes dotPulse {
+    0%, 80%, 100% { opacity: 0.25; transform: scale(0.75); }
+    40% { opacity: 1; transform: scale(1.15); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* ─── Header ────────────────────────────────────────────────── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(251,191,36,0.1);
+    background: rgba(15,23,42,0.85);
+    backdrop-filter: blur(14px);
+    flex-shrink: 0;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .logo-mark {
+    width: 42px; height: 42px; border-radius: 11px;
+    background: var(--amber-dim);
+    border: 1px solid var(--amber-border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .header-title { font-size: 16px; font-weight: 700; color: var(--slate-50); letter-spacing: -0.3px; }
+  .header-sub {
+    font-size: 10.5px; color: var(--slate-500); font-weight: 600;
+    letter-spacing: 0.8px; text-transform: uppercase;
+  }
+  .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .stat-pill {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 20px;
+    background: rgba(30,41,59,0.7);
+    border: 1px solid rgba(100,116,139,0.12);
+    font-size: 13px; font-weight: 600; font-family: var(--mono);
+  }
+  .stat-pill.green svg { stroke: var(--green); }
+  .stat-pill.green span { color: var(--green); }
+  .stat-pill.red svg { stroke: var(--red); }
+  .stat-pill.red span { color: var(--red); }
+  .stat-pill.gray svg { stroke: var(--slate-400); }
+  .stat-pill.gray span { color: var(--slate-400); }
+  .edition-badge {
+    padding: 4px 11px; border-radius: 20px;
+    background: rgba(251,191,36,0.1); color: var(--amber);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+    border: 1px solid rgba(251,191,36,0.2);
+  }
+
+  /* ─── Chat area ─────────────────────────────────────────────── */
+  .chat-area {
+    flex: 1; overflow-y: auto; padding: 20px 16px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+
+  /* ── Message rows ───────────────────────────────────────────── */
+  .msg-row {
+    display: flex; gap: 10px;
+    animation: fadeSlideIn 0.35s ease both;
+  }
+  .msg-row.user { justify-content: flex-end; }
+  .msg-row.assistant { justify-content: flex-start; }
+
+  .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--amber-dim); border: 1px solid rgba(251,191,36,0.2);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 2px;
+  }
+
+  .msg-content { max-width: 78%; display: flex; flex-direction: column; gap: 6px; }
+
+  .bubble {
+    padding: 13px 16px; font-size: 14px; line-height: 1.65; color: var(--slate-300);
+  }
+  .bubble.user-bubble {
+    background: linear-gradient(135deg, rgba(251,191,36,0.12) 0%, rgba(245,158,11,0.07) 100%);
+    border: 1px solid rgba(251,191,36,0.18);
+    border-radius: 18px 18px 4px 18px;
+  }
+  .bubble.assistant-bubble {
+    background: rgba(30,41,59,0.55);
+    border: 1px solid rgba(100,116,139,0.1);
+    border-radius: 18px 18px 18px 4px;
+  }
+  .bubble strong { color: var(--amber); font-weight: 600; }
+
+  .bubble-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 10px; padding-top: 8px;
+    border-top: 1px solid rgba(100,116,139,0.08);
+  }
+  .timestamp {
+    font-size: 11px; color: var(--slate-600);
+    font-family: var(--mono);
+  }
+  .copy-btn {
+    display: flex; align-items: center; gap: 4px;
+    background: none; border: 1px solid rgba(100,116,139,0.12);
+    border-radius: 6px; padding: 3px 9px;
+    color: var(--slate-500); cursor: pointer; font-size: 11px;
+    font-family: var(--font); transition: all 0.15s;
+  }
+  .copy-btn:hover { border-color: rgba(251,191,36,0.3); color: var(--amber); }
+
+  /* ── References panel ───────────────────────────────────────── */
+  .refs-container {
+    background: rgba(15,23,42,0.45);
+    border: 1px solid rgba(251,191,36,0.1);
+    border-radius: 14px; padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .refs-header {
+    display: flex; align-items: center; gap: 8px;
+    padding-bottom: 8px; border-bottom: 1px solid rgba(100,116,139,0.08);
+    color: var(--amber);
+  }
+  .refs-header .label {
+    font-size: 11.5px; font-weight: 600; color: var(--slate-200);
+    letter-spacing: 0.6px;
+  }
+  .ref-count {
+    background: rgba(251,191,36,0.15); color: var(--amber);
+    font-size: 11px; font-weight: 700; padding: 1px 8px;
+    border-radius: 10px; font-family: var(--mono);
+  }
+
+  .ref-card {
+    background: rgba(30,41,59,0.35);
+    border: 1px solid rgba(100,116,139,0.08);
+    border-radius: 10px; overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .ref-card:hover { border-color: rgba(251,191,36,0.15); }
+
+  .ref-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; cursor: pointer; gap: 8px;
+  }
+  .ref-header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .ref-header-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+
+  .chevron-icon {
+    transition: transform 0.2s ease; flex-shrink: 0;
+    color: var(--slate-400);
+  }
+  .ref-card.open .chevron-icon { transform: rotate(90deg); }
+
+  .ref-section {
+    font-family: var(--mono); font-size: 13px;
+    font-weight: 600; color: var(--amber); white-space: nowrap;
+  }
+  .type-badge {
+    font-size: 10px; font-weight: 600; padding: 2px 8px;
+    border-radius: 6px; text-transform: uppercase;
+    letter-spacing: 0.5px; white-space: nowrap;
+  }
+  .type-badge.standard { background: rgba(251,191,36,0.1); color: var(--amber); }
+  .type-badge.guidance  { background: rgba(96,165,250,0.1);  color: var(--blue); }
+  .type-badge.option    { background: rgba(167,139,250,0.1); color: var(--purple); }
+
+  .status-text { font-size: 11px; font-weight: 600; letter-spacing: 0.3px; white-space: nowrap; }
+  .status-text.verified { color: var(--green); }
+  .status-text.flagged  { color: var(--red); }
+  .status-text.pending  { color: var(--slate-400); }
+
+  .ref-body {
+    padding: 6px 12px 14px; display: none; flex-direction: column; gap: 10px;
+    border-top: 1px solid rgba(100,116,139,0.06);
+    animation: fadeSlideIn 0.2s ease both;
+  }
+  .ref-card.open .ref-body { display: flex; }
+
+  .ref-detail { display: flex; flex-direction: column; gap: 2px; }
+  .ref-label {
+    font-size: 10px; font-weight: 600; color: var(--slate-500);
+    text-transform: uppercase; letter-spacing: 0.8px;
+  }
+  .ref-value { font-size: 13px; color: var(--slate-300); font-weight: 500; }
+
+  .ref-detail-row { display: flex; gap: 24px; }
+
+  .ref-actions { display: flex; gap: 8px; margin-top: 4px; }
+  .verify-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 7px 16px; border-radius: 8px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s; font-family: var(--font);
+  }
+  .verify-btn.accept {
+    background: rgba(52,211,153,0.07); color: var(--green);
+    border-color: rgba(52,211,153,0.18);
+  }
+  .verify-btn.accept:hover { background: rgba(52,211,153,0.14); }
+  .verify-btn.reject {
+    background: rgba(248,113,113,0.07); color: var(--red);
+    border-color: rgba(248,113,113,0.18);
+  }
+  .verify-btn.reject:hover { background: rgba(248,113,113,0.14); }
+
+  /* ── Typing indicator ───────────────────────────────────────── */
+  .typing-bubble {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(30,41,59,0.55); border: 1px solid rgba(100,116,139,0.1);
+    border-radius: 18px 18px 18px 4px; padding: 12px 18px;
+  }
+  .typing-dots { display: flex; gap: 4px; }
+  .typing-dots span {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--amber); animation: dotPulse 1.2s infinite ease-in-out;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  .typing-label { font-size: 12px; color: var(--slate-400); }
+
+  /* ─── Suggestions ───────────────────────────────────────────── */
+  .suggestions-bar {
+    padding: 0 16px 8px; flex-shrink: 0;
+    border-top: 1px solid rgba(100,116,139,0.05);
+  }
+  .suggestions-inner {
+    display: flex; gap: 6px; overflow-x: auto;
+    padding: 8px 0 4px;
+    -ms-overflow-style: none; scrollbar-width: none;
+  }
+  .suggestions-inner::-webkit-scrollbar { display: none; }
+  .suggest-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 7px 13px; border-radius: 20px;
+    background: rgba(30,41,59,0.45);
+    border: 1px solid rgba(100,116,139,0.1);
+    color: var(--slate-400); font-size: 12px; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+    font-family: var(--font); transition: all 0.15s;
+  }
+  .suggest-btn:hover {
+    border-color: rgba(251,191,36,0.25); color: var(--amber);
+    background: rgba(251,191,36,0.05);
+  }
+  .suggest-btn svg { flex-shrink: 0; }
+
+  /* ─── Input bar ─────────────────────────────────────────────── */
+  .input-bar {
+    padding: 12px 16px 16px; flex-shrink: 0;
+    background: rgba(15,23,42,0.85);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid rgba(100,116,139,0.06);
+  }
+  .input-wrapper {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(30,41,59,0.55);
+    border: 1px solid rgba(100,116,139,0.12);
+    border-radius: 14px; padding: 4px 6px 4px 16px;
+    transition: border-color 0.2s;
+  }
+  .input-wrapper:focus-within { border-color: rgba(251,191,36,0.3); }
+  .input-wrapper input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--slate-200); font-size: 14px; font-family: var(--font);
+    padding: 10px 0;
+  }
+  .input-wrapper input::placeholder { color: var(--slate-600); }
+  .send-btn {
+    width: 40px; height: 40px; border-radius: 11px;
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    border: none; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--slate-950);
+    transition: all 0.15s; flex-shrink: 0;
+  }
+  .send-btn:hover { transform: scale(1.04); box-shadow: 0 0 16px rgba(251,191,36,0.25); }
+  .send-btn:disabled { opacity: 0.3; cursor: default; transform: none; box-shadow: none; }
+  .input-footer {
+    text-align: center; margin-top: 8px;
+    font-size: 11px; color: var(--slate-600); letter-spacing: 0.2px;
+  }
+
+  /* ─── Verified overrides on ref cards ───────────────────────── */
+  .ref-card[data-status="verified"] { border-color: rgba(52,211,153,0.2); }
+  .ref-card[data-status="flagged"]  { border-color: rgba(248,113,113,0.2); }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════ HEADER ════════════════════ -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo-mark">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="3" width="18" height="18" rx="3" stroke="#fbbf24" stroke-width="2"/>
+        <path d="M8 12h8M12 8v8" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="header-title">MUTCD Assistant</div>
+      <div class="header-sub">CRASH LENS · Reference Verification</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="stat-pill green">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <span id="verifiedCount">0</span>
+    </div>
+    <div class="stat-pill red">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      <span id="flaggedCount">0</span>
+    </div>
+    <div class="stat-pill gray">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span id="pendingCount">0</span>
+    </div>
+    <div class="edition-badge">11th Ed.</div>
+  </div>
+</div>
+
+<!-- ════════════════════ CHAT ════════════════════ -->
+<div class="chat-area" id="chatArea"></div>
+
+<!-- ════════════════════ SUGGESTIONS ════════════════════ -->
+<div class="suggestions-bar">
+  <div class="suggestions-inner" id="suggestions"></div>
+</div>
+
+<!-- ════════════════════ INPUT ════════════════════ -->
+<div class="input-bar">
+  <div class="input-wrapper">
+    <input type="text" id="chatInput" placeholder="Ask about any MUTCD section, standard, or warrant…" autocomplete="off">
+    <button class="send-btn" id="sendBtn" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+  <div class="input-footer">Powered by CRASH LENS AI · References require manual verification</div>
+</div>
+
+<script>
+// ──────────────────────────────────────────────────────────────
+//  DATA
+// ──────────────────────────────────────────────────────────────
+const MESSAGES = [
+  {
+    id: 1, role: "assistant",
+    text: "Welcome to the MUTCD Assistant. I can help you find sections, standards, guidance, and options from the Manual on Uniform Traffic Control Devices. What would you like to look up?",
+    references: [], timestamp: "10:30 AM"
+  },
+  {
+    id: 2, role: "user",
+    text: "What are the warrant criteria for installing a traffic signal at an intersection?",
+    timestamp: "10:31 AM"
+  },
+  {
+    id: 3, role: "assistant",
+    text: `Signal warrants are detailed in Chapter 4C of the MUTCD. There are nine traffic signal warrants that must be evaluated before a signal can be installed:
+
+1. <strong>Warrant 1</strong> — Eight-Hour Vehicular Volume
+2. <strong>Warrant 2</strong> — Four-Hour Vehicular Volume
+3. <strong>Warrant 3</strong> — Peak Hour
+4. <strong>Warrant 4</strong> — Pedestrian Volume
+5. <strong>Warrant 5</strong> — School Crossing
+6. <strong>Warrant 6</strong> — Coordinated Signal System
+7. <strong>Warrant 7</strong> — Crash Experience
+8. <strong>Warrant 8</strong> — Roadway Network
+9. <strong>Warrant 9</strong> — Intersection Near a Grade Crossing
+
+A signal <strong>SHALL NOT</strong> be installed unless an engineering study indicates that one or more warrants are met. Even if warrants are satisfied, a signal should not be installed if it would seriously disrupt progressive traffic flow.`,
+    references: [
+      { id: "ref-1", section: "4C.01", title: "Studies and Factors for Justifying Traffic Control Signals", page: "443", edition: "11th Edition (2023)", type: "Standard", verified: null },
+      { id: "ref-2", section: "4C.02", title: "Warrant 1, Eight-Hour Vehicular Volume", page: "446", edition: "11th Edition (2023)", type: "Standard", verified: null },
+      { id: "ref-3", section: "4C.10", title: "Warrant 9, Intersection Near a Grade Crossing", page: "470", edition: "11th Edition (2023)", type: "Standard", verified: null }
+    ],
+    timestamp: "10:31 AM"
+  },
+  {
+    id: 4, role: "user",
+    text: "Tell me more about Warrant 7 — Crash Experience. What are the specific thresholds?",
+    timestamp: "10:33 AM"
+  },
+  {
+    id: 5, role: "assistant",
+    text: `Warrant 7, Crash Experience, is satisfied when <strong>all</strong> of the following conditions are met:
+
+• Adequate trial of alternatives with satisfactory observance and enforcement has failed to reduce the crash frequency.
+
+• <strong>Five or more</strong> reported crashes of types susceptible to correction by traffic signal installation have occurred within a <strong>12-month period</strong>, each involving personal injury or property damage apparently exceeding the applicable threshold.
+
+• The volume thresholds for Condition A or Condition B of Warrant 1 (Eight-Hour Vehicular Volume) are satisfied at <strong>80% or more</strong> of the stated values.
+
+• A traffic signal <strong>SHALL NOT</strong> be installed based solely on Warrant 7 without also verifying that other reasonable measures have been tried and found inadequate.`,
+    references: [
+      { id: "ref-4", section: "4C.08", title: "Warrant 7, Crash Experience", page: "466", edition: "11th Edition (2023)", type: "Standard", verified: null },
+      { id: "ref-5", section: "4C.01", title: "Studies and Factors for Justifying Traffic Control Signals", page: "443", edition: "11th Edition (2023)", type: "Guidance", verified: null }
+    ],
+    timestamp: "10:33 AM"
+  }
+];
+
+const SUGGESTIONS = [
+  "What are the STOP sign warrants?",
+  "Pedestrian hybrid beacon standards",
+  "Speed limit sign placement rules",
+  "Flashing Yellow Arrow requirements",
+  "Work zone sign spacing guidelines",
+  "Roundabout signing and marking"
+];
+
+// ──────────────────────────────────────────────────────────────
+//  SVG SNIPPETS
+// ──────────────────────────────────────────────────────────────
+const SVG = {
+  check:   `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+  x:       `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+  pending: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  chevron: `<svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`,
+  book:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+  copy:    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  sparkle: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+  star:    `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+};
+
+// ──────────────────────────────────────────────────────────────
+//  RENDER
+// ──────────────────────────────────────────────────────────────
+const chatArea = document.getElementById("chatArea");
+const chatInput = document.getElementById("chatInput");
+const sendBtn = document.getElementById("sendBtn");
+const suggestionsEl = document.getElementById("suggestions");
+
+let allMessages = JSON.parse(JSON.stringify(MESSAGES));
+
+function getStatusInfo(verified) {
+  if (verified === true)  return { icon: SVG.check,   label: "Verified",       cls: "verified" };
+  if (verified === false) return { icon: SVG.x,       label: "Flagged",        cls: "flagged"  };
+  return                         { icon: SVG.pending,  label: "Pending Review", cls: "pending"  };
+}
+
+function getTypeCls(type) {
+  if (type === "Standard") return "standard";
+  if (type === "Guidance") return "guidance";
+  return "option";
+}
+
+function renderRefCard(ref) {
+  const status = getStatusInfo(ref.verified);
+  const dataStatus = ref.verified === true ? "verified" : ref.verified === false ? "flagged" : "";
+  return `
+    <div class="ref-card" id="${ref.id}" ${dataStatus ? `data-status="${dataStatus}"` : ""}>
+      <div class="ref-header" onclick="toggleRef('${ref.id}')">
+        <div class="ref-header-left">
+          ${SVG.chevron}
+          <span class="ref-section">§ ${ref.section}</span>
+          <span class="type-badge ${getTypeCls(ref.type)}">${ref.type}</span>
+        </div>
+        <div class="ref-header-right">
+          ${status.icon}
+          <span class="status-text ${status.cls}">${status.label}</span>
+        </div>
+      </div>
+      <div class="ref-body">
+        <div class="ref-detail">
+          <span class="ref-label">Title</span>
+          <span class="ref-value">${ref.title}</span>
+        </div>
+        <div class="ref-detail-row">
+          <div class="ref-detail">
+            <span class="ref-label">Page</span>
+            <span class="ref-value">${ref.page}</span>
+          </div>
+          <div class="ref-detail">
+            <span class="ref-label">Edition</span>
+            <span class="ref-value">${ref.edition}</span>
+          </div>
+        </div>
+        <div class="ref-actions">
+          <button class="verify-btn accept" onclick="verifyRef('${ref.id}', true)">
+            ${SVG.check} Verify
+          </button>
+          <button class="verify-btn reject" onclick="verifyRef('${ref.id}', false)">
+            ${SVG.x} Flag Issue
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderMessage(msg) {
+  const isUser = msg.role === "user";
+  const hasRefs = msg.references && msg.references.length > 0;
+
+  let html = `<div class="msg-row ${msg.role}">`;
+
+  if (!isUser) {
+    html += `<div class="avatar">${SVG.star}</div>`;
+  }
+
+  html += `<div class="msg-content">`;
+  html += `<div class="bubble ${isUser ? 'user-bubble' : 'assistant-bubble'}">`;
+  html += `<div>${msg.text.replace(/\n/g, '<br>')}</div>`;
+
+  if (!isUser) {
+    html += `
+      <div class="bubble-footer">
+        <span class="timestamp">${msg.timestamp}</span>
+        <button class="copy-btn" onclick="copyText(this, ${JSON.stringify(msg.text).replace(/"/g, '&quot;')})">
+          ${SVG.copy} <span>Copy</span>
+        </button>
+      </div>`;
+  }
+  html += `</div>`;
+
+  if (hasRefs) {
+    html += `
+      <div class="refs-container">
+        <div class="refs-header">
+          ${SVG.book}
+          <span class="label">MUTCD REFERENCES</span>
+          <span class="ref-count">${msg.references.length}</span>
+        </div>
+        ${msg.references.map(renderRefCard).join('')}
+      </div>`;
+  }
+
+  if (isUser) {
+    html += `<span class="timestamp" style="text-align:right">${msg.timestamp}</span>`;
+  }
+
+  html += `</div></div>`;
+  return html;
+}
+
+function renderAll() {
+  chatArea.innerHTML = allMessages.map(renderMessage).join('');
+  updateCounts();
+  scrollToBottom();
+}
+
+function scrollToBottom() {
+  requestAnimationFrame(() => { chatArea.scrollTop = chatArea.scrollHeight; });
+}
+
+// ──────────────────────────────────────────────────────────────
+//  INTERACTIONS
+// ──────────────────────────────────────────────────────────────
+function toggleRef(refId) {
+  const el = document.getElementById(refId);
+  if (el) el.classList.toggle("open");
+}
+
+function findRef(refId) {
+  for (const msg of allMessages) {
+    if (!msg.references) continue;
+    const r = msg.references.find(r => r.id === refId);
+    if (r) return r;
+  }
+  return null;
+}
+
+function verifyRef(refId, isVerified) {
+  const ref = findRef(refId);
+  if (ref) ref.verified = isVerified;
+  renderAll();
+}
+
+function updateCounts() {
+  let verified = 0, flagged = 0, total = 0;
+  for (const msg of allMessages) {
+    if (!msg.references) continue;
+    for (const r of msg.references) {
+      total++;
+      if (r.verified === true) verified++;
+      else if (r.verified === false) flagged++;
+    }
+  }
+  document.getElementById("verifiedCount").textContent = verified;
+  document.getElementById("flaggedCount").textContent = flagged;
+  document.getElementById("pendingCount").textContent = total - verified - flagged;
+}
+
+function copyText(btn, text) {
+  // Strip HTML tags for clipboard
+  const tmp = document.createElement("div");
+  tmp.innerHTML = text;
+  navigator.clipboard.writeText(tmp.textContent || tmp.innerText);
+  const span = btn.querySelector("span");
+  span.textContent = "Copied!";
+  setTimeout(() => { span.textContent = "Copy"; }, 1500);
+}
+
+function sendMessage() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+
+  const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  allMessages.push({ id: Date.now(), role: "user", text, timestamp: now });
+  renderAll();
+  chatInput.value = "";
+  sendBtn.disabled = true;
+
+  // Typing indicator
+  const typingHtml = `
+    <div class="msg-row assistant" id="typingIndicator" style="animation:fadeSlideIn .3s ease both">
+      <div class="avatar">${SVG.star}</div>
+      <div class="typing-bubble">
+        <div class="typing-dots"><span></span><span></span><span></span></div>
+        <span class="typing-label">Searching MUTCD…</span>
+      </div>
+    </div>`;
+  chatArea.insertAdjacentHTML("beforeend", typingHtml);
+  scrollToBottom();
+
+  setTimeout(() => {
+    const el = document.getElementById("typingIndicator");
+    if (el) el.remove();
+
+    const replyTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    allMessages.push({
+      id: Date.now() + 1, role: "assistant",
+      text: "I'm searching the MUTCD for relevant sections. In a production build, this response would contain the applicable standards, guidance, options, and support language along with verifiable references.",
+      references: [
+        { id: `ref-${Date.now()}`, section: "—", title: "Pending lookup…", page: "—", edition: "11th Edition (2023)", type: "Standard", verified: null }
+      ],
+      timestamp: replyTime
+    });
+    renderAll();
+  }, 2200);
+}
+
+// Suggestions
+function renderSuggestions() {
+  suggestionsEl.innerHTML = SUGGESTIONS.map(q => `
+    <button class="suggest-btn" onclick="useSuggestion(this)">
+      ${SVG.sparkle} ${q}
+    </button>`).join('');
+}
+
+function useSuggestion(btn) {
+  chatInput.value = btn.textContent.trim();
+  chatInput.focus();
+  sendBtn.disabled = false;
+}
+
+// Input events
+chatInput.addEventListener("input", () => {
+  sendBtn.disabled = !chatInput.value.trim();
+});
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") sendMessage();
+});
+sendBtn.addEventListener("click", sendMessage);
+
+// ──────────────────────────────────────────────────────────────
+//  INIT
+// ──────────────────────────────────────────────────────────────
+renderAll();
+renderSuggestions();
+</script>
+</body>
+</html>
