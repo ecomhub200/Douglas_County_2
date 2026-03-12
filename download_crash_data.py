@@ -318,6 +318,11 @@ def download_from_arcgis(config, jurisdiction_config):
         count = get_arcgis_record_count(api_url, successful_clause)
         logger.info(f"Total records in dataset: {count}")
 
+        # Warn if dataset is suspiciously small (likely district-specific, not statewide)
+        if count < 50000:
+            logger.warning(f"API has only {count:,} records — likely a district-specific dataset, not statewide")
+            logger.warning("This endpoint may not contain data for the requested jurisdiction")
+
     # Download with pagination
     offset = 0
     while offset < count:
@@ -339,20 +344,53 @@ def download_from_arcgis(config, jurisdiction_config):
 
 
 def download_from_fallback(config):
-    """Download crash data from fallback CSV URL with retry logic."""
+    """Download crash data from fallback CSV URL with retry logic.
+
+    ArcGIS Hub may return a JSON "Pending" status for large datasets that are
+    generated asynchronously. This function polls until the CSV is ready.
+    """
     fallback_url = config.get('dataSource', {}).get('fallbackUrl',
         "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0")
 
-    logger.info(f"Attempting download from fallback CSV URL: {fallback_url}")
+    max_poll_attempts = 6
+    poll_interval_seconds = 30  # Total max wait: ~3 minutes
 
-    response = make_request_with_retry(fallback_url, timeout=300, max_manual_retries=4)
+    logger.info(f"Downloading from CSV URL: {fallback_url}")
 
-    # Save temporarily and read as CSV
     import io
-    df = pd.read_csv(io.StringIO(response.text))
 
-    logger.info(f"Downloaded {len(df)} records from fallback URL")
-    return df
+    for attempt in range(max_poll_attempts):
+        response = make_request_with_retry(fallback_url, timeout=300, max_manual_retries=4)
+        text = response.text.strip()
+
+        # Check for async generation response (ArcGIS Hub returns JSON when generating)
+        if text.startswith('{'):
+            try:
+                status = json.loads(text)
+                if status.get('status') == 'Pending' or 'being generated' in status.get('message', ''):
+                    if attempt < max_poll_attempts - 1:
+                        logger.info(f"CSV generation pending, polling in {poll_interval_seconds}s "
+                                    f"(attempt {attempt + 1}/{max_poll_attempts})...")
+                        time.sleep(poll_interval_seconds)
+                        continue
+                    else:
+                        raise Exception(
+                            f"CSV still pending after {max_poll_attempts * poll_interval_seconds}s. "
+                            f"The ArcGIS Hub may be slow — try again later.")
+            except json.JSONDecodeError:
+                pass  # Not valid JSON, try parsing as CSV below
+
+        # Parse as CSV
+        df = pd.read_csv(io.StringIO(text))
+
+        # Validate it looks like real crash data
+        if len(df) < 10 or len(df.columns) < 5:
+            raise Exception(f"CSV appears empty or malformed ({len(df)} rows, {len(df.columns)} columns)")
+
+        logger.info(f"Downloaded {len(df)} records from CSV endpoint")
+        return df
+
+    raise Exception("CSV download timed out waiting for file generation")
 
 
 def filter_jurisdiction(df, jurisdiction_config):

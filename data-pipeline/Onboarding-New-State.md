@@ -893,3 +893,5 @@ When onboarding is complete, you should have touched exactly these files:
 | State adapter detects wrong state | Detection signature columns overlap with another state | Make `required` columns more specific (add more unique columns) |
 | Pipeline Stage 3 skips splitting | `download_mode` is `individual` not `statewide` | Only triggers when >3 jurisdictions. Single jurisdiction runs skip this stage. |
 | Geocoding hits rate limit | Too many missing coordinates | Set `cache_config.geocode_ttl_days` higher, ensure GPS columns are populated |
+| CSV endpoint returns JSON `"status":"Pending"` | ArcGIS Hub generates large CSV files asynchronously | `download_from_fallback()` polls every 30s for up to 3 minutes. If still pending, falls back to ArcGIS API. |
+| ArcGIS API has <50k records for a statewide dataset | Endpoint is district-specific, not statewide | Use the CSV endpoint as primary source. The script warns when record count is suspiciously low. Verify the ArcGIS endpoint covers the whole state before relying on it. |
