@@ -1,0 +1,420 @@
+# ==============================================================================
+# Universal State Crash Data Download Workflow
+# ==============================================================================
+# Single workflow that replaces all per-state download-{state}-crash-data.yml
+# files. Reads states/download-registry.json to resolve the correct script,
+# data directory, and invocation pattern for each state.
+#
+# Tiers:
+#   Tier 1 (Virginia, Colorado): Scope-aware, triggers pipeline.yml
+#   Tier 2 (Maryland): Jurisdiction-specific, R2 upload
+#   Tier 3 (Generic): --data-dir, --jurisdiction, --years, --gzip, R2 upload
+#
+# Existing per-state workflows are NOT deleted — they still work for states
+# that need custom UI (e.g., Maryland's jurisdiction dropdown). This universal
+# workflow provides a single entry point for all states.
+# ==============================================================================
+
+name: "Download: State Crash Data"
+
+on:
+  workflow_dispatch:
+    inputs:
+      state:
+        description: 'State to download'
+        required: true
+        type: choice
+        options:
+          - virginia
+          - colorado
+          - maryland
+          - alaska
+          - arkansas
+          - connecticut
+          - delaware
+          - florida
+          - georgia
+          - hawaii
+          - idaho
+          - illinois
+          - iowa
+          - louisiana
+          - massachusetts
+          - mississippi
+          - montana
+          - nevada
+          - new_york
+          - nyc
+          - ohio
+          - oklahoma
+          - oregon
+          - pennsylvania
+          - south_carolina
+          - texas
+          - utah
+          - vermont
+          - washington
+          - west_virginia
+          - wisconsin
+
+      jurisdiction:
+        description: 'Jurisdiction to filter (blank = statewide)'
+        required: false
+        default: ''
+        type: string
+
+      filter:
+        description: 'Road type filter (Virginia only)'
+        required: false
+        type: choice
+        default: 'countyOnly'
+        options:
+          - countyOnly
+          - countyPlusVDOT
+          - allRoads
+
+      years:
+        description: 'Space-separated years (blank = all available)'
+        required: false
+        default: ''
+        type: string
+
+      force_download:
+        description: 'Force re-download (skip cache)'
+        required: false
+        type: boolean
+        default: false
+
+      skip_pipeline:
+        description: 'Skip pipeline trigger (Tier 1 states only)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  # ============================================================
+  # JOB: Resolve registry and download
+  # ============================================================
+  download:
+    name: "Download (${{ github.event.inputs.state }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    outputs:
+      state: ${{ github.event.inputs.state }}
+      tier: ${{ steps.registry.outputs.tier }}
+      display_name: ${{ steps.registry.outputs.display_name }}
+      dot_dir: ${{ steps.registry.outputs.dot_dir }}
+      r2_prefix: ${{ steps.registry.outputs.r2_prefix }}
+      jurisdiction: ${{ steps.args.outputs.jurisdiction }}
+      csv_path: ${{ steps.download.outputs.csv_path }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ── Step 1: Read registry ──
+      - name: Resolve from download registry
+        id: registry
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+
+          # Parse registry
+          REGISTRY="states/download-registry.json"
+          if [ ! -f "$REGISTRY" ]; then
+            echo "::error::Registry file not found: $REGISTRY"
+            exit 1
+          fi
+
+          # Extract state config
+          ENTRY=$(python3 -c "
+          import json, sys
+          with open('$REGISTRY') as f:
+              reg = json.load(f)
+          state = '$STATE'
+          if state not in reg:
+              print(f'::error::State {state} not found in registry', file=sys.stderr)
+              sys.exit(1)
+          e = reg[state]
+          print(f\"tier={e.get('tier', 3)}\")
+          print(f\"display_name={e.get('displayName', state.replace('_', ' ').title())}\")
+          print(f\"dot_dir={e.get('dotDir', '')}\")
+          print(f\"script={e.get('script', '')}\")
+          print(f\"r2_prefix={e.get('r2Prefix', state)}\")
+          print(f\"requires_playwright={str(e.get('requiresPlaywright', False)).lower()}\")
+          print(f\"default_jurisdiction={e.get('defaultJurisdiction', 'statewide')}\")
+          ")
+
+          echo "$ENTRY" >> $GITHUB_OUTPUT
+          echo "Registry resolved for $STATE:"
+          echo "$ENTRY"
+
+      # ── Step 2: Install dependencies ──
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            pip install pandas requests openpyxl
+          fi
+
+          # Install Playwright only if needed (Colorado)
+          if [ "${{ steps.registry.outputs.requires_playwright }}" = "true" ]; then
+            pip install playwright
+            playwright install chromium
+          fi
+
+          # Install AWS CLI for R2 uploads (Tier 2 & 3)
+          TIER="${{ steps.registry.outputs.tier }}"
+          if [ "$TIER" != "1" ]; then
+            pip install awscli
+          fi
+
+      # ── Step 3: Build download arguments ──
+      - name: Build download arguments
+        id: args
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+          TIER="${{ steps.registry.outputs.tier }}"
+          SCRIPT="${{ steps.registry.outputs.script }}"
+          DOT_DIR="${{ steps.registry.outputs.dot_dir }}"
+          DEFAULT_JURIS="${{ steps.registry.outputs.default_jurisdiction }}"
+          FORCE="${{ github.event.inputs.force_download }}"
+          YEARS="${{ github.event.inputs.years }}"
+          FILTER="${{ github.event.inputs.filter || 'countyOnly' }}"
+          INPUT_JURIS="${{ github.event.inputs.jurisdiction }}"
+
+          # Resolve jurisdiction
+          JURISDICTION="${INPUT_JURIS:-$DEFAULT_JURIS}"
+          echo "jurisdiction=$JURISDICTION" >> $GITHUB_OUTPUT
+
+          # Build args based on tier
+          if [ "$TIER" = "1" ]; then
+            # Tier 1: Virginia/Colorado — scope-aware
+            ARGS="--output-dir $DOT_DIR"
+            if [ "$FORCE" = "true" ]; then
+              ARGS="$ARGS --force-download"
+            fi
+
+            if [ "$STATE" = "virginia" ]; then
+              if [ -z "$INPUT_JURIS" ] || [ "$INPUT_JURIS" = "statewide" ]; then
+                ARGS="$ARGS --jurisdiction henrico --save-statewide --filter $FILTER"
+              else
+                ARGS="$ARGS --jurisdiction $JURISDICTION --filter $FILTER"
+              fi
+            elif [ "$STATE" = "colorado" ]; then
+              if [ -n "$YEARS" ]; then
+                ARGS="$ARGS --years $YEARS"
+              fi
+              if [ -z "$INPUT_JURIS" ] || [ "$INPUT_JURIS" = "statewide" ]; then
+                ARGS="$ARGS --save-statewide-gzip"
+              else
+                ARGS="$ARGS --jurisdiction $JURISDICTION"
+              fi
+            fi
+
+          else
+            # Tier 2 & 3: Generic pattern
+            ARGS="--data-dir $DOT_DIR"
+            ARGS="$ARGS --jurisdiction $JURISDICTION"
+            if [ -n "$YEARS" ]; then
+              ARGS="$ARGS --years $YEARS"
+            fi
+            if [ "$FORCE" = "true" ]; then
+              ARGS="$ARGS --force"
+            fi
+            ARGS="$ARGS --gzip"
+          fi
+
+          echo "args=$ARGS" >> $GITHUB_OUTPUT
+          echo "script=$SCRIPT" >> $GITHUB_OUTPUT
+          echo "Download args: python $SCRIPT $ARGS"
+
+      # ── Step 4: Download ──
+      - name: "Download crash data"
+        id: download
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+          SCRIPT="${{ steps.args.outputs.script }}"
+          ARGS="${{ steps.args.outputs.args }}"
+          TIER="${{ steps.registry.outputs.tier }}"
+          DOT_DIR="${{ steps.registry.outputs.dot_dir }}"
+          JURISDICTION="${{ steps.args.outputs.jurisdiction }}"
+
+          echo "=========================================="
+          echo "Downloading ${{ steps.registry.outputs.display_name }} Crash Data"
+          echo "Tier: $TIER | Script: $SCRIPT"
+          echo "Started: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "=========================================="
+
+          python "$SCRIPT" $ARGS
+
+          # Determine output CSV path
+          if [ "$TIER" = "1" ]; then
+            if [ "$STATE" = "virginia" ]; then
+              if [ -f "$DOT_DIR/virginia_statewide_all_roads.csv" ]; then
+                CSV_PATH="$DOT_DIR/virginia_statewide_all_roads.csv"
+              else
+                CSV_PATH="$DOT_DIR/${JURISDICTION}_all_roads.csv"
+              fi
+            elif [ "$STATE" = "colorado" ]; then
+              if [ -f "$DOT_DIR/colorado_statewide_all_roads.csv" ]; then
+                CSV_PATH="$DOT_DIR/colorado_statewide_all_roads.csv"
+              else
+                CSV_PATH="$DOT_DIR/${JURISDICTION}_all_roads.csv"
+              fi
+            fi
+          else
+            # Tier 2/3: find the output files
+            CSV_PATH=$(ls -t "$DOT_DIR"/*.csv "$DOT_DIR"/*.csv.gz 2>/dev/null | head -1 || echo "")
+          fi
+
+          echo "csv_path=$CSV_PATH" >> $GITHUB_OUTPUT
+          echo "Download complete: $CSV_PATH"
+
+      # ── Step 5: Upload to R2 (Tier 2 & 3 only) ──
+      - name: Upload CSVs to R2
+        if: steps.registry.outputs.tier != '1'
+        id: r2-upload
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        run: |
+          DOT_DIR="${{ steps.registry.outputs.dot_dir }}"
+          R2_PREFIX="${{ steps.registry.outputs.r2_prefix }}"
+          JURISDICTION="${{ steps.args.outputs.jurisdiction }}"
+          UPLOADED=0
+
+          for f in "$DOT_DIR"/*.csv.gz; do
+            [ -f "$f" ] || continue
+            BASENAME=$(basename "$f" .csv.gz)
+            if aws s3 cp "$f" "s3://crash-lens-data/${R2_PREFIX}/${JURISDICTION}/${BASENAME}.csv.gz" \
+              --endpoint-url "$R2_ENDPOINT" --content-type "application/gzip"; then
+              echo "  Uploaded: $f -> ${R2_PREFIX}/${JURISDICTION}/${BASENAME}.csv.gz"
+              UPLOADED=$((UPLOADED + 1))
+            fi
+          done
+
+          echo "uploaded=$UPLOADED" >> $GITHUB_OUTPUT
+          if [ "$UPLOADED" -eq 0 ]; then
+            echo "::warning::No CSV.gz files uploaded to R2"
+          fi
+
+      # ── Step 6: Commit (Tier 1: data to git; Tier 2/3: metadata only) ──
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          STATE="${{ github.event.inputs.state }}"
+          TIER="${{ steps.registry.outputs.tier }}"
+          DISPLAY="${{ steps.registry.outputs.display_name }}"
+          DOT_DIR="${{ steps.registry.outputs.dot_dir }}"
+          JURISDICTION="${{ steps.args.outputs.jurisdiction }}"
+          CSV_PATH="${{ steps.download.outputs.csv_path }}"
+
+          if [ "$TIER" = "1" ]; then
+            # Tier 1: commit the CSV to git
+            if [ -n "$CSV_PATH" ] && [ -f "$CSV_PATH" ]; then
+              git add --force "$CSV_PATH"
+            fi
+            git add "$DOT_DIR"/ 2>/dev/null || true
+          else
+            # Tier 2/3: commit only metadata (CSVs are in R2)
+            git add data/r2-manifest.json 2>/dev/null || true
+            git add "$DOT_DIR"/.validation/ 2>/dev/null || true
+          fi
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          if [ "$TIER" = "1" ]; then
+            git commit -m "data: $STATE download ($JURISDICTION)"
+          else
+            git commit -m "chore: update $DISPLAY crash data ($JURISDICTION) -> R2 [$(date +'%Y-%m-%d')]"
+          fi
+
+          MAX_RETRIES=4
+          for i in $(seq 1 $MAX_RETRIES); do
+            if git push; then echo "Push successful"; exit 0; fi
+            sleep $((2 ** i))
+            git fetch origin main
+            git rebase origin/main || { git rebase --abort 2>/dev/null || true; git pull --no-edit origin main; }
+          done
+          echo "ERROR: Push failed after $MAX_RETRIES attempts"
+          exit 1
+
+      # ── Step 7: Job summary ──
+      - name: Job summary
+        if: always()
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+          DISPLAY="${{ steps.registry.outputs.display_name }}"
+          TIER="${{ steps.registry.outputs.tier }}"
+          JURISDICTION="${{ steps.args.outputs.jurisdiction }}"
+          UPLOADED="${{ steps.r2-upload.outputs.uploaded || 'N/A' }}"
+          CSV_PATH="${{ steps.download.outputs.csv_path }}"
+
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          ## ${DISPLAY} Crash Data Download
+
+          | Metric | Value |
+          |--------|-------|
+          | State | ${DISPLAY} (${STATE}) |
+          | Tier | ${TIER} |
+          | Jurisdiction | ${JURISDICTION} |
+          | Output | \`${CSV_PATH}\` |
+          | R2 uploads | ${UPLOADED} |
+          | Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
+          EOF
+
+  # ============================================================
+  # JOB: Trigger pipeline (Tier 1 only)
+  # ============================================================
+  trigger-pipeline:
+    name: "Trigger pipeline"
+    needs: download
+    if: |
+      needs.download.outputs.tier == '1' &&
+      github.event.inputs.skip_pipeline != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const state = '${{ needs.download.outputs.state }}';
+            const jurisdiction = '${{ needs.download.outputs.jurisdiction }}';
+            const csvPath = '${{ needs.download.outputs.csv_path }}';
+
+            // Determine scope from jurisdiction
+            const scope = (!jurisdiction || jurisdiction === 'statewide') ? 'statewide' : 'jurisdiction';
+            const selection = scope === 'statewide' ? '' : jurisdiction;
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pipeline.yml',
+              ref: 'main',
+              inputs: {
+                state: state,
+                scope: scope,
+                selection: selection,
+                data_source: csvPath,
+                skip_forecasts: 'false'
+              }
+            });
+            console.log(`Pipeline triggered for ${state} (${scope}/${selection})`);

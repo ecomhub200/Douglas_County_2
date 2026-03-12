@@ -101,7 +101,7 @@ on:
         description: 'Road type filter (Virginia only — other states ignore this)'
         required: false
         type: choice
-        default: 'allRoads'
+        default: 'countyOnly'
         options:
           - countyOnly
           - countyPlusVDOT
@@ -162,7 +162,7 @@ jobs:
         run: |
           STATE="${{ github.event.inputs.state }}"
           FORCE="${{ github.event.inputs.force_download }}"
-          FILTER="${{ github.event.inputs.filter || 'allRoads' }}"
+          FILTER="${{ github.event.inputs.filter || 'countyOnly' }}"
 
           echo "=========================================="
           echo "Stage 1: Download statewide data for $STATE"
