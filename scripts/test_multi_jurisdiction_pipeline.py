@@ -525,7 +525,7 @@ def test_frontend_changes(results, verbose=False):
 
 
 def test_workflow_file(results, verbose=False):
-    """Test 9: Verify batch workflow YAML is valid."""
+    """Test 9: Verify batch workflow YAML delegates to pipeline.yml."""
     print("\n--- Test 9: Batch Workflow File ---")
 
     workflow = PROJECT_ROOT / '.github' / 'workflows' / 'batch-all-jurisdictions.yml'
@@ -539,17 +539,28 @@ def test_workflow_file(results, verbose=False):
         ('has state input', 'virginia'),
         ('has colorado option', 'colorado'),
         ('has dry_run input', 'dry_run'),
-        ('has split step', 'split_jurisdictions.py'),
-        ('uses AWS CLI for R2', 'aws s3 cp'),
-        ('has statewide gzip upload', '_state/statewide_all_roads.csv.gz'),
-        ('has aggregate generation', 'generate_aggregates.py'),
+        ('triggers pipeline.yml', 'pipeline.yml'),
+        ('uses createWorkflowDispatch', 'createWorkflowDispatch'),
+        ('passes scope statewide', 'statewide'),
+        ('has skip_pipeline input', 'skip_pipeline'),
         ('has job summary', 'GITHUB_STEP_SUMMARY'),
+    ]
+
+    # Verify removed stages are gone
+    removed_checks = [
+        ('no split_jurisdictions.py', 'split_jurisdictions.py'),
+        ('no aws s3 cp', 'aws s3 cp'),
+        ('no generate_aggregates.py', 'generate_aggregates.py'),
+        ('no generate_forecast.py', 'generate_forecast.py'),
     ]
 
     results.check('Workflow: file exists', True)
     for name, pattern in checks:
         found = pattern in content
         results.check(f'Workflow: {name}', found)
+    for name, pattern in removed_checks:
+        absent = pattern not in content
+        results.check(f'Workflow: {name}', absent, 'still present!' if not absent else 'correctly removed')
 
 
 def test_plan_document(results, verbose=False):
