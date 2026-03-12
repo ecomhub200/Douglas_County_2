@@ -1,7 +1,8 @@
 name: Download Delaware Crash Data
 
 # Workflow for Delaware Department of Transportation crash data downloads.
-# Modeled after download-cdot-crash-data.yml
+# Downloads raw data from Socrata, normalizes to Virginia-standard format,
+# uploads to R2, then triggers pipeline.yml for processing.
 
 on:
   schedule:
@@ -28,9 +29,15 @@ on:
         required: false
         type: boolean
         default: false
+      skip_pipeline:
+        description: 'Skip pipeline trigger after download'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  actions: write
 
 env:
   R2_STATE_PREFIX: delaware
@@ -39,6 +46,9 @@ env:
 jobs:
   download-delaware-data:
     runs-on: ubuntu-latest
+    outputs:
+      jurisdiction: ${{ steps.build-args.outputs.jurisdiction }}
+      uploaded: ${{ steps.r2-upload.outputs.uploaded }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -69,7 +79,7 @@ jobs:
           if [ "$FORCE" = "true" ]; then
             ARGS="$ARGS --force"
           fi
-          ARGS="$ARGS --gzip"
+          # Download as plain CSV first (normalization happens before gzip)
           echo "args=$ARGS" >> $GITHUB_OUTPUT
           echo "jurisdiction=$JURISDICTION" >> $GITHUB_OUTPUT
 
@@ -80,6 +90,36 @@ jobs:
           echo "Started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
           python data/DelawareDOT/download_delaware_crash_data.py ${{ steps.build-args.outputs.args }}
+
+      - name: Normalize to Virginia standard
+        id: normalize
+        run: |
+          echo "=========================================="
+          echo "Normalizing ${STATE_DISPLAY} data to Virginia standard"
+          echo "=========================================="
+          NORMALIZED=0
+          for f in data/DelawareDOT/*.csv; do
+            [ -f "$f" ] || continue
+            BASENAME=$(basename "$f" .csv)
+            echo "  Normalizing: $f"
+            python scripts/state_adapter.py \
+              --input "$f" \
+              --output "data/DelawareDOT/${BASENAME}_normalized.csv" \
+              --state delaware
+            # Replace raw with normalized
+            mv "data/DelawareDOT/${BASENAME}_normalized.csv" "$f"
+            NORMALIZED=$((NORMALIZED + 1))
+          done
+          echo "  Normalized $NORMALIZED file(s)"
+          echo "normalized=$NORMALIZED" >> $GITHUB_OUTPUT
+
+      - name: Gzip CSVs for R2 upload
+        run: |
+          for f in data/DelawareDOT/*.csv; do
+            [ -f "$f" ] || continue
+            gzip -f "$f"
+            echo "  Compressed: ${f}.gz"
+          done
 
       - name: Generate download statistics
         id: stats
@@ -148,11 +188,39 @@ jobs:
         run: |
           JURISDICTION="${{ steps.build-args.outputs.jurisdiction }}"
           UPLOADED="${{ steps.r2-upload.outputs.uploaded || '0' }}"
+          NORMALIZED="${{ steps.normalize.outputs.normalized || '0' }}"
           cat >> $GITHUB_STEP_SUMMARY <<EOF
           ## ${STATE_DISPLAY} Crash Data Download — ${JURISDICTION}
           | Metric | Value |
           |--------|-------|
           | Jurisdiction | ${JURISDICTION} |
+          | Files normalized | ${NORMALIZED} |
           | CSVs uploaded to R2 | ${UPLOADED} |
           | Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
           EOF
+
+  # Trigger unified pipeline for processing
+  trigger-pipeline:
+    name: "Trigger pipeline"
+    needs: download-delaware-data
+    if: github.event.inputs.skip_pipeline != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pipeline.yml',
+              ref: 'main',
+              inputs: {
+                state: 'delaware',
+                scope: 'jurisdiction',
+                selection: '${{ needs.download-delaware-data.outputs.jurisdiction }}',
+                data_source: '',
+                skip_forecasts: 'false'
+              }
+            });
+            console.log('Pipeline triggered for Delaware (${{ needs.download-delaware-data.outputs.jurisdiction }})');

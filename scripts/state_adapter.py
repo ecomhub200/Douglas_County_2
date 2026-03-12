@@ -61,6 +61,13 @@ STATE_SIGNATURES = {
         'optional': ['acc_date', 'collision_type_desc', 'weather_desc', 'light_desc'],
         'display_name': 'Maryland (ACRS - Statewide)',
         'config_dir': 'maryland'
+    },
+    'delaware': {
+        'required': ['crash_datetime', 'crash_classification_description', 'latitude', 'longitude'],
+        'optional': ['manner_of_impact_description', 'weather_1_description', 'county_name',
+                     'alcohol_involved', 'drug_involved', 'motorcycle_involved'],
+        'display_name': 'Delaware (DelDOT)',
+        'config_dir': 'delaware'
     }
 }
 
@@ -1221,12 +1228,239 @@ class MarylandNormalizer(BaseNormalizer):
         return n
 
 
+# =============================================================================
+# Delaware Normalizer
+# =============================================================================
+
+class DelawareNormalizer(BaseNormalizer):
+    """
+    Delaware DelDOT crash data normalizer.
+
+    Data source: Socrata SODA API (data.delaware.gov, dataset 827n-m6xc)
+    Crash-level dataset — no person-level injury detail available.
+
+    Key limitations:
+    - Severity: 3 levels only (Fatal/Injury/PDO) → mapped to K/A/O per FHWA guidance
+    - No route/road name field → RTE Name empty (deferred to geocoding pipeline)
+    - No crash ID → composite key from datetime + coordinates
+    - No node/intersection ID → empty (deferred)
+    """
+
+    # Crash classification → KABCO severity
+    # Per FHWA standard: when only crash-level severity is available,
+    # "Personal Injury" → A (conservative; encompasses A/B/C)
+    SEVERITY_MAP = {
+        'Fatal Crash': 'K',
+        'FATAL CRASH': 'K',
+        'fatal crash': 'K',
+        'Personal Injury Crash': 'A',
+        'PERSONAL INJURY CRASH': 'A',
+        'personal injury crash': 'A',
+        'Property Damage Crash': 'O',
+        'PROPERTY DAMAGE CRASH': 'O',
+        'property damage crash': 'O',
+        'Property Damage Only': 'O',
+    }
+
+    # Lighting values that indicate darkness (for Night? flag)
+    DARKNESS_VALUES = {
+        'Dark - Lighted', 'Dark - Not Lighted', 'Dark - Unknown Lighting',
+        'dark - lighted', 'dark - not lighted', 'dark - unknown lighting',
+        'DARK - LIGHTED', 'DARK - NOT LIGHTED', 'DARK - UNKNOWN LIGHTING',
+        'Dark-Lighted', 'Dark-Not Lighted', 'Dark-Unknown',
+    }
+
+    # Delaware contributing circumstance codes that indicate speed-related
+    SPEED_CODES = {
+        '50', '51', '52', '53',  # speed too fast, exceeded limit, etc.
+    }
+
+    # Delaware contributing circumstance codes that indicate distraction
+    DISTRACTED_CODES = {
+        '60', '61', '62', '63', '64', '65', '66',  # distraction-related codes
+    }
+
+    def _get(self, row: Dict[str, str], primary: str, alt: str = '') -> str:
+        """Get field value trying primary name first, then alternate."""
+        val = (row.get(primary) or '').strip()
+        if not val and alt:
+            val = (row.get(alt) or '').strip()
+        return val
+
+    def _is_truthy(self, value: str) -> bool:
+        """Check if a Delaware boolean field value is truthy."""
+        return value.upper() in ('YES', 'TRUE', 'Y', '1') if value else False
+
+    def _build_composite_id(self, row: Dict[str, str], date_str: str, time_str: str) -> str:
+        """Generate composite crash ID from datetime + coordinates."""
+        lat = self._get(row, 'latitude')
+        lon = self._get(row, 'longitude')
+        lat_part = lat.replace('.', '').replace('-', '')[:6] if lat else '000000'
+        lon_part = lon.replace('.', '').replace('-', '')[:6] if lon else '000000'
+        date_compact = date_str.replace('-', '').replace('/', '')[:8] if date_str else '00000000'
+        time_compact = time_str[:4] if time_str else '0000'
+        return f"DE-{date_compact}-{time_compact}-{lat_part}-{lon_part}"
+
+    def normalize_row(self, row: Dict[str, str]) -> Dict[str, str]:
+        n = {}
+
+        # --- Date/Time ---
+        raw_datetime = self._get(row, 'crash_datetime')
+        date_part = ''
+        time_part = ''
+        year_part = ''
+
+        if 'T' in raw_datetime:
+            # ISO format: 2023-01-15T14:30:00.000
+            parts = raw_datetime.split('T')
+            date_part = parts[0]
+            time_str = parts[1].split('.')[0] if len(parts) > 1 else ''
+            time_part = time_str.replace(':', '')[:4]
+            year_part = date_part[:4] if len(date_part) >= 4 else ''
+        elif raw_datetime:
+            date_part = raw_datetime.split(' ')[0]
+            if len(raw_datetime.split(' ')) > 1:
+                time_str = raw_datetime.split(' ')[1]
+                time_part = time_str.replace(':', '')[:4]
+            if '-' in date_part:
+                year_part = date_part[:4]
+            elif '/' in date_part:
+                dparts = date_part.split('/')
+                if len(dparts) == 3:
+                    year_part = dparts[2][:4]
+
+        n['Crash Date'] = date_part
+        n['Crash Year'] = year_part or self._get(row, 'year', '')
+        n['Crash Military Time'] = time_part
+
+        # --- ID (composite key) ---
+        n['Document Nbr'] = self._build_composite_id(row, date_part, time_part)
+
+        # --- Severity ---
+        raw_severity = self._get(row, 'crash_classification_description')
+        severity = self.SEVERITY_MAP.get(raw_severity, 'O')
+        n['Crash Severity'] = severity
+        n['K_People'] = '1' if severity == 'K' else '0'
+        n['A_People'] = '1' if severity == 'A' else '0'
+        n['B_People'] = '0'
+        n['C_People'] = '0'
+
+        # --- Collision Type ---
+        n['Collision Type'] = self._get(row, 'manner_of_impact_description')
+
+        # --- Weather ---
+        n['Weather Condition'] = self._get(row, 'weather_1_description')
+
+        # --- Light ---
+        raw_light = self._get(row, 'lighting_condition_description')
+        n['Light Condition'] = raw_light
+
+        # --- Surface Condition ---
+        n['Roadway Surface Condition'] = self._get(row, 'road_surface_description')
+
+        # --- Road Alignment (not available) ---
+        n['Roadway Alignment'] = ''
+
+        # --- Roadway Description (not available) ---
+        n['Roadway Description'] = ''
+
+        # --- Intersection Type (not available) ---
+        n['Intersection Type'] = ''
+
+        # --- Relation to Roadway ---
+        n['Relation To Roadway'] = ''
+
+        # --- Route & Location (NOT available in Delaware public data) ---
+        n['RTE Name'] = ''
+        n['SYSTEM'] = ''
+        n['Node'] = ''
+        n['RNS MP'] = ''
+
+        # --- Coordinates (x=longitude, y=latitude per Virginia convention) ---
+        n['x'] = self._get(row, 'longitude')
+        n['y'] = self._get(row, 'latitude')
+
+        # --- Jurisdiction ---
+        n['Physical Juris Name'] = self._get(row, 'county_name')
+
+        # --- Boolean flags (available from Delaware dataset) ---
+        n['Pedestrian?'] = 'Yes' if self._is_truthy(self._get(row, 'pedestrian_involved')) else 'No'
+        n['Bike?'] = 'Yes' if self._is_truthy(self._get(row, 'bicycled_involved')) else 'No'
+        n['Alcohol?'] = 'Yes' if self._is_truthy(self._get(row, 'alcohol_involved')) else 'No'
+        n['Drug Related?'] = 'Yes' if self._is_truthy(self._get(row, 'drug_involved')) else 'No'
+        n['Motorcycle?'] = 'Yes' if self._is_truthy(self._get(row, 'motorcycle_involved')) else 'No'
+
+        # Unrestrained = inverse of seatbelt_used
+        seatbelt = self._get(row, 'seatbelt_used')
+        if seatbelt:
+            n['Unrestrained?'] = 'No' if self._is_truthy(seatbelt) else 'Yes'
+        else:
+            n['Unrestrained?'] = 'No'
+
+        # Work Zone
+        n['Work Zone Related'] = 'Yes' if self._is_truthy(self._get(row, 'work_zone')) else 'No'
+
+        # Night (derived from lighting condition)
+        n['Night?'] = 'Yes' if raw_light in self.DARKNESS_VALUES else 'No'
+
+        # Speed & Distracted (derived from contributing circumstance code)
+        contrib_code = self._get(row, 'primary_contributing_circumstance_code')
+        n['Speed?'] = 'Yes' if contrib_code in self.SPEED_CODES else 'No'
+        n['Distracted?'] = 'Yes' if contrib_code in self.DISTRACTED_CODES else 'No'
+
+        # Not available in Delaware public data
+        n['Hitrun?'] = 'No'
+        n['Drowsy?'] = 'No'
+        n['Young?'] = 'No'
+        n['Senior?'] = 'No'
+        n['School Zone'] = 'No'
+
+        # --- Safety fields ---
+        n['Animal Related?'] = 'No'
+        n['Guardrail Related?'] = 'No'
+        n['Lgtruck?'] = 'No'
+        n['RoadDeparture Type'] = ''
+        n['Intersection Analysis'] = ''
+        n['Max Speed Diff'] = ''
+
+        # --- Traffic Control (not available) ---
+        n['Traffic Control Type'] = ''
+        n['Traffic Control Status'] = ''
+
+        # --- Infrastructure fields (not available) ---
+        n['Functional Class'] = ''
+        n['Area Type'] = ''
+        n['Facility Type'] = ''
+        n['Ownership'] = ''
+
+        # --- First Harmful Event (not available) ---
+        n['First Harmful Event'] = ''
+        n['First Harmful Event Loc'] = ''
+
+        # --- Vehicle Count (not available) ---
+        n['Vehicle Count'] = ''
+
+        # --- Injury counts ---
+        n['Persons Injured'] = ''
+        n['Pedestrians Killed'] = '0'
+        n['Pedestrians Injured'] = '0'
+
+        # --- Source tracking ---
+        n['_source_state'] = 'delaware'
+        n['_de_classification_code'] = self._get(row, 'crash_classification_code')
+        n['_de_contrib_code'] = contrib_code
+        n['_de_day_of_week'] = self._get(row, 'day_of_week_description')
+
+        return n
+
+
 # --- Normalizer Registry ---
 _NORMALIZERS = {
     'colorado': ColoradoNormalizer,
     'virginia': VirginiaNormalizer,
     'maryland': MarylandNormalizer,
     'maryland_statewide': MarylandNormalizer,
+    'delaware': DelawareNormalizer,
 }
 
 
@@ -1338,3 +1572,30 @@ def convert_file(
                         pass
 
     return state, total, with_gps
+
+
+# =============================================================================
+# CLI Interface
+# =============================================================================
+
+def main():
+    """Command-line interface for state_adapter.py."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description='Convert raw state crash data CSV to Virginia-standard format',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=f"Supported states: {', '.join(get_supported_states().keys())}"
+    )
+    parser.add_argument('--input', '-i', required=True, help='Path to raw CSV')
+    parser.add_argument('--output', '-o', required=True, help='Path for normalized output CSV')
+    parser.add_argument('--state', '-s', default=None,
+                        help='State key (auto-detected if omitted)')
+    args = parser.parse_args()
+
+    state, total, with_gps = convert_file(args.input, args.output, state=args.state)
+    print(f"Normalized {total:,} rows ({with_gps:,} with GPS) from {state}")
+
+
+if __name__ == '__main__':
+    main()

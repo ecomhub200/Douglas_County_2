@@ -25,6 +25,7 @@ on:
           - virginia
           - colorado
           - maryland
+          - delaware
 
       scope:
         description: 'Processing scope'
