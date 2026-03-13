@@ -53,14 +53,16 @@ VALID_SYSTEM_VALUES = {'NonVDOT secondary', 'Primary', 'Secondary', 'Interstate'
 
 # Road type filter profiles (what SYSTEM values each filter should include)
 FILTER_PROFILES = {
-    'countyOnly': {'NonVDOT secondary'},  # City Street + County Road → NonVDOT secondary
+    'countyOnly': {'NonVDOT secondary'},  # County Road → NonVDOT secondary
+    'cityOnly': set(),  # City/town agency roads (ownership-based, no SYSTEM mapping)
     'countyPlusVDOT': {'NonVDOT secondary', 'Primary', 'Secondary'},
     'allRoads': {'NonVDOT secondary', 'Primary', 'Secondary', 'Interstate'},
 }
 
 # Corresponding Colorado system codes for each filter
 CO_FILTER_PROFILES = {
-    'countyOnly': {'City Street', 'County Road'},
+    'countyOnly': {'County Road'},
+    'cityOnly': {'City Street'},
     'countyPlusVDOT': {'City Street', 'County Road', 'State Highway', 'Frontage Road'},
     'allRoads': {'City Street', 'County Road', 'State Highway', 'Frontage Road', 'Interstate Highway'},
 }
@@ -183,7 +185,7 @@ def test_file_existence(suite):
 
 def test_column_presence(suite):
     """Test 2: Verify required columns exist in standardized CSVs."""
-    for key in ['county_roads', 'no_interstate', 'all_roads']:
+    for key in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
         data = suite.load_csv(key)
         if not data:
             suite.add(f'Columns check: {key}', False, 'File not loaded', 'critical')
@@ -226,7 +228,7 @@ def test_severity_distribution(suite):
     """Test 4: Verify severity values are valid and distribution is reasonable."""
     valid_severities = {'K', 'A', 'B', 'C', 'O'}
 
-    for key in ['county_roads', 'no_interstate', 'all_roads']:
+    for key in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
         data = suite.load_csv(key)
         if not data:
             continue
@@ -283,7 +285,7 @@ def test_severity_distribution(suite):
 
 def test_system_column_values(suite):
     """Test 5: Verify SYSTEM column contains valid Virginia-normalized values."""
-    for key in ['county_roads', 'no_interstate', 'all_roads']:
+    for key in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
         data = suite.load_csv(key)
         if not data:
             continue
@@ -361,7 +363,7 @@ def test_processrow_crash_bug(suite):
 
     This test verifies every row has the data fields needed for full processing.
     """
-    for key in ['county_roads', 'no_interstate', 'all_roads']:
+    for key in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
         data = suite.load_csv(key)
         if not data:
             continue
@@ -444,7 +446,7 @@ def test_no_stale_crashes_csv(suite):
 
 def test_duplicate_records(suite):
     """Test 10: Check for duplicate Document Nbr values."""
-    for key in ['county_roads', 'no_interstate', 'all_roads']:
+    for key in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
         data = suite.load_csv(key)
         if not data:
             continue
@@ -468,7 +470,7 @@ def test_duplicate_records(suite):
 
 def test_gps_coverage(suite):
     """Test 11: Verify GPS coordinate coverage and validity."""
-    for key in ['county_roads', 'no_interstate', 'all_roads']:
+    for key in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
         data = suite.load_csv(key)
         if not data:
             continue
@@ -510,7 +512,7 @@ def test_gps_coverage(suite):
 
 def test_date_integrity(suite):
     """Test 12: Verify crash dates are valid and within expected range."""
-    for key in ['county_roads', 'no_interstate', 'all_roads']:
+    for key in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
         data = suite.load_csv(key)
         if not data:
             continue
@@ -549,8 +551,9 @@ def test_date_integrity(suite):
 
 
 def test_cross_file_consistency(suite):
-    """Test 13: Verify county_roads ⊂ no_interstate ⊂ all_roads."""
+    """Test 13: Verify county_roads ⊂ no_interstate ⊂ all_roads, city_roads ⊂ all_roads."""
     county = suite.load_csv('county_roads')
+    city = suite.load_csv('city_roads')
     no_int = suite.load_csv('no_interstate')
     all_rd = suite.load_csv('all_roads')
 
@@ -572,6 +575,28 @@ def test_cross_file_consistency(suite):
         if county_not_in_noint else 'All county_roads records are in no_interstate',
         'high' if county_not_in_noint else 'info'
     )
+
+    # city_roads ⊂ all_roads? (city_roads may or may not be in no_interstate)
+    if city:
+        city_ids = {row['Document Nbr'] for row in city['rows']}
+        city_not_in_all = city_ids - all_ids
+        suite.add(
+            f'city_roads ⊂ all_roads ({len(city_not_in_all)} leaks)',
+            len(city_not_in_all) == 0,
+            f'{len(city_not_in_all)} city_roads records NOT in all_roads'
+            if city_not_in_all else 'All city_roads records are in all_roads',
+            'high' if city_not_in_all else 'info'
+        )
+
+        # county_roads ∩ city_roads should be empty (disjoint ownership)
+        overlap = county_ids & city_ids
+        suite.add(
+            f'county_roads ∩ city_roads = ∅ ({len(overlap)} overlap)',
+            len(overlap) == 0,
+            f'{len(overlap)} records appear in BOTH county_roads and city_roads'
+            if overlap else 'county_roads and city_roads are disjoint (correct)',
+            'medium' if overlap else 'info'
+        )
 
     # no_interstate ⊂ all_roads?
     noint_not_in_all = no_int_ids - all_ids
@@ -600,7 +625,7 @@ def test_cross_file_consistency(suite):
 
 def test_epdo_calculation(suite):
     """Test 14: Verify EPDO can be calculated correctly from the data."""
-    for key in ['county_roads', 'no_interstate', 'all_roads']:
+    for key in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
         data = suite.load_csv(key)
         if not data:
             continue
@@ -785,7 +810,7 @@ def test_config_json_consistency(suite):
 
 def test_ghost_rows(suite):
     """Test 19: Check for ghost rows (empty year, empty date)."""
-    for key in ['county_roads', 'no_interstate', 'all_roads']:
+    for key in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
         data = suite.load_csv(key)
         if not data:
             continue

@@ -228,7 +228,8 @@ const appConfig = {
         co_adams: { name: 'Adams County', type: 'county', state: 'CO', fips: '001' }
     },
     filterProfiles: {
-        countyOnly: { name: 'County/City Roads Only' },
+        countyOnly: { name: 'County Roads Only' },
+        cityOnly: { name: 'City Roads Only' },
         countyPlusVDOT: { name: 'All Roads (No Interstate)' },
         allRoads: { name: 'All Roads (Incl. Interstates)' }
     },
@@ -265,6 +266,7 @@ function getActiveRoadTypeSuffix(tier) {
     if (activeTier === 'state' || activeTier === 'federal' || activeTier === 'region') {
         const dotMap = {
             'countyOnly':      'dot_roads',
+            'cityOnly':        'city_roads',
             'countyPlusVDOT':  'non_dot_roads',
             'allRoads':        activeTier === 'state' ? 'statewide_all_roads' : 'all_roads'
         };
@@ -273,6 +275,7 @@ function getActiveRoadTypeSuffix(tier) {
 
     const localMap = {
         'countyOnly':      'county_roads',
+        'cityOnly':        'city_roads',
         'countyPlusVDOT':  'no_interstate',
         'allRoads':        'all_roads'
     };
@@ -344,7 +347,7 @@ function resolveDataUrl(localPath) {
         if (stateConfig?.r2Prefix) {
             const filename = normalizedPath.split('/').pop();
             if (filename) {
-                const knownSuffixes = ['_county_roads.csv', '_no_interstate.csv', '_all_roads.csv'];
+                const knownSuffixes = ['_county_roads.csv', '_city_roads.csv', '_no_interstate.csv', '_all_roads.csv'];
                 let jurisdiction = null, filterWithExt = null;
                 for (const suffix of knownSuffixes) {
                     if (filename.endsWith(suffix)) {
@@ -731,6 +734,86 @@ _activeStateKey = 'colorado';
 _activeJurisdiction = 'douglas';
 assertIncludes(getFallbackData(), 'no_interstate.csv',
     '55. Colorado fallback uses no_interstate when countyPlusVDOT selected');
+
+// ─── Test Suite 10: City Roads (4th road type filter) ───
+
+console.log('\n--- City Roads: 4th Road Type Filter ---');
+
+// cityOnly → city_roads for county tier
+_activeStateKey = 'virginia';
+_activeJurisdiction = 'henrico';
+jurisdictionContext.viewTier = 'county';
+
+_setMockRadio('roadTypeFilter', 'cityOnly');
+assertEq(getActiveRoadTypeSuffix(), 'city_roads',
+    '56. cityOnly → city_roads suffix at county tier');
+
+assertEq(getDataFilePath(), 'virginia/henrico/city_roads.csv',
+    '57. Virginia/Henrico/city_roads path when cityOnly selected');
+
+assertEq(getFallbackData(), 'virginia/henrico/city_roads.csv',
+    '58. getFallbackData returns city_roads.csv when cityOnly selected');
+
+assertEq(getPredictionForecastFile(), 'forecasts_city_roads.json',
+    '59. cityOnly → forecasts_city_roads.json');
+
+// cityOnly → city_roads for state tier too
+jurisdictionContext.viewTier = 'state';
+assertEq(getActiveRoadTypeSuffix(), 'city_roads',
+    '60. cityOnly → city_roads suffix at state tier');
+
+jurisdictionContext.viewTier = 'federal';
+assertEq(getActiveRoadTypeSuffix(), 'city_roads',
+    '61. cityOnly → city_roads suffix at federal tier');
+
+// Reset tier
+jurisdictionContext.viewTier = 'county';
+
+// Colorado city_roads
+_activeStateKey = 'colorado';
+_activeJurisdiction = 'douglas';
+_setMockRadio('roadTypeFilter', 'cityOnly');
+assertEq(getDataFilePath(), 'colorado/douglas/city_roads.csv',
+    '62. Colorado/Douglas/city_roads path when cityOnly selected');
+
+// resolveDataUrl with city_roads R2-native path
+_activeStateKey = 'virginia';
+assertEq(
+    resolveDataUrl('virginia/henrico/city_roads.csv'),
+    'https://data.aicreatesai.com/virginia/henrico/city_roads.csv',
+    '63. Resolves Virginia city_roads R2-native path');
+
+assertEq(
+    resolveDataUrl('virginia/henrico/forecasts_city_roads.json'),
+    'https://data.aicreatesai.com/virginia/henrico/forecasts_city_roads.json',
+    '64. Resolves Virginia forecasts_city_roads.json');
+
+// resolveDataUrl with legacy local path containing city_roads
+assertEq(
+    resolveDataUrl('data/henrico_city_roads.csv'),
+    'https://data.aicreatesai.com/virginia/henrico/city_roads.csv',
+    '65. Resolves legacy data/henrico_city_roads.csv to R2 URL via knownSuffixes');
+
+// Verify city_roads path differs from county_roads
+_setMockRadio('roadTypeFilter', 'countyOnly');
+const countyPath = getDataFilePath();
+_setMockRadio('roadTypeFilter', 'cityOnly');
+const cityPath = getDataFilePath();
+assert(countyPath !== cityPath,
+    '66. cityOnly path differs from countyOnly path');
+
+// Verify cityOnly doesn't fall back to county_roads
+assertNotIncludes(cityPath, 'county_roads',
+    '67. cityOnly path does NOT contain county_roads');
+assertIncludes(cityPath, 'city_roads',
+    '68. cityOnly path contains city_roads');
+
+// buildLocalFallbackPaths with city_roads
+const cityFallbacks = buildLocalFallbackPaths('virginia/henrico/city_roads.csv');
+assert(cityFallbacks.some(p => p.includes('henrico_city_roads.csv')),
+    '69. City roads fallback includes henrico_city_roads.csv');
+assert(cityFallbacks.some(p => p.includes('henrico_all_roads.csv')),
+    '70. City roads fallback includes all_roads variant');
 
 // ─── Summary ───
 

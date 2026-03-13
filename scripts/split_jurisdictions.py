@@ -365,6 +365,11 @@ def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
         detail = {'status': 'success', 'records': len(jdf), 'files': {}}
 
         for suffix, profile_key in road_type_map.items():
+            # city_roads requires explicit splitConfig.cityRoads — skip when not configured
+            if suffix == 'city_roads' and (not split_config or 'cityRoads' not in split_config):
+                logger.info(f"    city_roads: skipped (no cityRoads in splitConfig)")
+                continue
+
             if split_config and suffix != 'all_roads':
                 # Use state config splitConfig (ownership, functional_class, etc.)
                 filtered = _apply_split_config_filter(jdf, suffix, split_config)

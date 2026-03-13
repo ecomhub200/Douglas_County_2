@@ -96,7 +96,7 @@ def download_from_r2(state, jurisdiction, data_dir):
     CDN_BASE = "https://data.aicreatesai.com"
     os.makedirs(data_dir, exist_ok=True)
 
-    for rt in ["county_roads", "no_interstate", "all_roads"]:
+    for rt in ["county_roads", "city_roads", "no_interstate", "all_roads"]:
         url = f"{CDN_BASE}/{state}/{jurisdiction}/{rt}.csv"
         local_path = os.path.join(data_dir, f"{jurisdiction}_{rt}.csv")
         print(f"  Downloading {url} → {local_path}")
@@ -1674,9 +1674,14 @@ def generate_single_forecast(csv_path, output_path, horizon, road_type_label=Non
 # Road type configurations matching CRASH LENS UI filter options
 ROAD_TYPE_CONFIGS = {
     "county_roads": {
-        "label": "County/City Roads Only",
+        "label": "County Roads Only",
         "suffix": "county_roads",
         "output": "forecasts_county_roads.json",
+    },
+    "city_roads": {
+        "label": "City Roads Only",
+        "suffix": "city_roads",
+        "output": "forecasts_city_roads.json",
     },
     "no_interstate": {
         "label": "All Roads (No Interstate)",
@@ -1720,7 +1725,7 @@ def main():
             print("ERROR: --jurisdiction is required when using --all-road-types")
             sys.exit(1)
 
-        # Generate forecasts for all 3 road type datasets
+        # Generate forecasts for all road type datasets
         data_dir = os.path.join(project_root, args.data_dir) if not os.path.isabs(args.data_dir) else args.data_dir
 
         # If source is R2, download validated CSVs from CDN first
