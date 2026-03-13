@@ -1,29 +1,41 @@
 # ==============================================================================
-# Batch Download for Any State
+# Download State Crash Data — Universal Multi-Scope Dispatcher
 # ==============================================================================
-# Registry-driven replacement for batch-all-jurisdictions.yml.
-# Reads states/download-registry.json to resolve the correct script,
-# data directory, and invocation pattern for each state.
+# Registry-driven workflow that downloads crash data for ANY state at ANY scope.
 #
-# Flow: Resolve registry → Download statewide → Merge → Convert →
-#       Upload statewide CSV to R2 → Trigger batch-pipeline.yml
+# Supports all 5 scope levels:
+#   - statewide:     All counties in a state → statewide CSV → batch-pipeline
+#   - region:        Counties in a DOT region → statewide CSV → batch-pipeline
+#   - mpo:           Counties in an MPO/TPR  → statewide CSV → batch-pipeline
+#   - jurisdiction:  Single county           → individual CSV → batch-pipeline
+#   - federal:       (Reserved for future cross-state)
 #
-# batch-pipeline.yml then handles:
-#   Split by jurisdiction → Split road type (3 CSVs per county) →
-#   Aggregate → Upload per-county to R2 → Forecasts → Manifest
+# Resolution chain:
+#   1. download-registry.json → script, data dir, invocation pattern
+#   2. hierarchy.json         → regions, MPOs, county FIPS mappings
+#   3. resolve_scope.py       → concrete jurisdiction list + download mode
+#
+# Flow:
+#   Download statewide CSV → Upload to R2 → Trigger batch-pipeline.yml
+#     batch-pipeline handles: Split → Road Type → Aggregate → Upload → Forecast
+#
+# Road type filters:
+#   County scope:        countyOnly / countyPlusVDOT / allRoads
+#                        (produces county_roads.csv, no_interstate.csv, all_roads.csv)
+#   State/Region/MPO:    Handled by batch-pipeline aggregation
+#                        (produces dot_roads.csv, non_dot_roads.csv, statewide_all_roads.csv)
 #
 # WHY R2 instead of git commit?
 #   Statewide CSVs (700MB+) exceed GitHub's 100MB file size limit.
-#   R2 has no file size limit and avoids bloating the git repo.
 # ==============================================================================
 
-name: "Batch Download for Any State"
+name: "Download State Crash Data"
 
 on:
   workflow_dispatch:
     inputs:
       state:
-        description: 'State to download (statewide)'
+        description: 'State to download'
         required: true
         type: choice
         options:
@@ -59,15 +71,32 @@ on:
           - west_virginia
           - wisconsin
 
+      scope:
+        description: 'Processing scope'
+        required: true
+        type: choice
+        default: 'statewide'
+        options:
+          - statewide
+          - region
+          - mpo
+          - jurisdiction
+
+      selection:
+        description: 'Region/MPO/Jurisdiction ID (blank for statewide). Use --list to see available IDs.'
+        required: false
+        default: ''
+        type: string
+
       filter:
-        description: 'Road type filter (Virginia only — other states ignore this)'
+        description: 'Road type filter (county scope only — ignored for state/region/mpo)'
         required: false
         type: choice
-        default: 'countyOnly'
+        default: 'allRoads'
         options:
+          - allRoads
           - countyOnly
           - countyPlusVDOT
-          - allRoads
 
       force_download:
         description: 'Force re-download (skip cache)'
@@ -88,7 +117,7 @@ on:
         default: false
 
       dry_run:
-        description: 'Dry run (no uploads, no commits in batch pipeline)'
+        description: 'Dry run (no uploads, no pipeline trigger)'
         required: false
         type: boolean
         default: false
@@ -102,18 +131,23 @@ env:
 
 jobs:
   # ============================================================
-  # JOB 1: Download statewide data via registry
+  # JOB 1: Resolve scope + download statewide data
   # ============================================================
   download:
-    name: "Download (${{ github.event.inputs.state }})"
+    name: "Download — ${{ github.event.inputs.state }} (${{ github.event.inputs.scope }})"
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
     outputs:
       state: ${{ github.event.inputs.state }}
+      scope: ${{ steps.resolve.outputs.scope }}
+      selection: ${{ steps.resolve.outputs.selection }}
       display_name: ${{ steps.registry.outputs.display_name }}
       dot_dir: ${{ steps.registry.outputs.dot_dir }}
       r2_prefix: ${{ steps.registry.outputs.r2_prefix }}
+      download_mode: ${{ steps.resolve.outputs.download_mode }}
+      jurisdiction_count: ${{ steps.resolve.outputs.jurisdiction_count }}
+      jurisdictions_json: ${{ steps.resolve.outputs.jurisdictions_json }}
       csv_path: ${{ steps.finalize.outputs.csv_path }}
       total_records: ${{ steps.finalize.outputs.total_records }}
       r2_data_key: ${{ steps.r2_upload.outputs.r2_data_key }}
@@ -152,14 +186,82 @@ jobs:
           print(f\"dot_dir={e.get('dotDir', '')}\")
           print(f\"script={e.get('script', '')}\")
           print(f\"r2_prefix={e.get('r2Prefix', state)}\")
+          print(f\"tier={e.get('tier', 3)}\")
           print(f\"requires_playwright={str(e.get('requiresPlaywright', False)).lower()}\")
+          print(f\"default_jurisdiction={e.get('defaultJurisdiction', 'statewide')}\")
           ")
 
           echo "$ENTRY" >> $GITHUB_OUTPUT
           echo "Registry resolved for $STATE:"
           echo "$ENTRY"
 
-      # ── Step 2: Install dependencies ──
+      # ── Step 2: Resolve scope from hierarchy.json ──
+      - name: Resolve scope
+        id: resolve
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+          SCOPE="${{ github.event.inputs.scope }}"
+          SELECTION="${{ github.event.inputs.selection }}"
+
+          # Validate scope + selection combinations
+          if [ "$SCOPE" = "statewide" ]; then
+            SELECTION=""
+          elif [ -z "$SELECTION" ]; then
+            echo "::error::Selection is required for scope=$SCOPE. Run resolve_scope.py --state $STATE --list to see available IDs."
+            exit 1
+          fi
+
+          echo "scope=$SCOPE" >> $GITHUB_OUTPUT
+          echo "selection=$SELECTION" >> $GITHUB_OUTPUT
+
+          # Resolve jurisdictions via hierarchy.json
+          HIERARCHY="states/$STATE/hierarchy.json"
+          if [ ! -f "$HIERARCHY" ]; then
+            echo "::error::No hierarchy.json found for $STATE at $HIERARCHY"
+            exit 1
+          fi
+
+          echo "Resolving scope: state=$STATE scope=$SCOPE selection=$SELECTION"
+          RESOLVED=$(python scripts/resolve_scope.py \
+            --state "$STATE" --scope "$SCOPE" --selection "$SELECTION" --json)
+
+          echo "Resolved: $RESOLVED"
+
+          # Extract fields from resolved JSON
+          DOWNLOAD_MODE=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.load(sys.stdin)['download_mode'])")
+          JCOUNT=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.load(sys.stdin)['jurisdiction_count'])")
+          JURISDICTIONS=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['jurisdictions']))")
+
+          echo "download_mode=$DOWNLOAD_MODE" >> $GITHUB_OUTPUT
+          echo "jurisdiction_count=$JCOUNT" >> $GITHUB_OUTPUT
+          echo "jurisdictions_json=$JURISDICTIONS" >> $GITHUB_OUTPUT
+
+          # Log scope summary
+          echo ""
+          echo "=========================================="
+          echo "Scope Resolution Summary"
+          echo "  State:          $STATE"
+          echo "  Scope:          $SCOPE"
+          echo "  Selection:      ${SELECTION:-'(all)'}"
+          echo "  Download mode:  $DOWNLOAD_MODE"
+          echo "  Jurisdictions:  $JCOUNT"
+          echo "=========================================="
+
+          # Also list what we resolved for the step summary
+          if [ "$SCOPE" = "region" ] || [ "$SCOPE" = "mpo" ]; then
+            REGION_NAME=$(python3 -c "
+          import json
+          with open('states/$STATE/hierarchy.json') as f:
+              h = json.load(f)
+          section = 'regions' if '$SCOPE' == 'region' else 'tprs'
+          entry = h.get(section, {}).get('$SELECTION', {})
+          print(entry.get('name', entry.get('shortName', '$SELECTION')))
+          ")
+            echo "  Resolved name:  $REGION_NAME"
+            echo "region_name=$REGION_NAME" >> $GITHUB_OUTPUT
+          fi
+
+      # ── Step 3: Install dependencies ──
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -176,31 +278,43 @@ jobs:
             playwright install chromium
           fi
 
-      # ── Step 3: Download statewide data ──
+      # ── Step 4: Download statewide data ──
       - name: "Download statewide data"
         id: download
-        timeout-minutes: 45
+        timeout-minutes: 60
         run: |
           STATE="${{ github.event.inputs.state }}"
           SCRIPT="${{ steps.registry.outputs.script }}"
           DOT_DIR="${{ steps.registry.outputs.dot_dir }}"
           FORCE="${{ github.event.inputs.force_download }}"
-          FILTER="${{ github.event.inputs.filter || 'countyOnly' }}"
+          FILTER="${{ github.event.inputs.filter || 'allRoads' }}"
+          SCOPE="${{ steps.resolve.outputs.scope }}"
+          SELECTION="${{ steps.resolve.outputs.selection }}"
+          DOWNLOAD_MODE="${{ steps.resolve.outputs.download_mode }}"
 
           echo "=========================================="
-          echo "Downloading statewide data for $STATE"
-          echo "Script: $SCRIPT"
-          echo "Started: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Downloading data for $STATE"
+          echo "  Script:    $SCRIPT"
+          echo "  Scope:     $SCOPE / ${SELECTION:-statewide}"
+          echo "  Mode:      $DOWNLOAD_MODE"
+          echo "  Filter:    $FILTER (county-scope only)"
+          echo "  Started:   $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
 
           DATA_DIR="$DOT_DIR"
           STATEWIDE=""
 
+          # ── Virginia ──
           if [ "$STATE" = "virginia" ]; then
-            ARGS="--output-dir data --jurisdiction henrico --save-statewide --filter $FILTER"
+            ARGS="--output-dir data"
             if [ "$FORCE" = "true" ]; then
               ARGS="$ARGS --force-download"
             fi
+
+            # Always download statewide — pipeline handles scope filtering
+            ARGS="$ARGS --save-statewide --filter $FILTER"
+            # Use a seed jurisdiction for the Virginia API
+            ARGS="$ARGS --jurisdiction ${{ steps.registry.outputs.default_jurisdiction }}"
             python download_crash_data.py $ARGS
             DATA_DIR="data"
 
@@ -211,6 +325,7 @@ jobs:
               STATEWIDE="data/virginia_statewide_all_roads.csv"
             fi
 
+          # ── Colorado ──
           elif [ "$STATE" = "colorado" ]; then
             python download_cdot_crash_data.py --data-dir data/CDOT --save-statewide-gzip
             DATA_DIR="data/CDOT"
@@ -222,11 +337,11 @@ jobs:
               STATEWIDE="data/CDOT/colorado_statewide_raw.csv"
             fi
 
+          # ── Generic state (Tier 2/3) ──
           else
-            # Generic state: run state-specific download script
             echo "Running: python $SCRIPT --data-dir $DOT_DIR --gzip"
             python "$SCRIPT" --data-dir "$DOT_DIR" --gzip 2>&1 || {
-              echo "::warning::Download script failed, checking for existing data..."
+              echo "::warning::Download script returned non-zero, checking for output..."
             }
 
             # Find the statewide CSV
@@ -237,7 +352,7 @@ jobs:
               fi
             done
 
-            # Try decompressing gzip if no CSV found
+            # Try decompressing gzip if no plain CSV found
             if [ -z "$STATEWIDE" ]; then
               GZ=$(find "$DOT_DIR" -name "*statewide*.csv.gz" -o -name "*.csv.gz" -type f 2>/dev/null | head -1)
               if [ -n "$GZ" ]; then
@@ -249,27 +364,26 @@ jobs:
 
           # Verify statewide CSV exists
           if [ -z "$STATEWIDE" ] || [ ! -f "$STATEWIDE" ]; then
-            echo "::error::Statewide CSV not found for $STATE"
+            echo "::error::Statewide CSV not found for $STATE after download"
             exit 1
           fi
 
           TOTAL=$(wc -l < "$STATEWIDE" | tr -d ' ')
           SIZE=$(ls -lh "$STATEWIDE" | awk '{print $5}')
-          echo "Statewide: $STATEWIDE ($((TOTAL - 1)) records, $SIZE)"
+          echo ""
+          echo "Statewide CSV: $STATEWIDE"
+          echo "  Records: $((TOTAL - 1))"
+          echo "  Size:    $SIZE"
           echo "statewide_path=$STATEWIDE" >> $GITHUB_OUTPUT
           echo "data_dir=$DATA_DIR" >> $GITHUB_OUTPUT
 
-      # ── Step 4: Merge source files if needed ──
-      - name: "Merge source files if needed"
+      # ── Step 5: Merge source files if needed ──
+      - name: "Merge source files (if multi-file)"
         id: merge
         run: |
           STATE="${{ github.event.inputs.state }}"
           STATEWIDE="${{ steps.download.outputs.statewide_path }}"
           DATA_DIR="${{ steps.download.outputs.data_dir }}"
-
-          echo "=========================================="
-          echo "Merge check"
-          echo "=========================================="
 
           # Virginia and Colorado data are already merged by their download scripts
           if [ "$STATE" != "virginia" ] && [ "$STATE" != "colorado" ]; then
@@ -282,7 +396,7 @@ jobs:
                 -o "$DATA_DIR" \
                 --merge --convert-only
               STATEWIDE="$DATA_DIR/statewide_standardized.csv"
-              echo "Merged and converted: $STATEWIDE"
+              echo "Merged: $STATEWIDE"
             else
               echo "Single statewide file — no merge needed"
             fi
@@ -290,7 +404,7 @@ jobs:
 
           echo "statewide_path=${STATEWIDE}" >> $GITHUB_OUTPUT
 
-      # ── Step 5: Convert to standardized format ──
+      # ── Step 6: Convert to standardized format ──
       - name: "Convert to standardized format"
         id: convert
         run: |
@@ -298,13 +412,9 @@ jobs:
           STATEWIDE="${{ steps.merge.outputs.statewide_path || steps.download.outputs.statewide_path }}"
           DATA_DIR="${{ steps.download.outputs.data_dir }}"
 
-          echo "=========================================="
-          echo "Convert to standardized format"
-          echo "=========================================="
-
-          # Virginia data is already in standard format (passthrough)
+          # Virginia data is already in standard format
           if [ "$STATE" = "virginia" ]; then
-            echo "Virginia data already in standard format — skipping convert"
+            echo "Virginia data already in standard format — skipping"
             echo "csv_path=$STATEWIDE" >> $GITHUB_OUTPUT
           else
             CONVERTED="$DATA_DIR/${STATE}_statewide_standardized.csv"
@@ -326,7 +436,7 @@ jobs:
             echo "csv_path=$CONVERTED" >> $GITHUB_OUTPUT
           fi
 
-      # ── Step 6: Finalize ──
+      # ── Step 7: Finalize ──
       - name: "Finalize download"
         id: finalize
         run: |
@@ -343,9 +453,10 @@ jobs:
           echo "csv_path=$CSV_PATH" >> $GITHUB_OUTPUT
           echo "total_records=$((TOTAL - 1))" >> $GITHUB_OUTPUT
 
-      # ── Step 7: Upload statewide CSV to R2 ──
+      # ── Step 8: Upload statewide CSV to R2 ──
       - name: "Upload statewide CSV to R2"
         id: r2_upload
+        if: github.event.inputs.dry_run != 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
@@ -360,8 +471,8 @@ jobs:
 
           echo "=========================================="
           echo "Uploading statewide CSV to R2"
-          echo "  Local: $CSV_PATH"
-          echo "  R2:    s3://$R2_BUCKET/$R2_KEY"
+          echo "  Local:   $CSV_PATH"
+          echo "  R2:      s3://$R2_BUCKET/$R2_KEY"
           echo "  Records: $TOTAL"
           echo "=========================================="
 
@@ -370,7 +481,7 @@ jobs:
             exit 1
           fi
 
-          # Upload with retry
+          # Upload with retry (exponential backoff)
           for i in 1 2 3 4; do
             if aws s3 cp "$CSV_PATH" "s3://$R2_BUCKET/$R2_KEY" \
               --endpoint-url "$R2_ENDPOINT" \
@@ -379,8 +490,9 @@ jobs:
               echo "Upload succeeded"
               break
             fi
-            echo "Upload failed (attempt $i/4), retrying in $((2 ** i))s..."
-            sleep $((2 ** i))
+            DELAY=$((2 ** i))
+            echo "Upload failed (attempt $i/4), retrying in ${DELAY}s..."
+            sleep $DELAY
           done
 
           # Verify upload
@@ -399,35 +511,46 @@ jobs:
           echo "Verified: $R2_KEY (${SIZE_MB}MB on R2)"
           echo "r2_data_key=$R2_KEY" >> $GITHUB_OUTPUT
 
-      # ── Step 8: Job summary ──
+      # ── Step 9: Job summary ──
       - name: Job summary
         if: always()
         run: |
           STATE="${{ github.event.inputs.state }}"
           DISPLAY="${{ steps.registry.outputs.display_name }}"
+          SCOPE="${{ steps.resolve.outputs.scope }}"
+          SELECTION="${{ steps.resolve.outputs.selection }}"
+          JCOUNT="${{ steps.resolve.outputs.jurisdiction_count }}"
+          REGION_NAME="${{ steps.resolve.outputs.region_name }}"
           TOTAL="${{ steps.finalize.outputs.total_records }}"
           R2_KEY="${{ steps.r2_upload.outputs.r2_data_key }}"
-          CSV_PATH="${{ steps.finalize.outputs.csv_path }}"
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+
+          SCOPE_LABEL="${SCOPE}"
+          if [ -n "$SELECTION" ]; then
+            SCOPE_LABEL="${SCOPE}: ${REGION_NAME:-$SELECTION}"
+          fi
 
           cat >> $GITHUB_STEP_SUMMARY <<EOF
-          ## ${DISPLAY} — Batch Download
+          ## ${DISPLAY} — Download ($SCOPE_LABEL)
 
           | Metric | Value |
           |--------|-------|
           | State | ${DISPLAY} (${STATE}) |
+          | Scope | ${SCOPE_LABEL} |
+          | Jurisdictions | ${JCOUNT:-N/A} |
           | Records | ${TOTAL:-N/A} |
-          | Output | \`${CSV_PATH}\` |
-          | R2 Key | ${R2_KEY} |
-          | Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
+          | R2 Key | ${R2_KEY:-'(dry run)'} |
+          | Dry Run | ${DRY_RUN} |
+          | Completed | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
           EOF
 
   # ============================================================
-  # JOB 2: Trigger batch pipeline
+  # JOB 2: Trigger batch pipeline with scope awareness
   # ============================================================
   trigger-pipeline:
-    name: "Trigger batch pipeline"
+    name: "Trigger pipeline — ${{ github.event.inputs.scope }}"
     needs: download
-    if: github.event.inputs.skip_pipeline != 'true'
+    if: github.event.inputs.skip_pipeline != 'true' && github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -436,9 +559,19 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const state = '${{ needs.download.outputs.state }}';
+            const scope = '${{ needs.download.outputs.scope }}';
+            const selection = '${{ needs.download.outputs.selection }}';
             const r2DataKey = '${{ needs.download.outputs.r2_data_key }}';
             const skipForecasts = '${{ github.event.inputs.skip_forecasts }}';
             const dryRun = '${{ github.event.inputs.dry_run }}';
+
+            console.log('='.repeat(50));
+            console.log('Triggering batch-pipeline.yml');
+            console.log(`  State:     ${state}`);
+            console.log(`  Scope:     ${scope}`);
+            console.log(`  Selection: ${selection || '(all)'}`);
+            console.log(`  R2 key:    ${r2DataKey}`);
+            console.log('='.repeat(50));
 
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
@@ -447,33 +580,42 @@ jobs:
               ref: 'main',
               inputs: {
                 state: state,
-                scope: 'statewide',
-                selection: '',
+                scope: scope,
+                selection: selection || '',
                 r2_data_key: r2DataKey,
                 skip_forecasts: skipForecasts || 'false',
                 dry_run: dryRun || 'false'
               }
             });
 
-            console.log(`Batch pipeline triggered for ${state} (statewide)`);
-            console.log(`  R2 key: ${r2DataKey}`);
-            console.log(`  Skip forecasts: ${skipForecasts}`);
-            console.log(`  Dry run: ${dryRun}`);
+            console.log('Pipeline dispatched successfully');
 
       - name: Job summary
         run: |
           STATE="${{ needs.download.outputs.state }}"
+          SCOPE="${{ needs.download.outputs.scope }}"
+          SELECTION="${{ needs.download.outputs.selection }}"
           TOTAL="${{ needs.download.outputs.total_records }}"
           R2_KEY="${{ needs.download.outputs.r2_data_key }}"
-          echo "## Batch Download Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| State | $STATE |" >> $GITHUB_STEP_SUMMARY
-          echo "| Total Records | ${TOTAL:-N/A} |" >> $GITHUB_STEP_SUMMARY
-          echo "| R2 Upload | $R2_KEY |" >> $GITHUB_STEP_SUMMARY
-          echo "| Batch Pipeline | Triggered (scope=statewide) |" >> $GITHUB_STEP_SUMMARY
-          echo "| Skip Forecasts | ${{ github.event.inputs.skip_forecasts }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Next:** batch-pipeline.yml → Split jurisdiction → Split road type (3 CSVs) → Aggregate → Upload per-county to R2 → Forecasts → Manifest" >> $GITHUB_STEP_SUMMARY
+          JCOUNT="${{ needs.download.outputs.jurisdiction_count }}"
+
+          cat >> $GITHUB_STEP_SUMMARY <<EOF
+          ## Pipeline Triggered
+
+          | Metric | Value |
+          |--------|-------|
+          | State | $STATE |
+          | Scope | $SCOPE ${SELECTION:+($SELECTION)} |
+          | Jurisdictions | ${JCOUNT:-N/A} |
+          | Records | ${TOTAL:-N/A} |
+          | R2 Key | $R2_KEY |
+          | Skip Forecasts | ${{ github.event.inputs.skip_forecasts }} |
+
+          **Pipeline stages:** R2 Download → Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload per-county to R2 → Forecasts → Manifest
+
+          **Scope-aware aggregation:**
+          - \`statewide\`: Produces ALL region + MPO aggregates
+          - \`region\`: Processes only counties in the selected DOT region
+          - \`mpo\`: Processes only counties in the selected MPO/TPR
+          - \`jurisdiction\`: Processes single county (3 road-type CSVs)
+          EOF
