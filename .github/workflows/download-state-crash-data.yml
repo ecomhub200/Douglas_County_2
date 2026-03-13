@@ -20,9 +20,18 @@
 #   Locate output via registry pattern → Merge (if needsMerge) →
 #   Standardize (if needsStandardization) → Upload to R2 → Trigger batch-pipeline
 #
-# Road type CSVs (produced by batch-pipeline, NOT this workflow):
-#   County scope:        county_roads.csv, no_interstate.csv, all_roads.csv
-#   State/Region/MPO:    dot_roads.csv, non_dot_roads.csv, statewide_all_roads.csv
+# Road type splitting is AUTOMATIC (handled by batch-pipeline, NOT this workflow):
+#   County/Jurisdiction scope → 3 CSVs per county:
+#     county_roads.csv       — local/county-maintained roads
+#     no_interstate.csv      — county + DOT roads minus interstates
+#     all_roads.csv          — everything
+#   State/Region/MPO scope → 3 CSVs:
+#     dot_roads.csv          — state DOT-maintained roads
+#     non_dot_roads.csv      — local/non-state roads
+#     statewide_all_roads.csv — DOT + non-DOT combined
+#
+# No road type filter input is needed — the scope determines which 3 CSVs
+# to produce, and ALL 3 are always generated and pushed to R2.
 # ==============================================================================
 
 name: "Download State Crash Data"
@@ -83,16 +92,6 @@ on:
         required: false
         default: ''
         type: string
-
-      filter:
-        description: 'Road type filter (county scope only — states with filterProfiles in registry)'
-        required: false
-        type: choice
-        default: 'allRoads'
-        options:
-          - allRoads
-          - countyOnly
-          - countyPlusVDOT
 
       force_download:
         description: 'Force re-download (skip cache)'
@@ -162,7 +161,6 @@ jobs:
         id: registry
         run: |
           STATE="${{ github.event.inputs.state }}"
-          FILTER="${{ github.event.inputs.filter || 'allRoads' }}"
           FORCE="${{ github.event.inputs.force_download }}"
           REGISTRY="states/download-registry.json"
 
@@ -200,19 +198,11 @@ jobs:
           if '$FORCE' == 'true':
               force_flag = e.get('forceFlag', '--force')
 
-          # Filter flag (only if state has filterProfiles)
-          filter_flag = ''
-          if e.get('filterProfiles'):
-              filter_template = e.get('filterFlag', '')
-              if filter_template:
-                  filter_flag = filter_template.replace('{filter}', '$FILTER')
-
-          # Build full command
+          # Build full command (always downloads ALL roads — road type split is
+          # handled downstream by batch-pipeline based on scope)
           full_cmd = f'python {script} {script_args} {statewide_flags}'
           if force_flag:
               full_cmd += f' {force_flag}'
-          if filter_flag:
-              full_cmd += f' {filter_flag}'
 
           # Output patterns (replace {dotDir} and {state} placeholders)
           csv_pattern = e.get('statewideOutputPattern', f'{dot_dir}/{state}_statewide_all_roads.csv')
