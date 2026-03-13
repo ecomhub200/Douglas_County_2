@@ -2,31 +2,27 @@
 # Download State Crash Data — Universal Multi-Scope Dispatcher
 # ==============================================================================
 # Registry-driven workflow that downloads crash data for ANY state at ANY scope.
+# ZERO hardcoded state names — all behavior is driven by download-registry.json.
 #
-# Supports all 5 scope levels:
-#   - statewide:     All counties in a state → statewide CSV → batch-pipeline
-#   - region:        Counties in a DOT region → statewide CSV → batch-pipeline
-#   - mpo:           Counties in an MPO/TPR  → statewide CSV → batch-pipeline
-#   - jurisdiction:  Single county           → individual CSV → batch-pipeline
-#   - federal:       (Reserved for future cross-state)
+# Supports 4 scope levels:
+#   - statewide:     All counties in a state → batch-pipeline processes everything
+#   - region:        Counties in a DOT region → batch-pipeline filters to region
+#   - mpo:           Counties in an MPO/TPR  → batch-pipeline filters to MPO
+#   - jurisdiction:  Single county           → batch-pipeline processes 1 county
 #
 # Resolution chain:
-#   1. download-registry.json → script, data dir, invocation pattern
+#   1. download-registry.json → script, args, output patterns, flags
 #   2. hierarchy.json         → regions, MPOs, county FIPS mappings
 #   3. resolve_scope.py       → concrete jurisdiction list + download mode
 #
 # Flow:
-#   Download statewide CSV → Upload to R2 → Trigger batch-pipeline.yml
-#     batch-pipeline handles: Split → Road Type → Aggregate → Upload → Forecast
+#   Resolve registry → Build command from registry fields → Download →
+#   Locate output via registry pattern → Merge (if needsMerge) →
+#   Standardize (if needsStandardization) → Upload to R2 → Trigger batch-pipeline
 #
-# Road type filters:
-#   County scope:        countyOnly / countyPlusVDOT / allRoads
-#                        (produces county_roads.csv, no_interstate.csv, all_roads.csv)
-#   State/Region/MPO:    Handled by batch-pipeline aggregation
-#                        (produces dot_roads.csv, non_dot_roads.csv, statewide_all_roads.csv)
-#
-# WHY R2 instead of git commit?
-#   Statewide CSVs (700MB+) exceed GitHub's 100MB file size limit.
+# Road type CSVs (produced by batch-pipeline, NOT this workflow):
+#   County scope:        county_roads.csv, no_interstate.csv, all_roads.csv
+#   State/Region/MPO:    dot_roads.csv, non_dot_roads.csv, statewide_all_roads.csv
 # ==============================================================================
 
 name: "Download State Crash Data"
@@ -83,13 +79,13 @@ on:
           - jurisdiction
 
       selection:
-        description: 'Region/MPO/Jurisdiction ID (blank for statewide). Use --list to see available IDs.'
+        description: 'Region/MPO/Jurisdiction ID (blank for statewide). Run resolve_scope.py --state STATE --list to see IDs.'
         required: false
         default: ''
         type: string
 
       filter:
-        description: 'Road type filter (county scope only — ignored for state/region/mpo)'
+        description: 'Road type filter (county scope only — states with filterProfiles in registry)'
         required: false
         type: choice
         default: 'allRoads'
@@ -161,11 +157,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      # ── Step 1: Resolve from registry ──
+      # ── Step 1: Resolve ALL config from registry (single Python call) ──
       - name: Resolve from download registry
         id: registry
         run: |
           STATE="${{ github.event.inputs.state }}"
+          FILTER="${{ github.event.inputs.filter || 'allRoads' }}"
+          FORCE="${{ github.event.inputs.force_download }}"
           REGISTRY="states/download-registry.json"
 
           if [ ! -f "$REGISTRY" ]; then
@@ -173,27 +171,76 @@ jobs:
             exit 1
           fi
 
-          ENTRY=$(python3 -c "
+          python3 -c "
           import json, sys
+
           with open('$REGISTRY') as f:
               reg = json.load(f)
+
           state = '$STATE'
           if state not in reg:
               print(f'::error::State {state} not found in registry', file=sys.stderr)
               sys.exit(1)
-          e = reg[state]
-          print(f\"display_name={e.get('displayName', state.replace('_', ' ').title())}\")
-          print(f\"dot_dir={e.get('dotDir', '')}\")
-          print(f\"script={e.get('script', '')}\")
-          print(f\"r2_prefix={e.get('r2Prefix', state)}\")
-          print(f\"tier={e.get('tier', 3)}\")
-          print(f\"requires_playwright={str(e.get('requiresPlaywright', False)).lower()}\")
-          print(f\"default_jurisdiction={e.get('defaultJurisdiction', 'statewide')}\")
-          ")
 
-          echo "$ENTRY" >> $GITHUB_OUTPUT
-          echo "Registry resolved for $STATE:"
-          echo "$ENTRY"
+          e = reg[state]
+          dot_dir = e.get('dotDir', '')
+          script = e.get('script', '')
+
+          # Build the full download command from registry fields
+          script_args = e.get('scriptArgs', f'--data-dir {dot_dir}')
+          # Replace {defaultJurisdiction} placeholder
+          default_j = e.get('defaultJurisdiction', 'statewide')
+          script_args = script_args.replace('{defaultJurisdiction}', default_j)
+
+          # Statewide flags
+          statewide_flags = e.get('statewideFlagArgs', '--gzip')
+
+          # Force flag
+          force_flag = ''
+          if '$FORCE' == 'true':
+              force_flag = e.get('forceFlag', '--force')
+
+          # Filter flag (only if state has filterProfiles)
+          filter_flag = ''
+          if e.get('filterProfiles'):
+              filter_template = e.get('filterFlag', '')
+              if filter_template:
+                  filter_flag = filter_template.replace('{filter}', '$FILTER')
+
+          # Build full command
+          full_cmd = f'python {script} {script_args} {statewide_flags}'
+          if force_flag:
+              full_cmd += f' {force_flag}'
+          if filter_flag:
+              full_cmd += f' {filter_flag}'
+
+          # Output patterns (replace {dotDir} and {state} placeholders)
+          csv_pattern = e.get('statewideOutputPattern', f'{dot_dir}/{state}_statewide_all_roads.csv')
+          csv_pattern = csv_pattern.replace('{dotDir}', dot_dir).replace('{state}', state)
+          gz_pattern = e.get('statewideOutputGzPattern', f'{csv_pattern}.gz')
+          gz_pattern = gz_pattern.replace('{dotDir}', dot_dir).replace('{state}', state)
+
+          # Print all outputs
+          outputs = {
+              'display_name': e.get('displayName', state.replace('_', ' ').title()),
+              'dot_dir': dot_dir,
+              'script': script,
+              'r2_prefix': e.get('r2Prefix', state),
+              'tier': str(e.get('tier', 3)),
+              'requires_playwright': str(e.get('requiresPlaywright', False)).lower(),
+              'default_jurisdiction': default_j,
+              'download_cmd': full_cmd.strip(),
+              'csv_pattern': csv_pattern,
+              'gz_pattern': gz_pattern,
+              'needs_standardization': str(e.get('needsStandardization', True)).lower(),
+              'needs_merge': str(e.get('needsMerge', True)).lower(),
+          }
+
+          for k, v in outputs.items():
+              print(f'{k}={v}')
+          " >> $GITHUB_OUTPUT
+
+          echo "Registry resolved for $STATE"
 
       # ── Step 2: Resolve scope from hierarchy.json ──
       - name: Resolve scope
@@ -207,7 +254,7 @@ jobs:
           if [ "$SCOPE" = "statewide" ]; then
             SELECTION=""
           elif [ -z "$SELECTION" ]; then
-            echo "::error::Selection is required for scope=$SCOPE. Run resolve_scope.py --state $STATE --list to see available IDs."
+            echo "::error::Selection is required for scope=$SCOPE. Run: python scripts/resolve_scope.py --state $STATE --list"
             exit 1
           fi
 
@@ -221,13 +268,10 @@ jobs:
             exit 1
           fi
 
-          echo "Resolving scope: state=$STATE scope=$SCOPE selection=$SELECTION"
           RESOLVED=$(python scripts/resolve_scope.py \
             --state "$STATE" --scope "$SCOPE" --selection "$SELECTION" --json)
 
-          echo "Resolved: $RESOLVED"
-
-          # Extract fields from resolved JSON
+          # Extract fields
           DOWNLOAD_MODE=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.load(sys.stdin)['download_mode'])")
           JCOUNT=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.load(sys.stdin)['jurisdiction_count'])")
           JURISDICTIONS=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['jurisdictions']))")
@@ -236,18 +280,7 @@ jobs:
           echo "jurisdiction_count=$JCOUNT" >> $GITHUB_OUTPUT
           echo "jurisdictions_json=$JURISDICTIONS" >> $GITHUB_OUTPUT
 
-          # Log scope summary
-          echo ""
-          echo "=========================================="
-          echo "Scope Resolution Summary"
-          echo "  State:          $STATE"
-          echo "  Scope:          $SCOPE"
-          echo "  Selection:      ${SELECTION:-'(all)'}"
-          echo "  Download mode:  $DOWNLOAD_MODE"
-          echo "  Jurisdictions:  $JCOUNT"
-          echo "=========================================="
-
-          # Also list what we resolved for the step summary
+          # Resolve human-readable name for region/mpo
           if [ "$SCOPE" = "region" ] || [ "$SCOPE" = "mpo" ]; then
             REGION_NAME=$(python3 -c "
           import json
@@ -257,9 +290,17 @@ jobs:
           entry = h.get(section, {}).get('$SELECTION', {})
           print(entry.get('name', entry.get('shortName', '$SELECTION')))
           ")
-            echo "  Resolved name:  $REGION_NAME"
             echo "region_name=$REGION_NAME" >> $GITHUB_OUTPUT
           fi
+
+          echo ""
+          echo "=========================================="
+          echo "Scope Resolution"
+          echo "  State:         $STATE"
+          echo "  Scope:         $SCOPE ${SELECTION:+($SELECTION)}"
+          echo "  Download mode: $DOWNLOAD_MODE"
+          echo "  Jurisdictions: $JCOUNT"
+          echo "=========================================="
 
       # ── Step 3: Install dependencies ──
       - name: Install dependencies
@@ -272,169 +313,145 @@ jobs:
           fi
           pip install awscli
 
-          # Install Playwright only if needed (Colorado)
+          # Install Playwright only if registry says so
           if [ "${{ steps.registry.outputs.requires_playwright }}" = "true" ]; then
             pip install playwright
             playwright install chromium
           fi
 
-      # ── Step 4: Download statewide data ──
+      # ── Step 4: Download data (fully registry-driven) ──
       - name: "Download statewide data"
         id: download
         timeout-minutes: 60
         run: |
           STATE="${{ github.event.inputs.state }}"
-          SCRIPT="${{ steps.registry.outputs.script }}"
           DOT_DIR="${{ steps.registry.outputs.dot_dir }}"
-          FORCE="${{ github.event.inputs.force_download }}"
-          FILTER="${{ github.event.inputs.filter || 'allRoads' }}"
-          SCOPE="${{ steps.resolve.outputs.scope }}"
-          SELECTION="${{ steps.resolve.outputs.selection }}"
-          DOWNLOAD_MODE="${{ steps.resolve.outputs.download_mode }}"
+          DOWNLOAD_CMD="${{ steps.registry.outputs.download_cmd }}"
+          CSV_PATTERN="${{ steps.registry.outputs.csv_pattern }}"
+          GZ_PATTERN="${{ steps.registry.outputs.gz_pattern }}"
 
           echo "=========================================="
           echo "Downloading data for $STATE"
-          echo "  Script:    $SCRIPT"
-          echo "  Scope:     $SCOPE / ${SELECTION:-statewide}"
-          echo "  Mode:      $DOWNLOAD_MODE"
-          echo "  Filter:    $FILTER (county-scope only)"
-          echo "  Started:   $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "  Command: $DOWNLOAD_CMD"
+          echo "  Expected output: $CSV_PATTERN"
+          echo "  Started: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
 
-          DATA_DIR="$DOT_DIR"
+          # Ensure data directory exists
+          mkdir -p "$DOT_DIR"
+
+          # Run the download command (built entirely from registry)
+          eval $DOWNLOAD_CMD 2>&1 || {
+            echo "::warning::Download script returned non-zero, checking for output..."
+          }
+
+          # Locate the statewide CSV using registry patterns
           STATEWIDE=""
 
-          # ── Virginia ──
-          if [ "$STATE" = "virginia" ]; then
-            ARGS="--output-dir data"
-            if [ "$FORCE" = "true" ]; then
-              ARGS="$ARGS --force-download"
-            fi
-
-            # Always download statewide — pipeline handles scope filtering
-            ARGS="$ARGS --save-statewide --filter $FILTER"
-            # Use a seed jurisdiction for the Virginia API
-            ARGS="$ARGS --jurisdiction ${{ steps.registry.outputs.default_jurisdiction }}"
-            python download_crash_data.py $ARGS
-            DATA_DIR="data"
-
-            if [ -f "data/virginia_statewide_all_roads.csv" ]; then
-              STATEWIDE="data/virginia_statewide_all_roads.csv"
-            elif [ -f "data/virginia_statewide_all_roads.csv.gz" ]; then
-              gunzip -k data/virginia_statewide_all_roads.csv.gz
-              STATEWIDE="data/virginia_statewide_all_roads.csv"
-            fi
-
-          # ── Colorado ──
-          elif [ "$STATE" = "colorado" ]; then
-            python download_cdot_crash_data.py --data-dir data/CDOT --save-statewide-gzip
-            DATA_DIR="data/CDOT"
-
-            if [ -f "data/CDOT/colorado_statewide_all_roads.csv.gz" ]; then
-              gunzip -k data/CDOT/colorado_statewide_all_roads.csv.gz
-              STATEWIDE="data/CDOT/colorado_statewide_all_roads.csv"
-            elif [ -f "data/CDOT/colorado_statewide_raw.csv" ]; then
-              STATEWIDE="data/CDOT/colorado_statewide_raw.csv"
-            fi
-
-          # ── Generic state (Tier 2/3) ──
+          # 1. Check exact pattern from registry
+          if [ -f "$CSV_PATTERN" ]; then
+            STATEWIDE="$CSV_PATTERN"
+          # 2. Check gzip pattern and decompress
+          elif [ -f "$GZ_PATTERN" ]; then
+            gunzip -k "$GZ_PATTERN"
+            STATEWIDE="${GZ_PATTERN%.gz}"
+          # 3. Fallback: search for any statewide CSV in data dir
           else
-            echo "Running: python $SCRIPT --data-dir $DOT_DIR --gzip"
-            python "$SCRIPT" --data-dir "$DOT_DIR" --gzip 2>&1 || {
-              echo "::warning::Download script returned non-zero, checking for output..."
-            }
-
-            # Find the statewide CSV
-            for f in "$DOT_DIR"/${STATE}_statewide*.csv "$DOT_DIR"/*statewide*.csv "$DOT_DIR"/*.csv; do
+            for f in "$DOT_DIR"/${STATE}_statewide*.csv "$DOT_DIR"/*statewide*.csv; do
               if [ -f "$f" ]; then
                 STATEWIDE="$f"
                 break
               fi
             done
-
-            # Try decompressing gzip if no plain CSV found
+            # 4. Fallback: decompress any gzip
             if [ -z "$STATEWIDE" ]; then
-              GZ=$(find "$DOT_DIR" -name "*statewide*.csv.gz" -o -name "*.csv.gz" -type f 2>/dev/null | head -1)
+              GZ=$(find "$DOT_DIR" -maxdepth 1 \( -name "*statewide*.csv.gz" -o -name "*.csv.gz" \) -type f 2>/dev/null | head -1)
               if [ -n "$GZ" ]; then
                 gunzip -k "$GZ"
                 STATEWIDE="${GZ%.gz}"
               fi
             fi
+            # 5. Last resort: any CSV in data dir
+            if [ -z "$STATEWIDE" ]; then
+              STATEWIDE=$(find "$DOT_DIR" -maxdepth 1 -name "*.csv" -type f 2>/dev/null | head -1)
+            fi
           fi
 
-          # Verify statewide CSV exists
           if [ -z "$STATEWIDE" ] || [ ! -f "$STATEWIDE" ]; then
             echo "::error::Statewide CSV not found for $STATE after download"
+            echo "::error::Expected at: $CSV_PATTERN"
             exit 1
           fi
 
           TOTAL=$(wc -l < "$STATEWIDE" | tr -d ' ')
           SIZE=$(ls -lh "$STATEWIDE" | awk '{print $5}')
-          echo ""
-          echo "Statewide CSV: $STATEWIDE"
-          echo "  Records: $((TOTAL - 1))"
-          echo "  Size:    $SIZE"
+          echo "Found statewide CSV: $STATEWIDE ($((TOTAL - 1)) records, $SIZE)"
           echo "statewide_path=$STATEWIDE" >> $GITHUB_OUTPUT
-          echo "data_dir=$DATA_DIR" >> $GITHUB_OUTPUT
+          echo "data_dir=$DOT_DIR" >> $GITHUB_OUTPUT
 
-      # ── Step 5: Merge source files if needed ──
-      - name: "Merge source files (if multi-file)"
+      # ── Step 5: Merge source files (registry-driven) ──
+      - name: "Merge source files (if needed)"
         id: merge
         run: |
-          STATE="${{ github.event.inputs.state }}"
+          NEEDS_MERGE="${{ steps.registry.outputs.needs_merge }}"
           STATEWIDE="${{ steps.download.outputs.statewide_path }}"
           DATA_DIR="${{ steps.download.outputs.data_dir }}"
+          STATE="${{ github.event.inputs.state }}"
 
-          # Virginia and Colorado data are already merged by their download scripts
-          if [ "$STATE" != "virginia" ] && [ "$STATE" != "colorado" ]; then
-            RAW_COUNT=$(find "$DATA_DIR" -maxdepth 1 -name "*.csv" ! -name "*statewide*" ! -name "*standardized*" -type f 2>/dev/null | wc -l)
-            if [ "$RAW_COUNT" -gt 1 ]; then
-              echo "Found $RAW_COUNT raw CSV files — merging..."
-              python scripts/process_crash_data.py \
-                -i "$DATA_DIR"/*.csv \
-                -s "$STATE" -j "statewide" \
-                -o "$DATA_DIR" \
-                --merge --convert-only
-              STATEWIDE="$DATA_DIR/statewide_standardized.csv"
-              echo "Merged: $STATEWIDE"
-            else
-              echo "Single statewide file — no merge needed"
-            fi
+          if [ "$NEEDS_MERGE" != "true" ]; then
+            echo "Registry says needsMerge=false — skipping merge"
+            echo "statewide_path=$STATEWIDE" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          RAW_COUNT=$(find "$DATA_DIR" -maxdepth 1 -name "*.csv" ! -name "*statewide*" ! -name "*standardized*" -type f 2>/dev/null | wc -l)
+          if [ "$RAW_COUNT" -gt 1 ]; then
+            echo "Found $RAW_COUNT raw CSV files — merging..."
+            python scripts/process_crash_data.py \
+              -i "$DATA_DIR"/*.csv \
+              -s "$STATE" -j "statewide" \
+              -o "$DATA_DIR" \
+              --merge --convert-only
+            STATEWIDE="$DATA_DIR/statewide_standardized.csv"
+            echo "Merged: $STATEWIDE"
+          else
+            echo "Single statewide file — no merge needed"
           fi
 
           echo "statewide_path=${STATEWIDE}" >> $GITHUB_OUTPUT
 
-      # ── Step 6: Convert to standardized format ──
+      # ── Step 6: Convert to standardized format (registry-driven) ──
       - name: "Convert to standardized format"
         id: convert
         run: |
+          NEEDS_STD="${{ steps.registry.outputs.needs_standardization }}"
           STATE="${{ github.event.inputs.state }}"
           STATEWIDE="${{ steps.merge.outputs.statewide_path || steps.download.outputs.statewide_path }}"
           DATA_DIR="${{ steps.download.outputs.data_dir }}"
 
-          # Virginia data is already in standard format
-          if [ "$STATE" = "virginia" ]; then
-            echo "Virginia data already in standard format — skipping"
+          if [ "$NEEDS_STD" != "true" ]; then
+            echo "Registry says needsStandardization=false — already in standard format"
             echo "csv_path=$STATEWIDE" >> $GITHUB_OUTPUT
-          else
-            CONVERTED="$DATA_DIR/${STATE}_statewide_standardized.csv"
-            python scripts/process_crash_data.py \
-              -i "$STATEWIDE" \
-              -s "$STATE" -j "statewide" \
-              -o "$DATA_DIR" \
-              --convert-only --force 2>&1 || {
-              echo "::warning::Convert stage failed, using raw data"
-              CONVERTED="$STATEWIDE"
-            }
-
-            # Find the standardized output
-            if [ -f "$DATA_DIR/statewide_standardized.csv" ]; then
-              CONVERTED="$DATA_DIR/statewide_standardized.csv"
-            fi
-
-            echo "Converted: $CONVERTED"
-            echo "csv_path=$CONVERTED" >> $GITHUB_OUTPUT
+            exit 0
           fi
+
+          CONVERTED="$DATA_DIR/${STATE}_statewide_standardized.csv"
+          python scripts/process_crash_data.py \
+            -i "$STATEWIDE" \
+            -s "$STATE" -j "statewide" \
+            -o "$DATA_DIR" \
+            --convert-only --force 2>&1 || {
+            echo "::warning::Convert stage failed, using raw data"
+            CONVERTED="$STATEWIDE"
+          }
+
+          # Check for standardized output
+          if [ -f "$DATA_DIR/statewide_standardized.csv" ]; then
+            CONVERTED="$DATA_DIR/statewide_standardized.csv"
+          fi
+
+          echo "Converted: $CONVERTED"
+          echo "csv_path=$CONVERTED" >> $GITHUB_OUTPUT
 
       # ── Step 7: Finalize ──
       - name: "Finalize download"
@@ -463,11 +480,12 @@ jobs:
           AWS_DEFAULT_REGION: auto
         run: |
           STATE="${{ github.event.inputs.state }}"
+          R2_PREFIX="${{ steps.registry.outputs.r2_prefix }}"
           CSV_PATH="${{ steps.finalize.outputs.csv_path }}"
           TOTAL="${{ steps.finalize.outputs.total_records }}"
           R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
           R2_BUCKET="crash-lens-data"
-          R2_KEY="${STATE}/statewide/${STATE}_statewide_all_roads.csv"
+          R2_KEY="${R2_PREFIX}/statewide/${STATE}_statewide_all_roads.csv"
 
           echo "=========================================="
           echo "Uploading statewide CSV to R2"
@@ -565,13 +583,9 @@ jobs:
             const skipForecasts = '${{ github.event.inputs.skip_forecasts }}';
             const dryRun = '${{ github.event.inputs.dry_run }}';
 
-            console.log('='.repeat(50));
             console.log('Triggering batch-pipeline.yml');
-            console.log(`  State:     ${state}`);
-            console.log(`  Scope:     ${scope}`);
-            console.log(`  Selection: ${selection || '(all)'}`);
-            console.log(`  R2 key:    ${r2DataKey}`);
-            console.log('='.repeat(50));
+            console.log(`  State: ${state}, Scope: ${scope}, Selection: ${selection || '(all)'}`);
+            console.log(`  R2 key: ${r2DataKey}`);
 
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
@@ -595,8 +609,6 @@ jobs:
           STATE="${{ needs.download.outputs.state }}"
           SCOPE="${{ needs.download.outputs.scope }}"
           SELECTION="${{ needs.download.outputs.selection }}"
-          TOTAL="${{ needs.download.outputs.total_records }}"
-          R2_KEY="${{ needs.download.outputs.r2_data_key }}"
           JCOUNT="${{ needs.download.outputs.jurisdiction_count }}"
 
           cat >> $GITHUB_STEP_SUMMARY <<EOF
@@ -607,15 +619,7 @@ jobs:
           | State | $STATE |
           | Scope | $SCOPE ${SELECTION:+($SELECTION)} |
           | Jurisdictions | ${JCOUNT:-N/A} |
-          | Records | ${TOTAL:-N/A} |
-          | R2 Key | $R2_KEY |
           | Skip Forecasts | ${{ github.event.inputs.skip_forecasts }} |
 
-          **Pipeline stages:** R2 Download → Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload per-county to R2 → Forecasts → Manifest
-
-          **Scope-aware aggregation:**
-          - \`statewide\`: Produces ALL region + MPO aggregates
-          - \`region\`: Processes only counties in the selected DOT region
-          - \`mpo\`: Processes only counties in the selected MPO/TPR
-          - \`jurisdiction\`: Processes single county (3 road-type CSVs)
+          **Pipeline:** R2 Download → Init Cache → Split Jurisdiction → Split Road Type → Aggregate → Upload → Forecasts → Manifest
           EOF
