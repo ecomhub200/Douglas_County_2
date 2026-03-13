@@ -119,12 +119,12 @@
     "_note": "Update with actual state values from data dictionary"
   },
   "epdoWeights": {
-    "K": 462,
-    "A": 62,
-    "B": 12,
-    "C": 5,
+    "K": 883,
+    "A": 94,
+    "B": 21,
+    "C": 11,
     "O": 1,
-    "_source": "FHWA/HSM Standard"
+    "_source": "FHWA-SA-25-021 (Oct 2025) crash costs in 2024 dollars"
   },
   "validValues": {
     "severity": {

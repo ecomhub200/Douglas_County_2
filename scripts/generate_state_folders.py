@@ -364,7 +364,7 @@ crash-lens-data/{s['r2_prefix']}/{{jurisdiction}}/
 
 ## EPDO Weights
 
-Using FHWA/HSM standard: K=462, A=62, B=12, C=5, O=1
+Using FHWA 2025 (FHWA-SA-25-021): K=883, A=94, B=21, C=11, O=1
 
 ## GitHub Actions Workflow
 
@@ -449,7 +449,7 @@ def generate_config_json(state_key, s):
             "_note": "Update with actual state values from data dictionary",
         },
         "epdoWeights": {
-            "K": 462, "A": 62, "B": 12, "C": 5, "O": 1,
+            "K": 883, "A": 94, "B": 21, "C": 11, "O": 1,
             "_source": "FHWA/HSM Standard",
         },
         "validValues": {

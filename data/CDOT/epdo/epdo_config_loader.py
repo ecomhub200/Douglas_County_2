@@ -13,17 +13,18 @@ EPDO weights are derived from crash cost ratios:
   Weight = CrashCost(severity) / CrashCost(PDO)
 
 Different states/agencies have different crash costs, so weights vary:
-  HSM Standard (2010): K=462, A=62, B=12, C=5, O=1
+  FHWA 2025 (default): K=883, A=94, B=21, C=11, O=1  ($16.0M K / $18.1K O)
   VDOT 2024:           K=1032, A=53, B=16, C=10, O=1
   FHWA 2022:           K=975, A=48, B=13, C=8, O=1
+  HSM Standard (2010): K=462, A=62, B=12, C=5, O=1
 """
 
 import json
 import os
 
 
-# Default EPDO weights (FHWA/HSM Standard 2010)
-DEFAULT_EPDO_WEIGHTS = {"K": 462, "A": 62, "B": 12, "C": 5, "O": 1}
+# Default EPDO weights (FHWA-SA-25-021, Oct 2025, in 2024 dollars)
+DEFAULT_EPDO_WEIGHTS = {"K": 883, "A": 94, "B": 21, "C": 11, "O": 1}
 
 
 def load_epdo_weights(config_path=None):
@@ -33,10 +34,10 @@ def load_epdo_weights(config_path=None):
     The config file should have an 'epdoWeights' key with K/A/B/C/O values:
     {
         "epdoWeights": {
-            "K": 462,
-            "A": 62,
-            "B": 12,
-            "C": 5,
+            "K": 883,
+            "A": 94,
+            "B": 21,
+            "C": 11,
             "O": 1
         }
     }
@@ -158,9 +159,10 @@ if __name__ == "__main__":
 
     # Compare presets
     presets = {
-        "HSM 2010":  {"K": 462, "A": 62, "B": 12, "C": 5, "O": 1},
+        "FHWA 2025": {"K": 883, "A": 94, "B": 21, "C": 11, "O": 1},
         "VDOT 2024": {"K": 1032, "A": 53, "B": 16, "C": 10, "O": 1},
         "FHWA 2022": {"K": 975, "A": 48, "B": 13, "C": 8, "O": 1},
+        "HSM 2010":  {"K": 462, "A": 62, "B": 12, "C": 5, "O": 1},
     }
     print(f"\nComparison across presets for same crash data:")
     for name, preset_weights in presets.items():

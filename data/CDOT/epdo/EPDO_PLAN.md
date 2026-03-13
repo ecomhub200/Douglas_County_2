@@ -2,7 +2,7 @@
 
 ## Context
 
-The tool hardcodes FHWA/HSM standard EPDO weights (K=462, A=62, B=12, C=5, O=1) across the entire codebase. As the tool supports multiple states (Virginia, Colorado), EPDO weights need to become dynamic because **each state/federal agency derives different EPDO weights from their own crash cost data**. Example: VDOT 2024 crash costs would yield K=1032 (not 462). The config files already define `epdoWeights` per state but the app never reads them. This plan makes EPDO weights fully configurable with a UI preset selector and ensures ALL 14 inline hardcoded calculations switch to the centralized `calcEPDO()` function.
+The app now uses FHWA 2025 (FHWA-SA-25-021) as the default EPDO weights (K=883, A=94, B=21, C=11, O=1), derived from October 2025 comprehensive crash unit costs in 2024 dollars ($16.0M K / $18.1K O). As the tool supports multiple states, EPDO weights are dynamic — **each state/federal agency can define different EPDO weights from their own crash cost data** (e.g., VDOT 2024: K=1032). The config files define `epdoWeights` per state, and the app reads them via `getStateEPDOWeights()`. EPDO weights are fully configurable with a UI preset selector, and all calculations use the centralized `calcEPDO()` function.
 
 ---
 
@@ -137,7 +137,7 @@ These functions use local `const` declarations that shadow the global — they w
 
 ## Verification Plan
 
-1. **Dashboard:** Load app, note EPDO, switch to VDOT 2024, verify EPDO increases (K: 462→1032), switch back, verify original restores
+1. **Dashboard:** Load app, note EPDO, switch to VDOT 2024, verify EPDO increases (K: 883→1032), switch back, verify original restores
 2. **Dynamic labels:** Verify "Weights: K=..." text updates in dashboard breakdown and glossary
 3. **All tabs:** Switch preset, verify Hotspots, Grants, CMF, Safety Focus tabs all update
 4. **Persistence:** Set VDOT 2024, refresh page, verify VDOT 2024 still active

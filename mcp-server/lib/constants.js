@@ -39,7 +39,7 @@ export const COL = {
   PED_INJURED: 'Pedestrians Injured'
 };
 
-export const EPDO_WEIGHTS_DEFAULT = { K: 462, A: 62, B: 12, C: 5, O: 1 };
+export const EPDO_WEIGHTS_DEFAULT = { K: 883, A: 94, B: 21, C: 11, O: 1 };
 
 export const EPDO_PRESETS = {
   hsm2010:  { name: 'HSM Standard (2010)', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 },
@@ -48,6 +48,8 @@ export const EPDO_PRESETS = {
               description: 'Derived from VDOT 2024 crash cost ratios ($12.8M K / $12.4K O)' },
   fhwa2022: { name: 'FHWA 2022', weights: { K: 975, A: 48, B: 13, C: 8, O: 1 },
               description: 'Derived from FHWA 2022 crash cost ratios ($11.6M K / $11.9K O)' },
+  fhwa2025: { name: 'FHWA 2025', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 },
+              description: 'FHWA-SA-25-021 (Oct 2025) crash costs in 2024 dollars ($16.0M K / $18.1K O)' },
 };
 
 export const STATE_EPDO_WEIGHTS = {
@@ -77,8 +79,8 @@ export const STATE_EPDO_WEIGHTS = {
           source: 'NJDOT crash cost analysis (high cost of living adjustment)' },
   '53': { name: 'Washington (WSDOT 2023)', weights: { K: 975, A: 48, B: 13, C: 8, O: 1 },
           source: 'WSDOT uses FHWA 2022 national baseline' },
-  '04': { name: 'Arizona (ADOT 2023)', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 },
-          source: 'ADOT uses HSM Standard (2010)' },
+  '04': { name: 'Arizona (ADOT)', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 },
+          source: 'FHWA 2025 (FHWA-SA-25-021)' },
   '26': { name: 'Michigan (MDOT 2023)', weights: { K: 975, A: 48, B: 13, C: 8, O: 1 },
           source: 'MDOT uses FHWA 2022 national baseline' },
   '49': { name: 'Utah (UDOT 2024)', weights: { K: 975, A: 48, B: 13, C: 8, O: 1 },
@@ -94,38 +96,39 @@ export const STATE_EPDO_WEIGHTS = {
   '09': { name: 'Connecticut (CTDOT 2023)', weights: { K: 1050, A: 55, B: 15, C: 10, O: 1 },
           source: 'CTDOT crash cost analysis (high cost of living)' },
   // States using HSM Standard (2010) as default
-  '01': { name: 'Alabama', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '02': { name: 'Alaska', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '05': { name: 'Arkansas', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '08': { name: 'Colorado (CDOT)', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '10': { name: 'Delaware', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '11': { name: 'District of Columbia', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '15': { name: 'Hawaii', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '16': { name: 'Idaho', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '18': { name: 'Indiana', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '19': { name: 'Iowa', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '20': { name: 'Kansas', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '21': { name: 'Kentucky', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '23': { name: 'Maine', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '24': { name: 'Maryland', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '27': { name: 'Minnesota', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '28': { name: 'Mississippi', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '29': { name: 'Missouri', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '30': { name: 'Montana', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '31': { name: 'Nebraska', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '32': { name: 'Nevada', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '33': { name: 'New Hampshire', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '38': { name: 'North Dakota', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '40': { name: 'Oklahoma', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '44': { name: 'Rhode Island', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '45': { name: 'South Carolina', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '46': { name: 'South Dakota', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '47': { name: 'Tennessee', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '50': { name: 'Vermont', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '54': { name: 'West Virginia', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '55': { name: 'Wisconsin', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 }, source: 'HSM Standard (2010)' },
-  '_default': { name: 'HSM Standard (2010)', weights: { K: 462, A: 62, B: 12, C: 5, O: 1 },
-                source: 'Highway Safety Manual standard EPDO weights' }
+  '01': { name: 'Alabama', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '02': { name: 'Alaska', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '05': { name: 'Arkansas', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '08': { name: 'Colorado (CDOT)', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '10': { name: 'Delaware (FHWA 2025)', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 },
+          source: 'FHWA-SA-25-021 (Oct 2025) crash costs in 2024 dollars ($16.0M K / $18.1K O)' },
+  '11': { name: 'District of Columbia', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '15': { name: 'Hawaii', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '16': { name: 'Idaho', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '18': { name: 'Indiana', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '19': { name: 'Iowa', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '20': { name: 'Kansas', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '21': { name: 'Kentucky', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '23': { name: 'Maine', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '24': { name: 'Maryland', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '27': { name: 'Minnesota', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '28': { name: 'Mississippi', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '29': { name: 'Missouri', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '30': { name: 'Montana', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '31': { name: 'Nebraska', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '32': { name: 'Nevada', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '33': { name: 'New Hampshire', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '38': { name: 'North Dakota', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '40': { name: 'Oklahoma', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '44': { name: 'Rhode Island', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '45': { name: 'South Carolina', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '46': { name: 'South Dakota', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '47': { name: 'Tennessee', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '50': { name: 'Vermont', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '54': { name: 'West Virginia', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '55': { name: 'Wisconsin', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 }, source: 'FHWA 2025 (FHWA-SA-25-021)' },
+  '_default': { name: 'FHWA 2025', weights: { K: 883, A: 94, B: 21, C: 11, O: 1 },
+                source: 'FHWA-SA-25-021 (Oct 2025) crash costs in 2024 dollars' }
 };
 
 // Regex patterns for crash pattern matching (used by baselines)

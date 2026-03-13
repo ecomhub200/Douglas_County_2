@@ -129,10 +129,10 @@
     assertEq(STATE_EPDO_WEIGHTS['35'].weights.K, 567, 'New Mexico K=567 (NMDOT)');
     assertEq(STATE_EPDO_WEIGHTS['17'].weights.K, 850, 'Illinois K=850 (IDOT)');
 
-    // Verify HSM default states
-    assertEq(STATE_EPDO_WEIGHTS['08'].weights.K, 462, 'Colorado K=462 (HSM Standard)');
-    assertEq(STATE_EPDO_WEIGHTS['01'].weights.K, 462, 'Alabama K=462 (HSM Standard)');
-    assertEq(STATE_EPDO_WEIGHTS['55'].weights.K, 462, 'Wisconsin K=462 (HSM Standard)');
+    // Verify FHWA 2025 default states
+    assertEq(STATE_EPDO_WEIGHTS['08'].weights.K, 883, 'Colorado K=883 (FHWA 2025)');
+    assertEq(STATE_EPDO_WEIGHTS['01'].weights.K, 883, 'Alabama K=883 (FHWA 2025)');
+    assertEq(STATE_EPDO_WEIGHTS['55'].weights.K, 883, 'Wisconsin K=883 (FHWA 2025)');
 
     // Verify O=1 for all entries (EPDO base weight)
     let allO1 = true;
@@ -167,16 +167,16 @@
     assert(vaWeights.name.includes('Virginia'), 'getStateEPDOWeights("51") name includes Virginia');
 
     const coWeights = getStateEPDOWeights('08');
-    assertEq(coWeights.weights.K, 462, 'getStateEPDOWeights("08") returns Colorado K=462');
+    assertEq(coWeights.weights.K, 883, 'getStateEPDOWeights("08") returns Colorado K=883');
 
     // Test with unpadded FIPS
     const unpadded = getStateEPDOWeights('8');
-    assertEq(unpadded.weights.K, 462, 'getStateEPDOWeights("8") pads to "08" for Colorado');
+    assertEq(unpadded.weights.K, 883, 'getStateEPDOWeights("8") pads to "08" for Colorado');
 
     // Test with unknown FIPS
     const unknown = getStateEPDOWeights('99');
     assertEq(unknown.weights.K, STATE_EPDO_WEIGHTS['_default'].weights.K, 'getStateEPDOWeights("99") falls back to _default');
-    assert(unknown.name.includes('HSM'), 'Unknown FIPS falls back to HSM Standard');
+    assert(unknown.name.includes('FHWA'), 'Unknown FIPS falls back to FHWA 2025');
 
     // getCurrentStateFips
     assert(typeof getCurrentStateFips === 'function', 'getCurrentStateFips() exists');
@@ -279,11 +279,11 @@
         { fips: '51', name: 'Virginia', expectedK: 1032 },
         { fips: '06', name: 'California', expectedK: 1100 },
         { fips: '48', name: 'Texas', expectedK: 920 },
-        { fips: '08', name: 'Colorado', expectedK: 462 },
+        { fips: '08', name: 'Colorado', expectedK: 883 },
         { fips: '25', name: 'Massachusetts', expectedK: 1200 },
         { fips: '12', name: 'Florida', expectedK: 985 },
         { fips: '37', name: 'North Carolina', expectedK: 770 },
-        { fips: '01', name: 'Alabama', expectedK: 462 },
+        { fips: '01', name: 'Alabama', expectedK: 883 },
     ];
 
     // Set to stateDefault first
@@ -341,7 +341,7 @@
         epdoByState[state.fips] = calcEPDO(crashProfile);
     });
 
-    // Virginia (K=1032) should score higher than Colorado (K=462) for same crash profile
+    // Virginia (K=1032) should score higher than Colorado (K=883) for same crash profile
     assert(epdoByState['51'] > epdoByState['08'],
         `Virginia EPDO (${epdoByState['51']}) > Colorado EPDO (${epdoByState['08']}) for same crashes`);
 
@@ -353,9 +353,9 @@
     assert(epdoByState['25'] >= epdoByState['06'],
         `Massachusetts EPDO (${epdoByState['25']}) >= California EPDO (${epdoByState['06']})`);
 
-    // Alabama (K=462) should equal Colorado (K=462) since both use HSM
+    // Alabama (K=883) should equal Colorado (K=883) since both use FHWA 2025
     assertEq(epdoByState['01'], epdoByState['08'],
-        `Alabama EPDO (${epdoByState['01']}) = Colorado EPDO (${epdoByState['08']}) (both HSM)`);
+        `Alabama EPDO (${epdoByState['01']}) = Colorado EPDO (${epdoByState['08']}) (both FHWA 2025)`);
 
     // Verify the math is correct for Virginia
     const vaExpected = 3*1032 + 10*53 + 25*16 + 40*10 + 200*1;
@@ -363,9 +363,9 @@
         `Virginia EPDO math: 3×1032 + 10×53 + 25×16 + 40×10 + 200×1 = ${vaExpected}`);
 
     // Verify the math is correct for Colorado
-    const coExpected = 3*462 + 10*62 + 25*12 + 40*5 + 200*1;
+    const coExpected = 3*883 + 10*94 + 25*21 + 40*11 + 200*1;
     assertEq(epdoByState['08'], coExpected,
-        `Colorado EPDO math: 3×462 + 10×62 + 25×12 + 40×5 + 200×1 = ${coExpected}`);
+        `Colorado EPDO math: 3×883 + 10×94 + 25×21 + 40×11 + 200×1 = ${coExpected}`);
 
     // ================================================================
     // TEST GROUP 7: Collapsible UI Elements
@@ -490,7 +490,7 @@
 
     applyStateDefaultEPDO('08', 'Colorado');
     if (stateDescEl) {
-        assert(stateDescEl.textContent.includes('462'), 'State Default desc includes K=462 for Colorado');
+        assert(stateDescEl.textContent.includes('883'), 'State Default desc includes K=883 for Colorado');
     }
 
     // ================================================================

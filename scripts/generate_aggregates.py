@@ -67,8 +67,8 @@ def load_state_config(state_key):
 
 
 def get_epdo_weights(config):
-    """Extract EPDO weights from state config, with HSM 2010 fallback."""
-    defaults = {'K': 462, 'A': 62, 'B': 12, 'C': 5, 'O': 1}
+    """Extract EPDO weights from state config, with FHWA 2025 fallback."""
+    defaults = {'K': 883, 'A': 94, 'B': 21, 'C': 11, 'O': 1}
     return config.get('epdoWeights', defaults)
 
 

@@ -716,7 +716,7 @@ COL.ROAD_SYSTEM = 'SYSTEM'    COL.MP = 'RNS MP'
 
 #### EPDO Weights (Default — HSM 2010)
 ```javascript
-{ K: 462, A: 62, B: 12, C: 5, O: 1 }
+{ K: 883, A: 94, B: 21, C: 11, O: 1 }
 ```
 
 #### State-Specific EPDO Weights (by FIPS Code)

@@ -352,7 +352,7 @@ Key column indices used throughout the codebase:
 
 Equivalent Property Damage Only (EPDO) weights:
 ```javascript
-const EPDO_WEIGHTS = { K: 462, A: 62, B: 12, C: 5, O: 1 };
+const EPDO_WEIGHTS = { K: 883, A: 94, B: 21, C: 11, O: 1 };  // FHWA 2025 (FHWA-SA-25-021)
 ```
 
 Always use `calcEPDO(severityObject)` for consistent calculations.

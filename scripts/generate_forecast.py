@@ -70,7 +70,7 @@ DEFAULT_HORIZON = 12  # months
 # EPDO weights — loaded from state config, falls back to HSM standard
 def load_epdo_weights(config_path=None):
     """Load EPDO weights from state config JSON file."""
-    default_weights = {"K": 462, "A": 62, "B": 12, "C": 5, "O": 1}
+    default_weights = {"K": 883, "A": 94, "B": 21, "C": 11, "O": 1}
     if config_path is None:
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         config_path = os.path.join(project_root, "data", "CDOT", "config.json")
@@ -87,7 +87,7 @@ def load_epdo_weights(config_path=None):
         print(f"[Config] Using default EPDO weights: {e}")
         return default_weights
 
-EPDO_WEIGHTS = {"K": 462, "A": 62, "B": 12, "C": 5, "O": 1}  # Default; overridden in main() from state config
+EPDO_WEIGHTS = {"K": 883, "A": 94, "B": 21, "C": 11, "O": 1}  # Default (FHWA 2025); overridden in main() from state config
 
 
 def download_from_r2(state, jurisdiction, data_dir):

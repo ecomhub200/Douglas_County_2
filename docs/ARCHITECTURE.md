@@ -446,10 +446,10 @@ EPDO (Equivalent Property Damage Only) weights crashes by severity:
 
 ```javascript
 const EPDO_WEIGHTS = {
-  K: 462,   // Fatal
-  A: 62,    // Serious injury
-  B: 12,    // Minor injury
-  C: 5,     // Possible injury
+  K: 883,   // Fatal
+  A: 94,    // Serious injury
+  B: 21,    // Minor injury
+  C: 11,     // Possible injury
   O: 1      // Property damage only
 };
 

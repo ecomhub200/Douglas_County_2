@@ -2596,7 +2596,7 @@ data/CDOT/
   "period": { "startYear": 2021, "endYear": 2025, "totalMonths": 49 },
   "totals": {
     "crashes": 24598,
-    "K": 42, "A": 187, "B": 1203, "C": 5432, "O": 17734,
+    "K": 42, "A": 187, "B": 2103, "C": 5432, "O": 17734,
     "epdo": 67891,
     "pedestrian": 234, "bicycle": 89, "impaired": 1567
   },
@@ -3058,7 +3058,7 @@ At that point, use **Cloudflare D1** or **Turso** (edge SQLite) — not PostgreS
 
   // EPDO weights (may vary by state/agency policy)
   "epdoWeights": {
-    "K": 462, "A": 62, "B": 12, "C": 5, "O": 1
+    "K": 883, "A": 94, "B": 21, "C": 11, "O": 1
   },
 
   // Data source configuration
