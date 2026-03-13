@@ -240,12 +240,20 @@ jobs:
           SCOPE="${{ github.event.inputs.scope }}"
           SELECTION="${{ github.event.inputs.selection }}"
 
+          DEFAULT_J="${{ steps.registry.outputs.default_jurisdiction }}"
+
           # Validate scope + selection combinations
           if [ "$SCOPE" = "statewide" ]; then
             SELECTION=""
           elif [ -z "$SELECTION" ]; then
-            echo "::error::Selection is required for scope=$SCOPE. Run: python scripts/resolve_scope.py --state $STATE --list"
-            exit 1
+            # For jurisdiction scope, fall back to registry's defaultJurisdiction
+            if [ "$SCOPE" = "jurisdiction" ] && [ -n "$DEFAULT_J" ]; then
+              SELECTION="$DEFAULT_J"
+              echo "No selection provided — defaulting to registry defaultJurisdiction: $DEFAULT_J"
+            else
+              echo "::error::Selection is required for scope=$SCOPE. Run: python scripts/resolve_scope.py --state $STATE --list"
+              exit 1
+            fi
           fi
 
           echo "scope=$SCOPE" >> $GITHUB_OUTPUT
