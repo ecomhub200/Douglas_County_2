@@ -1284,16 +1284,27 @@ class DelawareNormalizer(BaseNormalizer):
     }
 
     # Crash classification → KABCO severity (case-insensitive via .strip().lower())
-    # Per FHWA standard: when only crash-level severity is available,
-    # "Personal Injury" → A (conservative; encompasses A/B/C)
+    # Delaware only reports 3 crash-level categories. For Fatal and PDO, mapping is
+    # direct. For "Personal Injury", we use proportional A/B/C split based on NHTSA
+    # national averages (FHWA HSIP Manual Sec 4.2, NHTSA Traffic Safety Facts):
+    #   A (Suspected Serious):  ~8% of injury crashes
+    #   B (Suspected Minor):    ~32% of injury crashes
+    #   C (Possible Injury):    ~60% of injury crashes
+    # This prevents EPDO inflation from mapping all injury → A.
     SEVERITY_MAP = {
         'fatal crash': 'K',
         'fatality crash': 'K',       # actual value in Delaware data
-        'personal injury crash': 'A',
+        'personal injury crash': 'INJURY',  # split into A/B/C proportionally
         'property damage crash': 'O',
         'property damage only': 'O',  # alternate wording
         'non-reportable': 'O',        # below-threshold crashes
     }
+
+    # NHTSA national average proportional split for "Injury" crashes
+    # Thresholds for deterministic hash-based assignment (reproducible per crash)
+    INJURY_SPLIT_A_THRESHOLD = 0.08   # 0.00 - 0.08 → A (8%)
+    INJURY_SPLIT_B_THRESHOLD = 0.40   # 0.08 - 0.40 → B (32%)
+    # remainder 0.40 - 1.00 → C (60%)
 
     # Lighting values that indicate darkness (for Night? flag)
     # Compared case-insensitively
@@ -1426,14 +1437,28 @@ class DelawareNormalizer(BaseNormalizer):
         # --- ID (composite key) ---
         n['Document Nbr'] = self._build_composite_id(row, date_part, time_part)
 
-        # --- Severity (case-insensitive lookup) ---
+        # --- Severity (case-insensitive lookup with proportional injury split) ---
         raw_severity = self._get(row, 'crash_classification_description')
         severity = self.SEVERITY_MAP.get(raw_severity.lower(), 'O')
+
+        if severity == 'INJURY':
+            # Proportional A/B/C split using deterministic hash for reproducibility.
+            # Same crash (same composite ID) always gets the same severity.
+            import hashlib
+            crash_key = n.get('Document Nbr', '') or f"{raw_datetime}-{self._get(row, 'latitude')}-{self._get(row, 'longitude')}"
+            hash_val = int(hashlib.md5(crash_key.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
+            if hash_val < self.INJURY_SPLIT_A_THRESHOLD:
+                severity = 'A'
+            elif hash_val < self.INJURY_SPLIT_B_THRESHOLD:
+                severity = 'B'
+            else:
+                severity = 'C'
+
         n['Crash Severity'] = severity
         n['K_People'] = '1' if severity == 'K' else '0'
         n['A_People'] = '1' if severity == 'A' else '0'
-        n['B_People'] = '0'
-        n['C_People'] = '0'
+        n['B_People'] = '1' if severity == 'B' else '0'
+        n['C_People'] = '1' if severity == 'C' else '0'
 
         # --- Collision Type ---
         n['Collision Type'] = self._get(row, 'manner_of_impact_description')
