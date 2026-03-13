@@ -5,6 +5,15 @@
     "2": "Jurisdiction-specific with dropdown, R2 upload, no pipeline trigger — Maryland",
     "3": "Generic pattern: --data-dir, --jurisdiction, --years, --force, --gzip, R2 upload"
   },
+  "_fieldReference": {
+    "scriptArgs": "Base arguments always passed to the download script",
+    "statewideFlagArgs": "Extra flags appended for statewide download mode",
+    "forceFlag": "CLI flag to force re-download (skip cache)",
+    "statewideOutputPattern": "Expected path to statewide CSV after download; {state} and {dotDir} are replaced",
+    "statewideOutputGzPattern": "Expected path to gzipped statewide CSV (checked if plain CSV not found)",
+    "needsStandardization": "If true, run process_crash_data.py to convert to standard column format",
+    "needsMerge": "If true, check for multiple raw CSVs and merge before conversion"
+  },
 
   "virginia": {
     "displayName": "Virginia",
@@ -13,14 +22,15 @@
     "tier": 1,
     "requiresPlaywright": false,
     "defaultJurisdiction": "henrico",
-    "scriptArgs": "--output-dir data",
+    "scriptArgs": "--output-dir data --jurisdiction {defaultJurisdiction}",
     "statewideFlagArgs": "--save-statewide",
-    "jurisdictionFlagTemplate": "--jurisdiction {jurisdiction} --filter {filter}",
-    "filterProfiles": ["countyOnly", "countyPlusVDOT", "allRoads"],
-    "defaultFilter": "countyOnly",
+    "forceFlag": "--force-download",
+    "statewideOutputPattern": "{dotDir}/virginia_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/virginia_statewide_all_roads.csv.gz",
+    "needsStandardization": false,
+    "needsMerge": false,
     "pipelineWorkflow": "pipeline.yml",
     "r2Prefix": "virginia",
-    "statewideOutputPattern": "data/virginia_statewide_all_roads.csv",
     "jurisdictionOutputPattern": "data/{jurisdiction}_all_roads.csv"
   },
 
@@ -31,12 +41,15 @@
     "tier": 1,
     "requiresPlaywright": true,
     "defaultJurisdiction": "douglas",
-    "scriptArgs": "--output-dir data/CDOT",
+    "scriptArgs": "--data-dir data/CDOT",
     "statewideFlagArgs": "--save-statewide-gzip",
-    "jurisdictionFlagTemplate": "--jurisdiction {jurisdiction}",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/colorado_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/colorado_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": false,
     "pipelineWorkflow": "pipeline.yml",
     "r2Prefix": "colorado",
-    "statewideOutputPattern": "data/CDOT/colorado_statewide_all_roads.csv",
     "jurisdictionOutputPattern": "data/CDOT/{jurisdiction}_all_roads.csv"
   },
 
@@ -47,6 +60,13 @@
     "tier": 2,
     "requiresPlaywright": false,
     "defaultJurisdiction": "montgomery",
+    "scriptArgs": "--data-dir data/MarylandDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "maryland"
   },
 
@@ -57,6 +77,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/AlaskaDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "alaska"
   },
 
@@ -67,6 +94,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/ArkansasDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "arkansas"
   },
 
@@ -77,6 +111,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/ConnecticutDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "connecticut"
   },
 
@@ -87,6 +128,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/DelawareDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "delaware"
   },
 
@@ -97,6 +145,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/FloridaDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "florida"
   },
 
@@ -107,6 +162,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/GeorgiaDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "georgia"
   },
 
@@ -117,6 +179,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/HawaiiDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "hawaii"
   },
 
@@ -127,6 +196,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/IdahoDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "idaho"
   },
 
@@ -137,6 +213,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/IllinoisDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "illinois"
   },
 
@@ -147,6 +230,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/IowaDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "iowa"
   },
 
@@ -157,6 +247,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/LouisianaDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "louisiana"
   },
 
@@ -167,6 +264,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/MassachusettsDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "massachusetts"
   },
 
@@ -177,6 +281,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/MississippiDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "mississippi"
   },
 
@@ -187,6 +298,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/MontanaDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "montana"
   },
 
@@ -197,6 +315,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/NevadaDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "nevada"
   },
 
@@ -207,6 +332,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/NewYorkDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "new_york"
   },
 
@@ -217,6 +349,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/NYCDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "nyc"
   },
 
@@ -227,6 +366,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/OhioDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "ohio"
   },
 
@@ -237,6 +383,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/OklahomaDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "oklahoma"
   },
 
@@ -247,6 +400,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/OregonDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "oregon"
   },
 
@@ -257,6 +417,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/PennsylvaniaDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "pennsylvania"
   },
 
@@ -267,6 +434,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/SouthCarolinaDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "south_carolina"
   },
 
@@ -277,6 +451,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/TexasDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "texas"
   },
 
@@ -287,6 +468,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/UtahDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "utah"
   },
 
@@ -297,6 +485,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/VermontDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "vermont"
   },
 
@@ -307,6 +502,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/WashingtonDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "washington"
   },
 
@@ -317,6 +519,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/WestVirginiaDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "west_virginia"
   },
 
@@ -327,6 +536,13 @@
     "tier": 3,
     "requiresPlaywright": false,
     "defaultJurisdiction": "statewide",
+    "scriptArgs": "--data-dir data/WisconsinDOT",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
+    "needsStandardization": true,
+    "needsMerge": true,
     "r2Prefix": "wisconsin"
   }
 }
