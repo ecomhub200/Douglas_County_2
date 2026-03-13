@@ -21,17 +21,18 @@
 #   Standardize (if needsStandardization) → Upload to R2 → Trigger batch-pipeline
 #
 # Road type splitting is AUTOMATIC (handled by batch-pipeline, NOT this workflow):
-#   County/Jurisdiction scope → 3 CSVs per county:
-#     county_roads.csv       — local/county-maintained roads
-#     no_interstate.csv      — county + DOT roads minus interstates
+#   County/Jurisdiction scope → 4 CSVs per county:
+#     county_roads.csv       — county-maintained roads (Ownership = County Hwy Agency)
+#     city_roads.csv         — city/town-maintained roads (Ownership = City or Town Hwy Agency)
+#     no_interstate.csv      — all roads minus interstates
 #     all_roads.csv          — everything
 #   State/Region/MPO scope → 3 CSVs:
 #     dot_roads.csv          — state DOT-maintained roads
 #     non_dot_roads.csv      — local/non-state roads
 #     statewide_all_roads.csv — DOT + non-DOT combined
 #
-# No road type filter input is needed — the scope determines which 3 CSVs
-# to produce, and ALL 3 are always generated and pushed to R2.
+# No road type filter input is needed — the scope determines which CSVs
+# to produce, and all variants are always generated and pushed to R2.
 # ==============================================================================
 
 name: "Download State Crash Data"
