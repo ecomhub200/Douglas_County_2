@@ -226,6 +226,10 @@ jobs:
               'needs_merge': str(e.get('needsMerge', True)).lower(),
           }
 
+          # Default region/MPO (Tier 1 states may define these)
+          outputs['default_region'] = e.get('defaultRegion', '')
+          outputs['default_mpo'] = e.get('defaultMpo', '')
+
           for k, v in outputs.items():
               print(f'{k}={v}')
           " >> $GITHUB_OUTPUT
@@ -241,15 +245,23 @@ jobs:
           SELECTION="${{ github.event.inputs.selection }}"
 
           DEFAULT_J="${{ steps.registry.outputs.default_jurisdiction }}"
+          DEFAULT_R="${{ steps.registry.outputs.default_region }}"
+          DEFAULT_M="${{ steps.registry.outputs.default_mpo }}"
 
           # Validate scope + selection combinations
           if [ "$SCOPE" = "statewide" ]; then
             SELECTION=""
           elif [ -z "$SELECTION" ]; then
-            # For jurisdiction scope, fall back to registry's defaultJurisdiction
+            # Fall back to registry defaults based on scope
             if [ "$SCOPE" = "jurisdiction" ] && [ -n "$DEFAULT_J" ]; then
               SELECTION="$DEFAULT_J"
               echo "No selection provided — defaulting to registry defaultJurisdiction: $DEFAULT_J"
+            elif [ "$SCOPE" = "region" ] && [ -n "$DEFAULT_R" ]; then
+              SELECTION="$DEFAULT_R"
+              echo "No selection provided — defaulting to registry defaultRegion: $DEFAULT_R"
+            elif [ "$SCOPE" = "mpo" ] && [ -n "$DEFAULT_M" ]; then
+              SELECTION="$DEFAULT_M"
+              echo "No selection provided — defaulting to registry defaultMpo: $DEFAULT_M"
             else
               echo "::error::Selection is required for scope=$SCOPE. Run: python scripts/resolve_scope.py --state $STATE --list"
               exit 1

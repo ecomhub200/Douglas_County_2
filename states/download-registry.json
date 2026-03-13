@@ -22,6 +22,8 @@
     "tier": 1,
     "requiresPlaywright": false,
     "defaultJurisdiction": "henrico",
+    "defaultRegion": "richmond",
+    "defaultMpo": "rvampo",
     "scriptArgs": "--output-dir data --jurisdiction {defaultJurisdiction}",
     "statewideFlagArgs": "--save-statewide",
     "forceFlag": "--force-download",
