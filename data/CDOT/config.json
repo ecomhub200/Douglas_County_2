@@ -19,11 +19,9 @@
     },
     "dataDir": "CDOT"
   },
-
   "columnMapping": {
     "_description": "Maps Colorado CDOT CSV column names to internal field codes used by CRASH LENS",
     "_note": "Colorado does NOT have a single severity column - severity must be DERIVED from Injury 00-04 counts",
-
     "ID": "CUID",
     "DATE": "Crash Date",
     "TIME": "Crash Time",
@@ -95,145 +93,221 @@
     "PROCESSING_STATUS": "Processing Status",
     "LAST_UPDATED": "Last Updated"
   },
-
   "derivedFields": {
     "_description": "Fields that don't exist in Colorado data and must be computed from other columns",
-
     "SEVERITY": {
       "method": "fromInjuryCounts",
-      "description": "Colorado has no single severity column. Derive from highest injury level: if Injury 04 > 0 → K, elif Injury 03 > 0 → A, elif Injury 02 > 0 → B, elif Injury 01 > 0 → C, else → O",
-      "sources": ["Injury 04", "Injury 03", "Injury 02", "Injury 01", "Injury 00"]
+      "description": "Colorado has no single severity column. Derive from highest injury level: if Injury 04 > 0 \u2192 K, elif Injury 03 > 0 \u2192 A, elif Injury 02 > 0 \u2192 B, elif Injury 01 > 0 \u2192 C, else \u2192 O",
+      "sources": [
+        "Injury 04",
+        "Injury 03",
+        "Injury 02",
+        "Injury 01",
+        "Injury 00"
+      ]
     },
-
     "YEAR": {
       "method": "fromDate",
       "description": "Extract year from Crash Date (format: M/D/YYYY)",
       "source": "Crash Date",
       "dateFormat": "M/D/YYYY"
     },
-
     "PED": {
       "method": "fromNonMotoristType",
       "description": "Check if any TU NM Type contains 'Pedestrian'",
-      "sources": ["TU-1 NM Type", "TU-2 NM Type"],
-      "matchValues": ["Pedestrian"]
+      "sources": [
+        "TU-1 NM Type",
+        "TU-2 NM Type"
+      ],
+      "matchValues": [
+        "Pedestrian"
+      ]
     },
-
     "BIKE": {
       "method": "fromNonMotoristType",
       "description": "Check if any TU NM Type contains 'Bicycle'",
-      "sources": ["TU-1 NM Type", "TU-2 NM Type"],
-      "matchValues": ["Bicycle", "Bicycle/Motorized Bicycle"]
+      "sources": [
+        "TU-1 NM Type",
+        "TU-2 NM Type"
+      ],
+      "matchValues": [
+        "Bicycle",
+        "Bicycle/Motorized Bicycle"
+      ]
     },
-
     "ALCOHOL": {
       "method": "fromSuspectedFlags",
       "description": "Check if any TU has alcohol suspected = Yes",
-      "sources": ["TU-1 Alcohol Suspected", "TU-2 Alcohol Suspected"],
-      "positiveValues": ["Yes - SFST", "Yes - BAC", "Yes - Both", "Yes - Observation"]
+      "sources": [
+        "TU-1 Alcohol Suspected",
+        "TU-2 Alcohol Suspected"
+      ],
+      "positiveValues": [
+        "Yes - SFST",
+        "Yes - BAC",
+        "Yes - Both",
+        "Yes - Observation"
+      ]
     },
-
     "SPEED": {
       "method": "fromDriverAction",
       "description": "Check if driver action indicates speeding",
-      "sources": ["TU-1 Driver Action", "TU-2 Driver Action"],
-      "matchValues": ["Too Fast for Conditions", "Exceeded Speed Limit"]
+      "sources": [
+        "TU-1 Driver Action",
+        "TU-2 Driver Action"
+      ],
+      "matchValues": [
+        "Too Fast for Conditions",
+        "Exceeded Speed Limit"
+      ]
     },
-
     "HITRUN": {
       "method": "fromHitAndRun",
       "description": "Check if any TU hit and run = TRUE",
-      "sources": ["TU-1 Hit And Run", "TU-2 Hit And Run"],
-      "positiveValues": ["TRUE", "true", "True"]
+      "sources": [
+        "TU-1 Hit And Run",
+        "TU-2 Hit And Run"
+      ],
+      "positiveValues": [
+        "TRUE",
+        "true",
+        "True"
+      ]
     },
-
     "MOTORCYCLE": {
       "method": "fromVehicleType",
       "description": "Check if any TU Type is motorcycle",
-      "sources": ["TU-1 Type", "TU-2 Type"],
-      "matchValues": ["Motorcycle"]
+      "sources": [
+        "TU-1 Type",
+        "TU-2 Type"
+      ],
+      "matchValues": [
+        "Motorcycle"
+      ]
     },
-
     "ROUTE": {
       "method": "buildRouteName",
       "description": "Construct route name from System Code + Rd_Number + Location 1",
-      "sources": ["System Code", "Rd_Number", "Location 1"]
+      "sources": [
+        "System Code",
+        "Rd_Number",
+        "Location 1"
+      ]
     },
-
     "NODE": {
       "method": "buildNodeId",
       "description": "Construct intersection ID from Location 1 + Location 2 when Road Description indicates intersection",
-      "sources": ["Location 1", "Location 2", "Road Description"]
+      "sources": [
+        "Location 1",
+        "Location 2",
+        "Road Description"
+      ]
     },
-
     "COLLISION": {
       "method": "mapCrashType",
       "description": "Map Colorado Crash Type / MHE to standardized collision categories",
       "source": "Crash Type",
       "fallback": "MHE"
     },
-
     "INTERSECTION_TYPE": {
       "method": "mapRoadDescription",
       "description": "Map Road Description to intersection type categories",
       "source": "Road Description"
     },
-
     "NIGHT": {
       "method": "fromLighting",
       "description": "Derive nighttime flag from Lighting Conditions",
       "source": "Lighting Conditions",
-      "matchValues": ["Dark – Lighted", "Dark – Unlighted", "Dark - Lighted", "Dark - Unlighted"]
+      "matchValues": [
+        "Dark \u2013 Lighted",
+        "Dark \u2013 Unlighted",
+        "Dark - Lighted",
+        "Dark - Unlighted"
+      ]
     },
-
     "DISTRACTED": {
       "method": "fromDriverAction",
       "description": "Check if driver action or human factor indicates distraction",
-      "sources": ["TU-1 Driver Action", "TU-2 Driver Action", "TU-1 Human Contributing Factor", "TU-2 Human Contributing Factor"],
-      "matchValues": ["Distracted", "Cell Phone", "Inattention", "Distracted - Cell Phone/Electronic Device", "Distracted - Other", "Inattentive/Distracted"]
+      "sources": [
+        "TU-1 Driver Action",
+        "TU-2 Driver Action",
+        "TU-1 Human Contributing Factor",
+        "TU-2 Human Contributing Factor"
+      ],
+      "matchValues": [
+        "Distracted",
+        "Cell Phone",
+        "Inattention",
+        "Distracted - Cell Phone/Electronic Device",
+        "Distracted - Other",
+        "Inattentive/Distracted"
+      ]
     },
-
     "DROWSY": {
       "method": "fromHumanFactor",
       "description": "Check if human contributing factor indicates drowsiness",
-      "sources": ["TU-1 Human Contributing Factor", "TU-2 Human Contributing Factor"],
-      "matchValues": ["Asleep/Fatigued", "Fatigued/Asleep", "Ill/Asleep/Fatigued"]
+      "sources": [
+        "TU-1 Human Contributing Factor",
+        "TU-2 Human Contributing Factor"
+      ],
+      "matchValues": [
+        "Asleep/Fatigued",
+        "Fatigued/Asleep",
+        "Ill/Asleep/Fatigued"
+      ]
     },
-
     "DRUG": {
       "method": "fromSuspectedFlags",
       "description": "Check marijuana or other drug suspected flags",
-      "sources": ["TU-1  Marijuana Suspected", "TU-2 Marijuana Suspected", "TU-1 Other Drugs Suspected ", "TU-2 Other Drugs Suspected "],
-      "positiveValues": ["Yes - Observation", "Yes - SFST", "Yes - Both", "Yes - Test Results", "Unknown"]
+      "sources": [
+        "TU-1  Marijuana Suspected",
+        "TU-2 Marijuana Suspected",
+        "TU-1 Other Drugs Suspected ",
+        "TU-2 Other Drugs Suspected "
+      ],
+      "positiveValues": [
+        "Yes - Observation",
+        "Yes - SFST",
+        "Yes - Both",
+        "Yes - Test Results",
+        "Unknown"
+      ]
     },
-
     "YOUNG": {
       "method": "fromAge",
       "description": "Check if any driver age is 16-20",
-      "sources": ["TU-1 Age", "TU-2 Age"],
+      "sources": [
+        "TU-1 Age",
+        "TU-2 Age"
+      ],
       "minAge": 16,
       "maxAge": 20
     },
-
     "SENIOR": {
       "method": "fromAge",
       "description": "Check if any driver age is 65+",
-      "sources": ["TU-1 Age", "TU-2 Age"],
+      "sources": [
+        "TU-1 Age",
+        "TU-2 Age"
+      ],
       "minAge": 65,
       "maxAge": 999
     },
-
     "UNRESTRAINED": {
       "method": "fromRestraintUse",
       "description": "Check if any driver had improper restraint use",
-      "sources": ["TU-1 Safety restraint Use", "TU-2 Safety restraint Use"],
-      "matchValues": ["Not Used", "Improperly Used"]
+      "sources": [
+        "TU-1 Safety restraint Use",
+        "TU-2 Safety restraint Use"
+      ],
+      "matchValues": [
+        "Not Used",
+        "Improperly Used"
+      ]
     }
   },
-
   "roadSystems": {
     "_description": "Colorado road classification system from 'System Code' column",
-
     "values": {
       "City Street": {
         "category": "local",
@@ -271,33 +345,52 @@
         "description": "CDOT-maintained interstate frontage roads"
       }
     },
-
     "filterProfiles": {
       "countyOnly": {
         "name": "County Roads Only",
         "description": "County-maintained roads only",
-        "systemValues": ["County Road"],
-        "excludeRoutePatterns": []
+        "systemValues": [
+          "County Road"
+        ],
+        "excludeRoutePatterns": [],
+        "label": "County Roads Only"
       },
       "countyPlusState": {
         "name": "All Roads (No Interstate)",
         "description": "Local roads plus CDOT state highways, excluding interstates",
-        "systemValues": ["City Street", "County Road", "State Highway", "Frontage Road"],
-        "excludeRoutePatterns": ["^I-\\d+"]
+        "systemValues": [
+          "City Street",
+          "County Road",
+          "State Highway",
+          "Frontage Road"
+        ],
+        "excludeRoutePatterns": [
+          "^I-\\d+"
+        ]
       },
       "allRoads": {
         "name": "All Roads (Including Interstate)",
         "description": "All road types including interstates",
-        "systemValues": ["City Street", "County Road", "State Highway", "Interstate Highway", "Frontage Road"],
+        "systemValues": [
+          "City Street",
+          "County Road",
+          "State Highway",
+          "Interstate Highway",
+          "Frontage Road"
+        ],
         "excludeRoutePatterns": []
+      },
+      "cityOnly": {
+        "include": [
+          "Local Road"
+        ],
+        "label": "City Roads Only"
       }
     }
   },
-
   "crashTypeMapping": {
     "_description": "Maps Colorado Crash Type / MHE values to standardized collision categories used by CRASH LENS",
     "_note": "Colorado uses text descriptions from Most Harmful Event and Crash Type fields",
-
     "Rear-End": "Rear End",
     "Broadside": "Angle",
     "Head-On": "Head On",
@@ -328,7 +421,6 @@
     "Other Non-Fixed Object Describe in Narrative)": "Other",
     "Other Non-Collision": "Non-Collision"
   },
-
   "intersectionTypeMapping": {
     "Non-Intersection": "Non-Intersection",
     "At Intersection": "Intersection",
@@ -344,7 +436,6 @@
     "Railroad Crossing Related": "Railroad Crossing",
     "Mid-Block Crosswalk": "Intersection"
   },
-
   "epdoWeights": {
     "_description": "EPDO weights - using FHWA recommended values. Adjust per state/agency policy.",
     "K": 462,
@@ -353,7 +444,6 @@
     "C": 5,
     "O": 1
   },
-
   "validValues": {
     "severity": {
       "K": "Fatal Injury (Killed)",
@@ -363,8 +453,14 @@
       "O": "No Apparent Injury (Property Damage Only)"
     },
     "roadCondition": [
-      "Dry", "Wet", "Icy", "Snowy", "Slushy", "Muddy",
-      "Sand/Gravel", "Roto-Milled",
+      "Dry",
+      "Wet",
+      "Icy",
+      "Snowy",
+      "Slushy",
+      "Muddy",
+      "Sand/Gravel",
+      "Roto-Milled",
       "Dry W/Visible Icy Road Treatment",
       "Snowy W/Visible Icy Road Treatment",
       "Icy W/Visible Icy Road Treatment",
@@ -372,29 +468,53 @@
       "Slushy W/Visible Icy Road Treatment"
     ],
     "lightingConditions": [
-      "Daylight", "Dark – Lighted", "Dark – Unlighted", "Dawn or Dusk"
+      "Daylight",
+      "Dark \u2013 Lighted",
+      "Dark \u2013 Unlighted",
+      "Dawn or Dusk"
     ],
     "weatherCondition": [
-      "Clear", "Cloudy", "Snow", "Rain", "Blowing Snow",
-      "Fog", "Freezing Rain or Freezing Drizzle", "Wind",
-      "Sleet or Hail", "Dust"
+      "Clear",
+      "Cloudy",
+      "Snow",
+      "Rain",
+      "Blowing Snow",
+      "Fog",
+      "Freezing Rain or Freezing Drizzle",
+      "Wind",
+      "Sleet or Hail",
+      "Dust"
     ],
     "roadDescription": [
-      "Non-Intersection", "At Intersection", "Intersection Related",
-      "Driveway Access Related", "Ramp", "Roundabout", "Ramp-related",
-      "Express/Managed/HOV Lane", "Crossover-Related ", "Auxiliary Lane",
-      "Alley Related", "Railroad Crossing Related", "Mid-Block Crosswalk"
+      "Non-Intersection",
+      "At Intersection",
+      "Intersection Related",
+      "Driveway Access Related",
+      "Ramp",
+      "Roundabout",
+      "Ramp-related",
+      "Express/Managed/HOV Lane",
+      "Crossover-Related ",
+      "Auxiliary Lane",
+      "Alley Related",
+      "Railroad Crossing Related",
+      "Mid-Block Crosswalk"
     ]
   },
-
   "interstateRoutes": [
-    "I-25", "I-70", "I-76", "I-225", "I-270"
+    "I-25",
+    "I-70",
+    "I-76",
+    "I-225",
+    "I-270"
   ],
-
   "commonStateHighways": [
-    "CO-83", "CO-86", "CO-67", "CO-105", "CO-470"
+    "CO-83",
+    "CO-86",
+    "CO-67",
+    "CO-105",
+    "CO-470"
   ],
-
   "dataSource": {
     "name": "CDOT Crash Data",
     "url": "https://data.colorado.gov",
@@ -403,7 +523,6 @@
     "fallbackUrl": "",
     "fileFormat": "CSV export from CDOT crash database"
   },
-
   "tigerweb": {
     "stateFips": "08"
   }

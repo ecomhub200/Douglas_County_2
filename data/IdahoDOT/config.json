@@ -63,7 +63,7 @@
     "SEVERITY": {
       "method": "text_to_kabco",
       "source": "Severity",
-      "_note": "Idaho provides text severity: 'Fatal'→K, 'Type A'→A (Suspected Serious), 'Type B'→B (Suspected Minor), 'Type C'→C (Possible), 'PDO'→O"
+      "_note": "Idaho provides text severity: 'Fatal'\u2192K, 'Type A'\u2192A (Suspected Serious), 'Type B'\u2192B (Suspected Minor), 'Type C'\u2192C (Possible), 'PDO'\u2192O"
     },
     "YEAR": {
       "method": "direct",
@@ -71,7 +71,10 @@
     },
     "NODE": {
       "method": "concatenate",
-      "sources": ["Street1", "Street2"],
+      "sources": [
+        "Street1",
+        "Street2"
+      ],
       "separator": " & "
     }
   },
@@ -102,10 +105,9 @@
     "filterProfiles": {
       "countyOnly": {
         "include": [
-          "County Road",
-          "Local Road"
+          "County Road"
         ],
-        "label": "County & Local Roads Only"
+        "label": "County Roads Only"
       },
       "countyPlusState": {
         "include": [
@@ -125,6 +127,12 @@
           "Local Road"
         ],
         "label": "All Roads"
+      },
+      "cityOnly": {
+        "include": [
+          "Local Road"
+        ],
+        "label": "City Roads Only"
       }
     }
   },

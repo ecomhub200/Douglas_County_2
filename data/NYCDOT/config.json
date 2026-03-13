@@ -44,17 +44,26 @@
     "SEVERITY": {
       "method": "derived_from_counts",
       "_note": "NYC Crashes table has injury/fatality counts, not KABCO directly",
-      "rule": "If number_of_persons_killed > 0 → K; Elif number_of_persons_injured > 0 → B (conservative); Else → O",
-      "sources": ["number_of_persons_killed", "number_of_persons_injured"]
+      "rule": "If number_of_persons_killed > 0 \u2192 K; Elif number_of_persons_injured > 0 \u2192 B (conservative); Else \u2192 O",
+      "sources": [
+        "number_of_persons_killed",
+        "number_of_persons_injured"
+      ]
     },
     "PED": {
       "method": "flag_from_count",
-      "sources": ["number_of_pedestrians_killed", "number_of_pedestrians_injured"],
+      "sources": [
+        "number_of_pedestrians_killed",
+        "number_of_pedestrians_injured"
+      ],
       "rule": "True if sum > 0"
     },
     "BIKE": {
       "method": "flag_from_count",
-      "sources": ["number_of_cyclist_killed", "number_of_cyclist_injured"],
+      "sources": [
+        "number_of_cyclist_killed",
+        "number_of_cyclist_injured"
+      ],
       "rule": "True if sum > 0"
     },
     "YEAR": {
@@ -63,7 +72,10 @@
     },
     "NODE": {
       "method": "concatenate",
-      "sources": ["on_street_name", "cross_street_name"],
+      "sources": [
+        "on_street_name",
+        "cross_street_name"
+      ],
       "separator": " & "
     }
   },
@@ -94,10 +106,9 @@
     "filterProfiles": {
       "countyOnly": {
         "include": [
-          "County Road",
-          "Local Road"
+          "County Road"
         ],
-        "label": "County & Local Roads Only"
+        "label": "County Roads Only"
       },
       "countyPlusState": {
         "include": [
@@ -117,6 +128,12 @@
           "Local Road"
         ],
         "label": "All Roads"
+      },
+      "cityOnly": {
+        "include": [
+          "Local Road"
+        ],
+        "label": "City Roads Only"
       }
     }
   },

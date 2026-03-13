@@ -10,7 +10,9 @@
     "dataPortalUrl": "https://opendata.maryland.gov",
     "contactEmail": "",
     "mutcdVersion": "Federal MUTCD (11th Edition)",
-    "mutcdSupplements": ["Maryland Supplement to the MUTCD"],
+    "mutcdSupplements": [
+      "Maryland Supplement to the MUTCD"
+    ],
     "coordinateBounds": {
       "latMin": 37.91,
       "latMax": 39.72,
@@ -19,12 +21,10 @@
     },
     "dataDir": "MarylandDOT"
   },
-
   "columnMapping": {
     "_description": "Maps Maryland ACRS Socrata field names to internal field codes used by CRASH LENS",
     "_note": "Maryland uses a 3-tier crash severity (Fatal/Injury/PDO). True KABCO requires joining Person Details dataset.",
     "_dataDictionary": "ACRS Field Reference Guide (NHTSA) + Zero Deaths MD definitions",
-
     "ID": "report_no",
     "DATE": "acc_date",
     "TIME": "acc_time",
@@ -79,10 +79,8 @@
     "LOCAL_CASE_NO": "local_case_no",
     "QUARTER": "quarter"
   },
-
   "derivedFields": {
     "_description": "Fields that must be computed from raw data during Stage 1 (CONVERT)",
-
     "SEVERITY": {
       "method": "report_type_map",
       "source": "acrs_report_type",
@@ -99,12 +97,19 @@
     },
     "NODE": {
       "method": "concatenate",
-      "sources": ["road_name", "cross_street_name"],
+      "sources": [
+        "road_name",
+        "cross_street_name"
+      ],
       "separator": " & "
     },
     "ROUTE_FULL": {
       "method": "concatenate",
-      "sources": ["route_type_desc", "rte_no", "road_name"],
+      "sources": [
+        "route_type_desc",
+        "rte_no",
+        "road_name"
+      ],
       "separator": " "
     },
     "PED": {
@@ -114,7 +119,7 @@
       "joinKey": "report_no"
     },
     "BIKE": {
-      "_note": "Same as PED — requires Person Details join",
+      "_note": "Same as PED \u2014 requires Person Details join",
       "method": "lookup_related_dataset",
       "source": "py4c-dicf",
       "joinKey": "report_no"
@@ -122,36 +127,76 @@
     "NIGHT": {
       "method": "contains_any",
       "source": "light_desc",
-      "values": ["Dark"]
+      "values": [
+        "Dark"
+      ]
     }
   },
-
   "roadSystems": {
     "_description": "Maryland road classification for road-type filtering",
     "values": {
-      "Interstate": {"classification": "state_maintained", "label": "Interstate"},
-      "US (State)": {"classification": "state_maintained", "label": "US Route"},
-      "Maryland (State)": {"classification": "state_maintained", "label": "MD State Route"},
-      "County": {"classification": "local", "label": "County Road"},
-      "Municipality": {"classification": "local", "label": "Municipal Road"},
-      "Other Public Roadway": {"classification": "local", "label": "Other Public"}
+      "Interstate": {
+        "classification": "state_maintained",
+        "label": "Interstate"
+      },
+      "US (State)": {
+        "classification": "state_maintained",
+        "label": "US Route"
+      },
+      "Maryland (State)": {
+        "classification": "state_maintained",
+        "label": "MD State Route"
+      },
+      "County": {
+        "classification": "local",
+        "label": "County Road"
+      },
+      "Municipality": {
+        "classification": "local",
+        "label": "Municipal Road"
+      },
+      "Other Public Roadway": {
+        "classification": "local",
+        "label": "Other Public"
+      }
     },
     "filterProfiles": {
       "countyOnly": {
-        "include": ["County", "Municipality", "Other Public Roadway"],
-        "label": "County & Municipal Roads Only"
+        "include": [
+          "County",
+          "Other Public Roadway"
+        ],
+        "label": "County Roads Only"
       },
       "countyPlusState": {
-        "include": ["County", "Municipality", "Other Public Roadway", "Maryland (State)", "US (State)"],
+        "include": [
+          "County",
+          "Municipality",
+          "Other Public Roadway",
+          "Maryland (State)",
+          "US (State)"
+        ],
         "label": "County + State Routes"
       },
       "allRoads": {
-        "include": ["Interstate", "US (State)", "Maryland (State)", "County", "Municipality", "Other Public Roadway"],
+        "include": [
+          "Interstate",
+          "US (State)",
+          "Maryland (State)",
+          "County",
+          "Municipality",
+          "Other Public Roadway"
+        ],
         "label": "All Roads"
+      },
+      "cityOnly": {
+        "include": [
+          "Municipality"
+        ],
+        "label": "City Roads Only"
       }
     }
   },
-
   "crashTypeMapping": {
     "_description": "Maps Maryland collision_type_desc values to CRASH LENS standard collision types",
     "Angle Meets Left Head On": "6. Angle",
@@ -170,7 +215,6 @@
     "Single Vehicle": "14. Fixed Object",
     "Other": "16. Other/Unknown"
   },
-
   "epdoWeights": {
     "K": 462,
     "A": 62,
@@ -179,7 +223,6 @@
     "O": 1,
     "_source": "FHWA/HSM Standard"
   },
-
   "validValues": {
     "severity": {
       "K": "Fatal Crash",
@@ -189,19 +232,41 @@
       "O": "Property Damage Only"
     },
     "weather": [
-      "Clear", "Cloudy", "Raining", "Foggy", "Snow", "Sleet",
-      "Blowing Sand/Dirt/Snow", "Severe Crosswinds", "Other", "Unknown"
+      "Clear",
+      "Cloudy",
+      "Raining",
+      "Foggy",
+      "Snow",
+      "Sleet",
+      "Blowing Sand/Dirt/Snow",
+      "Severe Crosswinds",
+      "Other",
+      "Unknown"
     ],
     "lighting": [
-      "Daylight", "Dark-Lights On", "Dark-No Lights", "Dawn", "Dusk",
-      "Dark - Unknown Lighting", "Other", "Unknown"
+      "Daylight",
+      "Dark-Lights On",
+      "Dark-No Lights",
+      "Dawn",
+      "Dusk",
+      "Dark - Unknown Lighting",
+      "Other",
+      "Unknown"
     ],
     "surfaceCondition": [
-      "Dry", "Wet", "Ice", "Snow", "Mud/Dirt/Gravel", "Water",
-      "Sand", "Oil", "Slush", "Other", "Unknown"
+      "Dry",
+      "Wet",
+      "Ice",
+      "Snow",
+      "Mud/Dirt/Gravel",
+      "Water",
+      "Sand",
+      "Oil",
+      "Slush",
+      "Other",
+      "Unknown"
     ]
   },
-
   "dataSource": {
     "name": "Maryland Open Data Portal (Socrata)",
     "url": "https://opendata.maryland.gov/Public-Safety/Maryland-Statewide-Vehicle-Crashes/65du-s3qu",
