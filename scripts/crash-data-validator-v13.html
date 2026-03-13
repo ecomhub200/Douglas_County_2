@@ -842,6 +842,13 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
           <div class="file-card-desc">County-maintained roads only — filtered for local jurisdiction analysis</div>
           <div style="margin-top:10px"><span class="badge badge-blue mono" id="size-county">— MB</span></div>
         </div>
+        <div class="file-card" id="fc-city" onclick="selectFile('city_roads')">
+          <div class="file-card-status" id="fs-city"></div>
+          <div class="file-card-icon">🏙️</div>
+          <div class="file-card-name">city_roads.csv</div>
+          <div class="file-card-desc">City/town agency roads only — filtered by ownership for city-maintained analysis</div>
+          <div style="margin-top:10px"><span class="badge badge-blue mono" id="size-city">— MB</span></div>
+        </div>
         <div class="file-card" id="fc-noint" onclick="selectFile('no_interstate')">
           <div class="file-card-status" id="fs-noint"></div>
           <div class="file-card-icon">🚫</div>
@@ -1203,6 +1210,7 @@ const APP = {
   fileMap: {
     'all_roads':    { file: 'all_roads.csv',    cardId: 'fc-all',    statusId: 'fs-all',    sizeId: 'size-all' },
     'county_roads': { file: 'county_roads.csv',  cardId: 'fc-county', statusId: 'fs-county', sizeId: 'size-county' },
+    'city_roads':   { file: 'city_roads.csv',    cardId: 'fc-city',   statusId: 'fs-city',   sizeId: 'size-city' },
     'no_interstate':{ file: 'no_interstate.csv', cardId: 'fc-noint',  statusId: 'fs-noint',  sizeId: 'size-noint' },
   },
 

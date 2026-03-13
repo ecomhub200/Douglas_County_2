@@ -37,7 +37,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
-ROAD_TYPES = ['all_roads', 'no_interstate', 'county_roads']
+ROAD_TYPES = ['all_roads', 'no_interstate', 'county_roads', 'city_roads']
 
 
 def load_hierarchy(state):

@@ -138,9 +138,13 @@
 
     "filterProfiles": {
       "countyOnly": {
-        "name": "County/Municipal Roads Only",
-        "description": "Only locally-maintained roads",
+        "name": "County Roads Only",
+        "description": "County-maintained roads only",
         "systemValues": ["NonVDOT secondary"]
+      },
+      "cityOnly": {
+        "name": "City Roads Only",
+        "description": "City/municipal agency roads only"
       },
       "countyPlusVDOT": {
         "name": "All Roads (No Interstate)",

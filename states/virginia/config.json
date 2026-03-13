@@ -137,6 +137,11 @@
         "column": "Ownership",
         "includeValues": ["2. County Hwy Agency"]
       },
+      "cityRoads": {
+        "method": "ownership",
+        "column": "Ownership",
+        "includeValues": ["3. City or Town Hwy Agency"]
+      },
       "interstateExclusion": {
         "method": "functional_class",
         "column": "Functional Class",
@@ -146,9 +151,14 @@
 
     "filterProfiles": {
       "countyOnly": {
-        "name": "County/City Roads Only",
-        "description": "Only locally-maintained roads (NonVDOT)",
+        "name": "County Roads Only",
+        "description": "County-maintained roads only (County Hwy Agency)",
         "systemValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT"]
+      },
+      "cityOnly": {
+        "name": "City Roads Only",
+        "description": "City/town agency-maintained roads only",
+        "ownershipValues": ["3. City or Town Hwy Agency"]
       },
       "countyPlusVDOT": {
         "name": "All Roads (No Interstate)",

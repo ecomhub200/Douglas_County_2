@@ -261,6 +261,33 @@ def _apply_split_config_filter(df, suffix, split_config):
             mask = df[col].astype(str).str.strip().isin(all_ids)
             return df[mask].copy()
 
+    elif suffix == 'city_roads':
+        city_config = split_config.get('cityRoads', {})
+        if not city_config:
+            return df.iloc[0:0].copy()  # Empty DataFrame — no cityRoads config
+        method = city_config.get('method', 'ownership')
+        col = city_config.get('column', 'Ownership')
+        if col not in df.columns:
+            logger.warning(f"  Column '{col}' not found for city roads filter (method={method})")
+            return df.copy()
+        if method == 'ownership':
+            include_values = city_config.get('includeValues', [])
+            include_upper = {v.upper() for v in include_values}
+            mask = df[col].astype(str).str.strip().str.upper().isin(include_upper)
+            return df[mask].copy()
+        elif method in ('system_column', 'column_value'):
+            include_values = city_config.get('includeValues', [])
+            include_upper = {v.upper() for v in include_values}
+            mask = df[col].astype(str).str.strip().str.upper().isin(include_upper)
+            return df[mask].copy()
+        elif method == 'agency_id':
+            agency_map = city_config.get('agencyMap', {})
+            all_ids = set()
+            for ids in agency_map.values():
+                all_ids.update(ids)
+            mask = df[col].astype(str).str.strip().isin(all_ids)
+            return df[mask].copy()
+
     elif suffix == 'no_interstate':
         interstate_config = split_config.get('interstateExclusion', {})
         method = interstate_config.get('method', 'system_column')
@@ -279,7 +306,7 @@ def _apply_split_config_filter(df, suffix, split_config):
 
 def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
                 skip_validation=False, skip_geocode=False, state_config=None):
-    """Split statewide dataframe into per-jurisdiction CSVs with 3 road-type variants."""
+    """Split statewide dataframe into per-jurisdiction CSVs with road-type variants."""
     filter_profiles = get_filter_profiles(config)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -289,9 +316,10 @@ def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
     if state_config:
         split_config = state_config.get('roadSystems', {}).get('splitConfig', None)
 
-    # The 3 road-type filter mappings
+    # Road-type filter mappings (city_roads included when splitConfig.cityRoads exists)
     road_type_map = {
         'county_roads': 'countyOnly',
+        'city_roads': 'cityOnly',
         'no_interstate': 'countyPlusVDOT',
         'all_roads': 'allRoads'
     }
@@ -381,7 +409,7 @@ def build_r2_upload_manifest(state, output_dir, jurisdictions, r2_prefix=None):
     for jid, jconfig in jurisdictions.items():
         file_jid = jid.replace('co_', '') if state == 'colorado' else jid
 
-        for suffix in ['county_roads', 'no_interstate', 'all_roads']:
+        for suffix in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
             local_path = output_dir / f"{file_jid}_{suffix}.csv"
             if local_path.exists():
                 files.append({

@@ -1262,7 +1262,7 @@ const server = http.createServer((req, res) => {
     const forecastCheckMatch = req.url.match(/^\/forecasts\/check\/([a-z_]+)\/([a-z_]+)$/);
     if (forecastCheckMatch && req.method === 'GET') {
         const [, state, jurisdiction] = forecastCheckMatch;
-        const roadTypes = ['county_roads', 'no_interstate', 'all_roads'];
+        const roadTypes = ['county_roads', 'city_roads', 'no_interstate', 'all_roads'];
         const prefix = `${state}/${jurisdiction}/forecasts_`;
 
         console.log(`[Forecasts] Availability check: ${state}/${jurisdiction}`);

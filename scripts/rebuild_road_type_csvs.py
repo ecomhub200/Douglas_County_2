@@ -25,9 +25,14 @@ SOURCE = os.path.join(DATA_DIR, 'douglas_standardized.csv')
 # Road system filter definitions based on _co_system_code
 FILTERS = {
     'county_roads': {
-        'include': {'City Street', 'County Road'},
+        'include': {'County Road'},
         'output': 'douglas_county_roads.csv',
-        'description': 'County/City Roads Only (local roads)'
+        'description': 'County Roads Only (county-maintained)'
+    },
+    'city_roads': {
+        'include': {'City Street'},
+        'output': 'douglas_city_roads.csv',
+        'description': 'City Roads Only (city/town-maintained)'
     },
     'no_interstate': {
         'include': {'City Street', 'County Road', 'State Highway', 'Frontage Road'},

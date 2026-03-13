@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Split jurisdiction CSVs into 3 road-type variants.
+Split jurisdiction CSVs into road-type variants.
 
 For each jurisdiction's all_roads.csv, produces:
-  - {jurisdiction}_county_roads.csv  (local/county roads only)
+  - {jurisdiction}_county_roads.csv  (county-maintained roads only)
+  - {jurisdiction}_city_roads.csv    (city/town-maintained roads only — if cityRoads config exists)
   - {jurisdiction}_no_interstate.csv (everything except interstates)
   - {jurisdiction}_all_roads.csv     (already exists, copied/kept as-is)
 
@@ -69,21 +70,27 @@ def get_system_column(headers, split_config):
     return None
 
 
-def filter_county_roads(rows, headers, split_config):
-    """Filter to county/local roads only."""
-    county_config = split_config.get('countyRoads', {})
-    method = county_config.get('method', 'system_column')
+def _filter_by_config(rows, headers, config_section, label):
+    """Generic ownership/system/agency filter used by both county and city roads.
 
+    Supports the same 3 methods as the original filter_county_roads:
+      - system_column: match values in a SYSTEM-style column
+      - agency_id: match agency IDs in a custom column (with jurisdiction mapping)
+      - ownership: match values in an Ownership-style column
+
+    Returns filtered rows, or all rows if column not found.
+    """
+    method = config_section.get('method', 'system_column')
     col_idx = {h: i for i, h in enumerate(headers)}
 
     if method == 'system_column':
-        col = county_config.get('column', 'SYSTEM')
-        include_values = county_config.get('includeValues', [])
+        col = config_section.get('column', 'SYSTEM')
+        include_values = config_section.get('includeValues', [])
         if not include_values:
             include_values = ['NonVDOT secondary', 'NONVDOT', 'Non-VDOT']
 
         if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for county roads filter")
+            logger.warning(f"  Column '{col}' not found for {label} filter")
             return rows
 
         idx = col_idx[col]
@@ -91,15 +98,13 @@ def filter_county_roads(rows, headers, split_config):
         return [r for r in rows if r[idx].strip().upper() in include_upper]
 
     elif method == 'agency_id':
-        col = county_config.get('column', '_co_agency_id')
+        col = config_section.get('column', '_co_agency_id')
         if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for agency-based county roads filter")
+            logger.warning(f"  Column '{col}' not found for agency-based {label} filter")
             return rows
 
         idx = col_idx[col]
-        # For agency_id method, we need jurisdiction to look up the agency map
-        # Since we process per-jurisdiction, we include all rows where the agency matches
-        agency_map = county_config.get('agencyMap', {})
+        agency_map = config_section.get('agencyMap', {})
         all_agency_ids = set()
         for ids in agency_map.values():
             all_agency_ids.update(ids)
@@ -110,16 +115,38 @@ def filter_county_roads(rows, headers, split_config):
             return rows
 
     elif method == 'ownership':
-        col = county_config.get('column', 'Ownership')
-        include_values = county_config.get('includeValues', ['2. County Hwy Agency'])
+        col = config_section.get('column', 'Ownership')
+        include_values = config_section.get('includeValues', [])
         if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for ownership-based county roads filter")
+            logger.warning(f"  Column '{col}' not found for ownership-based {label} filter")
             return rows
         idx = col_idx[col]
         include_upper = {v.upper() for v in include_values}
         return [r for r in rows if r[idx].strip().upper() in include_upper]
 
     return rows
+
+
+def filter_county_roads(rows, headers, split_config):
+    """Filter to county-maintained roads only."""
+    county_config = split_config.get('countyRoads', {})
+    if not county_config:
+        return rows
+    return _filter_by_config(rows, headers, county_config, 'county roads')
+
+
+def filter_city_roads(rows, headers, split_config):
+    """Filter to city/town-maintained roads only.
+
+    Uses splitConfig.cityRoads — same method options as countyRoads
+    (ownership, system_column, agency_id).
+
+    Returns None if no cityRoads config exists (signals: skip city_roads output).
+    """
+    city_config = split_config.get('cityRoads', {})
+    if not city_config:
+        return None  # No config → skip city_roads CSV
+    return _filter_by_config(rows, headers, city_config, 'city roads')
 
 
 def filter_no_interstate(rows, headers, split_config):
@@ -164,7 +191,7 @@ def filter_no_interstate(rows, headers, split_config):
 
 
 def split_jurisdiction(jurisdiction, data_dir, split_config):
-    """Split a single jurisdiction's all_roads.csv into 3 road-type CSVs."""
+    """Split a single jurisdiction's all_roads.csv into road-type CSVs."""
     data_dir = Path(data_dir)
     input_path = data_dir / f"{jurisdiction}_all_roads.csv"
 
@@ -188,6 +215,17 @@ def split_jurisdiction(jurisdiction, data_dir, split_config):
         writer.writerow(headers)
         writer.writerows(county_rows)
 
+    # city_roads (only if cityRoads config exists)
+    city_rows = filter_city_roads(all_rows, headers, split_config)
+    city_count_str = ''
+    if city_rows is not None:
+        city_path = data_dir / f"{jurisdiction}_city_roads.csv"
+        with open(city_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(city_rows)
+        city_count_str = f', city_roads={len(city_rows):,}'
+
     # no_interstate
     no_interstate_rows = filter_no_interstate(all_rows, headers, split_config)
     no_interstate_path = data_dir / f"{jurisdiction}_no_interstate.csv"
@@ -196,7 +234,7 @@ def split_jurisdiction(jurisdiction, data_dir, split_config):
         writer.writerow(headers)
         writer.writerows(no_interstate_rows)
 
-    logger.info(f"  {jurisdiction}: all={total:,}, county_roads={len(county_rows):,}, no_interstate={len(no_interstate_rows):,}")
+    logger.info(f"  {jurisdiction}: all={total:,}, county_roads={len(county_rows):,}{city_count_str}, no_interstate={len(no_interstate_rows):,}")
     return True
 
 
@@ -230,6 +268,8 @@ def main():
 
     logger.info(f"[{args.state}] Road-type split")
     logger.info(f"[{args.state}] Data dir: {args.data_dir}")
+    if 'cityRoads' in split_config:
+        logger.info(f"[{args.state}] City roads filter: enabled")
 
     # Determine jurisdictions to process
     jurisdictions = []
