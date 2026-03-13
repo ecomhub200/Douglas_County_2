@@ -16,7 +16,7 @@
   },
   "columnMapping": {
     "_description": "Maps Iowa DOT crash data fields (ArcGIS Feature Server) to CRASH LENS field codes",
-    "_note": "Column names confirmed from Iowa DOT Traffic_Safety/Crash_Data FeatureServer/0 metadata. Max Record Count: 2,000. Display Field: CITY_NAME. Geometry: esriGeometryPoint. Prior 10 years of crash data (SOR). XCOORD/YCOORD are UTM NAD83 Zone 15, NOT lat/lon — use outSR=4326 for WGS84.",
+    "_note": "Column names confirmed from Iowa DOT Traffic_Safety/Crash_Data FeatureServer/0 metadata. Max Record Count: 2,000. Display Field: CITY_NAME. Geometry: esriGeometryPoint. Prior 10 years of crash data (SOR). XCOORD/YCOORD are UTM NAD83 Zone 15, NOT lat/lon \u2014 use outSR=4326 for WGS84.",
     "ID": "CASENUMBER",
     "CRASH_KEY": "CRASH_KEY",
     "LE_CASE_NUM": "LECASENUM",
@@ -81,7 +81,10 @@
     },
     "NODE": {
       "method": "route_milepoint",
-      "sources": ["LITERAL", "FROM_MEASURE"],
+      "sources": [
+        "LITERAL",
+        "FROM_MEASURE"
+      ],
       "_note": "Iowa uses LITERAL (route description) + FROM_MEASURE (milepoint). SYSTEMSTR provides route system code."
     }
   },
@@ -112,10 +115,9 @@
     "filterProfiles": {
       "countyOnly": {
         "include": [
-          "County Road",
-          "Local Road"
+          "County Road"
         ],
-        "label": "County & Local Roads Only"
+        "label": "County Roads Only"
       },
       "countyPlusState": {
         "include": [
@@ -135,6 +137,12 @@
           "Local Road"
         ],
         "label": "All Roads"
+      },
+      "cityOnly": {
+        "include": [
+          "Local Road"
+        ],
+        "label": "City Roads Only"
       }
     }
   },

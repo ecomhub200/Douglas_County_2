@@ -105,7 +105,7 @@ def get_filter_profiles(config):
     """Get road-type filter profiles from config."""
     return config.get('filterProfiles', {
         'countyOnly': {
-            'name': 'County/City Roads Only',
+            'name': 'County Roads Only',
             'systemValues': ['NonVDOT secondary', 'NONVDOT', 'Non-VDOT']
         },
         'countyPlusVDOT': {

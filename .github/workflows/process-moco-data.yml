@@ -191,7 +191,7 @@ jobs:
           echo "Output Files"
           echo "=========================================="
 
-          for suffix in standardized all_roads county_roads no_interstate; do
+          for suffix in standardized all_roads county_roads city_roads no_interstate; do
             FILE="data/MarylandDOT/${JURISDICTION}_${suffix}.csv"
             if [ -f "$FILE" ]; then
               ROWS=$(wc -l < "$FILE")
@@ -243,7 +243,7 @@ jobs:
               --data "data/MarylandDOT/${JURISDICTION}_all_roads.csv" --dry-run || true
           }
 
-          for rt in county_roads no_interstate all_roads; do
+          for rt in county_roads city_roads no_interstate all_roads; do
             FFILE="data/MarylandDOT/forecasts_${rt}.json"
             if [ -f "$FFILE" ]; then
               SIZE=$(ls -lh "$FFILE" | awk '{print $5}')

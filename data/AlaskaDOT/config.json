@@ -53,7 +53,10 @@
     },
     "NODE": {
       "method": "not_confirmed",
-      "sources": ["_TBD_ROAD1", "_TBD_ROAD2"],
+      "sources": [
+        "_TBD_ROAD1",
+        "_TBD_ROAD2"
+      ],
       "separator": " & "
     }
   },
@@ -84,10 +87,9 @@
     "filterProfiles": {
       "countyOnly": {
         "include": [
-          "County Road",
-          "Local Road"
+          "County Road"
         ],
-        "label": "County & Local Roads Only"
+        "label": "County Roads Only"
       },
       "countyPlusState": {
         "include": [
@@ -107,6 +109,12 @@
           "Local Road"
         ],
         "label": "All Roads"
+      },
+      "cityOnly": {
+        "include": [
+          "Local Road"
+        ],
+        "label": "City Roads Only"
       }
     }
   },

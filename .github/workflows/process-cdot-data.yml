@@ -101,7 +101,7 @@ jobs:
             local name
             name=$(basename "$1" | tr '[:upper:]' '[:lower:]')
             case "$name" in
-              *_standardized.csv|*_all_roads.csv|*_county_roads.csv|*_no_interstate.csv|*_merged_raw.csv|crashes.csv)
+              *_standardized.csv|*_all_roads.csv|*_county_roads.csv|*_city_roads.csv|*_no_interstate.csv|*_merged_raw.csv|crashes.csv)
                 return 0 ;;
               *)
                 return 1 ;;
@@ -267,7 +267,7 @@ jobs:
           echo "Output Files"
           echo "=========================================="
 
-          for suffix in standardized all_roads county_roads no_interstate; do
+          for suffix in standardized all_roads county_roads city_roads no_interstate; do
             FILE="data/CDOT/${JURISDICTION}_${suffix}.csv"
             if [ -f "$FILE" ]; then
               ROWS=$(wc -l < "$FILE")
@@ -356,7 +356,7 @@ jobs:
           }
 
           # Verify forecast outputs
-          for rt in county_roads no_interstate all_roads; do
+          for rt in county_roads city_roads no_interstate all_roads; do
             FFILE="data/CDOT/forecasts_${rt}.json"
             if [ -f "$FFILE" ]; then
               SIZE=$(ls -lh "$FFILE" | awk '{print $5}')
