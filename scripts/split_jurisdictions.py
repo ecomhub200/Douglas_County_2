@@ -241,8 +241,8 @@ def _apply_split_config_filter(df, suffix, split_config):
         method = county_config.get('method', 'system_column')
         col = county_config.get('column', 'SYSTEM')
         if col not in df.columns:
-            logger.warning(f"  Column '{col}' not found for county roads filter (method={method})")
-            return df.copy()
+            logger.warning(f"  Column '{col}' not found for county roads filter (method={method}) — returning empty")
+            return df.iloc[0:0].copy()
         if method == 'ownership':
             include_values = county_config.get('includeValues', [])
             include_upper = {v.upper() for v in include_values}
@@ -268,8 +268,8 @@ def _apply_split_config_filter(df, suffix, split_config):
         method = city_config.get('method', 'ownership')
         col = city_config.get('column', 'Ownership')
         if col not in df.columns:
-            logger.warning(f"  Column '{col}' not found for city roads filter (method={method})")
-            return df.copy()
+            logger.warning(f"  Column '{col}' not found for city roads filter (method={method}) — returning empty")
+            return df.iloc[0:0].copy()
         if method == 'ownership':
             include_values = city_config.get('includeValues', [])
             include_upper = {v.upper() for v in include_values}
@@ -293,8 +293,8 @@ def _apply_split_config_filter(df, suffix, split_config):
         method = interstate_config.get('method', 'system_column')
         col = interstate_config.get('column', 'SYSTEM')
         if col not in df.columns:
-            logger.warning(f"  Column '{col}' not found for interstate exclusion (method={method})")
-            return df.copy()
+            logger.warning(f"  Column '{col}' not found for interstate exclusion (method={method}) — returning empty")
+            return df.iloc[0:0].copy()
         exclude_values = interstate_config.get('excludeValues', [])
         exclude_upper = {v.upper() for v in exclude_values}
         # Include rows where value is NOT in exclude list (including blank/empty)
@@ -370,7 +370,10 @@ def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
                 logger.info(f"    city_roads: skipped (no cityRoads in splitConfig)")
                 continue
 
-            if split_config and suffix != 'all_roads':
+            if suffix == 'all_roads':
+                # all_roads = full unfiltered jurisdiction data
+                filtered = jdf.copy()
+            elif split_config:
                 # Use state config splitConfig (ownership, functional_class, etc.)
                 filtered = _apply_split_config_filter(jdf, suffix, split_config)
             else:

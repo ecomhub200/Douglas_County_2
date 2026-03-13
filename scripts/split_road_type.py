@@ -90,8 +90,8 @@ def _filter_by_config(rows, headers, config_section, label):
             include_values = ['NonVDOT secondary', 'NONVDOT', 'Non-VDOT']
 
         if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for {label} filter")
-            return rows
+            logger.warning(f"  Column '{col}' not found for {label} filter — returning empty")
+            return []
 
         idx = col_idx[col]
         include_upper = {v.upper() for v in include_values}
@@ -100,8 +100,8 @@ def _filter_by_config(rows, headers, config_section, label):
     elif method == 'agency_id':
         col = config_section.get('column', '_co_agency_id')
         if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for agency-based {label} filter")
-            return rows
+            logger.warning(f"  Column '{col}' not found for agency-based {label} filter — returning empty")
+            return []
 
         idx = col_idx[col]
         agency_map = config_section.get('agencyMap', {})
@@ -118,8 +118,8 @@ def _filter_by_config(rows, headers, config_section, label):
         col = config_section.get('column', 'Ownership')
         include_values = config_section.get('includeValues', [])
         if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for ownership-based {label} filter")
-            return rows
+            logger.warning(f"  Column '{col}' not found for ownership-based {label} filter — returning empty")
+            return []
         idx = col_idx[col]
         include_upper = {v.upper() for v in include_values}
         return [r for r in rows if r[idx].strip().upper() in include_upper]

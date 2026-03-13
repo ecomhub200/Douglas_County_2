@@ -267,7 +267,7 @@ jobs:
           JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
 
           echo "=========================================="
-          echo "Stage 2: Split by road type (3 CSVs per jurisdiction)"
+          echo "Stage 2: Split by road type (4 CSVs per jurisdiction)"
           echo "=========================================="
 
           JURIS_LIST=$(echo "$JURISDICTIONS" | python3 -c "import json,sys; print(' '.join(json.load(sys.stdin)))")

@@ -5118,7 +5118,7 @@
   "defaultState": "colorado",
   "defaults": {
     "jurisdiction": null,
-    "filterProfile": "countyOnly",
+    "filterProfile": "allRoads",
     "_comment": "jurisdiction is resolved from the active state's defaultJurisdiction at runtime"
   },
   "dataSources": {

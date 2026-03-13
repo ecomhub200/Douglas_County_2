@@ -175,11 +175,12 @@ jobs:
 
           python scripts/init_cache.py --state "$STATE"
 
-      # ── Stage 1: Split by Jurisdiction (batch mode only) ──
-      # NOTE: Validation (old Stage 1) and Geocoding (old Stage 2) are now
-      #       handled separately on Cloudflare Workers.
+      # ── Stage 1: Split by Jurisdiction ──
+      # Always run: pipeline may receive statewide CSV that needs splitting
+      # into per-jurisdiction files (including city_roads, county_roads,
+      # no_interstate variants).
+      # NOTE: Validation and Geocoding are handled separately on Cloudflare.
       - name: "Stage 1: Split by jurisdiction"
-        if: needs.prepare.outputs.download_mode == 'statewide'
         run: |
           STATE="${{ needs.prepare.outputs.state }}"
           DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
@@ -218,7 +219,7 @@ jobs:
           JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
 
           echo "=========================================="
-          echo "Stage 2: Split by road type (3 CSVs per jurisdiction)"
+          echo "Stage 2: Split by road type (4 CSVs per jurisdiction)"
           echo "=========================================="
 
           JURIS_LIST=$(echo "$JURISDICTIONS" | python3 -c "import json,sys; print(' '.join(json.load(sys.stdin)))")
