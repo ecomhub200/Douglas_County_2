@@ -137,7 +137,7 @@ def split_data(source_path, output_dir, jurisdiction, state=None):
     _write_csv(
         os.path.join(output_dir, f"{jurisdiction}_county_roads.csv"),
         headers, county_rows,
-        "County/City Roads Only",
+        "County Roads Only",
         len(all_rows)
     )
 

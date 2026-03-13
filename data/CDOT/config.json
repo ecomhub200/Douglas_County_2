@@ -274,9 +274,9 @@
 
     "filterProfiles": {
       "countyOnly": {
-        "name": "County/City Roads Only",
-        "description": "Only locally-maintained roads (County Roads + City Streets)",
-        "systemValues": ["City Street", "County Road"],
+        "name": "County Roads Only",
+        "description": "County-maintained roads only",
+        "systemValues": ["County Road"],
         "excludeRoutePatterns": []
       },
       "countyPlusState": {

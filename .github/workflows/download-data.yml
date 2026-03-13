@@ -239,8 +239,8 @@ jobs:
           echo "Download started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
 
-          # Download County/City Roads Only (also save statewide gzip at Stage 1.5)
-          echo ">>> Downloading County/City Roads Only (+ statewide gzip)..."
+          # Download County Roads Only (also save statewide gzip at Stage 1.5)
+          echo ">>> Downloading County Roads Only (+ statewide gzip)..."
           python download_crash_data.py --jurisdiction "$JURISDICTION" --filter countyOnly --output "data/${JURISDICTION}_county_roads.csv" --save-statewide
 
           # Download All Roads (No Interstate)
@@ -268,7 +268,7 @@ jobs:
           NO_INTERSTATE_RECORDS=$(wc -l < "data/${JURISDICTION}_no_interstate.csv" | tr -d ' ')
           ALL_ROADS_RECORDS=$(wc -l < "data/${JURISDICTION}_all_roads.csv" | tr -d ' ')
 
-          echo "County/City Roads Only: $((COUNTY_RECORDS - 1)) records"
+          echo "County Roads Only: $((COUNTY_RECORDS - 1)) records"
           echo "All Roads (No Interstate): $((NO_INTERSTATE_RECORDS - 1)) records"
           echo "All Roads (Including Interstate): $((ALL_ROADS_RECORDS - 1)) records"
 
@@ -361,7 +361,7 @@ jobs:
           config.state = 'virginia'
           config.dry_run = False
           stats = PipelineStats()
-          for suffix in ['all_roads', 'county_roads', 'no_interstate']:
+          for suffix in ['all_roads', 'county_roads', 'city_roads', 'no_interstate']:
               fpath = f'data/${JURISDICTION}_{suffix}.csv'
               try:
                   stage_geocode(fpath, config, stats)
@@ -372,7 +372,7 @@ jobs:
           }
 
           # Report GPS coverage
-          for suffix in all_roads county_roads no_interstate; do
+          for suffix in all_roads county_roads city_roads no_interstate; do
             FILE="data/${JURISDICTION}_${suffix}.csv"
             if [ -f "$FILE" ]; then
               TOTAL=$(wc -l < "$FILE")
@@ -472,7 +472,7 @@ jobs:
           }
 
           # Verify forecast outputs
-          for rt in county_roads no_interstate all_roads; do
+          for rt in county_roads city_roads no_interstate all_roads; do
             FFILE="data/forecasts_${rt}.json"
             if [ -f "$FFILE" ]; then
               SIZE=$(ls -lh "$FFILE" | awk '{print $5}')

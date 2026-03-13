@@ -90,7 +90,7 @@ jobs:
           FIRST=true
 
           # Processed pipeline outputs
-          for suffix in standardized all_roads county_roads no_interstate; do
+          for suffix in standardized all_roads county_roads city_roads no_interstate; do
             FILE="${DATA_DIR}/${JURISDICTION}_${suffix}.csv"
             if [ -f "$FILE" ]; then
               if [ "$FIRST" = true ]; then FIRST=false; else FILES="$FILES,"; fi
@@ -100,7 +100,7 @@ jobs:
           done
 
           # Forecast JSON files
-          for rt in county_roads no_interstate all_roads; do
+          for rt in county_roads city_roads no_interstate all_roads; do
             FFILE="${DATA_DIR}/forecasts_${rt}.json"
             if [ -f "$FFILE" ]; then
               if [ "$FIRST" = true ]; then FIRST=false; else FILES="$FILES,"; fi

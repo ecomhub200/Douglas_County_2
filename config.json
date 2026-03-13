@@ -4505,8 +4505,8 @@
   },
   "filterProfiles": {
     "countyOnly": {
-      "name": "County/City Roads Only",
-      "description": "Only locally-maintained roads (NonVDOT)",
+      "name": "County Roads Only",
+      "description": "County-maintained roads only",
       "systemValues": [
         "NonVDOT secondary",
         "NONVDOT",

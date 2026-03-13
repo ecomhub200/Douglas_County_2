@@ -929,7 +929,7 @@ def stage_split(validated_path: str, config: PipelineConfig, stats: PipelineStat
     created_files.append(all_roads_path)
     stats.files_created.append(all_roads_path)
 
-    # --- File 2: County/City Roads Only ---
+    # --- File 2: County Roads Only ---
     # Config-driven split logic: reads splitConfig from state config
     split_config = state_cfg.get('roadSystems', {}).get('splitConfig', {}) if state_config_path.exists() else {}
     county_config = split_config.get('countyRoads', {})
@@ -959,7 +959,7 @@ def stage_split(validated_path: str, config: PipelineConfig, stats: PipelineStat
 
     county_path = str(config.output_dir / f"{jurisdiction}_county_roads.csv")
     _write_split_csv(county_path, headers, county_rows,
-                     f"County/City Roads Only ({len(county_rows)} of {len(all_rows)})")
+                     f"County Roads Only ({len(county_rows)} of {len(all_rows)})")
     created_files.append(county_path)
     stats.files_created.append(county_path)
 

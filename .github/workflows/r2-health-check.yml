@@ -33,8 +33,10 @@ jobs:
           # Test files that should always exist in R2
           TEST_FILES=(
             "colorado/douglas/county_roads.csv"
+            "colorado/douglas/city_roads.csv"
             "colorado/douglas/all_roads.csv"
             "virginia/henrico/county_roads.csv"
+            "virginia/henrico/city_roads.csv"
             "virginia/henrico/all_roads.csv"
           )
 
