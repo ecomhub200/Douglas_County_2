@@ -20,8 +20,12 @@ on:
       state:
         description: 'State to process (e.g., virginia, colorado, alaska)'
         required: true
-        type: string
-        default: 'virginia'
+        type: choice
+        options:
+          - virginia
+          - colorado
+          - maryland
+          - delaware
 
       scope:
         description: 'Processing scope'

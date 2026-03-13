@@ -724,7 +724,7 @@ with strict filtering, ghost row removal, and deduplication.
   "columnMapping": { "ID": "CUID", "DATE": "Crash Date", ... },
   "roadSystems": { ... },
   "crashTypeMapping": { ... },
-  "epdoWeights": { "K": 462, "A": 62, "B": 12, "C": 5, "O": 1 }
+  "epdoWeights": { "K": 883, "A": 94, "B": 21, "C": 11, "O": 1 }
 }
 ```
 
@@ -1730,7 +1730,7 @@ Built from the 6 matrices, these provide higher-order analytics:
   "model": "amazon/chronos-2" | "synthetic-demo",
   "horizon": 12,
   "quantileLevels": [0.1, 0.25, 0.5, 0.75, 0.9],
-  "epdoWeights": {"K": 462, "A": 62, "B": 12, "C": 5, "O": 1},
+  "epdoWeights": {"K": 883, "A": 94, "B": 21, "C": 11, "O": 1},
   "roadType": "county_roads" | "no_interstate" | "all_roads",
   "summary": {
     "totalCrashes": 12788,

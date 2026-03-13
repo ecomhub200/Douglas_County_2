@@ -144,10 +144,10 @@ This is the most critical file. Every pipeline script reads it. Copy the structu
 
   "epdoWeights": {
     "_source": "Source citation (e.g., HSM Standard, state-specific memo)",
-    "K": 462,
-    "A": 62,
-    "B": 12,
-    "C": 5,
+    "K": 883,
+    "A": 94,
+    "B": 21,
+    "C": 11,
     "O": 1
   },
 
@@ -200,7 +200,7 @@ This is the most critical file. Every pipeline script reads it. Copy the structu
 
 **Common mistake**: The SYSTEM column may seem correct but can give different results than Ownership or Functional Class. Always verify against manual filtering from the state DOT's raw data.
 
-**EPDO weights**: Use FHWA/HSM standard (K:462, A:62, B:12, C:5, O:1) unless the state DOT publishes their own crash cost weights.
+**EPDO weights**: Use FHWA 2025 (K:883, A:94, B:21, C:11, O:1) unless the state DOT publishes their own crash cost weights.
 
 **Coordinate bounds**: Use the state's geographic bounding box. Find at `states/{state}/hierarchy.json` → `state.bbox` if available, or look up the state's lat/lon bounds.
 

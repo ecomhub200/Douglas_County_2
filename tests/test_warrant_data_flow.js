@@ -109,7 +109,7 @@ const COL = {
     NIGHT: 'Night?',
 };
 
-const EPDO_WEIGHTS = { K: 462, A: 62, B: 12, C: 5, O: 1 };
+const EPDO_WEIGHTS = { K: 883, A: 94, B: 21, C: 11, O: 1 };
 
 const isYes = v => v && (String(v).toLowerCase() === 'yes' || v === 'Y' || v === '1' || v === 1);
 
@@ -204,14 +204,14 @@ function buildWarrantCrashProfile(crashes, aggregateCount = null) {
 
         if (severity === 'K' || severity === 'Fatal') {
             profile.severity.K++; profile.fatalCount++; profile.kaCount++;
-            profile.epdo += EPDO_WEIGHTS?.K || 462;
+            profile.epdo += EPDO_WEIGHTS?.K || 883;
         } else if (severity === 'A' || severity === 'Serious Injury') {
             profile.severity.A++; profile.seriousCount++; profile.kaCount++;
-            profile.epdo += EPDO_WEIGHTS?.A || 62;
+            profile.epdo += EPDO_WEIGHTS?.A || 94;
         } else if (severity === 'B') {
-            profile.severity.B++; profile.epdo += EPDO_WEIGHTS?.B || 12;
+            profile.severity.B++; profile.epdo += EPDO_WEIGHTS?.B || 21;
         } else if (severity === 'C') {
-            profile.severity.C++; profile.epdo += EPDO_WEIGHTS?.C || 5;
+            profile.severity.C++; profile.epdo += EPDO_WEIGHTS?.C || 11;
         } else {
             profile.severity.O++; profile.epdo += EPDO_WEIGHTS?.O || 1;
         }
@@ -440,9 +440,9 @@ section('2. buildWarrantCrashProfile — EPDO calculation');
 {
     const p = buildWarrantCrashProfile(testCrashes);
 
-    // EPDO = 2*462 + 3*62 + 4*12 + 4*5 + 7*1
-    //      = 924  + 186  + 48   + 20  + 7 = 1185
-    assertEqual(p.epdo, 1185, 'EPDO score with standard weights');
+    // EPDO = 2*883 + 3*94 + 4*21 + 4*11 + 7*1
+    //      = 1766 + 282  + 84   + 44   + 7 = 2183
+    assertEqual(p.epdo, 2183, 'EPDO score with FHWA 2025 weights');
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -574,9 +574,9 @@ section('8. P1-G FIX: Pedestrian EPDO uses standard weights');
     const K = 2, A = 1, B = 0, C = 1, O = 0;
 
     const epdoFixed = ped_calculateEPDO(K, A, B, C, O);
-    const epdoExpected = (2 * 462) + (1 * 62) + (0 * 12) + (1 * 5) + (0 * 1);
-    assertEqual(epdoFixed, epdoExpected, 'Pedestrian EPDO uses standard EPDO_WEIGHTS');
-    assertEqual(epdoFixed, 991, 'Pedestrian EPDO = 924 + 62 + 5 = 991');
+    const epdoExpected = (2 * 883) + (1 * 94) + (0 * 21) + (1 * 11) + (0 * 1);
+    assertEqual(epdoFixed, epdoExpected, 'Pedestrian EPDO uses FHWA 2025 EPDO_WEIGHTS');
+    assertEqual(epdoFixed, 1871, 'Pedestrian EPDO = 1766 + 94 + 11 = 1871');
 
     // Verify the OLD hardcoded calculation would have given a different (wrong) result
     const epdoOldBroken = (K * 1500) + (A * 240) + (B * 12) + (C * 6) + (O * 1);
@@ -752,7 +752,7 @@ section('14. P1-B FIX: Traffic Data profile builder consistency');
 
     assertEqual(crashDataObj.totalCrashes, 20, 'trafficData.crashData.totalCrashes');
     assertEqual(crashDataObj.severityBreakdown.K, 2, 'trafficData.crashData.severityBreakdown.K');
-    assertEqual(crashDataObj.epdoScore, 1185, 'trafficData.crashData.epdoScore');
+    assertEqual(crashDataObj.epdoScore, 2183, 'trafficData.crashData.epdoScore');
     assert(crashDataObj.topCrashTypes.length > 0, 'trafficData.crashData.topCrashTypes is populated');
     assertEqual(crashDataObj.topCrashTypes[0].type, 'Angle', 'Top crash type is Angle (5 crashes)');
 }
@@ -938,8 +938,8 @@ section('20. Date filtering simulation');
     assertEqual(filteredProfile.severity.K, 1, 'Date filter: 1 fatal in 2024 (D016)');
 
     // Verify the filtered data produces correct EPDO
-    // D016(K=462) + D017(B=12) + D018(O=1) + D019(C=5) + D020(O=1) = 481
-    assertEqual(filteredProfile.epdo, 481, 'Date filter: EPDO calculated from filtered data');
+    // D016(K=883) + D017(B=21) + D018(O=1) + D019(C=11) + D020(O=1) = 917
+    assertEqual(filteredProfile.epdo, 917, 'Date filter: EPDO calculated from filtered data');
 
     // 36-month window should get all
     const start36 = new Date('2022-01-01');

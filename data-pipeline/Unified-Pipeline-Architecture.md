@@ -1291,7 +1291,7 @@ python scripts/generate_forecast.py \
 
 The forecast script is fully state/jurisdiction-agnostic:
 
-1. **EPDO weights** are loaded from `states/{state}/config.json` at runtime (not hardcoded). Falls back to HSM standard weights (`K=462, A=62, B=12, C=5, O=1`) if the state config is missing.
+1. **EPDO weights** are loaded from `states/{state}/config.json` at runtime (not hardcoded). Falls back to FHWA 2025 weights (`K=883, A=94, B=21, C=11, O=1`) if the state config is missing.
 2. **Top corridors** are auto-detected from the data via `auto_detect_top_corridors()` — no hardcoded route names.
 3. **Data paths** are constructed from `--data-dir` and `--jurisdiction` arguments, not from fixed directory names.
 

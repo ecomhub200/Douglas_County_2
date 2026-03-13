@@ -17,7 +17,7 @@
 // Replace the existing const at app/index.html:19916
 // ============================================================
 
-let EPDO_WEIGHTS = { K: 462, A: 62, B: 12, C: 5, O: 1 };
+let EPDO_WEIGHTS = { K: 883, A: 94, B: 21, C: 11, O: 1 };
 let EPDO_ACTIVE_PRESET = 'hsm2010';
 
 const EPDO_PRESETS = {
@@ -38,7 +38,7 @@ const EPDO_PRESETS = {
     },
     custom: {
         name: 'Custom',
-        weights: { K: 462, A: 62, B: 12, C: 5, O: 1 },
+        weights: { K: 883, A: 94, B: 21, C: 11, O: 1 },
         description: 'User-defined custom weights'
     }
 };

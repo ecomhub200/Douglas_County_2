@@ -282,7 +282,7 @@ Since State and MPO views will support road type filtering (same as County), agg
   "roadTypes": {
     "all_roads": {
       "statewide": {
-        "total": 450000, "K": 890, "A": 4120, "B": 12050,
+        "total": 450000, "K": 890, "A": 4120, "B": 21050,
         "C": 38900, "O": 394040, "epdo": 1234567,
         "pedCrashes": 5600, "bikeCrashes": 1200,
         "yearlyTrend": [
@@ -297,7 +297,7 @@ Since State and MPO views will support road type filtering (same as County), agg
       "counties": {
         "henrico": {
           "name": "Henrico County", "fips": "087",
-          "total": 28500, "K": 89, "A": 412, "B": 1205,
+          "total": 28500, "K": 89, "A": 412, "B": 2105,
           "epdo": 112340, "crashRate": 4.2,
           "trend": -0.03, "rank": 5,
           "center": [-77.45, 37.55]
@@ -904,7 +904,7 @@ const EPDO_PRESETS = {
     },
     custom: {
         name: 'Custom',
-        weights: { K: 462, A: 62, B: 12, C: 5, O: 1 },
+        weights: { K: 883, A: 94, B: 21, C: 11, O: 1 },
         description: 'User-defined custom weights'
     }
 };
@@ -1043,7 +1043,7 @@ Pre-computed aggregate JSONs (`county_summary.json`, `aggregates.json`) include 
   "epdoWeights": { "K": 1032, "A": 53, "B": 16, "C": 10, "O": 1 },
   "epdoSource": "VDOT 2024 crash costs",
   "counties": {
-    "henrico": { "total": 28500, "K": 89, "A": 412, "B": 1205, "C": 3800, "O": 23094, "epdo": 136790 }
+    "henrico": { "total": 28500, "K": 89, "A": 412, "B": 2105, "C": 3800, "O": 23094, "epdo": 136790 }
   }
 }
 ```
@@ -1056,7 +1056,7 @@ After implementation, verify all 9 items:
 
 | # | Test | Expected Result |
 |---|------|-----------------|
-| 1 | **Dashboard:** Load app, note EPDO, switch to VDOT 2024 | EPDO increases (K: 462→1032). Switch back → original restores |
+| 1 | **Dashboard:** Load app, note EPDO, switch to VDOT 2024 | EPDO increases (K: 883→1032). Switch back → original restores |
 | 2 | **Dynamic labels:** Switch preset | "Weights: K=..." text updates in dashboard breakdown AND glossary |
 | 3 | **All tabs:** Switch preset | Hotspots, Grants, CMF, Safety Focus tabs all update |
 | 4 | **Persistence:** Set VDOT 2024, refresh page | VDOT 2024 still active |

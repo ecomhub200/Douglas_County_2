@@ -167,7 +167,7 @@ Before writing any code, research and collect:
 | Severity field | Derived from Injury 00-04 | Check if direct or derived |
 | Road system classification | Interstate Highway, State Highway, County Road, City Street | Raw data values |
 | County/jurisdiction list | 64 counties with FIPS codes | Census Bureau |
-| EPDO weights | K=462, A=62, B=12, C=5, O=1 (HSM default) | State DOT or use HSM standard |
+| EPDO weights | K=883, A=94, B=21, C=11, O=1 (FHWA 2025) | State DOT or use FHWA 2025 |
 | Target jurisdictions | Douglas, Arapahoe, Jefferson, etc. | Start with 1-3, expand later |
 
 ---
@@ -262,7 +262,7 @@ This is the heart of the state configuration. Template:
     }
   },
   "epdoWeights": {
-    "K": 462, "A": 62, "B": 12, "C": 5, "O": 1
+    "K": 883, "A": 94, "B": 21, "C": 11, "O": 1
   },
   "booleanFlags": {
     "PED": {"column": "{col}", "trueValues": ["Y", "Yes", "1", "TRUE"]},

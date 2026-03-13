@@ -1,7 +1,8 @@
 name: Download Delaware Crash Data
 
 # Workflow for Delaware Department of Transportation crash data downloads.
-# Modeled after download-cdot-crash-data.yml
+# Downloads raw data from Socrata, normalizes to Virginia-standard format,
+# uploads to R2, then triggers pipeline.yml for processing.
 
 on:
   schedule:
@@ -47,6 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       jurisdiction: ${{ steps.build-args.outputs.jurisdiction }}
+      uploaded: ${{ steps.r2-upload.outputs.uploaded }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -77,7 +79,7 @@ jobs:
           if [ "$FORCE" = "true" ]; then
             ARGS="$ARGS --force"
           fi
-          ARGS="$ARGS --gzip"
+          # Download as plain CSV first (normalization happens before gzip)
           echo "args=$ARGS" >> $GITHUB_OUTPUT
           echo "jurisdiction=$JURISDICTION" >> $GITHUB_OUTPUT
 
@@ -88,6 +90,36 @@ jobs:
           echo "Started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
           python data/DelawareDOT/download_delaware_crash_data.py ${{ steps.build-args.outputs.args }}
+
+      - name: Normalize to Virginia standard
+        id: normalize
+        run: |
+          echo "=========================================="
+          echo "Normalizing ${STATE_DISPLAY} data to Virginia standard"
+          echo "=========================================="
+          NORMALIZED=0
+          for f in data/DelawareDOT/*.csv; do
+            [ -f "$f" ] || continue
+            BASENAME=$(basename "$f" .csv)
+            echo "  Normalizing: $f"
+            python scripts/state_adapter.py \
+              --input "$f" \
+              --output "data/DelawareDOT/${BASENAME}_normalized.csv" \
+              --state delaware
+            # Replace raw with normalized
+            mv "data/DelawareDOT/${BASENAME}_normalized.csv" "$f"
+            NORMALIZED=$((NORMALIZED + 1))
+          done
+          echo "  Normalized $NORMALIZED file(s)"
+          echo "normalized=$NORMALIZED" >> $GITHUB_OUTPUT
+
+      - name: Gzip CSVs for R2 upload
+        run: |
+          for f in data/DelawareDOT/*.csv; do
+            [ -f "$f" ] || continue
+            gzip -f "$f"
+            echo "  Compressed: ${f}.gz"
+          done
 
       - name: Generate download statistics
         id: stats
@@ -156,11 +188,13 @@ jobs:
         run: |
           JURISDICTION="${{ steps.build-args.outputs.jurisdiction }}"
           UPLOADED="${{ steps.r2-upload.outputs.uploaded || '0' }}"
+          NORMALIZED="${{ steps.normalize.outputs.normalized || '0' }}"
           cat >> $GITHUB_STEP_SUMMARY <<EOF
           ## ${STATE_DISPLAY} Crash Data Download — ${JURISDICTION}
           | Metric | Value |
           |--------|-------|
           | Jurisdiction | ${JURISDICTION} |
+          | Files normalized | ${NORMALIZED} |
           | CSVs uploaded to R2 | ${UPLOADED} |
           | Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
           EOF
@@ -189,4 +223,4 @@ jobs:
                 skip_forecasts: 'false'
               }
             });
-            console.log('Pipeline triggered for Delaware');
+            console.log('Pipeline triggered for Delaware (${{ needs.download-delaware-data.outputs.jurisdiction }})');

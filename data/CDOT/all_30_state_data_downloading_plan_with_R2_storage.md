@@ -91,7 +91,7 @@ Following `data/CDOT/config.json` structure exactly. **Column names sourced from
   "derivedFields": { "SEVERITY": { "method": "...", "sources": [...] }, ... },
   "roadSystems": { "values": {...}, "filterProfiles": {...} },
   "crashTypeMapping": { "StateValue": "StandardValue", ... },
-  "epdoWeights": { "K": 462, "A": 62, "B": 12, "C": 5, "O": 1 },
+  "epdoWeights": { "K": 883, "A": 94, "B": 21, "C": 11, "O": 1 },
   "validValues": { "severity": {...}, "roadCondition": [...] },
   "dataSource": { "name", "url", "apiUrl", "fileFormat", "dataDictionary": "url_or_reference" }
 }
