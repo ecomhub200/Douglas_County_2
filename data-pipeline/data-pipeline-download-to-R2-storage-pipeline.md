@@ -199,8 +199,8 @@ project-root/
 │   └── download-registry.json              ← State download registry (all states)
 │
 └── .github/workflows/
-    ├── download-state-crash-data.yml       ← Universal download workflow (all states)
-    └── download-{state}-crash-data.yml     ← Legacy per-state workflows (still work)
+    ├── download-state-crash-data.yml       ← Batch Download for Any State (registry-driven)
+    └── download-{state}-crash-data.yml     ← Per-state single-jurisdiction workflows
 ```
 
 ### 3.2 Config.json Structure (data/{DOT_NAME}/config.json)
@@ -1038,26 +1038,29 @@ The pipeline has two jobs:
 | `skip_forecasts` | `false` | Skip forecast generation |
 | `dry_run` | `false` | No uploads, no commits |
 
-### 14.3 Universal Download Workflow + State Registry
+### 14.3 Batch Download for Any State (Registry-Driven)
 
-Instead of maintaining separate workflow files for each state, we use a **single universal workflow** (`download-state-crash-data.yml`) backed by a **state registry** (`states/download-registry.json`).
+A single workflow (`download-state-crash-data.yml` / "Batch Download for Any State") replaces the need for per-state download workflows. It uses `states/download-registry.json` to resolve the correct script, data directory, and R2 prefix for each state.
 
 #### Architecture
 
 ```
-states/download-registry.json          ← Defines script, dataDir, tier, r2Prefix per state
-    │
-    └─► .github/workflows/
-        └── download-state-crash-data.yml   ← Single workflow dispatches to any state
+"Batch Download for Any State"                   "Batch Pipeline: Process Statewide Data"
+(download-state-crash-data.yml)                   (batch-pipeline.yml)
+┌───────────────────────────────┐                 ┌──────────────────────────────────┐
+│ 1. Resolve from registry      │                 │ Download statewide CSV from R2   │
+│ 2. Download statewide data    │                 │         ↓                        │
+│ 3. Merge (if multi-file)      │   triggers      │ Split by jurisdiction            │
+│ 4. Convert to standard format │ ──────────────► │         ↓                        │
+│ 5. Upload statewide CSV to R2 │                 │ Split road type (3 CSVs/county)  │
+└───────────────────────────────┘                 │         ↓                        │
+                                                  │ Aggregate → Upload → Forecasts   │
+                                                  │         ↓                        │
+                                                  │ Manifest commit                  │
+                                                  └──────────────────────────────────┘
 ```
 
-**Three tiers of invocation:**
-
-| Tier | States | Pattern | Pipeline Trigger |
-|------|--------|---------|-----------------|
-| 1 | Virginia, Colorado | Scope-aware (jurisdiction/region/mpo/statewide), custom root scripts | Yes (`pipeline.yml`) |
-| 2 | Maryland | Jurisdiction dropdown, Socrata API | No (R2 only) |
-| 3 | 28 generic states | `data/{DotDir}/download_{state}_crash_data.py`, `--data-dir`, `--gzip` | No (R2 only) |
+**Every state follows the same flow:** download statewide → merge → convert → upload to R2 → trigger batch-pipeline.yml which splits into per-county, 3-road-type CSVs.
 
 #### Registry Entry Format (`states/download-registry.json`)
 
@@ -1067,9 +1070,7 @@ states/download-registry.json          ← Defines script, dataDir, tier, r2Pref
     "displayName": "Florida",
     "dotDir": "data/FloridaDOT",
     "script": "data/FloridaDOT/download_florida_crash_data.py",
-    "tier": 3,
     "requiresPlaywright": false,
-    "defaultJurisdiction": "statewide",
     "r2Prefix": "florida"
   }
 }
@@ -1080,44 +1081,47 @@ states/download-registry.json          ← Defines script, dataDir, tier, r2Pref
 | `displayName` | Human-readable state name |
 | `dotDir` | Path to data directory |
 | `script` | Path to download script |
-| `tier` | 1 (scope-aware + pipeline), 2 (jurisdiction + R2), 3 (generic + R2) |
 | `requiresPlaywright` | Install Playwright for browser-based downloads (Colorado) |
-| `defaultJurisdiction` | Fallback jurisdiction when none specified |
 | `r2Prefix` | R2 bucket prefix for this state |
 
 **To add a new state:** add an entry to `states/download-registry.json` + write the download script. No new workflow file needed.
 
-#### Universal Workflow Inputs
+#### Workflow Inputs
 
 | Input | Default | Description |
 |-------|---------|-------------|
 | `state` | (required) | State key from registry dropdown |
-| `jurisdiction` | (blank = default from registry) | Jurisdiction to filter |
 | `filter` | `countyOnly` | Road type filter (Virginia only) |
-| `years` | (blank = all) | Space-separated years |
 | `force_download` | `false` | Skip cache |
-| `skip_pipeline` | `false` | Don't trigger pipeline.yml (Tier 1 only) |
+| `skip_pipeline` | `false` | Download + R2 upload only |
+| `skip_forecasts` | `false` | Skip forecast generation in batch pipeline |
+| `dry_run` | `false` | No uploads, no commits |
 
-#### Workflow Steps
+#### Workflow Steps (Job 1: Download)
 
-1. **Resolve from registry** — reads `states/download-registry.json` to get tier, script, dotDir
-2. **Install dependencies** — `requirements.txt` + Playwright if needed
-3. **Build download arguments** — tier-specific arg patterns
-4. **Download crash data** — runs the state's script with built args
-5. **Upload to R2** (Tier 2 & 3 only) — gzipped CSVs to `crash-lens-data/{r2Prefix}/{jurisdiction}/`
-6. **Commit** — Tier 1: data to git; Tier 2/3: metadata only
-7. **Trigger pipeline** (Tier 1 only, unless `skip_pipeline`) — dispatches `pipeline.yml`
+1. **Resolve from registry** — reads `states/download-registry.json` for script, dotDir, r2Prefix
+2. **Install dependencies** — `requirements.txt` + Playwright if needed + awscli
+3. **Download statewide data** — Virginia/Colorado use custom root scripts; all others use `data/{DotDir}/download_{state}_crash_data.py --data-dir {dotDir} --gzip`
+4. **Merge** — combines multi-file data if needed (skipped for Virginia/Colorado)
+5. **Convert** — normalizes to standardized format via `scripts/process_crash_data.py` (skipped for Virginia)
+6. **Upload statewide CSV to R2** — `crash-lens-data/{state}/statewide/{state}_statewide_all_roads.csv`
+
+#### Workflow Steps (Job 2: Trigger Pipeline)
+
+7. **Trigger `batch-pipeline.yml`** — passes R2 data key, state, scope=statewide
+   - batch-pipeline downloads from R2 → splits by jurisdiction → splits road type (3 CSVs per county) → aggregates → uploads per-county to R2 → generates forecasts → commits manifest
 
 ### 14.4 Legacy Per-State Workflows
 
-The existing per-state `download-{state}-crash-data.yml` files are **not deleted** — they still work and can be used for states requiring custom UI (e.g., Maryland's jurisdiction dropdown). The universal workflow provides a single entry point for all states.
+The existing per-state `download-{state}-crash-data.yml` files are **not deleted** — they still work for single-jurisdiction downloads. The batch download workflow handles statewide processing.
 
-| State | Legacy Workflow | Status |
-|-------|----------------|--------|
-| Virginia | `download-virginia.yml` | Active (default filter: `countyOnly`) |
-| Colorado | `download-cdot-crash-data.yml` | Active |
-| Maryland | `download-maryland-crash-data.yml` | Active |
-| 28 generic states | `download-{state}-crash-data.yml` | Active |
+| Workflow | Purpose | Pipeline |
+|----------|---------|----------|
+| `download-state-crash-data.yml` | **Batch statewide** for any state (registry-driven) | `batch-pipeline.yml` |
+| `batch-all-jurisdictions.yml` | Batch statewide (hardcoded, all 50 states) | `batch-pipeline.yml` |
+| `download-virginia.yml` | Virginia single jurisdiction/region/mpo | `pipeline.yml` |
+| `download-colorado.yml` | Colorado single jurisdiction/region/mpo | `pipeline.yml` |
+| `download-{state}-crash-data.yml` | Per-state single jurisdiction (R2 only, no pipeline) | None |
 
 ---
 
@@ -1229,7 +1233,7 @@ Use this checklist when adding a new state. Check off each item as completed.
 ### Phase 7: Automation
 
 - [ ] Add state entry to `states/download-registry.json` (see Section 14.3)
-- [ ] Test via universal workflow: Actions → "Download: State Crash Data" → select state
+- [ ] Test via Actions → "Batch Download for Any State" → select state
 - [ ] (Optional) Create a dedicated `.github/workflows/download-{state}-crash-data.yml` if custom UI is needed
 - [ ] Enable scheduled trigger (monthly) if applicable
 - [ ] Verify end-to-end: download → process → upload → (CF validate) → manifest commit
@@ -1386,7 +1390,7 @@ crash-lens-data/
 | `states/colorado/hierarchy.json` | Regions, MPOs, 64 counties |
 | `states/download-registry.json` (colorado entry) | Universal download registry |
 | `.github/workflows/download-cdot-crash-data.yml` | Legacy download workflow |
-| `.github/workflows/download-state-crash-data.yml` | Universal download workflow |
+| `.github/workflows/download-state-crash-data.yml` | Batch Download for Any State |
 | `.github/workflows/process-cdot-data.yml` | Processing workflow |
 
 ### Virginia (VDOT) — Key Files
@@ -1398,7 +1402,7 @@ crash-lens-data/
 | `states/virginia/hierarchy.json` | Construction districts, 133 jurisdictions |
 | `states/download-registry.json` (virginia entry) | Universal download registry |
 | `.github/workflows/download-virginia.yml` | Virginia download workflow (default: `countyOnly`) |
-| `.github/workflows/download-state-crash-data.yml` | Universal download workflow |
+| `.github/workflows/download-state-crash-data.yml` | Batch Download for Any State |
 
 ### Key Differences Between the Two
 
