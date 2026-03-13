@@ -120,6 +120,20 @@ def get_filter_profiles(config):
     })
 
 
+def _find_column_ci(df, candidates):
+    """Find a column by trying candidates, then case-insensitive fuzzy match."""
+    # Exact match first
+    for col in candidates:
+        if col in df.columns:
+            return col
+    # Case-insensitive match
+    cols_lower = {c.lower(): c for c in df.columns}
+    for col in candidates:
+        if col.lower() in cols_lower:
+            return cols_lower[col.lower()]
+    return None
+
+
 def filter_jurisdiction_virginia(df, jconfig):
     """Filter Virginia dataframe by jurisdiction config."""
     juris_code = jconfig.get('jurisCode', '')
@@ -127,36 +141,51 @@ def filter_jurisdiction_virginia(df, jconfig):
     fips = jconfig.get('fips', '')
 
     mask = pd.Series([False] * len(df), index=df.index)
+    matched_cols = []
 
     # Try Juris Code columns
     if juris_code:
-        for col in ['Juris_Code', 'JURIS_CODE', 'juris_code', 'Juris Code',
-                     'Jurisdiction Code', 'JURISDICTION_CODE']:
-            if col in df.columns:
-                code_str = str(juris_code)
-                mask |= df[col].astype(str).str.strip() == code_str
-                break
+        col = _find_column_ci(df, [
+            'Juris_Code', 'JURIS_CODE', 'juris_code', 'Juris Code',
+            'Jurisdiction Code', 'JURISDICTION_CODE'
+        ])
+        if col:
+            code_str = str(juris_code)
+            mask |= df[col].astype(str).str.strip() == code_str
+            matched_cols.append(f"juris_code:{col}")
 
     # Try FIPS columns
     if fips:
-        for col in ['FIPS', 'fips', 'County_FIPS', 'COUNTY_FIPS']:
-            if col in df.columns:
-                mask |= df[col].astype(str).str.strip() == str(fips)
-                break
+        col = _find_column_ci(df, [
+            'FIPS', 'fips', 'County_FIPS', 'COUNTY_FIPS', 'COUNTYFP'
+        ])
+        if col:
+            mask |= df[col].astype(str).str.strip() == str(fips)
+            matched_cols.append(f"fips:{col}")
 
-    # Try name patterns
+    # Try name patterns (expanded column list to match standardize_columns output)
     if name_patterns:
-        for col in ['JURISDICTION', 'Jurisdiction', 'jurisdiction',
-                     'County_City', 'COUNTY_CITY', 'county_name']:
-            if col in df.columns:
-                for pattern in name_patterns:
-                    try:
-                        mask |= df[col].astype(str).str.contains(
-                            pattern, case=False, na=False, regex=True
-                        )
-                    except re.error:
-                        mask |= df[col].astype(str).str.lower() == pattern.lower()
-                break
+        col = _find_column_ci(df, [
+            'Physical Juris Name', 'Physical_Juris_Name',
+            'PHYSICAL_JURIS_NAME', 'PHYSICAL_JURIS',
+            'JURISDICTION', 'Jurisdiction', 'jurisdiction',
+            'County_City', 'COUNTY_CITY', 'county_name'
+        ])
+        if col:
+            for pattern in name_patterns:
+                try:
+                    mask |= df[col].astype(str).str.contains(
+                        pattern, case=False, na=False, regex=True
+                    )
+                except re.error:
+                    mask |= df[col].astype(str).str.lower() == pattern.lower()
+            matched_cols.append(f"name:{col}")
+
+    if not matched_cols:
+        # Log diagnostic info when no columns match
+        logger.warning(f"  No jurisdiction columns found in data!")
+        logger.warning(f"  Available columns: {list(df.columns)[:25]}")
+        logger.warning(f"  Looking for juris_code={juris_code}, fips={fips}, patterns={name_patterns}")
 
     return df[mask].copy()
 
@@ -283,6 +312,22 @@ def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
     filter_profiles = get_filter_profiles(config)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Log available columns for diagnostics
+    logger.info(f"Input data: {len(df):,} rows, {len(df.columns)} columns")
+    logger.info(f"Columns: {list(df.columns)[:30]}")
+
+    # Pre-check for jurisdiction columns (early warning)
+    if state == 'virginia':
+        juris_cols = [c for c in df.columns if any(
+            kw in c.lower() for kw in ['juris', 'fips', 'jurisdiction', 'physical']
+        )]
+        if juris_cols:
+            logger.info(f"Jurisdiction columns detected: {juris_cols}")
+        else:
+            logger.error("NO JURISDICTION COLUMNS FOUND in statewide data!")
+            logger.error("This may be person/driver-level data instead of crash-level data.")
+            logger.error("Check the download source — ensure layers=0 (crash records), not layers=1 (person records).")
 
     # Check if state config has splitConfig (preferred over filterProfiles)
     split_config = None

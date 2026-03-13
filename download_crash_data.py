@@ -399,7 +399,38 @@ def download_csv_from_url(url, max_poll_attempts=6, poll_interval_seconds=30):
         if len(df) < 10 or len(df.columns) < 5:
             raise Exception(f"CSV appears empty or malformed ({len(df)} rows, {len(df.columns)} columns)")
 
+        # Validate this is crash-level data (not person/driver-level)
+        # Crash-level data must have jurisdiction columns for splitting
+        cols_lower = {c.lower().replace(' ', '_').replace('-', '_') for c in df.columns}
+        has_jurisdiction = any(
+            kw in cols_lower for kw in [
+                'physical_juris_name', 'juris_code', 'jurisdiction',
+                'physical_juris', 'juris_name', 'county_fips', 'fips'
+            ]
+        )
+        # Person/driver-level data has these columns instead
+        has_driver_cols = any(
+            kw in cols_lower for kw in [
+                'driver_vehiclenumber', 'driver_injurytype', 'driver_age',
+                'driver_gender', 'driver_action_type_cd'
+            ]
+        )
+
+        if has_driver_cols and not has_jurisdiction:
+            raise Exception(
+                f"CSV contains person/driver-level data ({len(df)} rows, "
+                f"columns include Driver_* fields) but no jurisdiction columns. "
+                f"Need crash-level data with Physical_Juris_Name/Juris_Code. "
+                f"Available columns: {list(df.columns)[:15]}..."
+            )
+
         logger.info(f"Downloaded {len(df)} records from CSV endpoint")
+        logger.info(f"Columns: {list(df.columns)[:20]}...")
+        if has_jurisdiction:
+            logger.info("Crash-level data validated: jurisdiction columns found")
+        else:
+            logger.warning("No jurisdiction columns detected — splitting may fail")
+
         return df
 
     raise Exception("CSV download timed out waiting for file generation")
@@ -429,8 +460,9 @@ def download_from_fallback(config, state='virginia'):
             "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0",
             # Full Crash dataset (statewide with all fields)
             "https://www.virginiaroads.org/api/download/v1/items/3bd854bff90d49eaa85bdc68acf952e0/csv?layers=0",
-            # CrashData Details (layer 1)
-            "https://www.virginiaroads.org/api/download/v1/items/101101cecac34f28b38c0846e847bd0b/csv?layers=1",
+            # Full Crash - Layer 0 (crash-level data with jurisdiction columns)
+            # NOTE: Layer 0 = crash records, Layer 1 = person/driver records (no jurisdiction cols)
+            "https://www.virginiaroads.org/api/download/v1/items/101101cecac34f28b38c0846e847bd0b/csv?layers=0",
         ]
 
     last_error = None
