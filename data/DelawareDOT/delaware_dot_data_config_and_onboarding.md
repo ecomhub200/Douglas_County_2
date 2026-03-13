@@ -95,6 +95,20 @@ Assignment is **deterministic** via MD5 hash of the crash composite ID, so the s
 
 **Why not map all to A?** Mapping all injury → A inflates EPDO by 2.3x (14.4/crash vs typical 5-6/crash), making Delaware data incomparable with Virginia and other states that have proper KABCO.
 
+### EPDO Weights
+
+Using **FHWA-SA-25-021 (October 2025)** comprehensive crash unit costs in 2024 dollars:
+
+| Severity | Crash Cost | EPDO Weight |
+|----------|-----------|-------------|
+| K (Fatal) | $15,988,000 | 883 |
+| A (Suspected Serious) | $1,705,100 | 94 |
+| B (Suspected Minor) | $384,000 | 21 |
+| C (Possible Injury) | $204,600 | 11 |
+| O (PDO) | $18,100 | 1 |
+
+Blended EPDO weight for undifferentiated "Personal Injury Crash": `0.08×94 + 0.32×21 + 0.60×11 ≈ 21` per injury crash.
+
 ### Composite Crash ID
 
 Delaware has no crash ID field. We generate: `DE-{YYYYMMDD}-{HHMM}-{lat6}-{lon6}`

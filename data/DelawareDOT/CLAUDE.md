@@ -74,7 +74,7 @@ crash-lens-data/delaware/{jurisdiction}/
 
 ## EPDO Weights
 
-Using FHWA/HSM standard: K=462, A=62, B=12, C=5, O=1
+Using FHWA-SA-25-021 (Oct 2025) crash costs in 2024 dollars: K=883, A=94, B=21, C=11, O=1
 
 ## GitHub Actions Workflow
 
