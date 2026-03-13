@@ -429,15 +429,33 @@ def download_from_fallback(config, state='virginia'):
             "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0",
             # Full Crash dataset (statewide with all fields)
             "https://www.virginiaroads.org/api/download/v1/items/3bd854bff90d49eaa85bdc68acf952e0/csv?layers=0",
-            # CrashData Details (layer 1)
-            "https://www.virginiaroads.org/api/download/v1/items/101101cecac34f28b38c0846e847bd0b/csv?layers=1",
+            # CrashData Details (layer 0 = crash summary with jurisdiction columns)
+            "https://www.virginiaroads.org/api/download/v1/items/101101cecac34f28b38c0846e847bd0b/csv?layers=0",
         ]
+
+    # Required columns that must exist for jurisdiction splitting to work
+    required_jurisdiction_cols = {
+        'Juris_Code', 'JURIS_CODE', 'juris_code', 'Juris Code',
+        'Physical_Juris_Name', 'PHYSICAL_JURIS_NAME', 'Physical Juris Name',
+        'PHYSICAL_JURIS', 'Jurisdiction_Code', 'JURISDICTION_CODE'
+    }
 
     last_error = None
     for url in csv_urls:
         try:
             logger.info(f"Trying CSV download: {url}")
             df = download_csv_from_url(url)
+
+            # Validate that the CSV has jurisdiction columns needed for splitting
+            has_juris_col = bool(required_jurisdiction_cols & set(df.columns))
+            if not has_juris_col:
+                logger.warning(
+                    f"CSV from {url} has no jurisdiction columns "
+                    f"(found: {list(df.columns)[:10]}...) — skipping this endpoint"
+                )
+                last_error = Exception(f"No jurisdiction columns in CSV from {url}")
+                continue
+
             return df
         except Exception as e:
             last_error = e

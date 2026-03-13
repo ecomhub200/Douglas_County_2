@@ -491,6 +491,23 @@ def main():
     load_elapsed = time.time() - load_start
     logger.info(f"Loaded {len(df):,} records in {load_elapsed:.1f}s")
 
+    # Validate that jurisdiction columns exist (critical for splitting)
+    if args.state == 'virginia':
+        juris_cols = {'Juris_Code', 'JURIS_CODE', 'juris_code', 'Juris Code',
+                      'Jurisdiction Code', 'JURISDICTION_CODE'}
+        found = juris_cols & set(df.columns)
+        if not found:
+            logger.error(
+                f"FATAL: No jurisdiction columns found in {args.input}. "
+                f"Available columns: {list(df.columns)[:20]}..."
+            )
+            logger.error(
+                "The statewide CSV may have been downloaded from a detail/driver-level "
+                "endpoint (layers=1) instead of the crash summary endpoint (layers=0). "
+                "Re-run the download workflow to fetch the correct dataset."
+            )
+            return 1
+
     # Split
     results = split_state(
         df, args.state, config, jurisdictions,
