@@ -244,34 +244,31 @@ CL.upload = CL.upload || {};
 
     /**
      * Check if crash data is available in R2 for a given state/jurisdiction.
+     * Jurisdiction-agnostic: always returns available=true so the frontend
+     * connects to the R2 folder regardless of manifest state.
      *
      * @param {string} stateKey - State key (e.g., 'virginia')
      * @param {string} jurisdictionId - Jurisdiction ID (e.g., 'henrico')
-     * @returns {{ available: boolean, reason?: string, files?: string[] }}
+     * @returns {{ available: boolean, reason: string, inManifest: boolean, files?: string[] }}
      */
     function checkR2DataAvailability(stateKey, jurisdictionId) {
-        if (!r2State.manifest || !r2State.manifest.files) {
-            // No manifest — assume available (will try direct URL)
-            return { available: true, reason: 'No manifest, will try direct URL' };
-        }
-
         var prefix = (appConfig && appConfig.states && appConfig.states[stateKey] && appConfig.states[stateKey].r2Prefix) || stateKey;
         var pathPrefix = prefix + '/' + jurisdictionId.toLowerCase() + '/';
+
+        if (!r2State.manifest || !r2State.manifest.files) {
+            return { available: true, inManifest: false, reason: 'No manifest — will attempt direct R2 fetch' };
+        }
+
         var files = Object.keys(r2State.manifest.files);
         var matchingFiles = files.filter(function(f) { return f.indexOf(pathPrefix) === 0; });
 
-        if (matchingFiles.length === 0) {
-            return {
-                available: false,
-                reason: 'No files found in R2 manifest for ' + pathPrefix,
-                files: []
-            };
-        }
-
         return {
             available: true,
+            inManifest: matchingFiles.length > 0,
             files: matchingFiles,
-            reason: matchingFiles.length + ' file(s) found'
+            reason: matchingFiles.length > 0
+                ? matchingFiles.length + ' file(s) confirmed in manifest'
+                : 'Not in manifest — will attempt direct R2 fetch at ' + pathPrefix
         };
     }
 
