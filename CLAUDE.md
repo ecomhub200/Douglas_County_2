@@ -356,3 +356,51 @@ const EPDO_WEIGHTS = { K: 462, A: 62, B: 12, C: 5, O: 1 };
 ```
 
 Always use `calcEPDO(severityObject)` for consistent calculations.
+
+---
+
+## Multi-State Data Onboarding
+
+### State Onboarding Documentation (MANDATORY)
+
+When onboarding a **new state's crash data** into the system, you **MUST** create a comprehensive onboarding document:
+
+- **File**: `data/{StateDOT}/{state}_dot_data_config_and_onboarding.md`
+- **Example**: `data/DelawareDOT/delaware_dot_data_config_and_onboarding.md`
+
+This document serves as the **single source of truth** for Claude Code when working with that state's crash data. It must be created **during** the onboarding process and kept updated with any future changes.
+
+### Required Sections
+
+Every state onboarding document must include:
+
+1. **State Data Profile** — State name, abbreviation, FIPS, DOT name, counties, data custodian, data portal URL, dataset ID, API type, update frequency, historical range
+2. **Data Source Details** — API behavior (pagination, filtering, auth), raw field names with descriptions and example values, field name format differences (API vs CSV/Excel)
+3. **Normalization Rules** — Normalizer file location, severity mapping (with rationale), composite crash ID format, datetime parsing formats, boolean field mapping table (Virginia Standard → State Source → Transform), fields NOT available (with future resolution plans)
+4. **Download Pipeline** — Workflow file path, pipeline flow diagram, download script details, schedule (cron), R2 storage path
+5. **Known Limitations & Exceptions** — Data quality issues, analysis limitations (which tabs/features won't work), comparison caveats vs other states
+6. **Configuration Files Reference** — Table of all config files with purpose and location
+7. **Future Enhancement Roadmap** — Prioritized list of planned improvements (e.g., reverse geocoding, road classification, person-level data)
+
+### Onboarding Checklist
+
+When adding a new state:
+
+1. **Research the data source** — API type, field names, data dictionary, severity levels, available fields
+2. **Create the normalizer** — Add `{State}Normalizer` class to `scripts/state_adapter.py` with `STATE_SIGNATURES` entry
+3. **Create state config** — `states/{state}/config.json` with jurisdictions, EPDO weights, column mapping
+4. **Create hierarchy config** — `states/{state}/hierarchy.json` with regions, MPOs, counties
+5. **Create download script** — `data/{StateDOT}/download_{state}_crash_data.py`
+6. **Create download workflow** — `.github/workflows/download-{state}-crash-data.yml` with normalize step and pipeline trigger
+7. **Register in pipeline** — Add state to `.github/workflows/pipeline.yml` state options
+8. **Create onboarding doc** — `data/{StateDOT}/{state}_dot_data_config_and_onboarding.md` (this document)
+9. **Test with sample data** — Run normalizer against sample data, verify severity distribution, EPDO, and column mappings
+10. **Document limitations** — Record what's missing and what workarounds are in place
+
+### Existing State Onboarding Docs
+
+| State | Document |
+|-------|----------|
+| Delaware | `data/DelawareDOT/delaware_dot_data_config_and_onboarding.md` |
+
+Update this table as new states are onboarded.
