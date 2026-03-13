@@ -237,7 +237,7 @@ def test_virginia_split(results, tmp_dir, verbose=False):
 
     # Verify output files exist
     for jid in VA_TEST_JURISDICTIONS:
-        for suffix in ['county_roads', 'no_interstate', 'all_roads']:
+        for suffix in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
             fpath = os.path.join(va_output, f'{jid}_{suffix}.csv')
             exists = os.path.exists(fpath)
             if exists:
@@ -394,7 +394,7 @@ def test_resolve_data_url_logic(results, verbose=False):
     print("\n--- Test 5: resolveDataUrl() Strategy 2 Logic ---")
 
     # Simulate the JavaScript suffix-matching logic in Python
-    known_suffixes = ['_county_roads.csv', '_no_interstate.csv', '_all_roads.csv']
+    known_suffixes = ['_county_roads.csv', '_city_roads.csv', '_no_interstate.csv', '_all_roads.csv']
 
     test_cases = [
         # (filename, expected_jurisdiction, expected_filter)

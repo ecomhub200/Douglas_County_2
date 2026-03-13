@@ -408,7 +408,7 @@ jobs:
           skipped = 0
 
           for j in jurisdictions:
-              for rt in ['county_roads', 'no_interstate', 'all_roads']:
+              for rt in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
                   local_path = os.path.join(data_dir, f'forecasts_{rt}.json')
                   # Also check jurisdiction-prefixed path
                   if not os.path.exists(local_path):

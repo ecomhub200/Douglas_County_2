@@ -649,8 +649,12 @@ const StateAdapter = (() => {
             if (detectedState === 'colorado') {
                 return {
                     countyOnly: {
-                        name: "County/City Roads Only",
+                        name: "County Roads Only",
                         systemValues: ["NonVDOT secondary"]
+                    },
+                    cityOnly: {
+                        name: "City Roads Only",
+                        systemCodeValues: ["City Street"]
                     },
                     countyPlusVDOT: {
                         name: "All Roads (No Interstate)",

@@ -100,7 +100,7 @@ def find_county_csvs(data_dir, state_key, hierarchy):
         print(f"[WARN] Data directory not found: {data_path}")
         return found
 
-    road_types = ['all_roads', 'county_roads', 'no_interstate']
+    road_types = ['all_roads', 'county_roads', 'city_roads', 'no_interstate']
 
     for csv_file in data_path.glob('*.csv'):
         fname = csv_file.stem.lower()

@@ -112,6 +112,11 @@
           "adams": ["ACSO"]
         }
       },
+      "cityRoads": {
+        "method": "column_value",
+        "column": "_co_system_code",
+        "includeValues": ["City Street"]
+      },
       "interstateExclusion": {
         "method": "column_value",
         "column": "_co_system_code",
@@ -121,9 +126,14 @@
 
     "filterProfiles": {
       "countyOnly": {
-        "name": "County/City Roads Only",
-        "description": "Only locally-maintained roads",
+        "name": "County Roads Only",
+        "description": "County-maintained roads only",
         "systemValues": ["NonVDOT secondary"]
+      },
+      "cityOnly": {
+        "name": "City Roads Only",
+        "description": "City street roads only",
+        "systemCodeValues": ["City Street"]
       },
       "countyPlusVDOT": {
         "name": "All Roads (No Interstate)",

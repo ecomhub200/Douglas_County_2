@@ -36,6 +36,7 @@ CL.upload = CL.upload || {};
         if (activeTier === 'state' || activeTier === 'federal' || activeTier === 'region') {
             var dotMap = {
                 'countyOnly':      'dot_roads',
+                'cityOnly':        'city_roads',
                 'countyPlusVDOT':  'non_dot_roads',
                 'allRoads':        activeTier === 'state' ? 'statewide_all_roads' : 'all_roads'
             };
@@ -44,6 +45,7 @@ CL.upload = CL.upload || {};
 
         var localMap = {
             'countyOnly':      'county_roads',
+            'cityOnly':        'city_roads',
             'countyPlusVDOT':  'no_interstate',
             'allRoads':        'all_roads'
         };
@@ -118,7 +120,7 @@ CL.upload = CL.upload || {};
             if (stateConfig && stateConfig.r2Prefix) {
                 var filename = normalizedPath.split('/').pop();
                 if (filename) {
-                    var knownSuffixes = ['_county_roads.csv', '_no_interstate.csv', '_all_roads.csv'];
+                    var knownSuffixes = ['_county_roads.csv', '_city_roads.csv', '_no_interstate.csv', '_all_roads.csv'];
                     var jurisdiction = null, filterWithExt = null;
                     for (var i = 0; i < knownSuffixes.length; i++) {
                         if (filename.indexOf(knownSuffixes[i], filename.length - knownSuffixes[i].length) !== -1) {

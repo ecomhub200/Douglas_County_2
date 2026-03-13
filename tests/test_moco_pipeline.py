@@ -1417,7 +1417,7 @@ class TestProcessWorkflow:
 
     def test_output_file_suffixes(self):
         """Should produce standardized, all_roads, county_roads, no_interstate."""
-        for suffix in ['standardized', 'all_roads', 'county_roads', 'no_interstate']:
+        for suffix in ['standardized', 'all_roads', 'county_roads', 'city_roads', 'no_interstate']:
             assert suffix in self.content, f"Missing output suffix: {suffix}"
 
     def test_uploads_forecasts_to_r2(self):

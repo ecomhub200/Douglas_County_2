@@ -37,6 +37,10 @@ ROAD_TYPES = {
         'forecast_file': 'forecasts_county_roads.json',
         'csv_file': '{jurisdiction}_county_roads.csv',
     },
+    'city_roads': {
+        'forecast_file': 'forecasts_city_roads.json',
+        'csv_file': '{jurisdiction}_city_roads.csv',
+    },
     'no_interstate': {
         'forecast_file': 'forecasts_no_interstate.json',
         'csv_file': '{jurisdiction}_no_interstate.csv',

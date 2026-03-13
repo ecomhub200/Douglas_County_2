@@ -25,9 +25,14 @@ SOURCE = os.path.join(DATA_DIR, 'douglas_standardized.csv')
 # Road system filter definitions based on _co_system_code
 FILTERS = {
     'county_roads': {
-        'include': {'City Street', 'County Road'},
+        'include': {'County Road'},
         'output': 'douglas_county_roads.csv',
-        'description': 'County/City Roads Only (local roads)'
+        'description': 'County Roads Only (county-maintained)'
+    },
+    'city_roads': {
+        'include': {'City Street'},
+        'output': 'douglas_city_roads.csv',
+        'description': 'City Roads Only (city/town-maintained)'
     },
     'no_interstate': {
         'include': {'City Street', 'County Road', 'State Highway', 'Frontage Road'},
@@ -106,10 +111,11 @@ def rebuild():
     # Phase 3: Verify subset relationships
     print('\n  Verifying subset relationships...')
     county_ids = set()
+    city_ids = set()
     noint_ids = set()
     all_ids = set()
 
-    for filt_key, id_set in [('county_roads', county_ids), ('no_interstate', noint_ids), ('all_roads', all_ids)]:
+    for filt_key, id_set in [('county_roads', county_ids), ('city_roads', city_ids), ('no_interstate', noint_ids), ('all_roads', all_ids)]:
         path = os.path.join(DATA_DIR, FILTERS[filt_key]['output'])
         with open(path, newline='', encoding='utf-8') as f:
             reader = csv.DictReader(f)
@@ -118,11 +124,23 @@ def rebuild():
 
     county_not_in_noint = county_ids - noint_ids
     noint_not_in_all = noint_ids - all_ids
+    city_not_in_all = city_ids - all_ids
+    county_city_overlap = county_ids & city_ids
 
     if county_not_in_noint:
         print(f'  WARNING: {len(county_not_in_noint)} county records NOT in no_interstate')
     else:
         print(f'  OK: county_roads ({len(county_ids)}) ⊂ no_interstate ({len(noint_ids)})')
+
+    if city_not_in_all:
+        print(f'  WARNING: {len(city_not_in_all)} city records NOT in all_roads')
+    else:
+        print(f'  OK: city_roads ({len(city_ids)}) ⊂ all_roads ({len(all_ids)})')
+
+    if county_city_overlap:
+        print(f'  WARNING: {len(county_city_overlap)} records in BOTH county_roads and city_roads')
+    else:
+        print(f'  OK: county_roads ∩ city_roads = ∅ (disjoint)')
 
     if noint_not_in_all:
         print(f'  WARNING: {len(noint_not_in_all)} no_interstate records NOT in all_roads')

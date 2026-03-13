@@ -79,7 +79,7 @@ def build_file_map(state, jurisdiction):
         r2_prefix = f'colorado/{jurisdiction}'
 
         # Processed pipeline outputs
-        for suffix in ['standardized', 'all_roads', 'county_roads', 'no_interstate']:
+        for suffix in ['standardized', 'all_roads', 'county_roads', 'city_roads', 'no_interstate']:
             local = data_dir / f'{jurisdiction}_{suffix}.csv'
             if local.exists():
                 files.append({
@@ -113,7 +113,7 @@ def build_file_map(state, jurisdiction):
         data_dir = PROJECT_ROOT / 'data'
         r2_prefix = f'virginia/{jurisdiction}'
 
-        for suffix in ['all_roads', 'county_roads', 'no_interstate']:
+        for suffix in ['all_roads', 'county_roads', 'city_roads', 'no_interstate']:
             local = data_dir / f'{jurisdiction}_{suffix}.csv'
             if local.exists():
                 files.append({
