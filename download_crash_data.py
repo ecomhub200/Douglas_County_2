@@ -48,7 +48,7 @@ RETRY_BACKOFF_FACTOR = 2  # 2s, 4s, 8s, 16s
 
 
 def create_session_with_retries():
-    """Create a requests session with retry logic."""
+    """Create a requests session with retry logic and browser-like headers."""
     session = requests.Session()
     retry_strategy = Retry(
         total=MAX_RETRIES,
@@ -59,6 +59,12 @@ def create_session_with_retries():
     adapter = HTTPAdapter(max_retries=retry_strategy)
     session.mount("https://", adapter)
     session.mount("http://", adapter)
+    # ArcGIS Hub blocks requests with default Python User-Agent (returns 403).
+    # Use a browser-like User-Agent to avoid this.
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/csv,application/json,text/html,*/*',
+    })
     return session
 
 
@@ -227,12 +233,26 @@ def download_arcgis_page(api_url, where_clause, offset):
     return records
 
 
-def find_working_api_url(config):
+def get_data_source_config(config, state='virginia'):
+    """
+    Get the data source configuration for a state.
+    Handles both old format (config['dataSource']) and new format (config['dataSources'][state]).
+    """
+    # Try new format first: dataSources.<state>
+    data_sources = config.get('dataSources', {})
+    if state in data_sources:
+        return data_sources[state]
+
+    # Fall back to old format: dataSource (singular)
+    return config.get('dataSource', {})
+
+
+def find_working_api_url(config, state='virginia'):
     """
     Try to find a working API URL from configured options.
     Returns the first URL that passes health check.
     """
-    data_source = config.get('dataSource', {})
+    data_source = get_data_source_config(config, state)
     primary_url = data_source.get('apiUrl')
     alternative_urls = data_source.get('apiUrlAlternatives', [])
 
@@ -258,12 +278,12 @@ def find_working_api_url(config):
     return None
 
 
-def download_from_arcgis(config, jurisdiction_config):
+def download_from_arcgis(config, jurisdiction_config, state='virginia'):
     """
     Download crash data from ArcGIS REST API with pagination.
     Tries multiple API endpoints and filters for the specified jurisdiction.
     """
-    api_url = find_working_api_url(config)
+    api_url = find_working_api_url(config, state)
 
     if not api_url:
         raise Exception("No working ArcGIS API endpoint available")
@@ -343,24 +363,16 @@ def download_from_arcgis(config, jurisdiction_config):
     return pd.DataFrame(all_records)
 
 
-def download_from_fallback(config):
-    """Download crash data from fallback CSV URL with retry logic.
+def download_csv_from_url(url, max_poll_attempts=6, poll_interval_seconds=30):
+    """Download crash data CSV from a single URL with polling for async generation.
 
     ArcGIS Hub may return a JSON "Pending" status for large datasets that are
     generated asynchronously. This function polls until the CSV is ready.
     """
-    fallback_url = config.get('dataSource', {}).get('fallbackUrl',
-        "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0")
-
-    max_poll_attempts = 6
-    poll_interval_seconds = 30  # Total max wait: ~3 minutes
-
-    logger.info(f"Downloading from CSV URL: {fallback_url}")
-
     import io
 
     for attempt in range(max_poll_attempts):
-        response = make_request_with_retry(fallback_url, timeout=300, max_manual_retries=4)
+        response = make_request_with_retry(url, timeout=300, max_manual_retries=4)
         text = response.text.strip()
 
         # Check for async generation response (ArcGIS Hub returns JSON when generating)
@@ -391,6 +403,48 @@ def download_from_fallback(config):
         return df
 
     raise Exception("CSV download timed out waiting for file generation")
+
+
+def download_from_fallback(config, state='virginia'):
+    """Download crash data from CSV URLs with retry logic.
+
+    Tries multiple CSV download URLs in order. ArcGIS Hub sometimes blocks
+    specific item URLs or returns 403, so having alternatives is important.
+    """
+    data_source = get_data_source_config(config, state)
+
+    # Build list of CSV URLs to try (primary + alternatives)
+    csv_urls = []
+
+    primary_url = data_source.get('fallbackUrl')
+    if primary_url:
+        csv_urls.append(primary_url)
+
+    csv_urls.extend(data_source.get('fallbackUrlAlternatives', []))
+
+    # Hardcoded defaults if nothing configured
+    if not csv_urls:
+        csv_urls = [
+            # CrashData Basic (the original default)
+            "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0",
+            # Full Crash dataset (statewide with all fields)
+            "https://www.virginiaroads.org/api/download/v1/items/3bd854bff90d49eaa85bdc68acf952e0/csv?layers=0",
+            # CrashData Details (layer 1)
+            "https://www.virginiaroads.org/api/download/v1/items/101101cecac34f28b38c0846e847bd0b/csv?layers=1",
+        ]
+
+    last_error = None
+    for url in csv_urls:
+        try:
+            logger.info(f"Trying CSV download: {url}")
+            df = download_csv_from_url(url)
+            return df
+        except Exception as e:
+            last_error = e
+            logger.warning(f"CSV download failed for {url}: {e}")
+            continue
+
+    raise last_error or Exception("All CSV download URLs failed")
 
 
 def filter_jurisdiction(df, jurisdiction_config):
@@ -813,7 +867,7 @@ def main():
     # Try CSV download first (primary source - has complete statewide data)
     try:
         logger.info("Downloading from Virginia Roads CSV (primary source)...")
-        df = download_from_fallback(config)
+        df = download_from_fallback(config, state='virginia')
 
         # Stage 1.5: Save statewide copy as gzip before jurisdiction filtering
         if args.save_statewide and df is not None and not df.empty:
@@ -859,7 +913,7 @@ def main():
         try:
             logger.info("=" * 40)
             logger.info("Attempting ArcGIS API fallback...")
-            df = download_from_arcgis(config, jurisdiction_config)
+            df = download_from_arcgis(config, jurisdiction_config, state='virginia')
             used_api_fallback = True
 
             # Filter by jurisdiction

@@ -23,9 +23,15 @@ on:
         required: false
         type: boolean
         default: false
+      skip_pipeline:
+        description: 'Skip pipeline trigger (download only)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  actions: write
 
 env:
   R2_STATE_PREFIX: west_virginia
@@ -34,14 +40,16 @@ env:
 jobs:
   download-west-virginia-data:
     runs-on: ubuntu-latest
+    outputs:
+      jurisdiction: ${{ steps.build-args.outputs.jurisdiction }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -151,3 +159,29 @@ jobs:
           | CSVs uploaded to R2 | ${UPLOADED} |
           | Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
           EOF
+
+  # Trigger unified pipeline
+  trigger-pipeline:
+    name: "Trigger pipeline"
+    needs: download-west-virginia-data
+    if: github.event.inputs.skip_pipeline != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pipeline.yml',
+              ref: 'main',
+              inputs: {
+                state: 'west_virginia',
+                scope: 'jurisdiction',
+                selection: '${{ needs.download-west-virginia-data.outputs.jurisdiction }}',
+                data_source: '',
+                skip_forecasts: 'false'
+              }
+            });
+            console.log('Pipeline triggered for West Virginia');

@@ -76,6 +76,16 @@ on:
         type: boolean
         default: false
 
+      filter:
+        description: 'Road type filter'
+        required: true
+        type: choice
+        default: 'countyOnly'
+        options:
+          - countyOnly
+          - countyPlusVDOT
+          - allRoads
+
       skip_pipeline:
         description: 'Skip pipeline trigger (download only)'
         required: false
@@ -103,11 +113,11 @@ jobs:
       csv_path: ${{ steps.download.outputs.csv_path }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -143,6 +153,7 @@ jobs:
           SCOPE="${{ steps.params.outputs.scope }}"
           SELECTION="${{ steps.params.outputs.selection }}"
           FORCE="${{ github.event.inputs.force_download }}"
+          FILTER="${{ github.event.inputs.filter || 'countyOnly' }}"
 
           # Determine download strategy
           RESOLVED=$(python scripts/resolve_scope.py \
@@ -155,11 +166,11 @@ jobs:
           fi
 
           if [ "$MODE" = "statewide" ]; then
-            ARGS="$ARGS --save-statewide --filter allRoads"
+            ARGS="$ARGS --save-statewide --filter $FILTER"
             python download_crash_data.py $ARGS
             CSV_PATH="${{ env.DATA_DIR }}/virginia_statewide_all_roads.csv"
           else
-            ARGS="$ARGS --jurisdiction $SELECTION --filter allRoads"
+            ARGS="$ARGS --jurisdiction $SELECTION --filter $FILTER"
             python download_crash_data.py $ARGS
             CSV_PATH="${{ env.DATA_DIR }}/${SELECTION}_all_roads.csv"
           fi

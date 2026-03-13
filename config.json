@@ -5133,6 +5133,10 @@
         "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_test/FeatureServer/0/query"
       ],
       "fallbackUrl": "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0",
+      "fallbackUrlAlternatives": [
+        "https://www.virginiaroads.org/api/download/v1/items/3bd854bff90d49eaa85bdc68acf952e0/csv?layers=0",
+        "https://www.virginiaroads.org/api/download/v1/items/101101cecac34f28b38c0846e847bd0b/csv?layers=1"
+      ],
       "datasetId": "1a96a2f31b4f4d77991471b6cabb38ba"
     },
     "colorado": {

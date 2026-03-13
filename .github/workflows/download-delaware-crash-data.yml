@@ -30,7 +30,7 @@ on:
         type: boolean
         default: false
       skip_pipeline:
-        description: 'Skip pipeline trigger after download'
+        description: 'Skip pipeline trigger (download only)'
         required: false
         type: boolean
         default: false
@@ -51,12 +51,12 @@ jobs:
       uploaded: ${{ steps.r2-upload.outputs.uploaded }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -199,7 +199,7 @@ jobs:
           | Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
           EOF
 
-  # Trigger unified pipeline for processing
+  # Trigger unified pipeline
   trigger-pipeline:
     name: "Trigger pipeline"
     needs: download-delaware-data

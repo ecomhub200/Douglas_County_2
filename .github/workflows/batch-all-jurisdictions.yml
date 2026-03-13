@@ -97,6 +97,16 @@ on:
         type: boolean
         default: false
 
+      filter:
+        description: 'Road type filter (Virginia only — other states ignore this)'
+        required: false
+        type: choice
+        default: 'countyOnly'
+        options:
+          - countyOnly
+          - countyPlusVDOT
+          - allRoads
+
       dry_run:
         description: 'Dry run (no uploads, no commits in batch pipeline)'
         required: false
@@ -127,11 +137,11 @@ jobs:
       r2_data_key: ${{ steps.r2_upload.outputs.r2_data_key }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -152,6 +162,7 @@ jobs:
         run: |
           STATE="${{ github.event.inputs.state }}"
           FORCE="${{ github.event.inputs.force_download }}"
+          FILTER="${{ github.event.inputs.filter || 'countyOnly' }}"
 
           echo "=========================================="
           echo "Stage 1: Download statewide data for $STATE"
@@ -164,7 +175,7 @@ jobs:
           if [ "$STATE" = "virginia" ]; then
             # --jurisdiction is required by the script as a seed; --save-statewide
             # captures the full statewide dataset before jurisdiction filtering
-            ARGS="--output-dir data --jurisdiction henrico --save-statewide --filter allRoads"
+            ARGS="--output-dir data --jurisdiction henrico --save-statewide --filter $FILTER"
             if [ "$FORCE" = "true" ]; then
               ARGS="$ARGS --force-download"
             fi
