@@ -224,9 +224,11 @@ jobs:
 
           python scripts/init_cache.py --state "$STATE"
 
-      # ── Stage 1: Split by Jurisdiction (batch mode only) ──
+      # ── Stage 1: Split by Jurisdiction ──
+      # Always run: batch pipeline downloads statewide CSV from R2,
+      # so we always need to split it into per-jurisdiction files
+      # (including city_roads, county_roads, no_interstate variants).
       - name: "Stage 1: Split by jurisdiction"
-        if: needs.prepare.outputs.download_mode == 'statewide'
         run: |
           STATE="${{ needs.prepare.outputs.state }}"
           DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
