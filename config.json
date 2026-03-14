@@ -4600,6 +4600,11 @@
         "Secondary",
         "Interstate"
       ]
+    },
+    "cityOnly": {
+      "name": "City Roads Only",
+      "description": "City/town agency-maintained roads only",
+      "ownershipValues": ["3. City or Town Hwy Agency"]
     }
   },
   "states": {

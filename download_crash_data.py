@@ -540,32 +540,54 @@ def filter_jurisdiction(df, jurisdiction_config):
 
 def filter_by_road_system(df, filter_profile):
     """
-    Filter dataframe based on road system type (NonVDOT, Primary, Secondary, etc.).
+    Filter dataframe based on road system type or ownership values.
     """
     original_count = len(df)
 
-    system_values = filter_profile.get('systemValues', ['NonVDOT secondary', 'NONVDOT'])
+    system_values = filter_profile.get('systemValues', [])
+    ownership_values = filter_profile.get('ownershipValues', [])
     exclude_patterns = filter_profile.get('excludeRoutePatterns', [])
     filter_name = filter_profile.get('name', 'Unknown Filter')
 
-    # Find the SYSTEM column
-    system_columns = ['SYSTEM', 'System', 'system']
-    system_col = None
-    for col in system_columns:
-        if col in df.columns:
-            system_col = col
-            break
+    if ownership_values:
+        # Filter by ownership column
+        ownership_columns = ['Ownership', 'OWNERSHIP', 'ownership']
+        ownership_col = None
+        for col in ownership_columns:
+            if col in df.columns:
+                ownership_col = col
+                break
 
-    if system_col is None:
-        logger.warning("Could not find SYSTEM column, skipping road system filter")
+        if ownership_col is None:
+            logger.warning("Could not find Ownership column, skipping ownership filter")
+            return df
+
+        mask = df[ownership_col].astype(str).apply(
+            lambda x: any(val in x for val in ownership_values)
+        )
+        df_filtered = df[mask].copy().reset_index(drop=True)
+
+    elif system_values:
+        # Filter by system values
+        system_columns = ['SYSTEM', 'System', 'system']
+        system_col = None
+        for col in system_columns:
+            if col in df.columns:
+                system_col = col
+                break
+
+        if system_col is None:
+            logger.warning("Could not find SYSTEM column, skipping road system filter")
+            return df
+
+        mask = df[system_col].astype(str).str.upper().apply(
+            lambda x: any(sys_val.upper() in x for sys_val in system_values)
+        )
+        df_filtered = df[mask].copy().reset_index(drop=True)
+
+    else:
+        logger.warning(f"Filter profile '{filter_name}' has no systemValues or ownershipValues, returning all data")
         return df
-
-    # Filter by system values
-    mask = df[system_col].astype(str).str.upper().apply(
-        lambda x: any(sys_val.upper() in x for sys_val in system_values)
-    )
-
-    df_filtered = df[mask].copy().reset_index(drop=True)
 
     # Apply route exclusion patterns if specified
     if exclude_patterns and len(df_filtered) > 0:
@@ -761,7 +783,7 @@ Examples:
     parser.add_argument(
         '--filter', '-f',
         type=str,
-        choices=['countyOnly', 'countyPlusVDOT', 'allRoads'],
+        choices=['countyOnly', 'cityOnly', 'countyPlusVDOT', 'allRoads'],
         help='Road type filter profile'
     )
 

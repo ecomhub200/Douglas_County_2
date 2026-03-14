@@ -80,9 +80,10 @@ on:
         description: 'Road type filter'
         required: true
         type: choice
-        default: 'countyOnly'
+        default: 'allRoads'
         options:
           - countyOnly
+          - cityOnly
           - countyPlusVDOT
           - allRoads
 
@@ -153,7 +154,7 @@ jobs:
           SCOPE="${{ steps.params.outputs.scope }}"
           SELECTION="${{ steps.params.outputs.selection }}"
           FORCE="${{ github.event.inputs.force_download }}"
-          FILTER="${{ github.event.inputs.filter || 'countyOnly' }}"
+          FILTER="${{ github.event.inputs.filter || 'allRoads' }}"
 
           # Determine download strategy
           RESOLVED=$(python scripts/resolve_scope.py \

@@ -435,7 +435,7 @@ def parse_args():
         epilog=__doc__
     )
     parser.add_argument('--state', '-s', required=True,
-                        choices=['virginia', 'colorado'],
+                        choices=['virginia', 'colorado', 'maryland', 'delaware'],
                         help='State to process')
     parser.add_argument('--input', '-i', type=str,
                         help='Input statewide CSV file')
