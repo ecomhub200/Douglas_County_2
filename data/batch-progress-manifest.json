@@ -1,0 +1,20 @@
+{
+  "_comment": "Batch processing progress tracker",
+  "states": {
+    "virginia": {
+      "runs": [
+        {
+          "timestamp": "2026-03-14T11:18:14.489182+00:00",
+          "scope": "statewide",
+          "selection": "all",
+          "total_records": 1097430,
+          "jurisdiction_count": 133,
+          "r2_key": "virginia/statewide/virginia_statewide_all_roads.csv",
+          "data_changed": true,
+          "workflow_run": "23086842599"
+        }
+      ],
+      "last_updated": "2026-03-14T11:18:14.489172+00:00"
+    }
+  }
+}
