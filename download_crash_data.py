@@ -855,32 +855,85 @@ def main():
             logger.error("Health check FAILED. No working API endpoint found.")
             return 1
 
-    # Get jurisdiction
-    jurisdiction_id = args.jurisdiction or config.get('defaults', {}).get('jurisdiction', 'henrico')
-    jurisdiction_config = get_jurisdiction_config(config, jurisdiction_id)
+    # Get jurisdiction (may be None for statewide-only mode)
+    jurisdiction_id = args.jurisdiction or config.get('defaults', {}).get('jurisdiction') or None
+    statewide_only = args.save_statewide and jurisdiction_id is None
 
-    # Get filter profile
-    filter_id = args.filter or config.get('defaults', {}).get('filterProfile', 'allRoads')
-    filter_profiles = config.get('filterProfiles', {})
-    filter_profile = filter_profiles.get(filter_id, filter_profiles.get('countyOnly', {}))
-
-    # Get output file
-    if args.output:
-        output_file = args.output
-    elif args.output_dir:
-        output_file = os.path.join(args.output_dir, f"{jurisdiction_id}_all_roads.csv")
+    if statewide_only:
+        logger.info("Statewide-only mode: no jurisdiction specified, will save statewide CSV and exit.")
+        jurisdiction_config = None
+        filter_id = args.filter or config.get('defaults', {}).get('filterProfile', 'allRoads')
+        output_file = os.path.join(args.output_dir or OUTPUT_DIR, "virginia_statewide_all_roads.csv")
     else:
-        output_file = os.path.join(OUTPUT_DIR, f"{jurisdiction_id}_all_roads.csv")
+        if jurisdiction_id is None:
+            jurisdiction_id = 'henrico'
+        jurisdiction_config = get_jurisdiction_config(config, jurisdiction_id)
+
+        # Get filter profile
+        filter_id = args.filter or config.get('defaults', {}).get('filterProfile', 'allRoads')
+        filter_profiles = config.get('filterProfiles', {})
+        filter_profile = filter_profiles.get(filter_id, filter_profiles.get('countyOnly', {}))
+
+        # Get output file
+        if args.output:
+            output_file = args.output
+        elif args.output_dir:
+            output_file = os.path.join(args.output_dir, f"{jurisdiction_id}_all_roads.csv")
+        else:
+            output_file = os.path.join(OUTPUT_DIR, f"{jurisdiction_id}_all_roads.csv")
 
     logger.info("=" * 60)
     logger.info(f"Starting crash data download at {datetime.now()}")
-    logger.info(f"Jurisdiction: {jurisdiction_config.get('name', jurisdiction_id)}")
-    logger.info(f"Filter: {filter_profile.get('name', filter_id)}")
+    if statewide_only:
+        logger.info("Mode: Statewide-only (no jurisdiction filtering)")
+    else:
+        logger.info(f"Jurisdiction: {jurisdiction_config.get('name', jurisdiction_id)}")
+    logger.info(f"Filter: {filter_id}")
     logger.info(f"Output: {output_file}")
     logger.info("=" * 60)
 
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_file) or '.', exist_ok=True)
+
+    # Statewide-only mode: download full dataset, save, and exit
+    if statewide_only:
+        try:
+            logger.info("Downloading from Virginia Roads CSV (primary source)...")
+            df = download_from_fallback(config, state='virginia')
+            if df is None or df.empty:
+                logger.error("CSV download returned no data!")
+                sys.exit(1)
+
+            df_statewide = standardize_columns(df.copy())
+
+            # Validate crash-level data
+            required_cols = {'Crash_Severity', 'Crash Severity', 'crash_seve', 'Crash_Year', 'Crash Year', 'crash_year'}
+            has_crash_cols = bool(required_cols & set(df_statewide.columns))
+            if not has_crash_cols:
+                logger.error(f"Downloaded data appears to be driver-level (columns: {list(df_statewide.columns)[:10]}...)")
+                sys.exit(1)
+
+            # Save uncompressed CSV
+            df_statewide.to_csv(output_file, index=False)
+            logger.info(f"Statewide CSV saved: {output_file} ({os.path.getsize(output_file):,} bytes, {len(df_statewide):,} records)")
+
+            # Save gzipped copy
+            import gzip
+            import shutil
+            gz_path = f"{output_file}.gz"
+            with open(output_file, 'rb') as f_in:
+                with gzip.open(gz_path, 'wb', compresslevel=6) as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            compressed_size = os.path.getsize(gz_path)
+            ratio = os.path.getsize(output_file) / compressed_size if compressed_size > 0 else 0
+            logger.info(f"Statewide gzip saved: {gz_path} ({compressed_size:,} bytes, {ratio:.1f}x compression)")
+
+            logger.info("Statewide download complete!")
+            return 0
+
+        except Exception as e:
+            logger.error(f"Statewide download failed: {e}")
+            sys.exit(1)
 
     df = None
     df_filtered = None
