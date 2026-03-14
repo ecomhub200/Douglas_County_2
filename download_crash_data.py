@@ -898,23 +898,43 @@ def main():
                 statewide_path = os.path.join(statewide_dir, "virginia_statewide_all_roads.csv")
                 logger.info(f"Saving statewide dataset ({len(df):,} records) before filtering...")
                 df_statewide = standardize_columns(df.copy())
-                df_statewide.to_csv(statewide_path, index=False)
-                logger.info(f"Statewide CSV saved: {statewide_path} ({os.path.getsize(statewide_path):,} bytes)")
 
-                # Gzip the statewide CSV
-                import gzip
-                import shutil
-                gz_path = f"{statewide_path}.gz"
-                with open(statewide_path, 'rb') as f_in:
-                    with gzip.open(gz_path, 'wb', compresslevel=6) as f_out:
-                        shutil.copyfileobj(f_in, f_out)
-                uncompressed_size = os.path.getsize(statewide_path)
-                compressed_size = os.path.getsize(gz_path)
-                # Keep uncompressed CSV alongside gzip for batch splitting workflows
-                # (split_jurisdictions.py needs the uncompressed CSV to split into
-                # per-jurisdiction files). The batch workflow cleans up after splitting.
-                ratio = uncompressed_size / compressed_size if compressed_size > 0 else 0
-                logger.info(f"Statewide gzip saved: {gz_path} ({compressed_size:,} bytes, {ratio:.1f}x compression)")
+                # Validate that this is crash-level data (not driver-level)
+                required_cols = {'Crash_Severity', 'Crash Severity', 'crash_seve', 'Crash_Year', 'Crash Year', 'crash_year'}
+                has_crash_cols = bool(required_cols & set(df_statewide.columns))
+                if not has_crash_cols:
+                    logger.warning(f"Downloaded data appears to be driver-level (columns: {list(df_statewide.columns)[:10]}...)")
+                    logger.warning("Skipping statewide save — data lacks crash-level columns needed for splitting.")
+                else:
+                    # Validate that jurisdiction columns exist (needed for split_jurisdictions.py)
+                    jurisdiction_cols = {
+                        'Juris_Code', 'Juris Code', 'JURIS_CODE',
+                        'Physical_Juris_Name', 'Physical Juris Name', 'PHYSICAL_JURIS_NAME',
+                        'FIPS', 'County_FIPS', 'COUNTY_FIPS', 'COUNTYFP',
+                        'Jurisdiction', 'JURISDICTION', 'County_City', 'COUNTY_CITY'
+                    }
+                    has_jurisdiction_cols = bool(jurisdiction_cols & set(df_statewide.columns))
+                    if not has_jurisdiction_cols:
+                        logger.warning(f"Downloaded data has NO jurisdiction columns (columns: {list(df_statewide.columns)[:15]}...)")
+                        logger.warning("Skipping statewide save — data cannot be split by jurisdiction without Juris_Code/FIPS/Physical_Juris_Name.")
+                    else:
+                        df_statewide.to_csv(statewide_path, index=False)
+                        logger.info(f"Statewide CSV saved: {statewide_path} ({os.path.getsize(statewide_path):,} bytes)")
+
+                        # Gzip the statewide CSV
+                        import gzip
+                        import shutil
+                        gz_path = f"{statewide_path}.gz"
+                        with open(statewide_path, 'rb') as f_in:
+                            with gzip.open(gz_path, 'wb', compresslevel=6) as f_out:
+                                shutil.copyfileobj(f_in, f_out)
+                        uncompressed_size = os.path.getsize(statewide_path)
+                        compressed_size = os.path.getsize(gz_path)
+                        # Keep uncompressed CSV alongside gzip for batch splitting workflows
+                        # (split_jurisdictions.py needs the uncompressed CSV to split into
+                        # per-jurisdiction files). The batch workflow cleans up after splitting.
+                        ratio = uncompressed_size / compressed_size if compressed_size > 0 else 0
+                        logger.info(f"Statewide gzip saved: {gz_path} ({compressed_size:,} bytes, {ratio:.1f}x compression)")
             except Exception as e:
                 logger.warning(f"Failed to save statewide copy (non-fatal): {e}")
 

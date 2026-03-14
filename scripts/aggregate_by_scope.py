@@ -198,6 +198,9 @@ def main():
         states_found = 0
 
         for state_key, state_info in config.get('states', {}).items():
+            # Skip non-dict entries (e.g., "_comment" keys that are strings)
+            if not isinstance(state_info, dict):
+                continue
             data_dir = state_info.get('dataDir')
             if not data_dir:
                 continue
