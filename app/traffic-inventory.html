@@ -9,6 +9,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="../states/us_counties_db.js"></script>
+    <script src="../states/fips_database.js"></script>
     <style>
         :root{--primary:#1e40af;--primary-light:#3b82f6;--primary-dark:#1e3a8a;--success:#059669;--success-bg:#d1fae5;--warning:#d97706;--warning-bg:#fef3c7;--error:#dc2626;--error-bg:#fee2e2;--bg:#f1f5f9;--card-bg:#fff;--text:#0f172a;--text-muted:#64748b;--border:#cbd5e1;--border-light:#e2e8f0;--mutcd-red:#cf2030;--mutcd-yellow:#f59e0b;--mutcd-green:#059669;--mutcd-school:#84cc16;--mutcd-orange:#ea580c}
         *{margin:0;padding:0;box-sizing:border-box}
@@ -186,11 +188,17 @@
                     </div>
                     <div class="card">
                         <div class="card-header">
-                            <span class="card-title">📍 Jurisdiction</span>
+                            <span class="card-title">📍 Location</span>
                             <span class="badge badge-info" id="tileCount">0 tiles</span>
                         </div>
+                        <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;display:block;">State</label>
+                        <select id="stateSelect" onchange="handleStateChange()">
+                            <option value="">-- Select State --</option>
+                        </select>
+                        <div id="stateLoadingMsg" style="font-size:0.7rem;color:var(--text-muted);padding:0.25rem 0;display:none;"></div>
+                        <label style="font-size:0.75rem;font-weight:600;color:var(--text-muted);margin:0.5rem 0 0.25rem;display:block;">County / Jurisdiction</label>
                         <select id="jurisdiction" onchange="updateJurisdiction()">
-                            <option value="">-- Select --</option>
+                            <option value="">-- Select State First --</option>
                         </select>
                         <div class="jurisdiction-info" id="jurisdictionInfo">
                             <div><strong>Type:</strong> <span id="jurisdictionType">-</span></div>
@@ -877,7 +885,7 @@
                     MAPILLARY_TO_KEY[mv] = key;
                 });
             });
-            initMap();populateJurisdictions();setupEventListeners();loadApiToken();switchSeries('R');initSpeedFilterPanel();loadR2Config();
+            initMap();populateStateDropdown();populateJurisdictions();setupEventListeners();loadApiToken();switchSeries('R');initSpeedFilterPanel();loadR2Config();
 
             // Listen for jurisdiction data and selection sync from parent app
             window.addEventListener('message', function(evt) {
@@ -892,8 +900,9 @@
                     // Rebuild dropdown
                     const sel = document.getElementById('jurisdiction');
                     const curVal = sel.value;
-                    sel.innerHTML = '<option value="">-- Select --</option>';
-                    Object.entries(JURISDICTIONS).forEach(([k, v]) => {
+                    sel.innerHTML = '<option value="">-- Select County --</option>';
+                    const sorted = Object.entries(JURISDICTIONS).sort((a, b) => a[1].name.localeCompare(b[1].name));
+                    sorted.forEach(([k, v]) => {
                         const o = document.createElement('option');
                         o.value = k;
                         o.textContent = v.name;
@@ -901,6 +910,27 @@
                     });
                     // Restore previous selection if still valid
                     if (curVal && JURISDICTIONS[curVal]) sel.value = curVal;
+                    // Auto-detect and select state from parent jurisdictions
+                    const firstJur = Object.values(incoming)[0];
+                    if (firstJur) {
+                        const stateAbbr = firstJur.stateAbbr || firstJur.state || '';
+                        const stateSel = document.getElementById('stateSelect');
+                        if (stateSel && stateAbbr) {
+                            // Try to match by abbreviation or state name
+                            try {
+                                const stateInfo = FIPSDatabase.getStateByAbbr(stateAbbr) || FIPSDatabase.getStateByAbbr(stateAbbr.toUpperCase());
+                                if (stateInfo) {
+                                    stateSel.value = stateInfo.fips;
+                                    const loadMsg = document.getElementById('stateLoadingMsg');
+                                    if (loadMsg) {
+                                        loadMsg.style.display = 'block';
+                                        loadMsg.textContent = `${stateInfo.name}: ${sorted.length} counties (synced from app)`;
+                                        loadMsg.style.color = 'var(--success)';
+                                    }
+                                }
+                            } catch(e) { /* FIPSDatabase may not be loaded */ }
+                        }
+                    }
                     console.log('[TI] Jurisdictions populated from parent:', Object.keys(JURISDICTIONS).length);
                 }
 
@@ -936,6 +966,167 @@
             Object.entries(JURISDICTIONS).forEach(([k,v])=>{const o=document.createElement('option');o.value=k;o.textContent=v.name;sel.appendChild(o);});
         }
 
+        // ========== STATE DROPDOWN FUNCTIONS ==========
+
+        function populateStateDropdown() {
+            const sel = document.getElementById('stateSelect');
+            if (!sel) return;
+            try {
+                const states = FIPSDatabase.getAllStates();
+                states.forEach(st => {
+                    const o = document.createElement('option');
+                    o.value = st.fips;
+                    o.textContent = `${st.name} (${st.abbr})`;
+                    sel.appendChild(o);
+                });
+                // Restore saved state
+                const saved = localStorage.getItem('ti_selected_state');
+                if (saved && sel.querySelector(`option[value="${saved}"]`)) {
+                    sel.value = saved;
+                    handleStateChange();
+                }
+                console.log('[TI] State dropdown populated:', states.length, 'states');
+            } catch(e) {
+                console.warn('[TI] FIPSDatabase not available, state dropdown disabled:', e.message);
+                sel.innerHTML = '<option value="">FIPSDatabase not loaded</option>';
+            }
+        }
+
+        async function handleStateChange() {
+            const sel = document.getElementById('stateSelect');
+            const stateFips = sel.value;
+            const loadMsg = document.getElementById('stateLoadingMsg');
+            const jurSel = document.getElementById('jurisdiction');
+
+            if (!stateFips) {
+                loadMsg.style.display = 'none';
+                jurSel.innerHTML = '<option value="">-- Select State First --</option>';
+                Object.keys(JURISDICTIONS).forEach(k => delete JURISDICTIONS[k]);
+                currentJurisdiction = null;
+                currentJurisdictionKey = null;
+                return;
+            }
+
+            localStorage.setItem('ti_selected_state', stateFips);
+            const stateInfo = FIPSDatabase.getState(stateFips);
+            loadMsg.style.display = 'block';
+            loadMsg.textContent = `Loading counties for ${stateInfo?.name || stateFips}...`;
+            jurSel.innerHTML = '<option value="">Loading...</option>';
+
+            try {
+                await loadCountiesForState(stateFips, stateInfo);
+            } catch(e) {
+                console.error('[TI] Failed to load counties:', e);
+                loadMsg.textContent = 'Error loading counties: ' + e.message;
+                loadMsg.style.color = 'var(--error)';
+                jurSel.innerHTML = '<option value="">-- Error --</option>';
+            }
+        }
+
+        async function loadCountiesForState(stateFips, stateInfo) {
+            const loadMsg = document.getElementById('stateLoadingMsg');
+            const jurSel = document.getElementById('jurisdiction');
+            const stateName = stateInfo?.name || 'Unknown';
+            const stateAbbr = stateInfo?.abbr || '';
+
+            // Get counties from FIPSDatabase (uses embedded USCountiesDB or TIGERweb)
+            const counties = await FIPSDatabase.getCounties(stateFips);
+            if (!counties || Object.keys(counties).length === 0) {
+                loadMsg.textContent = 'No counties found for this state';
+                jurSel.innerHTML = '<option value="">-- No Counties --</option>';
+                return;
+            }
+
+            // Fetch bounding boxes from TIGERweb for each county
+            loadMsg.textContent = `Fetching boundaries for ${Object.keys(counties).length} counties...`;
+            const bboxMap = await fetchCountyBboxes(stateFips);
+
+            // Build JURISDICTIONS from county data
+            Object.keys(JURISDICTIONS).forEach(k => delete JURISDICTIONS[k]);
+
+            for (const [id, county] of Object.entries(counties)) {
+                const countyFips = county.fips || county.stateCountyFips?.slice(2);
+                const fullFips = stateFips + (countyFips || '');
+                const folder = id.replace(/\s+/g, '_').replace(/[^a-z0-9_-]/gi, '').toLowerCase();
+
+                // Use TIGERweb bbox if available, otherwise estimate from centroid
+                let bbox = bboxMap[countyFips] || bboxMap[fullFips] || null;
+                if (!bbox && county.mapCenter) {
+                    // Approximate bbox: ~0.25 degree offset (~17 miles) from centroid
+                    const [lat, lon] = county.mapCenter;
+                    bbox = [lon - 0.25, lat - 0.25, lon + 0.25, lat + 0.25];
+                }
+
+                JURISDICTIONS[id] = {
+                    name: county.name,
+                    type: county.type || 'county',
+                    fips: countyFips || '',
+                    state: stateName.toLowerCase().replace(/\s+/g, '-'),
+                    stateAbbr: stateAbbr,
+                    folder: folder,
+                    bbox: bbox,
+                    mapCenter: county.mapCenter || (stateInfo?.center) || [39.0, -98.0],
+                    mapZoom: county.mapZoom || 10
+                };
+            }
+
+            // Rebuild jurisdiction dropdown sorted alphabetically
+            jurSel.innerHTML = '<option value="">-- Select County --</option>';
+            const sorted = Object.entries(JURISDICTIONS).sort((a, b) => a[1].name.localeCompare(b[1].name));
+            sorted.forEach(([k, v]) => {
+                const o = document.createElement('option');
+                o.value = k;
+                o.textContent = v.name;
+                jurSel.appendChild(o);
+            });
+
+            // Restore saved jurisdiction if still valid
+            const savedJur = localStorage.getItem('ti_selected_jurisdiction');
+            if (savedJur && JURISDICTIONS[savedJur]) {
+                jurSel.value = savedJur;
+                updateJurisdiction();
+            }
+
+            loadMsg.textContent = `${stateName}: ${sorted.length} counties loaded`;
+            loadMsg.style.color = 'var(--success)';
+            console.log(`[TI] Loaded ${sorted.length} counties for ${stateName}`);
+        }
+
+        async function fetchCountyBboxes(stateFips) {
+            const bboxMap = {};
+            try {
+                const url = `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/86/query?`
+                    + `where=STATE='${stateFips}'`
+                    + `&outFields=COUNTY,NAME`
+                    + `&returnGeometry=true&outSR=4326`
+                    + `&maxAllowableOffset=0.01`
+                    + `&f=json`;
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                if (data.features) {
+                    data.features.forEach(feat => {
+                        const countyFips = feat.attributes?.COUNTY;
+                        const geom = feat.geometry;
+                        if (countyFips && geom?.rings) {
+                            let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+                            geom.rings.forEach(ring => ring.forEach(([lon, lat]) => {
+                                if (lon < minLon) minLon = lon;
+                                if (lat < minLat) minLat = lat;
+                                if (lon > maxLon) maxLon = lon;
+                                if (lat > maxLat) maxLat = lat;
+                            }));
+                            bboxMap[countyFips] = [minLon, minLat, maxLon, maxLat];
+                        }
+                    });
+                }
+                console.log(`[TI] Fetched bboxes for ${Object.keys(bboxMap).length} counties from TIGERweb`);
+            } catch(e) {
+                console.warn('[TI] TIGERweb bbox fetch failed, using centroid estimates:', e.message);
+            }
+            return bboxMap;
+        }
+
         function setupEventListeners(){
             document.querySelectorAll('.asset-item input[type="checkbox"]').forEach(cb=>{
                 cb.addEventListener('change',()=>{updateSelectedCount();cb.closest('.asset-item').classList.toggle('selected',cb.checked);});
@@ -965,6 +1156,7 @@
             const v=document.getElementById('jurisdiction').value;
             currentJurisdiction=JURISDICTIONS[v]||null;
             currentJurisdictionKey=v||null;
+            if(v) localStorage.setItem('ti_selected_jurisdiction', v);
             if(currentJurisdiction){
                 const tiles=generateTiles(currentJurisdiction.bbox);
                 document.getElementById('tileCount').textContent=`${tiles.length} tiles`;
