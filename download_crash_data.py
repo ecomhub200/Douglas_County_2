@@ -399,6 +399,27 @@ def download_csv_from_url(url, max_poll_attempts=6, poll_interval_seconds=30):
         if len(df) < 10 or len(df.columns) < 5:
             raise Exception(f"CSV appears empty or malformed ({len(df)} rows, {len(df.columns)} columns)")
 
+        # Validate that critical columns exist for jurisdiction splitting
+        # The bike-specific dataset (101101ce...) passes the basic check above
+        # but lacks jurisdiction columns, causing all 133 jurisdictions to get 0 records
+        cols_lower = {c.lower().replace(' ', '_').replace('-', '_') for c in df.columns}
+        has_jurisdiction = any(kw in cols_lower for kw in [
+            'juris_code', 'physical_juris_name', 'jurisdiction', 'county_city',
+            'juriscode', 'jurisdiction_code', 'jurisdiction_name'
+        ])
+        has_severity = any(kw in cols_lower for kw in [
+            'crash_severity', 'severity', 'crashseverity'
+        ])
+        if not has_jurisdiction:
+            logger.warning(f"CSV from {url} has {len(df)} records but NO jurisdiction columns")
+            logger.warning(f"Columns: {list(df.columns)[:15]}...")
+            raise Exception(
+                f"CSV lacks jurisdiction columns (has {len(df.columns)} cols: {list(df.columns)[:10]}...). "
+                f"This may be a specialized dataset (bike/ped) unsuitable for statewide splitting."
+            )
+        if not has_severity:
+            logger.warning(f"CSV from {url} missing crash severity column — may be wrong dataset")
+
         logger.info(f"Downloaded {len(df)} records from CSV endpoint")
         return df
 
@@ -429,8 +450,8 @@ def download_from_fallback(config, state='virginia'):
             "https://www.virginiaroads.org/api/download/v1/items/1a96a2f31b4f4d77991471b6cabb38ba/csv?layers=0",
             # Full Crash dataset (statewide with all fields)
             "https://www.virginiaroads.org/api/download/v1/items/3bd854bff90d49eaa85bdc68acf952e0/csv?layers=0",
-            # CrashData Details (layer 1)
-            "https://www.virginiaroads.org/api/download/v1/items/101101cecac34f28b38c0846e847bd0b/csv?layers=1",
+            # NOTE: 101101cecac34f28b38c0846e847bd0b (CrashData Details layer 1) was removed
+            # because it returns a bike-specific dataset without jurisdiction columns
         ]
 
     last_error = None
