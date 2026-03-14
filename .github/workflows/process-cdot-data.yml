@@ -338,22 +338,18 @@ jobs:
           echo "Stage 5: PREDICT — Generating forecasts"
           echo "=========================================="
 
-          # Generate forecasts for all 3 road types
+          # Generate forecasts for all 4 road types
           CMD="python scripts/generate_forecast.py --all-road-types --jurisdiction $JURISDICTION --data data/CDOT/${JURISDICTION}_all_roads.csv"
 
-          # If no AWS credentials, fall back to dry-run (synthetic forecasts)
           if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-            echo "No AWS credentials — using dry-run mode (synthetic forecasts)"
-            CMD="$CMD --dry-run"
+            echo "WARNING: No AWS credentials — skipping forecast generation."
+            echo "Run the pipeline with valid AWS credentials to generate real Chronos-2 forecasts."
+          else
+            echo "Running: $CMD"
+            $CMD || {
+              echo "WARNING: Forecast generation failed (non-fatal). Check SageMaker endpoint status."
+            }
           fi
-
-          echo "Running: $CMD"
-          $CMD || {
-            echo "WARNING: Forecast generation failed (non-fatal). Pipeline CSVs are still valid."
-            echo "Falling back to dry-run mode..."
-            python scripts/generate_forecast.py --all-road-types --jurisdiction $JURISDICTION \
-              --data "data/CDOT/${JURISDICTION}_all_roads.csv" --dry-run || true
-          }
 
           # Verify forecast outputs
           for rt in county_roads city_roads no_interstate all_roads; do
@@ -373,6 +369,7 @@ jobs:
           files_json: |
             [
               {"local_path": "data/CDOT/forecasts_county_roads.json", "r2_key": "${{ env.R2_STATE_PREFIX }}/${{ steps.detect.outputs.jurisdiction }}/forecasts_county_roads.json"},
+              {"local_path": "data/CDOT/forecasts_city_roads.json", "r2_key": "${{ env.R2_STATE_PREFIX }}/${{ steps.detect.outputs.jurisdiction }}/forecasts_city_roads.json"},
               {"local_path": "data/CDOT/forecasts_no_interstate.json", "r2_key": "${{ env.R2_STATE_PREFIX }}/${{ steps.detect.outputs.jurisdiction }}/forecasts_no_interstate.json"},
               {"local_path": "data/CDOT/forecasts_all_roads.json", "r2_key": "${{ env.R2_STATE_PREFIX }}/${{ steps.detect.outputs.jurisdiction }}/forecasts_all_roads.json"}
             ]
