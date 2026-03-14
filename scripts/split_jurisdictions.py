@@ -128,14 +128,24 @@ def filter_jurisdiction_virginia(df, jconfig):
 
     mask = pd.Series([False] * len(df), index=df.index)
 
-    # Try Juris Code columns
+    # Try Juris Code columns (includes standardized column names from download_crash_data.py)
     if juris_code:
-        for col in ['Juris_Code', 'JURIS_CODE', 'juris_code', 'Juris Code',
-                     'Jurisdiction Code', 'JURISDICTION_CODE']:
+        for col in ['Juris Code', 'Juris_Code', 'JURIS_CODE', 'juris_code',
+                     'Jurisdiction Code', 'JURISDICTION_CODE', 'JURISCODE']:
             if col in df.columns:
                 code_str = str(juris_code)
                 mask |= df[col].astype(str).str.strip() == code_str
+                # Also try numeric comparison (e.g., "43" vs "43.0")
+                if code_str.isdigit():
+                    mask |= df[col].astype(str).str.strip() == str(int(code_str))
                 break
+        else:
+            # Fuzzy fallback: search any column containing 'juris' and 'code'
+            for col in df.columns:
+                if 'juris' in col.lower() and 'code' in col.lower():
+                    code_str = str(juris_code)
+                    mask |= df[col].astype(str).str.strip() == code_str
+                    break
 
     # Try FIPS columns
     if fips:
@@ -144,9 +154,12 @@ def filter_jurisdiction_virginia(df, jconfig):
                 mask |= df[col].astype(str).str.strip() == str(fips)
                 break
 
-    # Try name patterns
+    # Try name patterns (includes standardized column names from download_crash_data.py)
     if name_patterns:
-        for col in ['JURISDICTION', 'Jurisdiction', 'jurisdiction',
+        for col in ['Physical Juris Name', 'Physical_Juris_Name', 'PHYSICAL_JURIS_NAME',
+                     'Physical_Jurisdiction', 'PHYSICAL_JURISDICTION',
+                     'JURISDICTION', 'Jurisdiction', 'jurisdiction',
+                     'Jurisdiction_Name', 'JURISDICTION_NAME',
                      'County_City', 'COUNTY_CITY', 'county_name']:
             if col in df.columns:
                 for pattern in name_patterns:
@@ -157,6 +170,18 @@ def filter_jurisdiction_virginia(df, jconfig):
                     except re.error:
                         mask |= df[col].astype(str).str.lower() == pattern.lower()
                 break
+        else:
+            # Fuzzy fallback: search any column containing 'juris' and 'name'
+            for col in df.columns:
+                if 'juris' in col.lower() and 'name' in col.lower():
+                    for pattern in name_patterns:
+                        try:
+                            mask |= df[col].astype(str).str.contains(
+                                pattern, case=False, na=False, regex=True
+                            )
+                        except re.error:
+                            mask |= df[col].astype(str).str.lower() == pattern.lower()
+                    break
 
     return df[mask].copy()
 
