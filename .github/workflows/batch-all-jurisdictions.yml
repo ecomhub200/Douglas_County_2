@@ -342,10 +342,9 @@ jobs:
                 STATEWIDE="${GZ%.gz}"
               fi
             fi
-            # 5. Last resort: any CSV in data dir
-            if [ -z "$STATEWIDE" ]; then
-              STATEWIDE=$(find "$DOT_DIR" -maxdepth 1 -name "*.csv" -type f 2>/dev/null | head -1)
-            fi
+            # NOTE: "Last resort: any CSV" fallback was REMOVED — it would pick up
+            # unrelated files like grants.csv or henrico_all_roads.csv and upload them
+            # to R2 as the "statewide" dataset, causing all 133 jurisdiction splits to fail.
           fi
 
           if [ -z "$STATEWIDE" ] || [ ! -f "$STATEWIDE" ]; then
@@ -357,6 +356,16 @@ jobs:
           TOTAL=$(wc -l < "$STATEWIDE" | tr -d ' ')
           SIZE=$(ls -lh "$STATEWIDE" | awk '{print $5}')
           echo "Found statewide CSV: $STATEWIDE ($((TOTAL - 1)) records, $SIZE)"
+
+          # Validate minimum record count — statewide data should have tens of thousands
+          # of records. If it's tiny, the download returned wrong/partial data.
+          MIN_RECORDS=1000
+          if [ "$((TOTAL - 1))" -lt "$MIN_RECORDS" ]; then
+            echo "::error::Statewide CSV has only $((TOTAL - 1)) records (minimum: $MIN_RECORDS)"
+            echo "::error::This likely means the download returned partial or wrong data."
+            echo "::error::Check if the Virginia Roads CSV URLs are working."
+            exit 1
+          fi
           echo "statewide_path=$STATEWIDE" >> $GITHUB_OUTPUT
           echo "data_dir=$DOT_DIR" >> $GITHUB_OUTPUT
 

@@ -885,6 +885,7 @@ def main():
     df = None
     df_filtered = None
     used_api_fallback = False
+    statewide_saved = False
 
     # Try CSV download first (primary source - has complete statewide data)
     try:
@@ -919,6 +920,7 @@ def main():
                         logger.warning("Skipping statewide save — data cannot be split by jurisdiction without Juris_Code/FIPS/Physical_Juris_Name.")
                     else:
                         df_statewide.to_csv(statewide_path, index=False)
+                        statewide_saved = True
                         logger.info(f"Statewide CSV saved: {statewide_path} ({os.path.getsize(statewide_path):,} bytes)")
 
                         # Gzip the statewide CSV
@@ -976,6 +978,16 @@ def main():
 
     if used_api_fallback:
         logger.info(f"Successfully retrieved {len(df)} records using ArcGIS API fallback")
+        # CRITICAL: If --save-statewide was requested but CSV download failed,
+        # the ArcGIS API only returns jurisdiction-specific data (not statewide).
+        # The statewide CSV was NOT saved. Warn loudly so the batch workflow knows.
+        if args.save_statewide and not statewide_saved:
+            logger.error("=" * 60)
+            logger.error("WARNING: --save-statewide was requested but CSV download failed!")
+            logger.error("ArcGIS API fallback only has jurisdiction-specific data.")
+            logger.error("NO statewide CSV was saved. Batch pipeline will NOT work.")
+            logger.error("Fix: Ensure Virginia Roads CSV URLs are accessible.")
+            logger.error("=" * 60)
     else:
         logger.info(f"Successfully retrieved {len(df)} records from CSV source")
 
