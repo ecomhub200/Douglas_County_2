@@ -572,11 +572,14 @@ jobs:
           echo "  Local: $GZ_PATH"
           echo "  R2:    s3://$R2_BUCKET/$R2_KEY"
 
+          LOCAL_SIZE=$(stat -c%s "$GZ_PATH" 2>/dev/null || stat -f%z "$GZ_PATH" 2>/dev/null || echo "0")
+          LOCAL_MB=$((LOCAL_SIZE / 1048576))
+          echo "  Size: ${LOCAL_MB}MB (${LOCAL_SIZE} bytes)"
+
           for i in 1 2 3 4; do
             if aws s3 cp "$GZ_PATH" "s3://$R2_BUCKET/$R2_KEY" \
               --endpoint-url "$R2_ENDPOINT" \
-              --content-type "text/csv" \
-              --content-encoding "gzip" \
+              --content-type "application/gzip" \
               --only-show-errors; then
               echo "Gzip upload succeeded"
               break
@@ -592,7 +595,7 @@ jobs:
             --endpoint-url "$R2_ENDPOINT" \
             --query 'ContentLength' --output text 2>/dev/null || echo "0")
           SIZE_MB=$((SIZE / 1048576))
-          echo "Verified: $R2_KEY (${SIZE_MB}MB on R2)"
+          echo "Verified: $R2_KEY (${SIZE_MB}MB on R2, local was ${LOCAL_MB}MB)"
 
       # ── Progress manifest: record download metadata ──
       - name: "Update progress manifest"
