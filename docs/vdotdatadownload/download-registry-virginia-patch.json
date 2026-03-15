@@ -1,0 +1,21 @@
+{
+  "_comment": "PATCH: Update Virginia entry in states/download-registry.json with these values",
+  "virginia": {
+    "displayName": "Virginia",
+    "dotDir": "data",
+    "script": "download_virginia_crash_data.py",
+    "scriptArgs": "--data-dir data --jurisdiction {defaultJurisdiction}",
+    "statewideFlagArgs": "--gzip",
+    "forceFlag": "--force",
+    "defaultJurisdiction": "henrico",
+    "defaultRegion": "richmond",
+    "defaultMpo": "rvampo",
+    "r2Prefix": "virginia",
+    "tier": 1,
+    "requiresPlaywright": true,
+    "needsStandardization": false,
+    "needsMerge": false,
+    "statewideOutputPattern": "data/virginia_statewide_all_roads.csv",
+    "statewideOutputGzPattern": "data/virginia_statewide_all_roads.csv.gz"
+  }
+}
