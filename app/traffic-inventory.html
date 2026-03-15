@@ -158,6 +158,23 @@
         .download-warning-text span{color:#a16207;font-size:0.75rem;line-height:1.4}
         .download-warning-badge{background:#dc2626;color:#fff;font-size:0.65rem;font-weight:700;padding:0.3rem 0.6rem;border-radius:12px;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;animation:warningPulse 2s ease-in-out infinite}
         @keyframes warningPulse{0%,100%{opacity:1}50%{opacity:0.7}}
+        /* Statewide Download */
+        .statewide-section{margin-top:0.75rem;border-top:2px dashed var(--border-light);padding-top:0.75rem}
+        .statewide-unlock{display:flex;align-items:flex-start;gap:0.5rem;padding:0.6rem;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;cursor:pointer;font-size:0.72rem;line-height:1.4;color:#92400e;transition:all 0.2s}
+        .statewide-unlock:hover{background:#fef3c7}
+        .statewide-unlock input[type="checkbox"]{margin-top:2px;flex-shrink:0;accent-color:#d97706}
+        .statewide-unlock .sw-warn-icon{font-size:1rem;flex-shrink:0}
+        .btn-statewide{background:linear-gradient(135deg,#d97706,#ea580c);color:#fff;border:none;font-weight:600}
+        .btn-statewide:hover:not(:disabled){background:linear-gradient(135deg,#b45309,#dc2626)}
+        .btn-statewide:disabled{opacity:0.4;cursor:not-allowed}
+        .sw-progress{display:none;margin-top:0.75rem}
+        .sw-progress.active{display:block}
+        .sw-jurisdiction-label{font-size:0.8rem;font-weight:600;color:var(--primary);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.4rem}
+        .sw-jurisdiction-bar{height:8px;background:var(--border-light);border-radius:4px;overflow:hidden;margin-bottom:0.4rem}
+        .sw-jurisdiction-fill{height:100%;background:linear-gradient(90deg,#d97706,#ea580c);border-radius:4px;width:0%;transition:width 0.3s}
+        .sw-stats{display:flex;gap:0.5rem;flex-wrap:wrap;font-size:0.72rem;margin-top:0.3rem}
+        .sw-stat{display:flex;align-items:center;gap:0.2rem;padding:0.2rem 0.5rem;background:var(--bg);border-radius:4px;font-weight:500}
+        .sw-stat.ok{color:var(--success)}.sw-stat.fail{color:var(--error)}.sw-stat.total{color:var(--primary)}
     </style>
 </head>
 <body>
@@ -460,6 +477,26 @@
                 <div class="card">
                     <button class="btn btn-success btn-lg btn-block" id="downloadBtn" onclick="startDownload()">⬇️ Start Download</button>
                     <button class="btn btn-ghost btn-block" id="cancelBtn" style="display:none;margin-top:0.4rem" onclick="cancelDownload()">Cancel</button>
+                    <!-- Statewide Download Section -->
+                    <div class="statewide-section">
+                        <label class="statewide-unlock" id="statewideUnlockLabel">
+                            <span class="sw-warn-icon">⚠️</span>
+                            <input type="checkbox" id="statewideUnlock" onchange="toggleStatewideBtn()">
+                            <span>Enable <b>Statewide Download</b> — downloads data for ALL jurisdictions in the selected state. This may take a significantly longer time. Please keep this window/tab open. You can use other tabs meanwhile.</span>
+                        </label>
+                        <button class="btn btn-statewide btn-lg btn-block" id="statewideDownloadBtn" disabled onclick="startStatewideDownload()" style="margin-top:0.5rem">🌍 Statewide Download</button>
+                        <button class="btn btn-ghost btn-block" id="swCancelBtn" style="display:none;margin-top:0.4rem" onclick="cancelStatewideDownload()">Cancel Statewide</button>
+                        <div class="sw-progress" id="swProgress">
+                            <div class="sw-jurisdiction-label" id="swJurLabel">Preparing...</div>
+                            <div class="sw-jurisdiction-bar"><div class="sw-jurisdiction-fill" id="swJurFill"></div></div>
+                            <div class="sw-stats">
+                                <span class="sw-stat ok">✓ <span id="swDoneCount">0</span> done</span>
+                                <span class="sw-stat fail">✗ <span id="swFailCount">0</span> failed</span>
+                                <span class="sw-stat total">📍 <span id="swAssetCount">0</span> assets</span>
+                            </div>
+                            <div class="log-container" id="swLogContainer" style="margin-top:0.5rem"></div>
+                        </div>
+                    </div>
                     <div class="rate-limit-warning" id="rateLimitWarning">⚠️ Rate limit - adding delays...</div>
                     <div class="progress-section" id="progressSection">
                         <div class="progress-header"><span id="progressLabel">Tile 0/0</span><span id="progressPercent">0%</span></div>
@@ -1233,6 +1270,225 @@
         function escapeXML(s){return s?.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')||'';}
         function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
         function showToast(msg,type='info'){const c=document.getElementById('toastContainer');const t=document.createElement('div');t.className=`toast ${type}`;const icons={success:'✓',error:'✗',info:'ℹ',warn:'⚠'};t.innerHTML=`<span>${icons[type]||'ℹ'}</span> ${msg}`;c.appendChild(t);setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},3000);}
+
+        // ================================================================
+        // STATEWIDE DOWNLOAD
+        // ================================================================
+        let isStatewideDownloading = false;
+
+        function toggleStatewideBtn(){
+            const cb = document.getElementById('statewideUnlock');
+            const btn = document.getElementById('statewideDownloadBtn');
+            btn.disabled = !cb.checked;
+        }
+
+        function swLog(msg, type='info'){
+            const el = document.getElementById('swLogContainer');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            el.appendChild(entry);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function updateSwProgress(cur, total, name){
+            const pct = Math.round((cur/total)*100);
+            document.getElementById('swJurLabel').textContent = `Jurisdiction ${cur}/${total}: ${name}`;
+            document.getElementById('swJurFill').style.width = `${pct}%`;
+        }
+
+        async function startStatewideDownload(){
+            if(!apiToken) return showToast('Mapillary token not configured.','error');
+
+            // Collect selected asset types
+            const selected = [];
+            document.querySelectorAll('.asset-item input:checked').forEach(cb => selected.push(cb.value));
+            if(!selected.length) return showToast('Select asset types first','error');
+
+            // Get all jurisdictions for current state
+            const stateJurisdictions = [];
+            const currentState = Object.values(JURISDICTIONS).find(j => j)?.state;
+            if(!currentState){return showToast('No jurisdictions loaded. Select a state first.','error');}
+
+            Object.entries(JURISDICTIONS).forEach(([key, jur]) => {
+                if(jur.state === currentState) stateJurisdictions.push({key, ...jur});
+            });
+
+            if(!stateJurisdictions.length) return showToast('No jurisdictions found for this state','error');
+
+            // Confirm
+            const confirmMsg = `Download inventory data for ALL ${stateJurisdictions.length} jurisdictions in ${currentState}? This may take a long time.`;
+            if(!confirm(confirmMsg)) return;
+
+            // Build object values from selected asset types
+            const objectValues = [];
+            selected.forEach(k => { if(MUTCD_MAPPINGS[k]) objectValues.push(...MUTCD_MAPPINGS[k].mapillary); });
+
+            // Reset UI
+            isStatewideDownloading = true;
+            document.getElementById('statewideDownloadBtn').disabled = true;
+            document.getElementById('statewideDownloadBtn').innerHTML = '<span class="spinner"></span> Downloading...';
+            document.getElementById('swCancelBtn').style.display = 'block';
+            document.getElementById('swProgress').classList.add('active');
+            document.getElementById('swLogContainer').innerHTML = '';
+            document.getElementById('swDoneCount').textContent = '0';
+            document.getElementById('swFailCount').textContent = '0';
+            document.getElementById('swAssetCount').textContent = '0';
+            showDownloadWarning();
+
+            let doneCount = 0, failCount = 0, totalAssets = 0;
+
+            swLog(`Starting statewide download: ${stateJurisdictions.length} jurisdictions, ${objectValues.length} asset classes`, 'info');
+
+            for(let i = 0; i < stateJurisdictions.length && isStatewideDownloading; i++){
+                const jur = stateJurisdictions[i];
+                updateSwProgress(i + 1, stateJurisdictions.length, jur.name);
+                swLog(`[${i+1}/${stateJurisdictions.length}] Starting: ${jur.name}`, 'info');
+
+                try {
+                    // Set current jurisdiction for the download functions
+                    currentJurisdiction = jur;
+                    currentJurisdictionKey = jur.key;
+
+                    // Generate tiles for this jurisdiction
+                    const tiles = generateTiles(jur.bbox);
+
+                    // Download tile by tile (same logic as startDownload)
+                    allFeatures = [];
+                    let tileSuccess = 0, tileErrors = 0;
+
+                    for(let t = 0; t < tiles.length && isStatewideDownloading; t++){
+                        try {
+                            const features = await fetchFeatures(tiles[t], objectValues);
+                            if(features.length) allFeatures.push(...features);
+                            tileSuccess++;
+                            await sleep(100);
+                        } catch(err) {
+                            tileErrors++;
+                            if(err.message.includes('rate')){
+                                swLog(`  Rate limit on ${jur.name} — waiting 30s...`, 'warn');
+                                await sleep(30000);
+                                t--; // retry this tile
+                            } else {
+                                if(tileErrors > 20){
+                                    swLog(`  Too many tile errors for ${jur.name}, skipping`, 'error');
+                                    break;
+                                }
+                                await sleep(500);
+                            }
+                        }
+                    }
+
+                    // Apply boundary filtering if available
+                    if(allFeatures.length > 0){
+                        try {
+                            const stateFips = STATE_FIPS[jur.state];
+                            if(stateFips && jur.fips){
+                                const geo = await fetchTIGERBoundary(stateFips, jur.fips);
+                                if(geo){
+                                    const before = allFeatures.length;
+                                    allFeatures = allFeatures.filter(f => {
+                                        if(!f.geometry || !f.geometry.coordinates) return false;
+                                        const [lng, lat] = f.geometry.coordinates;
+                                        return pointInPolygon(lng, lat, geo);
+                                    });
+                                    const removed = before - allFeatures.length;
+                                    if(removed > 0) swLog(`  Boundary filter: ${removed} outside removed`, 'info');
+                                }
+                            }
+                        } catch(e){ /* boundary filtering optional */ }
+
+                        // Cluster signals
+                        clusterSignals();
+                    }
+
+                    if(allFeatures.length > 0){
+                        // Generate CSV and upload to R2
+                        const csv = generateCSV();
+                        const key = `${jur.state}/${jur.folder}/traffic-inventory.csv`;
+                        try {
+                            const r = await fetch('/api/r2/worker-upload', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({r2Key: key, data: csv, contentType: 'text/csv'})
+                            });
+                            if(!r.ok) throw new Error('HTTP ' + r.status);
+                            swLog(`  ✅ ${jur.name}: ${allFeatures.length} assets uploaded`, 'success');
+                        } catch(e){
+                            swLog(`  ⚠️ ${jur.name}: ${allFeatures.length} found but upload failed: ${e.message}`, 'warn');
+                        }
+                        totalAssets += allFeatures.length;
+                    } else {
+                        swLog(`  ${jur.name}: 0 assets found`, 'info');
+                    }
+
+                    doneCount++;
+                    document.getElementById('swDoneCount').textContent = doneCount;
+                    document.getElementById('swAssetCount').textContent = totalAssets.toLocaleString();
+
+                    // Delay between jurisdictions to avoid rate limiting
+                    if(i < stateJurisdictions.length - 1 && isStatewideDownloading){
+                        await sleep(2000);
+                    }
+
+                } catch(err){
+                    failCount++;
+                    document.getElementById('swFailCount').textContent = failCount;
+                    swLog(`  ❌ ${jur.name}: ${err.message}`, 'error');
+                }
+            }
+
+            // Done
+            isStatewideDownloading = false;
+            hideDownloadWarning();
+            document.getElementById('statewideDownloadBtn').disabled = false;
+            document.getElementById('statewideDownloadBtn').innerHTML = '🌍 Statewide Download';
+            document.getElementById('swCancelBtn').style.display = 'none';
+            document.getElementById('statewideUnlock').checked = false;
+
+            const summary = `Statewide complete: ${doneCount} done, ${failCount} failed, ${totalAssets.toLocaleString()} total assets`;
+            swLog(summary, doneCount > 0 ? 'success' : 'error');
+            showToast(summary, doneCount > 0 ? 'success' : 'error');
+
+            // Trigger server-side statewide consolidation
+            if(doneCount > 0){
+                swLog('Triggering statewide CSV consolidation...', 'info');
+                try {
+                    const jurKeys = stateJurisdictions.map(j => j.folder);
+                    const r = await fetch('/api/r2/consolidate-inventory', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ state: currentState, jurisdictions: jurKeys })
+                    });
+                    if(r.ok){
+                        const result = await r.json();
+                        swLog(`✅ Statewide CSV consolidated: ${result.totalRows?.toLocaleString() || '?'} rows`, 'success');
+                    } else {
+                        swLog('⚠️ Consolidation endpoint returned error: ' + r.status, 'warn');
+                    }
+                } catch(e){
+                    swLog('⚠️ Consolidation request failed: ' + e.message, 'warn');
+                }
+            }
+
+            // Restore jurisdiction dropdown selection
+            const sel = document.getElementById('jurisdiction');
+            if(sel.value && JURISDICTIONS[sel.value]){
+                currentJurisdiction = JURISDICTIONS[sel.value];
+                currentJurisdictionKey = sel.value;
+            }
+        }
+
+        function cancelStatewideDownload(){
+            isStatewideDownloading = false;
+            hideDownloadWarning();
+            document.getElementById('statewideDownloadBtn').disabled = false;
+            document.getElementById('statewideDownloadBtn').innerHTML = '🌍 Statewide Download';
+            document.getElementById('swCancelBtn').style.display = 'none';
+            document.getElementById('statewideUnlock').checked = false;
+            swLog('Statewide download cancelled by user', 'info');
+            showToast('Statewide download cancelled', 'info');
+        }
 
         // Download warning — prevent accidental window close during active download
         function onBeforeUnloadWarning(e){e.preventDefault();e.returnValue='';return '';}

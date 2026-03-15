@@ -1061,7 +1061,10 @@ async function saveEdit(push){
       // Update local ledger with merged result
       ledger=merged;localStorage.setItem('aim3_ledger',JSON.stringify(ledger));
       const r=await fetch('/api/r2/worker-upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({r2Key:getLedgerKey(),data:JSON.stringify(ledger),contentType:'application/json'})});
-      if(r.ok)toast('Pushed '+Object.keys(ledger).length+' edits to server ✅','ok');else toast('Data push failed: '+r.status,'err');
+      if(r.ok){toast('Pushed '+Object.keys(ledger).length+' edits to server ✅','ok');
+        // Fire-and-forget: trigger statewide CSV consolidation
+        try{fetch('/api/r2/consolidate-inventory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:$('stSel').value})}).then(cr=>{if(cr.ok)console.log('[IM] Statewide consolidation triggered');}).catch(()=>{})}catch(e){}
+      }else toast('Data push failed: '+r.status,'err');
     }catch(e){toast('Data error: '+e.message,'err')}}
   updateStats();buildSubFilters();showAll();closeEditPanel();
 }
