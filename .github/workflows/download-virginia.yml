@@ -327,24 +327,22 @@ jobs:
             RECORDS=$(( $(wc -l < "$CSV_PATH") - 1 ))
           fi
 
-          cat >> $GITHUB_STEP_SUMMARY <<'SUMMARY'
-## Virginia Crash Data Download
-SUMMARY
-          cat >> $GITHUB_STEP_SUMMARY <<EOF
-
-| Metric | Value |
-|--------|-------|
-| Scope | $SCOPE |
-| Selection | ${SELECTION:-statewide} |
-| Records | ${RECORDS} |
-| Mode | ${{ steps.download.outputs.download_mode || 'incremental' }} |
-| Method | Playwright (browser-based) |
-| Output | ${CSV_PATH:-N/A} |
-| Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
-
-**Download method:** Playwright Chromium browser simulates real user to bypass
-virginiaroads.org bot-detection (403 Forbidden on programmatic CSV requests).
-EOF
+          {
+            echo '## Virginia Crash Data Download'
+            echo ''
+            echo '| Metric | Value |'
+            echo '|--------|-------|'
+            echo "| Scope | $SCOPE |"
+            echo "| Selection | ${SELECTION:-statewide} |"
+            echo "| Records | ${RECORDS} |"
+            echo "| Mode | ${{ steps.download.outputs.download_mode || 'incremental' }} |"
+            echo '| Method | Playwright (browser-based) |'
+            echo "| Output | ${CSV_PATH:-N/A} |"
+            echo "| Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |"
+            echo ''
+            echo '**Download method:** Playwright Chromium browser simulates real user to bypass'
+            echo 'virginiaroads.org bot-detection (403 Forbidden on programmatic CSV requests).'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # Trigger unified pipeline
   trigger-pipeline:
