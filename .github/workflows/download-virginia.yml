@@ -295,22 +295,23 @@ jobs:
             RECORDS=$(( $(wc -l < "$CSV_PATH") - 1 ))
           fi
 
+          cat >> $GITHUB_STEP_SUMMARY <<'SUMMARY'
+## Virginia Crash Data Download
+SUMMARY
           cat >> $GITHUB_STEP_SUMMARY <<EOF
-          ## Virginia Crash Data Download ($SCOPE)
 
-          | Metric | Value |
-          |--------|-------|
-          | Scope | $SCOPE |
-          | Selection | ${SELECTION:-statewide} |
-          | Records | ${RECORDS} |
-          | Method | Playwright (browser-based) |
-          | Output | ${CSV_PATH:-N/A} |
-          | Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
+| Metric | Value |
+|--------|-------|
+| Scope | $SCOPE |
+| Selection | ${SELECTION:-statewide} |
+| Records | ${RECORDS} |
+| Method | Playwright (browser-based) |
+| Output | ${CSV_PATH:-N/A} |
+| Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
 
-          **Download method:** Playwright Chromium browser simulates real user to bypass
-          virginiaroads.org bot-detection (403 Forbidden on programmatic CSV requests).
-          Falls back to ArcGIS REST API pagination if browser download fails.
-          EOF
+**Download method:** Playwright Chromium browser simulates real user to bypass
+virginiaroads.org bot-detection (403 Forbidden on programmatic CSV requests).
+EOF
 
   # Trigger unified pipeline
   trigger-pipeline:

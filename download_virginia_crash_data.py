@@ -59,7 +59,7 @@ def load_cached_url():
             if url:
                 logger.info(f"  Cached: {url}")
                 return url
-        except:
+        except Exception:
             pass
     return None
 
@@ -69,7 +69,7 @@ def save_cached_url(url):
         CACHE_PATH.write_text(json.dumps({
             'url': url, 'discovered': datetime.now().isoformat(),
         }))
-    except:
+    except Exception:
         pass
 
 
@@ -83,12 +83,13 @@ def browser_fetch_json(page, url, retries=5):
     because the request has the browser's TLS fingerprint, cookies, and headers.
     Returns parsed JSON dict, or None on failure.
     """
+    safe_url = json.dumps(url)  # Properly escape URL for JS string literal
     for attempt in range(retries):
         try:
             result = page.evaluate(f"""
                 async () => {{
                     try {{
-                        const resp = await fetch("{url}");
+                        const resp = await fetch({safe_url});
                         if (!resp.ok) return {{error: 'HTTP ' + resp.status}};
                         const text = await resp.text();
                         return JSON.parse(text);
@@ -229,9 +230,9 @@ def download_with_browser(output_path, headless=True, batch_size=5000):
                             btn.click()
                             page.wait_for_timeout(5000)
                             break
-                        except:
+                        except Exception:
                             continue
-                except:
+                except Exception:
                     pass
 
                 # Extract FeatureServer URL from captured traffic
@@ -331,7 +332,7 @@ def download_with_browser(output_path, headless=True, batch_size=5000):
                 writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
                 writer.writeheader()
 
-                while offset < total_count + batch_size:
+                while offset < total_count:
                     # Progress logging
                     pct = min(100, int(offset / max(total_count, 1) * 100))
                     elapsed = time.time() - start_time
@@ -475,7 +476,8 @@ def validate_csv(path):
         logger.error("  Wrong dataset (driver-level)")
         return False
 
-    rows = sum(1 for _ in open(path, encoding='utf-8-sig')) - 1
+    with open(path, encoding='utf-8-sig') as fh:
+        rows = sum(1 for _ in fh) - 1
     logger.info(f"  CSV: {len(headers)} columns, {rows:,} records")
     logger.info(f"  Columns: {headers[:10]}...")
     return True
@@ -614,7 +616,8 @@ def main():
     if not args.force and os.path.exists(output_path):
         size = os.path.getsize(output_path)
         if size > 10_000_000:
-            rows = sum(1 for _ in open(output_path, encoding='utf-8-sig')) - 1
+            with open(output_path, encoding='utf-8-sig') as fh:
+                rows = sum(1 for _ in fh) - 1
             logger.info(f"Existing: {output_path} ({rows:,} records). Use --force.")
             csv_path = output_path
         else:
