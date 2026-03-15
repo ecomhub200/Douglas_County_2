@@ -541,6 +541,59 @@ jobs:
           echo "r2_data_key=$R2_KEY" >> $GITHUB_OUTPUT
           echo "data_changed=$DATA_CHANGED" >> $GITHUB_OUTPUT
 
+      # ── Step 8b: Upload gzipped statewide CSV to R2 _state/ (matches download-virginia.yml) ──
+      - name: "Upload statewide gzip to R2 (_state/)"
+        id: r2_upload_gzip
+        if: github.event.inputs.dry_run != 'true' && steps.r2_upload.outputs.data_changed != 'false'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+          R2_PREFIX="${{ steps.registry.outputs.r2_prefix }}"
+          CSV_PATH="${{ steps.finalize.outputs.csv_path }}"
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+          R2_KEY="${R2_PREFIX}/_state/statewide_all_roads.csv.gz"
+
+          if [ -z "$CSV_PATH" ] || [ ! -f "$CSV_PATH" ]; then
+            echo "No CSV to gzip — skipping _state/ upload"
+            exit 0
+          fi
+
+          # Gzip the statewide CSV
+          GZ_PATH="${CSV_PATH}.gz"
+          if [ ! -f "$GZ_PATH" ]; then
+            gzip -k "$CSV_PATH"
+          fi
+
+          echo "Uploading gzipped statewide CSV to _state/"
+          echo "  Local: $GZ_PATH"
+          echo "  R2:    s3://$R2_BUCKET/$R2_KEY"
+
+          for i in 1 2 3 4; do
+            if aws s3 cp "$GZ_PATH" "s3://$R2_BUCKET/$R2_KEY" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type "text/csv" \
+              --content-encoding "gzip" \
+              --only-show-errors; then
+              echo "Gzip upload succeeded"
+              break
+            fi
+            DELAY=$((2 ** i))
+            echo "Upload failed (attempt $i/4), retrying in ${DELAY}s..."
+            sleep $DELAY
+          done
+
+          SIZE=$(aws s3api head-object \
+            --bucket "$R2_BUCKET" \
+            --key "$R2_KEY" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --query 'ContentLength' --output text 2>/dev/null || echo "0")
+          SIZE_MB=$((SIZE / 1048576))
+          echo "Verified: $R2_KEY (${SIZE_MB}MB on R2)"
+
       # ── Progress manifest: record download metadata ──
       - name: "Update progress manifest"
         if: github.event.inputs.dry_run != 'true'
