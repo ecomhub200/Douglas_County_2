@@ -753,9 +753,77 @@ def standardize_columns(df):
         'RD_TYPE': 'RoadDeparture Type',
     }
 
+    # Additional column names from newer ArcGIS endpoints
+    column_mapping.update({
+        'LOCAL_CASE_CD': 'Local Case CD',
+        'ROUTE_OR_STREET_NM': 'Route or Street Name',
+        'INTERSECTION_ANALYSIS': 'Intersection Analysis',
+        'ANIMAL': 'Animal Related?',
+    })
+
     # Rename columns that exist
     rename_dict = {k: v for k, v in column_mapping.items() if k in df.columns}
     df = df.rename(columns=rename_dict)
+
+    # ── Decode ArcGIS FeatureServer coded domain values ──
+    # The FeatureServer API returns raw numeric/abbreviated codes instead of
+    # human-readable text (e.g., OWNERSHIP=3 instead of "3. City or Town Hwy Agency").
+    # These mappings are derived from the VDOT ArcGIS service field domains.
+
+    # Ownership codes → text labels
+    if 'Ownership' in df.columns:
+        ownership_map = {
+            '1': '1. State Hwy Agency',
+            '2': '2. County Hwy Agency',
+            '3': '3. City or Town Hwy Agency',
+            '4': '4. Federal Roads',
+            '5': '5. State Toll Authority',
+            '6': '6. Other',
+        }
+        raw = df['Ownership'].astype(str).str.strip()
+        # Only decode if values are numeric codes (not already decoded text)
+        if raw.isin(ownership_map.keys()).any() and not raw.str.contains('Hwy Agency', na=False).any():
+            df['Ownership'] = raw.map(ownership_map).fillna(df['Ownership'])
+
+    # SYSTEM codes → text labels
+    if 'SYSTEM' in df.columns:
+        system_map = {
+            '1': 'Interstate',
+            '2': 'Primary',
+            '3': 'Secondary',
+            '4': 'NonVDOT primary',
+            '5': 'NonVDOT secondary',
+            '6': 'Non-VDOT',
+        }
+        raw = df['SYSTEM'].astype(str).str.strip()
+        if raw.isin(system_map.keys()).any() and not raw.str.contains('VDOT', na=False).any():
+            df['SYSTEM'] = raw.map(system_map).fillna(df['SYSTEM'])
+
+    # Functional Class codes → text labels
+    if 'Functional Class' in df.columns:
+        func_class_map = {
+            'INT': '1-Interstate (A,1)',
+            'OFE': '2-Principal Arterial - Other Freeways and Expressways (B)',
+            'OPA': '3-Principal Arterial - Other (E,2)',
+            'MIA': '4-Minor Arterial (H,3)',
+            'MAC': '5-Major Collector (I,4)',
+            'MIC': '6-Minor Collector (5)',
+            'LOC': '7-Local (J,6)',
+        }
+        raw = df['Functional Class'].astype(str).str.strip()
+        if raw.isin(func_class_map.keys()).any() and not raw.str.contains('Interstate', na=False).any():
+            df['Functional Class'] = raw.map(func_class_map).fillna(df['Functional Class'])
+
+    # Facility Type codes → text labels
+    if 'Facility Type' in df.columns:
+        facility_map = {
+            'TUD': 'Two-Way Undivided',
+            'TDD': 'Two-Way Divided',
+            'OWA': 'One-Way',
+        }
+        raw = df['Facility Type'].astype(str).str.strip()
+        if raw.isin(facility_map.keys()).any() and not raw.str.contains('Way', na=False).any():
+            df['Facility Type'] = raw.map(facility_map).fillna(df['Facility Type'])
 
     return df
 

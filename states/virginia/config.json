@@ -131,21 +131,24 @@
     },
 
     "splitConfig": {
-      "_description": "Config-driven split logic for stage_split in process_crash_data.py",
+      "_description": "Config-driven split logic. includeValues supports both decoded text AND raw ArcGIS numeric codes.",
       "countyRoads": {
         "method": "ownership",
         "column": "Ownership",
-        "includeValues": ["2. County Hwy Agency"]
+        "columnAliases": ["OWNERSHIP"],
+        "includeValues": ["2. County Hwy Agency", "2"]
       },
       "cityRoads": {
         "method": "ownership",
         "column": "Ownership",
-        "includeValues": ["3. City or Town Hwy Agency"]
+        "columnAliases": ["OWNERSHIP"],
+        "includeValues": ["3. City or Town Hwy Agency", "3"]
       },
       "interstateExclusion": {
         "method": "functional_class",
         "column": "Functional Class",
-        "excludeValues": ["1-Interstate (A,1)"]
+        "columnAliases": ["FUN"],
+        "excludeValues": ["1-Interstate (A,1)", "INT"]
       }
     },
 
