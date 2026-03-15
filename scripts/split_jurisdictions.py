@@ -383,6 +383,11 @@ def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
 
         logger.info(f"  Found {len(jdf):,} records")
 
+        # Standardize columns BEFORE road-type filtering so that splitConfig
+        # column names (e.g. "Ownership", "Functional Class") match the DataFrame.
+        if state == 'virginia':
+            jdf = standardize_columns_virginia(jdf)
+
         # For Colorado, strip the co_ prefix for file naming
         file_jid = jid.replace('co_', '') if state == 'colorado' else jid
 
@@ -411,10 +416,6 @@ def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
             if dry_run:
                 logger.info(f"    {suffix}: {len(filtered):,} records (dry-run, not saved)")
             else:
-                # Standardize columns
-                if state == 'virginia':
-                    filtered = standardize_columns_virginia(filtered)
-
                 filtered.to_csv(output_path, index=False)
                 size_mb = os.path.getsize(output_path) / (1024 * 1024)
                 logger.info(f"    {suffix}: {len(filtered):,} records → {output_path.name} ({size_mb:.1f} MB)")
