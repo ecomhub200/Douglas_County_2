@@ -22,9 +22,19 @@
           "r2_key": "virginia/statewide/virginia_statewide_all_roads.csv",
           "data_changed": true,
           "workflow_run": "23087471583"
+        },
+        {
+          "timestamp": "2026-03-15T19:50:21.155104+00:00",
+          "scope": "statewide",
+          "selection": "all",
+          "total_records": 1097423,
+          "jurisdiction_count": 133,
+          "r2_key": "virginia/statewide/virginia_statewide_all_roads.csv",
+          "data_changed": true,
+          "workflow_run": "23117482895"
         }
       ],
-      "last_updated": "2026-03-14T11:59:18.093767+00:00"
+      "last_updated": "2026-03-15T19:50:21.155092+00:00"
     }
   }
 }
