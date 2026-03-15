@@ -1,23 +1,34 @@
 #!/usr/bin/env python3
 """
-CRASH LENS — Virginia Crash Data Downloader (v6)
+CRASH LENS — Virginia Crash Data Downloader (v7)
 
 Downloads CrashData_Basic from virginiaroads.org via ArcGIS FeatureServer.
 ALL API calls are routed through Playwright's browser context to bypass
 VDOT's bot detection (Python requests gets connection-reset).
 
+Supports INCREMENTAL downloads using OBJECTID high-water mark:
+  - Tracks max OBJECTID from previous download in a manifest file
+  - On incremental runs, only fetches records with OBJECTID > last_max
+  - Merges delta into existing statewide CSV, deduplicates by Document Nbr
+  - Auto-detects OBJECTID resets and falls back to full download
+  - Quarterly full refresh recommended to catch edits/deletions
+
 Strategy:
   1. Open browser, navigate to Hub page (establishes session/cookies)
   2. Discover live FeatureServer URL from network traffic
-  3. Paginate ALL records via fetch() inside browser context
+  3. Check manifest for last OBJECTID (incremental) or paginate all (full)
   4. Stream results to CSV on disk
-
-No row limit. Works at any dataset size. Future-proof.
+  5. Merge delta into existing CSV if incremental
 
 Usage:
-    python download_virginia_crash_data.py --data-dir data --jurisdiction henrico --force
-    python download_virginia_crash_data.py --data-dir data --force --batch-size 10000
-    python download_virginia_crash_data.py --data-dir data --headful --force
+    # Incremental (default — fast, only new records):
+    python download_virginia_crash_data.py --data-dir data --jurisdiction henrico
+
+    # Full download (all records — use quarterly or with --force):
+    python download_virginia_crash_data.py --data-dir data --full --jurisdiction henrico
+
+    # Force full re-download:
+    python download_virginia_crash_data.py --data-dir data --force --jurisdiction henrico
 """
 
 import argparse
@@ -49,6 +60,59 @@ KNOWN_FEATURE_SERVERS = [
 ]
 
 CACHE_PATH = SCRIPT_DIR / '.virginia_featureserver_cache.json'
+MANIFEST_FILENAME = 'virginia_download_manifest.json'
+
+# Columns used for deduplication (in priority order)
+DEDUP_PRIMARY_COL = 'DOCUMENT_NBR'  # ArcGIS field name (raw from API)
+DEDUP_FALLBACK_COLS = ['Document_Nbr', 'Document Nbr', 'document_nbr']
+
+
+# ============================================================================
+# Download manifest — tracks OBJECTID high-water mark for incremental mode
+# ============================================================================
+
+def load_manifest(data_dir):
+    """Load the download manifest with last OBJECTID, count, and timestamp."""
+    path = Path(data_dir) / MANIFEST_FILENAME
+    if path.exists():
+        try:
+            data = json.loads(path.read_text())
+            logger.info(f"  Manifest loaded: max_objectid={data.get('max_objectid')}, "
+                        f"total_count={data.get('total_count'):,}, "
+                        f"date={data.get('download_date')}")
+            return data
+        except Exception as e:
+            logger.warning(f"  Manifest load failed: {e}")
+    return None
+
+
+def save_manifest(data_dir, max_objectid, total_count, record_count, mode,
+                  service_url=None, delta_count=0):
+    """Save download manifest after successful download."""
+    path = Path(data_dir) / MANIFEST_FILENAME
+    data = {
+        'max_objectid': max_objectid,
+        'total_count': total_count,
+        'record_count': record_count,
+        'download_date': datetime.now().isoformat(),
+        'download_mode': mode,
+        'delta_count': delta_count,
+        'service_url': service_url or '',
+    }
+    path.write_text(json.dumps(data, indent=2))
+    logger.info(f"  Manifest saved: max_objectid={max_objectid}, total={total_count:,}")
+
+
+def find_doc_nbr_column(fieldnames):
+    """Find the Document Number column name from available fields."""
+    for col in [DEDUP_PRIMARY_COL] + DEDUP_FALLBACK_COLS:
+        if col in fieldnames:
+            return col
+    # Case-insensitive search
+    for col in fieldnames:
+        if 'document' in col.lower() and 'nbr' in col.lower():
+            return col
+    return None
 
 
 def load_cached_url():
@@ -127,13 +191,23 @@ def browser_fetch_json(page, url, retries=5):
 # Main download flow (all inside one browser session)
 # ============================================================================
 
-def download_with_browser(output_path, headless=True, batch_size=5000):
+def download_with_browser(output_path, headless=True, batch_size=5000,
+                          where_clause=None, append_mode=False):
     """
     Single browser session that:
       1. Loads Hub page (establishes session)
       2. Discovers FeatureServer URL
-      3. Paginates all records via browser fetch()
+      3. Paginates records via browser fetch() (all or incremental delta)
       4. Streams to CSV
+
+    Args:
+        where_clause: ArcGIS WHERE filter (e.g. 'OBJECTID > 500000').
+                      None means '1=1' (all records).
+        append_mode: If True, writes CSV without header (for merging later).
+
+    Returns:
+        dict with {success, total_written, max_objectid, total_server_count, service_url}
+        or False on failure.
     """
     try:
         from playwright.sync_api import sync_playwright
@@ -291,7 +365,7 @@ def download_with_browser(output_path, headless=True, batch_size=5000):
                 return False
 
             logger.info(f"  Using: {service_url}")
-            logger.info(f"  Total records: {total_count:,}")
+            logger.info(f"  Total records on server: {total_count:,}")
 
             # ============================================================
             # Step 3: Get field schema
@@ -299,7 +373,7 @@ def download_with_browser(output_path, headless=True, batch_size=5000):
             logger.info("Step 3: Fetching field schema...")
             schema_url = f'{service_url}?f=json'
             schema = browser_fetch_json(page, schema_url)
-            
+
             if not schema or 'fields' not in schema:
                 logger.error("  Could not get field schema")
                 browser.close()
@@ -315,13 +389,32 @@ def download_with_browser(output_path, headless=True, batch_size=5000):
             logger.info(f"  Fields: {', '.join(fieldnames[:10])}...")
 
             # ============================================================
-            # Step 4: Paginate all records via browser fetch()
+            # Step 4: Determine download query (full vs incremental)
             # ============================================================
-            logger.info(f"Step 4: Downloading {total_count:,} records ({batch_size}/batch)...")
+            from urllib.parse import quote
+            effective_where = where_clause or '1=1'
+            encoded_where = quote(effective_where)
+
+            # Get count for the actual query (may differ from total if incremental)
+            if effective_where != '1=1':
+                delta_count_url = f'{service_url}/query?where={encoded_where}&returnCountOnly=true&f=json'
+                delta_data = browser_fetch_json(page, delta_count_url, retries=3)
+                download_count = delta_data.get('count', total_count) if delta_data else total_count
+                logger.info(f"  Incremental query: {effective_where}")
+                logger.info(f"  Delta records to download: {download_count:,}")
+            else:
+                download_count = total_count
+                logger.info(f"  Full download: {download_count:,} records")
+
+            # ============================================================
+            # Step 5: Paginate records via browser fetch()
+            # ============================================================
+            logger.info(f"Step 5: Downloading {download_count:,} records ({batch_size}/batch)...")
 
             temp_path = output_path + '.partial'
             offset = 0
             total_written = 0
+            max_objectid_seen = 0
             start_time = time.time()
             consecutive_errors = 0
             max_consecutive_errors = 10
@@ -330,24 +423,26 @@ def download_with_browser(output_path, headless=True, batch_size=5000):
 
             with open(temp_path, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
-                writer.writeheader()
+                if not append_mode:
+                    writer.writeheader()
 
-                while offset < total_count:
+                while offset < download_count:
                     # Progress logging
-                    pct = min(100, int(offset / max(total_count, 1) * 100))
+                    pct = min(100, int(offset / max(download_count, 1) * 100))
                     elapsed = time.time() - start_time
                     rate = total_written / max(elapsed, 0.1)
-                    eta = (total_count - total_written) / max(rate, 0.1)
+                    remaining = download_count - total_written
+                    eta = remaining / max(rate, 0.1)
 
                     if offset % (batch_size * 5) == 0 or offset == 0:
                         logger.info(
-                            f"  {total_written:,} / {total_count:,} ({pct}%) "
+                            f"  {total_written:,} / {download_count:,} ({pct}%) "
                             f"| {rate:.0f} rec/s | ETA {eta/60:.1f} min"
                         )
 
                     # Build query URL
                     params = (
-                        f'?where=1%3D1'
+                        f'?where={encoded_where}'
                         f'&outFields=*'
                         f'&resultOffset={offset}'
                         f'&resultRecordCount={batch_size}'
@@ -356,7 +451,7 @@ def download_with_browser(output_path, headless=True, batch_size=5000):
                     )
                     if has_geometry:
                         params += '&outSR=4326'
-                    
+
                     fetch_url = query_base + params
 
                     # Fetch via browser
@@ -388,7 +483,7 @@ def download_with_browser(output_path, headless=True, batch_size=5000):
 
                     consecutive_errors = 0
 
-                    # Write batch to CSV
+                    # Write batch to CSV and track max OBJECTID
                     for feat in features:
                         row = feat.get('attributes', {})
                         geom = feat.get('geometry')
@@ -397,6 +492,13 @@ def download_with_browser(output_path, headless=True, batch_size=5000):
                             row['y'] = geom.get('y', '')
                         writer.writerow(row)
                         total_written += 1
+                        # Track highest OBJECTID seen
+                        oid = row.get('OBJECTID') or row.get('objectid') or row.get('FID')
+                        if oid is not None:
+                            try:
+                                max_objectid_seen = max(max_objectid_seen, int(oid))
+                            except (ValueError, TypeError):
+                                pass
 
                     offset += len(features)
                     if len(features) < batch_size:
@@ -407,44 +509,61 @@ def download_with_browser(output_path, headless=True, batch_size=5000):
             elapsed = time.time() - start_time
             logger.info(f"  Downloaded {total_written:,} records in {elapsed/60:.1f} min")
             logger.info(f"  Average: {total_written/max(elapsed,1):.0f} rec/s")
+            logger.info(f"  Max OBJECTID seen: {max_objectid_seen:,}")
 
             if total_written == 0:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
-                return False
+                # Return metadata even for zero-delta (incremental up-to-date)
+                return {
+                    'success': True,
+                    'total_written': 0,
+                    'max_objectid': max_objectid_seen,
+                    'total_server_count': total_count,
+                    'service_url': service_url,
+                }
 
-            if total_written < total_count * 0.95:
+            if effective_where == '1=1' and total_written < total_count * 0.95:
                 logger.warning(
                     f"  Got {total_written:,} of {total_count:,} "
                     f"({total_written/total_count*100:.1f}%)"
                 )
 
             # Replace old file with new one (handles Windows file locks)
-            replaced = False
             if os.path.exists(output_path):
                 for attempt in range(5):
                     try:
                         os.remove(output_path)
-                        replaced = True
                         break
                     except PermissionError:
                         if attempt < 4:
                             logger.info(f"  File locked, retrying in {attempt+1}s (close Excel?)...")
                             time.sleep(attempt + 1)
                         else:
-                            # Last resort: save with timestamp suffix
                             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
                             alt_path = output_path.replace('.csv', f'_{ts}.csv')
                             shutil.move(temp_path, alt_path)
                             size = os.path.getsize(alt_path)
                             logger.warning(f"  Old file locked — saved as: {alt_path} ({size/(1024*1024):.1f} MB)")
-                            logger.info(f"  Close Excel, delete the old file, and rename this one.")
-                            return True
+                            return {
+                                'success': True,
+                                'total_written': total_written,
+                                'max_objectid': max_objectid_seen,
+                                'total_server_count': total_count,
+                                'service_url': service_url,
+                            }
 
             shutil.move(temp_path, output_path)
             size = os.path.getsize(output_path)
             logger.info(f"  Saved: {output_path} ({size/(1024*1024):.1f} MB)")
-            return True
+
+            return {
+                'success': True,
+                'total_written': total_written,
+                'max_objectid': max_objectid_seen,
+                'total_server_count': total_count,
+                'service_url': service_url,
+            }
 
     except Exception as e:
         logger.error(f"  Fatal error: {e}")
@@ -584,14 +703,102 @@ def split_road_types(df, jurisdiction, data_dir):
 
 
 # ============================================================================
+# Merge — append incremental delta to existing CSV
+# ============================================================================
+
+def merge_delta_into_csv(existing_path, delta_path, output_path):
+    """
+    Merge incremental delta CSV into existing statewide CSV.
+    Deduplicates by Document Nbr (keeps the newer version from delta).
+
+    Returns: dict with {total_rows, delta_rows, duplicates_removed}
+    """
+    import pandas as pd
+
+    logger.info("Merging incremental delta into existing CSV...")
+
+    # Load both files
+    existing_df = pd.read_csv(existing_path, dtype=str, low_memory=False)
+    delta_df = pd.read_csv(delta_path, dtype=str, low_memory=False)
+
+    existing_count = len(existing_df)
+    delta_count = len(delta_df)
+    logger.info(f"  Existing: {existing_count:,} records")
+    logger.info(f"  Delta: {delta_count:,} records")
+
+    if delta_count == 0:
+        logger.info("  No new records to merge")
+        return {'total_rows': existing_count, 'delta_rows': 0, 'duplicates_removed': 0}
+
+    # Find Document Number column for deduplication
+    doc_col = find_doc_nbr_column(list(existing_df.columns))
+
+    # Concatenate: delta goes AFTER existing so drop_duplicates(keep='last')
+    # keeps the newer delta version of any duplicated document numbers
+    combined_df = pd.concat([existing_df, delta_df], ignore_index=True)
+
+    duplicates_removed = 0
+    if doc_col and doc_col in combined_df.columns:
+        before_dedup = len(combined_df)
+        # Only deduplicate rows that have a non-empty document number
+        has_doc = combined_df[doc_col].notna() & (combined_df[doc_col] != '') & (combined_df[doc_col] != 'nan')
+        df_with_doc = combined_df[has_doc].drop_duplicates(subset=[doc_col], keep='last')
+        df_without_doc = combined_df[~has_doc]
+        combined_df = pd.concat([df_with_doc, df_without_doc], ignore_index=True)
+        duplicates_removed = before_dedup - len(combined_df)
+        logger.info(f"  Deduplicated by {doc_col}: removed {duplicates_removed:,} duplicates")
+    else:
+        logger.warning("  No Document Nbr column found — skipping deduplication")
+
+    # Write merged result
+    combined_df.to_csv(output_path, index=False)
+    total_rows = len(combined_df)
+    net_new = total_rows - existing_count
+    logger.info(f"  Merged result: {total_rows:,} records ({net_new:+,} net new)")
+
+    return {
+        'total_rows': total_rows,
+        'delta_rows': delta_count,
+        'duplicates_removed': duplicates_removed,
+    }
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
 def main():
-    parser = argparse.ArgumentParser(description='Download Virginia crash data')
+    parser = argparse.ArgumentParser(
+        description='Download Virginia crash data (supports incremental updates)',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Download modes:
+  Default (incremental):  Only downloads new records since last run.
+                          Uses OBJECTID high-water mark from manifest.
+                          ~30 seconds for monthly updates vs ~23 min full.
+
+  --full:                 Downloads ALL records (ignore manifest).
+                          Use quarterly to catch edits/deletions.
+
+  --force:                Same as --full but also overwrites cached data.
+
+Examples:
+  # Monthly incremental (fast — only new records):
+  python download_virginia_crash_data.py --data-dir data --jurisdiction henrico
+
+  # Quarterly full refresh (catches edits/deletions):
+  python download_virginia_crash_data.py --data-dir data --full --jurisdiction henrico
+
+  # Force full re-download:
+  python download_virginia_crash_data.py --data-dir data --force --jurisdiction henrico
+        """
+    )
     parser.add_argument('--data-dir', default='data')
     parser.add_argument('--jurisdiction', default='statewide')
-    parser.add_argument('--force', action='store_true')
+    parser.add_argument('--force', action='store_true',
+                        help='Force full re-download (overwrite everything)')
+    parser.add_argument('--full', action='store_true',
+                        help='Full download (all records, not incremental)')
     parser.add_argument('--gzip', action='store_true')
     parser.add_argument('--headful', action='store_true', help='Show browser window')
     parser.add_argument('--batch-size', type=int, default=5000, help='Records per request')
@@ -601,49 +808,151 @@ def main():
     data_dir.mkdir(parents=True, exist_ok=True)
     jurisdiction = args.jurisdiction.lower().strip()
     headless = not args.headful
+    do_full = args.full or args.force
+
+    output_path = str(data_dir / 'virginia_statewide_all_roads.csv')
+
+    # Determine download mode
+    manifest = load_manifest(data_dir) if not do_full else None
+    existing_csv_exists = os.path.exists(output_path)
+
+    if manifest and existing_csv_exists and not do_full:
+        download_mode = 'incremental'
+    else:
+        download_mode = 'full'
+        if not do_full and not existing_csv_exists:
+            logger.info("No existing CSV found — starting with full download")
+        elif not do_full and not manifest:
+            logger.info("No manifest found — starting with full download")
 
     logger.info("=" * 60)
-    logger.info("  CRASH LENS — Virginia Crash Data Download (v6)")
+    logger.info("  CRASH LENS — Virginia Crash Data Download (v7)")
+    logger.info(f"  Mode: {download_mode.upper()}")
     logger.info(f"  Method: Browser-routed FeatureServer pagination")
     logger.info(f"  Output: {data_dir}")
     logger.info(f"  Jurisdiction: {jurisdiction}")
     logger.info(f"  Batch size: {args.batch_size:,}")
+    if download_mode == 'incremental':
+        logger.info(f"  Last OBJECTID: {manifest['max_objectid']:,}")
+        logger.info(f"  Last download: {manifest.get('download_date', 'unknown')}")
     logger.info(f"  Started: {datetime.now()}")
     logger.info("=" * 60)
 
-    output_path = str(data_dir / 'virginia_statewide_all_roads.csv')
+    csv_path = None
 
-    if not args.force and os.path.exists(output_path):
-        size = os.path.getsize(output_path)
-        if size > 10_000_000:
-            with open(output_path, encoding='utf-8-sig') as fh:
-                rows = sum(1 for _ in fh) - 1
-            logger.info(f"Existing: {output_path} ({rows:,} records). Use --force.")
-            csv_path = output_path
-        else:
-            csv_path = None
-    else:
-        csv_path = None
+    if download_mode == 'incremental':
+        # ── Incremental: download only new records ──
+        last_max = manifest['max_objectid']
+        last_count = manifest.get('total_count', 0)
+        where_clause = f'OBJECTID > {last_max}'
+        delta_path = str(data_dir / 'virginia_delta.csv')
 
-    if csv_path is None:
-        success = download_with_browser(
-            output_path, headless=headless, batch_size=args.batch_size
+        result = download_with_browser(
+            delta_path, headless=headless, batch_size=args.batch_size,
+            where_clause=where_clause
         )
-        if not success:
-            logger.error("Download failed")
-            sys.exit(1)
-        if not validate_csv(output_path):
-            logger.error("CSV validation failed")
-            sys.exit(1)
-        csv_path = output_path
 
-    if args.gzip:
+        if result is False:
+            logger.error("Incremental download failed — falling back to full download")
+            download_mode = 'full'
+            result = None
+        elif isinstance(result, dict):
+            server_count = result.get('total_server_count', 0)
+            delta_written = result.get('total_written', 0)
+
+            # ── OBJECTID reset detection ──
+            # If delta returned 0 records but server has MORE records than
+            # we last saw, the OBJECTIDs were likely reset (dataset republished)
+            if delta_written == 0 and server_count > last_count:
+                logger.warning("=" * 50)
+                logger.warning("  OBJECTID RESET DETECTED!")
+                logger.warning(f"  Server has {server_count:,} records (was {last_count:,})")
+                logger.warning(f"  But 0 records with OBJECTID > {last_max:,}")
+                logger.warning("  Falling back to FULL download")
+                logger.warning("=" * 50)
+                download_mode = 'full'
+                if os.path.exists(delta_path):
+                    os.remove(delta_path)
+            elif delta_written == 0:
+                # Genuinely no new records
+                logger.info("  No new records since last download — dataset is up to date")
+                csv_path = output_path
+                # Update manifest timestamp even if no new data
+                save_manifest(
+                    data_dir,
+                    max_objectid=last_max,
+                    total_count=server_count,
+                    record_count=last_count,
+                    mode='incremental',
+                    service_url=result.get('service_url'),
+                    delta_count=0,
+                )
+            else:
+                # Merge delta into existing CSV
+                logger.info(f"  Downloaded {delta_written:,} new records")
+                merge_result = merge_delta_into_csv(output_path, delta_path, output_path)
+
+                # Update manifest
+                new_max = result.get('max_objectid', last_max)
+                save_manifest(
+                    data_dir,
+                    max_objectid=new_max,
+                    total_count=server_count,
+                    record_count=merge_result['total_rows'],
+                    mode='incremental',
+                    service_url=result.get('service_url'),
+                    delta_count=delta_written,
+                )
+                csv_path = output_path
+
+                # Clean up delta file
+                if os.path.exists(delta_path):
+                    os.remove(delta_path)
+
+                if not validate_csv(output_path):
+                    logger.error("CSV validation failed after merge")
+                    sys.exit(1)
+
+    if download_mode == 'full' and csv_path is None:
+        # ── Full download ──
+        if not args.force and existing_csv_exists:
+            size = os.path.getsize(output_path)
+            if size > 10_000_000 and not args.full:
+                with open(output_path, encoding='utf-8-sig') as fh:
+                    rows = sum(1 for _ in fh) - 1
+                logger.info(f"Existing: {output_path} ({rows:,} records). Use --force or --full.")
+                csv_path = output_path
+
+        if csv_path is None:
+            result = download_with_browser(
+                output_path, headless=headless, batch_size=args.batch_size
+            )
+            if result is False or (isinstance(result, dict) and not result.get('success')):
+                logger.error("Download failed")
+                sys.exit(1)
+            if not validate_csv(output_path):
+                logger.error("CSV validation failed")
+                sys.exit(1)
+            csv_path = output_path
+
+            # Save manifest for future incremental runs
+            if isinstance(result, dict):
+                save_manifest(
+                    data_dir,
+                    max_objectid=result.get('max_objectid', 0),
+                    total_count=result.get('total_server_count', 0),
+                    record_count=result.get('total_written', 0),
+                    mode='full',
+                    service_url=result.get('service_url'),
+                )
+
+    if args.gzip and csv_path:
         gz = csv_path + '.gz'
         with open(csv_path, 'rb') as fi, gzip.open(gz, 'wb') as fo:
             shutil.copyfileobj(fi, fo)
         logger.info(f"Compressed: {os.path.getsize(gz)/(1024*1024):.1f} MB")
 
-    if jurisdiction and jurisdiction != 'statewide':
+    if jurisdiction and jurisdiction != 'statewide' and csv_path:
         import pandas as pd
         jconfig = load_jurisdiction_config(jurisdiction)
         df = pd.read_csv(csv_path, dtype=str, low_memory=False)
@@ -661,7 +970,7 @@ def main():
 
     logger.info("")
     logger.info("=" * 60)
-    logger.info("  DONE")
+    logger.info(f"  DONE ({download_mode} mode)")
     logger.info("=" * 60)
 
 
