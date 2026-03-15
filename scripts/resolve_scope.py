@@ -66,15 +66,40 @@ def county_name_to_key(name):
     return key
 
 
-def build_fips_to_key_map(hierarchy):
-    """Build a mapping from FIPS code to snake_case jurisdiction key.
+def load_config_fips_map():
+    """Build FIPS → config.json jurisdiction key mapping.
 
-    allCounties in hierarchy.json maps FIPS -> display name (string).
+    config.json jurisdiction keys are the source of truth for filenames
+    (e.g., "alexandria" not "alexandria_city"), so we prefer these over
+    hierarchy-derived keys when available.
     """
+    config_path = PROJECT_ROOT / 'config.json'
+    if not config_path.exists():
+        return {}
+    with open(config_path) as f:
+        config = json.load(f)
+    fips_to_config_key = {}
+    for jid, jinfo in config.get('jurisdictions', {}).items():
+        if isinstance(jinfo, dict) and 'fips' in jinfo:
+            fips_to_config_key[jinfo['fips']] = jid
+    return fips_to_config_key
+
+
+def build_fips_to_key_map(hierarchy):
+    """Build a mapping from FIPS code to jurisdiction key.
+
+    Prefers config.json keys (which match actual output filenames) over
+    hierarchy-derived keys. Falls back to hierarchy names for FIPS codes
+    not in config.json.
+    """
+    config_fips_map = load_config_fips_map()
+
     all_counties = hierarchy.get('allCounties', {})
     fips_to_key = {}
     for fips, name in all_counties.items():
-        if isinstance(name, str):
+        if fips in config_fips_map:
+            fips_to_key[fips] = config_fips_map[fips]
+        elif isinstance(name, str):
             fips_to_key[fips] = county_name_to_key(name)
         elif isinstance(name, dict):
             display = name.get('name', name.get('displayName', fips))

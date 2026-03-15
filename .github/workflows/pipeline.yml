@@ -222,11 +222,11 @@ jobs:
           echo "Stage 2: Split by road type (4 CSVs per jurisdiction)"
           echo "=========================================="
 
-          JURIS_LIST=$(echo "$JURISDICTIONS" | python3 -c "import json,sys; print(' '.join(json.load(sys.stdin)))")
-
+          # Use --auto to detect jurisdictions from Stage 1's actual output files
+          # (avoids naming mismatches between config.json keys and hierarchy-derived IDs)
           python scripts/split_road_type.py \
             --state "$STATE" \
-            --jurisdictions $JURIS_LIST \
+            --auto \
             --data-dir "$DATA_DIR" || {
             echo "WARNING: Road-type split had issues (non-fatal)"
           }
