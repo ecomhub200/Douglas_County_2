@@ -35,6 +35,99 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
+# ── ArcGIS FeatureServer raw field name → standard name mapping ──
+# The Playwright-based downloader writes raw API field names (e.g., OWNERSHIP)
+# while our splitConfig expects human-readable names (e.g., Ownership).
+HEADER_ALIASES = {
+    'OWNERSHIP': 'Ownership',
+    'FUN': 'Functional Class',
+    'FAC': 'Facility Type',
+    'SYSTEM': 'SYSTEM',  # already matches
+    'DOCUMENT_NBR': 'Document Nbr',
+    'CRASH_YEAR': 'Crash Year',
+    'CRASH_DT': 'Crash Date',
+    'CRASH_SEVERITY': 'Crash Severity',
+    'CRASH_MILITARY_TM': 'Crash Military Time',
+    'PHYSICAL_JURIS': 'Physical Juris Name',
+    'RTE_NM': 'RTE Name',
+    'COLLISION_TYPE': 'Collision Type',
+    'WEATHER_CONDITION': 'Weather Condition',
+    'LIGHT_CONDITION': 'Light Condition',
+    'AREA_TYPE': 'Area Type',
+}
+
+# ── ArcGIS coded domain values → human-readable text ──
+# Maps numeric/abbreviated codes to the text labels our pipeline expects.
+VALUE_DECODE_MAP = {
+    'Ownership': {
+        '1': '1. State Hwy Agency',
+        '2': '2. County Hwy Agency',
+        '3': '3. City or Town Hwy Agency',
+        '4': '4. Federal Roads',
+        '5': '5. State Toll Authority',
+        '6': '6. Other',
+    },
+    'SYSTEM': {
+        '1': 'Interstate',
+        '2': 'Primary',
+        '3': 'Secondary',
+        '4': 'NonVDOT primary',
+        '5': 'NonVDOT secondary',
+        '6': 'Non-VDOT',
+    },
+    'Functional Class': {
+        'INT': '1-Interstate (A,1)',
+        'OFE': '2-Principal Arterial - Other Freeways and Expressways (B)',
+        'OPA': '3-Principal Arterial - Other (E,2)',
+        'MIA': '4-Minor Arterial (H,3)',
+        'MAC': '5-Major Collector (I,4)',
+        'MIC': '6-Minor Collector (5)',
+        'LOC': '7-Local (J,6)',
+    },
+}
+
+
+def normalize_headers_and_values(headers, rows):
+    """Normalize raw ArcGIS field names and decode coded domain values.
+
+    Handles CSVs from both the old download_crash_data.py (already standardized)
+    and the new download_virginia_crash_data.py (raw API field names + codes).
+    """
+    # Step 1: Rename headers
+    new_headers = [HEADER_ALIASES.get(h, h) for h in headers]
+
+    # Check if decoding is needed (are values already decoded text?)
+    needs_decoding = False
+    col_idx = {h: i for i, h in enumerate(new_headers)}
+    if 'Ownership' in col_idx and len(rows) > 0:
+        sample = rows[0][col_idx['Ownership']].strip()
+        # If the value is a short numeric code, decoding is needed
+        if sample.isdigit() and len(sample) <= 2:
+            needs_decoding = True
+
+    if not needs_decoding:
+        return new_headers, rows
+
+    # Step 2: Decode coded values in-place
+    logger.info("  Decoding raw ArcGIS coded values → text labels")
+    decode_columns = {}
+    for col_name, value_map in VALUE_DECODE_MAP.items():
+        if col_name in col_idx:
+            decode_columns[col_idx[col_name]] = value_map
+
+    if decode_columns:
+        new_rows = []
+        for row in rows:
+            new_row = list(row)
+            for idx, value_map in decode_columns.items():
+                val = new_row[idx].strip()
+                if val in value_map:
+                    new_row[idx] = value_map[val]
+            new_rows.append(new_row)
+        return new_headers, new_rows
+
+    return new_headers, rows
+
 
 def load_state_config(state):
     """Load state-specific config for road system split rules."""
@@ -70,6 +163,18 @@ def get_system_column(headers, split_config):
     return None
 
 
+def _resolve_column(col_idx, config_section, default_col):
+    """Find the actual column name, checking primary name then aliases."""
+    col = config_section.get('column', default_col)
+    if col in col_idx:
+        return col
+    # Try columnAliases from config
+    for alias in config_section.get('columnAliases', []):
+        if alias in col_idx:
+            return alias
+    return None
+
+
 def _filter_by_config(rows, headers, config_section, label):
     """Generic ownership/system/agency filter used by both county and city roads.
 
@@ -84,13 +189,13 @@ def _filter_by_config(rows, headers, config_section, label):
     col_idx = {h: i for i, h in enumerate(headers)}
 
     if method == 'system_column':
-        col = config_section.get('column', 'SYSTEM')
+        col = _resolve_column(col_idx, config_section, 'SYSTEM')
         include_values = config_section.get('includeValues', [])
         if not include_values:
             include_values = ['NonVDOT secondary', 'NONVDOT', 'Non-VDOT']
 
-        if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for {label} filter — returning empty")
+        if col is None:
+            logger.warning(f"  Column not found for {label} filter — returning empty")
             return []
 
         idx = col_idx[col]
@@ -98,9 +203,9 @@ def _filter_by_config(rows, headers, config_section, label):
         return [r for r in rows if r[idx].strip().upper() in include_upper]
 
     elif method == 'agency_id':
-        col = config_section.get('column', '_co_agency_id')
-        if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for agency-based {label} filter — returning empty")
+        col = _resolve_column(col_idx, config_section, '_co_agency_id')
+        if col is None:
+            logger.warning(f"  Column not found for agency-based {label} filter — returning empty")
             return []
 
         idx = col_idx[col]
@@ -115,10 +220,10 @@ def _filter_by_config(rows, headers, config_section, label):
             return rows
 
     elif method == 'ownership':
-        col = config_section.get('column', 'Ownership')
+        col = _resolve_column(col_idx, config_section, 'Ownership')
         include_values = config_section.get('includeValues', [])
-        if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for ownership-based {label} filter — returning empty")
+        if col is None:
+            logger.warning(f"  Column not found for ownership-based {label} filter — returning empty")
             return []
         idx = col_idx[col]
         include_upper = {v.upper() for v in include_values}
@@ -157,30 +262,30 @@ def filter_no_interstate(rows, headers, split_config):
     col_idx = {h: i for i, h in enumerate(headers)}
 
     if method == 'column_value':
-        col = interstate_config.get('column', '_co_system_code')
+        col = _resolve_column(col_idx, interstate_config, '_co_system_code')
         exclude_values = interstate_config.get('excludeValues', [])
-        if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for interstate exclusion")
+        if col is None:
+            logger.warning(f"  Column not found for interstate exclusion")
             return rows
         idx = col_idx[col]
         exclude_upper = {v.upper() for v in exclude_values}
         return [r for r in rows if r[idx].strip().upper() not in exclude_upper]
 
     elif method == 'system_column':
-        col = interstate_config.get('column', 'SYSTEM')
+        col = _resolve_column(col_idx, interstate_config, 'SYSTEM')
         exclude_values = interstate_config.get('excludeValues', ['Interstate'])
-        if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for interstate exclusion")
+        if col is None:
+            logger.warning(f"  Column not found for interstate exclusion")
             return rows
         idx = col_idx[col]
         exclude_upper = {v.upper() for v in exclude_values}
         return [r for r in rows if r[idx].strip().upper() not in exclude_upper]
 
     elif method == 'functional_class':
-        col = interstate_config.get('column', 'Functional Class')
+        col = _resolve_column(col_idx, interstate_config, 'Functional Class')
         exclude_values = interstate_config.get('excludeValues', ['1-Interstate (A,1)'])
-        if col not in col_idx:
-            logger.warning(f"  Column '{col}' not found for functional class interstate exclusion")
+        if col is None:
+            logger.warning(f"  Column not found for functional class interstate exclusion")
             return rows
         idx = col_idx[col]
         exclude_upper = {v.upper() for v in exclude_values}
@@ -204,6 +309,9 @@ def split_jurisdiction(jurisdiction, data_dir, split_config):
         reader = csv.reader(f)
         headers = next(reader)
         all_rows = list(reader)
+
+    # Normalize raw ArcGIS field names and decode coded values if needed
+    headers, all_rows = normalize_headers_and_values(headers, all_rows)
 
     total = len(all_rows)
 
