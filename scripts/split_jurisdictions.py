@@ -254,9 +254,83 @@ def standardize_columns_virginia(df):
         sys.path.insert(0, str(PROJECT_ROOT))
         from download_crash_data import standardize_columns
         return standardize_columns(df)
-    except ImportError:
-        logger.warning("Could not import standardize_columns — skipping standardization")
+    except Exception as e:
+        logger.warning(f"Could not import standardize_columns ({e}) — using built-in normalization")
+        # Built-in fallback: rename raw ArcGIS field names and decode coded values
+        # so that splitConfig column names (Ownership, Functional Class) match.
+        header_aliases = {
+            'OWNERSHIP': 'Ownership',
+            'FUN': 'Functional Class',
+            'FAC': 'Facility Type',
+            'AREA_TYPE': 'Area Type',
+            'PHYSICAL_JURIS': 'Physical Juris Name',
+            'JURIS_CODE': 'Juris Code',
+            'DOCUMENT_NBR': 'Document Nbr',
+            'CRASH_YEAR': 'Crash Year',
+            'CRASH_DT': 'Crash Date',
+            'CRASH_SEVERITY': 'Crash Severity',
+            'CRASH_MILITARY_TM': 'Crash Military Time',
+            'COLLISION_TYPE': 'Collision Type',
+            'WEATHER_CONDITION': 'Weather Condition',
+            'LIGHT_CONDITION': 'Light Condition',
+            'RTE_NM': 'RTE Name',
+        }
+        rename_dict = {k: v for k, v in header_aliases.items() if k in df.columns}
+        if rename_dict:
+            df = df.rename(columns=rename_dict)
+            logger.info(f"  Renamed {len(rename_dict)} raw ArcGIS columns")
+
+        # Decode Ownership codes
+        if 'Ownership' in df.columns:
+            ownership_map = {
+                '1': '1. State Hwy Agency',
+                '2': '2. County Hwy Agency',
+                '3': '3. City or Town Hwy Agency',
+                '4': '4. Federal Roads',
+                '5': '5. State Toll Authority',
+                '6': '6. Other',
+            }
+            raw = df['Ownership'].astype(str).str.strip()
+            if raw.isin(ownership_map.keys()).any() and not raw.str.contains('Hwy Agency', na=False).any():
+                df['Ownership'] = raw.map(ownership_map).fillna(df['Ownership'])
+
+        # Decode SYSTEM codes
+        if 'SYSTEM' in df.columns:
+            system_map = {
+                '1': 'Interstate', '2': 'Primary', '3': 'Secondary',
+                '4': 'NonVDOT primary', '5': 'NonVDOT secondary', '6': 'Non-VDOT',
+            }
+            raw = df['SYSTEM'].astype(str).str.strip()
+            if raw.isin(system_map.keys()).any() and not raw.str.contains('VDOT', na=False).any():
+                df['SYSTEM'] = raw.map(system_map).fillna(df['SYSTEM'])
+
+        # Decode Functional Class codes
+        if 'Functional Class' in df.columns:
+            func_map = {
+                'INT': '1-Interstate (A,1)',
+                'OFE': '2-Principal Arterial - Other Freeways and Expressways (B)',
+                'OPA': '3-Principal Arterial - Other (E,2)',
+                'MIA': '4-Minor Arterial (H,3)',
+                'MAC': '5-Major Collector (I,4)',
+                'MIC': '6-Minor Collector (5)',
+                'LOC': '7-Local (J,6)',
+            }
+            raw = df['Functional Class'].astype(str).str.strip()
+            if raw.isin(func_map.keys()).any() and not raw.str.contains('Interstate', na=False).any():
+                df['Functional Class'] = raw.map(func_map).fillna(df['Functional Class'])
+
         return df
+
+
+def _resolve_column_pd(df, config_section, default_col):
+    """Find the actual column name in a DataFrame, checking primary name then aliases."""
+    col = config_section.get('column', default_col)
+    if col in df.columns:
+        return col
+    for alias in config_section.get('columnAliases', []):
+        if alias in df.columns:
+            return alias
+    return None
 
 
 def _apply_split_config_filter(df, suffix, split_config):
@@ -264,16 +338,11 @@ def _apply_split_config_filter(df, suffix, split_config):
     if suffix == 'county_roads':
         county_config = split_config.get('countyRoads', {})
         method = county_config.get('method', 'system_column')
-        col = county_config.get('column', 'SYSTEM')
-        if col not in df.columns:
-            logger.warning(f"  Column '{col}' not found for county roads filter (method={method}) — returning empty")
+        col = _resolve_column_pd(df, county_config, 'SYSTEM')
+        if col is None:
+            logger.warning(f"  Column not found for county roads filter (method={method}) — returning empty")
             return df.iloc[0:0].copy()
-        if method == 'ownership':
-            include_values = county_config.get('includeValues', [])
-            include_upper = {v.upper() for v in include_values}
-            mask = df[col].astype(str).str.strip().str.upper().isin(include_upper)
-            return df[mask].copy()
-        elif method in ('system_column', 'column_value'):
+        if method in ('ownership', 'system_column', 'column_value'):
             include_values = county_config.get('includeValues', [])
             include_upper = {v.upper() for v in include_values}
             mask = df[col].astype(str).str.strip().str.upper().isin(include_upper)
@@ -291,16 +360,11 @@ def _apply_split_config_filter(df, suffix, split_config):
         if not city_config:
             return df.iloc[0:0].copy()  # Empty DataFrame — no cityRoads config
         method = city_config.get('method', 'ownership')
-        col = city_config.get('column', 'Ownership')
-        if col not in df.columns:
-            logger.warning(f"  Column '{col}' not found for city roads filter (method={method}) — returning empty")
+        col = _resolve_column_pd(df, city_config, 'Ownership')
+        if col is None:
+            logger.warning(f"  Column not found for city roads filter (method={method}) — returning empty")
             return df.iloc[0:0].copy()
-        if method == 'ownership':
-            include_values = city_config.get('includeValues', [])
-            include_upper = {v.upper() for v in include_values}
-            mask = df[col].astype(str).str.strip().str.upper().isin(include_upper)
-            return df[mask].copy()
-        elif method in ('system_column', 'column_value'):
+        if method in ('ownership', 'system_column', 'column_value'):
             include_values = city_config.get('includeValues', [])
             include_upper = {v.upper() for v in include_values}
             mask = df[col].astype(str).str.strip().str.upper().isin(include_upper)
@@ -316,9 +380,9 @@ def _apply_split_config_filter(df, suffix, split_config):
     elif suffix == 'no_interstate':
         interstate_config = split_config.get('interstateExclusion', {})
         method = interstate_config.get('method', 'system_column')
-        col = interstate_config.get('column', 'SYSTEM')
-        if col not in df.columns:
-            logger.warning(f"  Column '{col}' not found for interstate exclusion (method={method}) — returning empty")
+        col = _resolve_column_pd(df, interstate_config, 'SYSTEM')
+        if col is None:
+            logger.warning(f"  Column not found for interstate exclusion (method={method}) — returning empty")
             return df.iloc[0:0].copy()
         exclude_values = interstate_config.get('excludeValues', [])
         exclude_upper = {v.upper() for v in exclude_values}
