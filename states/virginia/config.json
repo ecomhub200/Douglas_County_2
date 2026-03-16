@@ -98,11 +98,11 @@
         "isInterstate": false,
         "displayName": "NonVDOT Secondary"
       },
-      "NONVDOT": {
+      "NonVDOT primary": {
         "category": "local",
         "isStateDOT": false,
         "isInterstate": false,
-        "displayName": "NonVDOT"
+        "displayName": "NonVDOT Primary"
       },
       "Non-VDOT": {
         "category": "local",
@@ -110,23 +110,23 @@
         "isInterstate": false,
         "displayName": "Non-VDOT"
       },
-      "Primary": {
+      "VDOT Primary": {
         "category": "state",
         "isStateDOT": true,
         "isInterstate": false,
         "displayName": "VDOT Primary"
       },
-      "Secondary": {
+      "VDOT Secondary": {
         "category": "state",
         "isStateDOT": true,
         "isInterstate": false,
         "displayName": "VDOT Secondary"
       },
-      "Interstate": {
+      "VDOT Interstate": {
         "category": "interstate",
         "isStateDOT": true,
         "isInterstate": true,
-        "displayName": "Interstate"
+        "displayName": "VDOT Interstate"
       }
     },
 
@@ -156,7 +156,7 @@
       "countyOnly": {
         "name": "County Roads Only",
         "description": "County-maintained roads only (County Hwy Agency)",
-        "systemValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT"]
+        "systemValues": ["NonVDOT secondary", "NonVDOT primary", "Non-VDOT"]
       },
       "cityOnly": {
         "name": "City Roads Only",
@@ -166,13 +166,13 @@
       "countyPlusVDOT": {
         "name": "All Roads (No Interstate)",
         "description": "Local roads plus VDOT primary/secondary, excluding interstates",
-        "systemValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT", "Primary", "Secondary"],
+        "systemValues": ["NonVDOT secondary", "NonVDOT primary", "Non-VDOT", "VDOT Primary", "VDOT Secondary"],
         "excludeRoutePatterns": ["^I-\\d+"]
       },
       "allRoads": {
         "name": "All Roads (Including Interstate)",
         "description": "All road types including interstates",
-        "systemValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT", "Primary", "Secondary", "Interstate"]
+        "systemValues": ["NonVDOT secondary", "NonVDOT primary", "Non-VDOT", "VDOT Primary", "VDOT Secondary", "VDOT Interstate"]
       }
     }
   },

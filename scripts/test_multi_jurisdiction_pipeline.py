@@ -102,7 +102,7 @@ def generate_va_statewide_csv(output_path, jurisdictions, records_per=50):
     }
 
     severities = ['K', 'A', 'B', 'C', 'O']
-    systems = ['NonVDOT secondary', 'Primary', 'Secondary', 'Interstate']
+    systems = ['NonVDOT secondary', 'VDOT Primary', 'VDOT Secondary', 'VDOT Interstate']
     collisions = ['Rear End', 'Angle', 'Sideswipe - Same', 'Head On', 'Fixed Object']
 
     with open(output_path, 'w', newline='') as f:
@@ -117,7 +117,7 @@ def generate_va_statewide_csv(output_path, jurisdictions, records_per=50):
             for i in range(records_per):
                 doc_id += 1
                 system = random.choice(systems)
-                route = f"{'I-' if system == 'Interstate' else 'US-'}{random.randint(1, 95)}"
+                route = f"{'I-' if system == 'VDOT Interstate' else 'US-'}{random.randint(1, 95)}"
                 writer.writerow([
                     f'VA{doc_id}',
                     f'2024-{random.randint(1,12):02d}-{random.randint(1,28):02d}',

@@ -287,8 +287,8 @@ def standardize_columns_virginia(df):
                 '2': '2. County Hwy Agency',
                 '3': '3. City or Town Hwy Agency',
                 '4': '4. Federal Roads',
-                '5': '5. State Toll Authority',
-                '6': '6. Other',
+                '5': '5. Toll Roads Maintained by Others',
+                '6': '6. Private/Unknown Roads',
             }
             raw = df['Ownership'].astype(str).str.strip()
             if raw.isin(ownership_map.keys()).any() and not raw.str.contains('Hwy Agency', na=False).any():
@@ -297,7 +297,7 @@ def standardize_columns_virginia(df):
         # Decode SYSTEM codes
         if 'SYSTEM' in df.columns:
             system_map = {
-                '1': 'Interstate', '2': 'Primary', '3': 'Secondary',
+                '1': 'VDOT Interstate', '2': 'VDOT Primary', '3': 'VDOT Secondary',
                 '4': 'NonVDOT primary', '5': 'NonVDOT secondary', '6': 'Non-VDOT',
             }
             raw = df['SYSTEM'].astype(str).str.strip()
