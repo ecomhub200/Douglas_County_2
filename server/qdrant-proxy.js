@@ -930,6 +930,284 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // ---- R2 Inventory Consolidation: Merge jurisdiction CSVs into statewide file ----
+    if (req.url.startsWith('/r2/consolidate-inventory') && req.method === 'POST') {
+        if (!R2_WORKER_URL || !R2_WORKER_SECRET) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({ error: 'R2 Worker not configured' }));
+            return;
+        }
+
+        collectBody(req).then(async body => {
+            let payload;
+            try { payload = JSON.parse(body); } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { state, jurisdictions } = payload;
+            if (!state) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Missing required field: state' }));
+                return;
+            }
+
+            console.log(`[Inventory Consolidation] Starting for state: ${state}, jurisdictions: ${jurisdictions?.length || 'auto-detect'}`);
+
+            const R2_PUBLIC = 'https://data.aicreatesai.com';
+
+            // Helper: fetch a file from R2 public URL
+            function fetchR2File(key) {
+                return new Promise((resolve, reject) => {
+                    const fileUrl = `${R2_PUBLIC}/${key}`;
+                    https.get(fileUrl, (resp) => {
+                        if (resp.statusCode === 404) { resolve(null); return; }
+                        if (resp.statusCode !== 200) { reject(new Error(`HTTP ${resp.statusCode} for ${key}`)); return; }
+                        let data = '';
+                        resp.on('data', chunk => { data += chunk; });
+                        resp.on('end', () => resolve(data));
+                    }).on('error', err => reject(err));
+                });
+            }
+
+            // Helper: upload to R2 via Worker
+            function uploadR2File(key, content, contentType) {
+                return new Promise((resolve, reject) => {
+                    const uploadUrl = `${R2_WORKER_URL.replace(/\/+$/, '')}/${key}`;
+                    const parsedUrl = new URL(uploadUrl);
+                    const options = {
+                        hostname: parsedUrl.hostname,
+                        port: 443,
+                        path: parsedUrl.pathname + parsedUrl.search,
+                        method: 'PUT',
+                        headers: {
+                            'X-Upload-Secret': R2_WORKER_SECRET,
+                            'Content-Type': contentType,
+                            'Content-Length': Buffer.byteLength(content)
+                        }
+                    };
+                    const workerReq = https.request(options, (workerRes) => {
+                        let responseData = '';
+                        workerRes.on('data', chunk => { responseData += chunk; });
+                        workerRes.on('end', () => {
+                            if (workerRes.statusCode >= 200 && workerRes.statusCode < 300) resolve(responseData);
+                            else reject(new Error(`Upload failed: HTTP ${workerRes.statusCode}`));
+                        });
+                    });
+                    workerReq.on('error', err => reject(err));
+                    workerReq.write(content);
+                    workerReq.end();
+                });
+            }
+
+            // Helper: parse CSV text into array of objects
+            function parseCSV(text) {
+                const lines = text.split('\n').filter(l => l.trim());
+                if (lines.length < 2) return { headers: [], rows: [] };
+                const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                const rows = [];
+                for (let i = 1; i < lines.length; i++) {
+                    // Handle quoted fields
+                    const vals = [];
+                    let current = '';
+                    let inQuotes = false;
+                    for (let c = 0; c < lines[i].length; c++) {
+                        const ch = lines[i][c];
+                        if (ch === '"') { inQuotes = !inQuotes; }
+                        else if (ch === ',' && !inQuotes) { vals.push(current.trim()); current = ''; }
+                        else { current += ch; }
+                    }
+                    vals.push(current.trim());
+                    if (vals.length >= headers.length) rows.push(vals);
+                }
+                return { headers, rows };
+            }
+
+            // Helper: apply ledger edits to parsed rows
+            function applyLedger(headers, rows, ledger) {
+                if (!ledger || typeof ledger !== 'object') return rows;
+                const idIdx = headers.indexOf('id');
+                if (idIdx === -1) return rows;
+
+                // Column indices for editable fields
+                const colMap = {};
+                ['mutcd', 'name', 'class', 'speed', 'lat', 'lon', 'first_seen', 'signal_heads', 'condition'].forEach(col => {
+                    const idx = headers.indexOf(col);
+                    if (idx !== -1) colMap[col] = idx;
+                });
+
+                const existingIds = new Set();
+                rows.forEach(row => {
+                    const id = row[idIdx];
+                    existingIds.add(id);
+                    const edit = ledger[id];
+                    if (!edit) return;
+                    if (edit.mutcd && colMap.mutcd !== undefined) row[colMap.mutcd] = edit.mutcd;
+                    if (edit.name && colMap.name !== undefined) row[colMap.name] = edit.name;
+                    if (edit.class_val && colMap.class !== undefined) row[colMap.class] = edit.class_val;
+                    if (edit.speed && colMap.speed !== undefined) row[colMap.speed] = edit.speed;
+                    if (edit.lat && colMap.lat !== undefined) row[colMap.lat] = edit.lat;
+                    if (edit.lon && colMap.lon !== undefined) row[colMap.lon] = edit.lon;
+                    if (edit.first_seen && colMap.first_seen !== undefined) row[colMap.first_seen] = edit.first_seen;
+                    if (edit.signal_heads && colMap.signal_heads !== undefined) row[colMap.signal_heads] = edit.signal_heads;
+                    if (edit.condition && colMap.condition !== undefined) row[colMap.condition] = edit.condition;
+                });
+
+                // Add new assets from ledger
+                Object.entries(ledger).forEach(([id, edit]) => {
+                    if (existingIds.has(id) || !edit._isNew) return;
+                    const newRow = new Array(headers.length).fill('');
+                    newRow[idIdx] = id;
+                    if (edit.mutcd && colMap.mutcd !== undefined) newRow[colMap.mutcd] = edit.mutcd;
+                    if (edit.name && colMap.name !== undefined) newRow[colMap.name] = edit.name || 'New Asset';
+                    if (edit.class_val && colMap.class !== undefined) newRow[colMap.class] = edit.class_val;
+                    if (edit.speed && colMap.speed !== undefined) newRow[colMap.speed] = edit.speed;
+                    if (edit.lat && colMap.lat !== undefined) newRow[colMap.lat] = edit.lat;
+                    if (edit.lon && colMap.lon !== undefined) newRow[colMap.lon] = edit.lon;
+                    if (edit.first_seen && colMap.first_seen !== undefined) newRow[colMap.first_seen] = edit.first_seen;
+                    if (edit.signal_heads && colMap.signal_heads !== undefined) newRow[colMap.signal_heads] = edit.signal_heads;
+                    if (edit.condition && colMap.condition !== undefined) newRow[colMap.condition] = edit.condition;
+                    rows.push(newRow);
+                });
+
+                return rows;
+            }
+
+            try {
+                // Determine jurisdiction list
+                let jurList = jurisdictions;
+                if (!jurList || !jurList.length) {
+                    // Auto-detect: list R2 files under state/
+                    const listUrl = `${R2_WORKER_URL.replace(/\/+$/, '')}/?list=1&prefix=${encodeURIComponent(state + '/')}`;
+                    const listData = await new Promise((resolve, reject) => {
+                        https.get(listUrl, { headers: { 'X-Upload-Secret': R2_WORKER_SECRET } }, (resp) => {
+                            let data = '';
+                            resp.on('data', chunk => { data += chunk; });
+                            resp.on('end', () => {
+                                try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
+                            });
+                        }).on('error', reject);
+                    });
+
+                    // Extract jurisdiction folders that have traffic-inventory.csv
+                    const jurSet = new Set();
+                    if (listData.files) {
+                        listData.files.forEach(f => {
+                            const key = f.key || f;
+                            const match = key.match(new RegExp(`^${state}/([^/]+)/traffic-inventory\\.csv$`));
+                            if (match && match[1] !== '_statewide') jurSet.add(match[1]);
+                        });
+                    }
+                    jurList = [...jurSet];
+                }
+
+                if (!jurList.length) {
+                    res.writeHead(404, corsHeaders);
+                    res.end(JSON.stringify({ error: 'No jurisdiction inventory files found' }));
+                    return;
+                }
+
+                console.log(`[Inventory Consolidation] Processing ${jurList.length} jurisdictions`);
+
+                let mergedHeaders = null;
+                const allRows = [];
+                const seenIds = new Set();
+                let processed = 0, skipped = 0;
+
+                for (const jur of jurList) {
+                    const csvKey = `${state}/${jur}/traffic-inventory.csv`;
+                    const ledgerKey = `${state}/${jur}/traffic-inventory-edits.json`;
+
+                    try {
+                        const csvText = await fetchR2File(csvKey);
+                        if (!csvText) { skipped++; continue; }
+
+                        const { headers, rows } = parseCSV(csvText);
+                        if (!headers.length) { skipped++; continue; }
+
+                        // Load and apply ledger
+                        let ledger = null;
+                        try {
+                            const ledgerText = await fetchR2File(ledgerKey);
+                            if (ledgerText) ledger = JSON.parse(ledgerText);
+                        } catch (e) { /* ledger optional */ }
+
+                        const editedRows = applyLedger(headers, rows, ledger);
+
+                        // Set up merged headers (add jurisdiction column)
+                        if (!mergedHeaders) {
+                            mergedHeaders = [...headers];
+                            if (!mergedHeaders.includes('jurisdiction')) mergedHeaders.push('jurisdiction');
+                        }
+
+                        const jurIdx = mergedHeaders.indexOf('jurisdiction');
+                        const idIdx = headers.indexOf('id');
+
+                        editedRows.forEach(row => {
+                            // Deduplicate by id
+                            const id = idIdx !== -1 ? row[idIdx] : null;
+                            if (id && seenIds.has(id)) return;
+                            if (id) seenIds.add(id);
+
+                            // Pad row to match merged headers length and add jurisdiction
+                            while (row.length < mergedHeaders.length) row.push('');
+                            if (jurIdx !== -1) row[jurIdx] = jur;
+                            allRows.push(row);
+                        });
+
+                        processed++;
+                    } catch (e) {
+                        console.error(`[Inventory Consolidation] Error processing ${jur}: ${e.message}`);
+                        skipped++;
+                    }
+                }
+
+                if (!mergedHeaders || !allRows.length) {
+                    res.writeHead(200, corsHeaders);
+                    res.end(JSON.stringify({ success: true, totalRows: 0, processed: 0, skipped: jurList.length, message: 'No data to consolidate' }));
+                    return;
+                }
+
+                // Build merged CSV
+                const quotedHeaders = mergedHeaders.map(h => `"${h}"`).join(',');
+                const csvLines = [quotedHeaders];
+                allRows.forEach(row => {
+                    csvLines.push(row.map(v => {
+                        const s = String(v || '');
+                        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+                    }).join(','));
+                });
+                const mergedCSV = csvLines.join('\n');
+
+                // Upload statewide file
+                const statewideKey = `${state}/_statewide/traffic-inventory.csv`;
+                await uploadR2File(statewideKey, mergedCSV, 'text/csv');
+
+                console.log(`[Inventory Consolidation] Complete: ${allRows.length} rows from ${processed} jurisdictions, ${skipped} skipped`);
+
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({
+                    success: true,
+                    totalRows: allRows.length,
+                    processed,
+                    skipped,
+                    statewideKey,
+                    sizeBytes: Buffer.byteLength(mergedCSV)
+                }));
+
+            } catch (err) {
+                console.error(`[Inventory Consolidation] Fatal error: ${err.message}`);
+                res.writeHead(500, corsHeaders);
+                res.end(JSON.stringify({ error: 'Consolidation failed', message: err.message }));
+            }
+        }).catch(err => {
+            res.writeHead(400, corsHeaders);
+            res.end(JSON.stringify({ error: 'Bad request', message: err.message }));
+        });
+        return;
+    }
+
     // ---- Subscriber Management: Save subscribers to R2 ----
     if (req.url === '/subscribers/save' && req.method === 'POST') {
         if (!R2_WORKER_URL || !R2_WORKER_SECRET) {
