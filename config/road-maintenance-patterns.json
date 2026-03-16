@@ -1,0 +1,102 @@
+{
+  "_version": "1.0",
+  "_description": "Road maintenance responsibility patterns by state. Used to set intelligent default road type filters when a user selects a jurisdiction. Based on FHWA Highway Statistics, state DOT documentation, and Byrd Road Act (VA), NCDOT system (NC), etc.",
+  "_sources": [
+    "FHWA Highway Statistics Series (HM-10)",
+    "Virginia Byrd Road Act of 1932",
+    "NCDOT State-Maintained Roads",
+    "WV Division of Highways",
+    "DelDOT Road Ownership (89% state-maintained)",
+    "SCDOT State Highway System"
+  ],
+
+  "patterns": {
+    "state_maintained": {
+      "description": "State DOT maintains most secondary/local roads (53-89%). Counties have little/no road responsibility.",
+      "countyDefault": "countyPlusVDOT",
+      "cityDefault": "cityOnly",
+      "states": ["VA", "NC", "WV", "DE", "SC"]
+    },
+    "county_maintained": {
+      "description": "Counties maintain their own local road networks. State DOT only handles highways/interstates. This is the dominant national pattern (~35 states).",
+      "countyDefault": "countyOnly",
+      "cityDefault": "cityOnly",
+      "states": [
+        "AL", "AZ", "AR", "CA", "CO", "FL", "GA", "HI", "ID", "IL",
+        "IN", "IA", "KS", "KY", "LA", "MI", "MN", "MS", "MO", "MT",
+        "NE", "NV", "NJ", "NM", "NY", "ND", "OH", "OK", "OR", "PA",
+        "SD", "TN", "TX", "UT", "WA", "WI", "WY"
+      ]
+    },
+    "town_maintained": {
+      "description": "Towns/townships are the primary road-maintaining entity (New England model). County government abolished or vestigial.",
+      "countyDefault": "countyPlusVDOT",
+      "cityDefault": "cityOnly",
+      "states": ["CT", "MA", "ME", "NH", "RI", "VT"]
+    },
+    "mixed": {
+      "description": "Varies significantly by jurisdiction within the state. Requires per-jurisdiction overrides.",
+      "countyDefault": "countyOnly",
+      "cityDefault": "cityOnly",
+      "states": ["AK", "MD"]
+    },
+    "single_entity": {
+      "description": "Single jurisdiction with no county/city distinction. All roads maintained by one entity.",
+      "countyDefault": "allRoads",
+      "cityDefault": "allRoads",
+      "states": ["DC"]
+    }
+  },
+
+  "exceptions": {
+    "VA": {
+      "_notes": "VDOT maintains ~80% of roads (Byrd Road Act 1932). Arlington & Henrico counties maintain their own roads. All 38 independent cities maintain their own streets.",
+      "maintainsOwnRoads": ["arlington", "henrico"],
+      "independentCities": true
+    },
+    "MD": {
+      "_notes": "Baltimore City maintains ALL roads within city limits, including interstates. Montgomery County maintains its own roads. Other counties vary.",
+      "maintainsOwnRoads": ["baltimore_city", "montgomery"]
+    },
+    "CO": {
+      "_notes": "Denver is a consolidated city-county maintaining all its own roads.",
+      "consolidatedCityCounties": ["denver"]
+    },
+    "PA": {
+      "_notes": "Philadelphia is a consolidated city-county.",
+      "consolidatedCityCounties": ["philadelphia"]
+    },
+    "CA": {
+      "_notes": "San Francisco is a consolidated city-county.",
+      "consolidatedCityCounties": ["san_francisco"]
+    },
+    "TN": {
+      "_notes": "Nashville-Davidson is a consolidated city-county.",
+      "consolidatedCityCounties": ["nashville", "davidson"]
+    },
+    "FL": {
+      "_notes": "Jacksonville-Duval is a consolidated city-county.",
+      "consolidatedCityCounties": ["jacksonville", "duval"]
+    },
+    "IN": {
+      "_notes": "Indianapolis-Marion is a consolidated city-county (Unigov).",
+      "consolidatedCityCounties": ["indianapolis", "marion"]
+    },
+    "KY": {
+      "_notes": "Louisville-Jefferson and Lexington-Fayette are consolidated city-counties.",
+      "consolidatedCityCounties": ["louisville", "jefferson", "lexington", "fayette"]
+    },
+    "MO": {
+      "_notes": "St. Louis City is independent from St. Louis County (separated 1876).",
+      "independentCities": ["st_louis_city"]
+    },
+    "NV": {
+      "_notes": "Carson City is a consolidated city-county.",
+      "consolidatedCityCounties": ["carson_city"]
+    },
+    "GA": {
+      "_notes": "Athens-Clarke, Augusta-Richmond, Columbus-Muscogee, Macon-Bibb are consolidated.",
+      "consolidatedCityCounties": ["clarke", "richmond", "muscogee", "bibb"]
+    }
+  }
+}
