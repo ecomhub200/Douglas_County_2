@@ -1,6 +1,11 @@
 # CRASH LENS — Delaware (DelDOT) Full Onboarding Package
 
-*Generated: March 16, 2026 | Target: Virginia-standard CRASH LENS schema*
+> **Canonical onboarding doc**: `data/DelawareDOT/delaware_dot_data_config_and_onboarding.md`
+> This file is the **extended reference** with detailed value mapping tables and prompt templates.
+> The canonical doc at `data/DelawareDOT/` is the single source of truth per CLAUDE.md rules.
+> Both documents have been reconciled as of March 16, 2026.
+
+*Updated: March 16, 2026 | Target: Virginia-standard CRASH LENS schema*
 
 ---
 
@@ -86,7 +91,7 @@ COUNTY CODE, COUNTY NAME, YEAR
 | 27 | Work Zone Related | WORK ZONE | VALUE_MAP | Y/N → `"1. Yes"`/`"2. No"` |
 | 28 | Work Zone Location | WORK ZONE LOCATION DESCRIPTION | VALUE_MAP | See §4 |
 | 29 | Work Zone Type | WORK ZONE TYPE DESCRIPTION | VALUE_MAP | See §4 |
-| 30 | School Zone | SCHOOL BUS INVOLVED CODE | VALUE_MAP | Approximate: bus=school zone indicator |
+| 30 | School Zone | SCHOOL BUS INVOLVED CODE | VALUE_MAP | **Approximate**: bus ≠ school zone. Actual normalizer defaults to `"No"` |
 | 31 | First Harmful Event | — | MISSING | `"Not Provided"` |
 | 32 | First Harmful Event Loc | — | MISSING | `"Not Provided"` |
 | 33 | Alcohol? | ALCOHOL INVOLVED | VALUE_MAP | Y→`"Yes"`, N→`"No"` |
@@ -158,19 +163,25 @@ COUNTY CODE, COUNTY NAME, YEAR
 
 Delaware uses a **3-level system**, NOT KABCO:
 
-| DE Code | DE Description | KABCO Mapping | K_People | A_People | B_People | C_People |
-|---------|---------------|---------------|----------|----------|----------|----------|
-| 01 | Fatal | **K** | 1 | 0 | 0 | 0 |
-| 03 | Personal Injury | **B** (default) | 0 | 0 | 1 | 0 |
-| 02 | Property Damage Only | **O** | 0 | 0 | 0 | 0 |
+| DE Description | KABCO Mapping | Method |
+|---------------|---------------|--------|
+| `Fatal Crash` / `Fatality Crash` | **K** | Direct mapping |
+| `Personal Injury Crash` | **A/B/C (proportional split)** | Hash-based deterministic assignment |
+| `Property Damage Crash` / `Property Damage Only` | **O** | Direct mapping |
+| `Non-Reportable` | **O** | Below reporting threshold |
 
-**Assumption & Data Loss**: Delaware does not distinguish A/B/C injury levels. All "Personal Injury" crashes are mapped to severity **B** (non-incapacitating injury) as the middle-ground default. This means:
-- True A-level (incapacitating) injuries are UNDERCOUNTED
-- True C-level (possible injury) crashes are OVERCOUNTED as B
-- EPDO scores will be approximate for injury crashes
-- **Alternative**: Use proportional A/B/C split based on national averages (~15% A, 45% B, 40% C). This is more accurate for aggregate statistics but adds complexity.
+**Proportional A/B/C Split (IMPLEMENTED)**: Since Delaware does not distinguish A/B/C injury levels, the normalizer uses **NHTSA national averages** (FHWA HSIP Manual Sec 4.2, NHTSA Traffic Safety Facts) to distribute injury crashes proportionally:
+- **A (Suspected Serious)**: 8% of injury crashes
+- **B (Suspected Minor)**: 32% of injury crashes
+- **C (Possible Injury)**: 60% of injury crashes
 
-**Recommended approach**: Map to B by default. Document the limitation. Allow config override.
+Assignment is **deterministic** via MD5 hash of the crash composite ID (`Document Nbr`), so the same crash always receives the same severity across normalizer runs.
+
+**Why not map all injury → A?** Mapping all injury → A inflates EPDO by ~2.3x (14.4/crash vs typical 5-6/crash), making Delaware data incomparable with Virginia and other states with true KABCO.
+
+**Why not map all injury → B?** A single-bucket approach loses distribution information. The proportional split produces statistically accurate aggregate EPDO scores while individual crash severity may not match reality.
+
+**Blended EPDO weight** for undifferentiated "Personal Injury Crash": `0.08×94 + 0.32×21 + 0.60×11 ≈ 21` per injury crash.
 
 ### 3.2 Crash Date / Time
 
@@ -185,13 +196,17 @@ Delaware provides a single `CRASH DATETIME` field in ISO 8601 format from Socrat
 
 ### 3.3 Document Number (Composite Key)
 
-Delaware has no document/report number in the public dataset. Generate a composite key:
+Delaware has no document/report number in the public dataset. The normalizer generates a **coordinate-based composite key**:
 ```
-DE-{YEAR}-{zero-padded-row-index}
+DE-{YYYYMMDD}-{HHMM}-{lat6}-{lon6}
 ```
-Example: `DE-2023-000001`, `DE-2023-000002`
+Where `lat6`/`lon6` are the first 6 digits of latitude/longitude (decimals and signs stripped).
 
-**Deduplication**: Use `CRASH DATETIME` + `LATITUDE` + `LONGITUDE` as the natural composite key for duplicate detection.
+Example: `DE-20230615-1430-391059-755409`
+
+**Why coordinate-based instead of sequential counter?** A sequential counter (`DE-2023-000001`) changes if row order changes between API calls. The coordinate-based format is **deterministic** — the same crash always produces the same ID regardless of download order. This also enables the MD5-hash-based severity assignment (§3.1) to be reproducible.
+
+**Deduplication**: The composite key itself serves as the natural deduplication key (datetime + coordinates).
 
 ### 3.4 Jurisdiction Mapping (CRITICAL for County Dropdown)
 
@@ -236,12 +251,18 @@ Configure in `states/delaware/config.json` `roadSystems` to match.
 ## 4. Value Mapping Tables (Complete JSON)
 
 ### 4.1 Crash Severity (crash_classification)
+
+**Note**: The actual normalizer uses `crash_classification_description` (case-insensitive), NOT codes. Injury crashes are proportionally split into A/B/C via hash-based deterministic assignment (see §3.1).
+
 ```json
 {
-  "crash_classification_code": {
-    "01": {"Crash Severity": "K", "K_People": 1, "A_People": 0, "B_People": 0, "C_People": 0},
-    "03": {"Crash Severity": "B", "K_People": 0, "A_People": 0, "B_People": 1, "C_People": 0},
-    "02": {"Crash Severity": "O", "K_People": 0, "A_People": 0, "B_People": 0, "C_People": 0}
+  "crash_classification_description": {
+    "fatal crash": "K",
+    "fatality crash": "K",
+    "personal injury crash": "INJURY → proportional A/B/C split (8% A, 32% B, 60% C via MD5 hash)",
+    "property damage crash": "O",
+    "property damage only": "O",
+    "non-reportable": "O"
   }
 }
 ```
@@ -358,15 +379,35 @@ Delaware uses "Manner of Impact" which differs from Virginia's "Collision Type".
     "": "No",
     null: "No"
   },
-  "seatbelt_map": {
-    "Y": "Belted",
-    "N": "Unbelted",
-    "U": "Belted",
-    "": "Belted",
-    null: "Belted"
+  "unrestrained_map (inverted logic)": {
+    "Y (seatbelt used)": "No (not unrestrained)",
+    "N (seatbelt not used)": "Yes (unrestrained)",
+    "U": "No (default — conservative for restraint use)",
+    "": "No",
+    null: "No"
   }
 }
 ```
+
+> **Note on Unrestrained? mapping**: The actual normalizer inverts the `seatbelt_used` field:
+> `seatbelt_used=Y` → `Unrestrained?=No`, `seatbelt_used=N` → `Unrestrained?=Yes`.
+> Unknown/empty defaults to `No` (assumes restrained). This is anti-conservative for safety
+> analysis — consider changing to `Yes` if unrestrained crash analysis is critical.
+
+### 4.6.1 Contributing Circumstance → Boolean Flags (IMPLEMENTED)
+
+The actual normalizer infers `Speed?` and `Distracted?` from `primary_contributing_circumstance_code`:
+
+```json
+{
+  "speed_codes": ["50", "51", "52", "53"],
+  "distracted_codes": ["60", "61", "62", "63", "64", "65", "66"]
+}
+```
+
+> **Limitation**: Most Delaware records have `primary_contributing_circumstance_code = NA`,
+> so Speed? and Distracted? will be "No" for the majority of records. This is still better
+> than defaulting all to "No" since the codes that ARE present provide real signal.
 
 ### 4.7 Work Zone
 
@@ -440,326 +481,37 @@ Delaware uses "Manner of Impact" which differs from Virginia's "Collision Type".
 
 ### Prompt A — Delaware State Normalizer
 
+> **STATUS: IMPLEMENTED** — The `DelawareNormalizer` class already exists at `scripts/state_adapter.py:1242`.
+> The code below is a **reference summary** of the actual implementation. For the authoritative version, read the source file.
+
 ```
-TASK: Add a DelawareNormalizer to scripts/state_adapter.py
+IMPLEMENTATION REFERENCE (scripts/state_adapter.py):
 
-CONTEXT:
-- CRASH LENS normalizes all state crash data to Virginia's schema
-- Delaware data comes from Socrata API at data.delaware.gov (dataset 827n-m6xc)
-- Delaware has 40 columns, Virginia target has 69 columns
-- Key challenge: Delaware has 3-level severity (Fatal/Injury/PDO), not KABCO
-- Key challenge: Delaware has NO Ownership, Functional Class, RTE Name, SYSTEM columns
-- Key challenge: Delaware has no Document Number — must generate composite ID
+1. STATE_SIGNATURES entries (both registered):
+   - 'delaware': lowercase Socrata API field names
+   - 'delaware_csv': UPPERCASE CSV/Excel field names
 
-INSTRUCTIONS:
+2. DelawareNormalizer class key features:
+   - Extends BaseNormalizer
+   - _FIELD_ALIASES dict maps lowercase API names ↔ UPPERCASE CSV names
+   - SEVERITY_MAP uses description text (case-insensitive), NOT codes
+   - Proportional A/B/C split via MD5 hash (8% A, 32% B, 60% C)
+   - SPEED_CODES (50-53) and DISTRACTED_CODES (60-66) for contributing circumstance inference
+   - _build_composite_id() generates DE-{YYYYMMDD}-{HHMM}-{lat6}-{lon6}
+           
 
-1. Add STATE_SIGNATURES entry:
-STATE_SIGNATURES['delaware'] = {
-    'required': ['crash_datetime', 'crash_classification_description', 'latitude', 'longitude'],
-    'optional': ['manner_of_impact_description', 'weather_1_description', 'county_name'],
-    'display_name': 'Delaware (DelDOT)',
-    'config_dir': 'delaware'
-}
-Also add 'delaware_csv' variant with uppercase column names:
-STATE_SIGNATURES['delaware_csv'] = {
-    'required': ['CRASH DATETIME', 'CRASH CLASSIFICATION DESCRIPTION', 'LATITUDE', 'LONGITUDE'],
-    'optional': ['MANNER OF IMPACT DESCRIPTION', 'WEATHER 1 DESCRIPTION', 'COUNTY NAME'],
-    'display_name': 'Delaware (DelDOT CSV)',
-    'config_dir': 'delaware'
-}
-
-2. Create DelawareNormalizer class extending BaseNormalizer:
-   
-   class DelawareNormalizer(BaseNormalizer):
-       """Normalizes Delaware DSHS crash data to Virginia-standard format."""
-       
-       def __init__(self):
-           # Column name mapping (lowercase Socrata API → standard)
-           self._col_map = {
-               'crash_datetime': 'CRASH DATETIME',
-               'crash_classification_code': 'CRASH CLASSIFICATION CODE',
-               'crash_classification_description': 'CRASH CLASSIFICATION DESCRIPTION',
-               'manner_of_impact_code': 'MANNER OF IMPACT CODE',
-               'manner_of_impact_description': 'MANNER OF IMPACT DESCRIPTION',
-               'alcohol_involved': 'ALCOHOL INVOLVED',
-               'drug_involved': 'DRUG INVOLVED',
-               'road_surface_description': 'ROAD SURFACE DESCRIPTION',
-               'lighting_condition_code': 'LIGHTING CONDITION CODE',
-               'lighting_condition_description': 'LIGHTING CONDITION DESCRIPTION',
-               'weather_1_description': 'WEATHER 1 DESCRIPTION',
-               'seatbelt_used': 'SEATBELT USED',
-               'motorcycle_involved': 'MOTORCYCLE INVOLVED',
-               'bicycled_involved': 'BICYCLED INVOLVED',
-               'pedestrian_involved': 'PEDESTRIAN INVOLVED',
-               'latitude': 'LATITUDE',
-               'longitude': 'LONGITUDE',
-               'county_code': 'COUNTY CODE',
-               'county_name': 'COUNTY NAME',
-               'year': 'YEAR',
-               'work_zone': 'WORK ZONE',
-               'school_bus_involved_code': 'SCHOOL BUS INVOLVED CODE',
-           }
-           
-           # Severity mapping (3-level → KABCO)
-           self._severity_map = {
-               '01': {'severity': 'K', 'K': 1, 'A': 0, 'B': 0, 'C': 0},
-               '1':  {'severity': 'K', 'K': 1, 'A': 0, 'B': 0, 'C': 0},
-               'Fatal': {'severity': 'K', 'K': 1, 'A': 0, 'B': 0, 'C': 0},
-               '03': {'severity': 'B', 'K': 0, 'A': 0, 'B': 1, 'C': 0},
-               '3':  {'severity': 'B', 'K': 0, 'A': 0, 'B': 1, 'C': 0},
-               'Personal Injury': {'severity': 'B', 'K': 0, 'A': 0, 'B': 1, 'C': 0},
-               '02': {'severity': 'O', 'K': 0, 'A': 0, 'B': 0, 'C': 0},
-               '2':  {'severity': 'O', 'K': 0, 'A': 0, 'B': 0, 'C': 0},
-               'Property Damage Only': {'severity': 'O', 'K': 0, 'A': 0, 'B': 0, 'C': 0},
-           }
-           
-           # Collision type mapping (Manner of Impact → Virginia Collision Type)
-           self._collision_map = {
-               '01': '1. Rear End', 'Front to Rear': '1. Rear End',
-               '02': '2. Angle', 'Angle': '2. Angle',
-               '03': '3. Head On', 'Head On': '3. Head On', 'Front to Front': '3. Head On',
-               '04': '4. Sideswipe - Same Direction', 'Sideswipe Same Direction': '4. Sideswipe - Same Direction',
-               '05': '5. Sideswipe - Opposite Direction', 'Sideswipe Opposite Direction': '5. Sideswipe - Opposite Direction',
-               '06': '8. Non-Collision', 'Non-Collision': '8. Non-Collision',
-               '07': '16. Other', 'Rear to Side': '16. Other',
-               '08': '16. Other', 'Rear to Rear': '16. Other',
-               '09': '16. Other',
-               '00': 'Not Applicable', '99': 'Not Provided',
-               'Unknown': 'Not Provided', 'Other': '16. Other',
-               'Not Applicable': 'Not Applicable',
-           }
-           
-           # Weather mapping
-           self._weather_map = {
-               'Clear': '1. No Adverse Condition (Clear/Cloudy)',
-               'Cloudy': '1. No Adverse Condition (Clear/Cloudy)',
-               'Rain': '5. Rain', 'Snow': '6. Snow',
-               'Sleet/Hail': '7. Sleet/Hail', 'Fog': '3. Fog',
-               'Fog/Smog/Smoke': '3. Fog',
-               'Blowing Sand/Soil/Dirt': '10. Blowing Sand, Soil, Dirt, or Snow',
-               'Blowing Snow': '10. Blowing Sand, Soil, Dirt, or Snow',
-               'Severe Crosswinds': '11. Severe Crosswinds',
-               'Other': '9. Other', 'Unknown': 'Not Applicable',
-           }
-           
-           # Light condition mapping
-           self._light_map = {
-               'Daylight': '2. Daylight', 'Dawn': '1. Dawn', 'Dusk': '3. Dusk',
-               'Dark - Lighted': '4. Darkness - Road Lighted',
-               'Dark-Lighted': '4. Darkness - Road Lighted',
-               'Dark - Not Lighted': '5. Darkness - Road Not Lighted',
-               'Dark-Not Lighted': '5. Darkness - Road Not Lighted',
-               'Dark - Unknown Lighting': '6. Darkness - Unknown Road Lighting',
-               'Dark-Unknown Lighting': '6. Darkness - Unknown Road Lighting',
-               'Unknown': '7. Unknown', 'Other': '7. Unknown',
-           }
-           
-           # Road surface mapping
-           self._surface_map = {
-               'Dry': '1. Dry', 'Wet': '2. Wet', 'Snow': '3. Snowy',
-               'Ice': '4. Icy', 'Ice/Frost': '4. Icy',
-               'Sand/Mud/Dirt/Oil/Gravel': '5. Muddy',
-               'Water': '9. Water (Standing, Moving)', 'Slush': '10. Slush',
-               'Other': '7. Other', 'Unknown': 'Not Provided',
-           }
-           
-           # Jurisdiction mapping
-           self._juris_map = {
-               '1': (1, '001. Kent County'),
-               '2': (2, '002. New Castle County'),
-               '3': (3, '003. Sussex County'),
-               'Kent': (1, '001. Kent County'),
-               'New Castle': (2, '002. New Castle County'),
-               'Sussex': (3, '003. Sussex County'),
-           }
-           
-           self._row_counter = 0
-
-       def _get_val(self, row, *keys):
-           """Get value from row, trying multiple key variants."""
-           for k in keys:
-               if k in row and row[k] not in (None, '', 'nan'):
-                   return str(row[k]).strip()
-               lk = k.lower().replace(' ', '_')
-               if lk in row and row[lk] not in (None, '', 'nan'):
-                   return str(row[lk]).strip()
-           return ''
-
-       def _parse_datetime(self, dt_str):
-           """Parse Delaware datetime → (crash_date_str, military_time_int, year_int)"""
-           from datetime import datetime
-           for fmt in ['%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S',
-                       '%m/%d/%Y %I:%M:%S %p', '%m/%d/%Y %H:%M:%S',
-                       '%m/%d/%Y %H:%M']:
-               try:
-                   dt = datetime.strptime(dt_str.strip(), fmt)
-                   crash_date = f"{dt.month}/{dt.day}/{dt.year} 5:00:00 AM"
-                   mil_time = dt.hour * 100 + dt.minute
-                   return crash_date, mil_time, dt.year
-               except ValueError:
-                   continue
-           return '1/1/2000 5:00:00 AM', 0, 2000
-
-       def _yn_to_yesno(self, val):
-           return 'Yes' if str(val).upper() in ('Y', 'YES', 'TRUE', '1') else 'No'
-
-       def _yn_to_belt(self, val):
-           return 'Belted' if str(val).upper() in ('Y', 'YES', 'TRUE', '1') else 'Unbelted'
-
-       def _is_night(self, light_desc):
-           desc = str(light_desc).lower()
-           return 'Yes' if 'dark' in desc else 'No'
-
-       def normalize_row(self, row):
-           """Transform a single Delaware row to Virginia-standard format."""
-           # Idempotency check: if already normalized, skip
-           if 'Crash Severity' in row and row.get('Crash Severity', '') in ('K','A','B','C','O'):
-               if 'Physical Juris Name' in row and '.' in str(row.get('Physical Juris Name', '')):
-                   return row  # Already normalized
-           
-           self._row_counter += 1
-           
-           # Parse datetime
-           dt_str = self._get_val(row, 'CRASH DATETIME', 'crash_datetime')
-           crash_date, mil_time, year = self._parse_datetime(dt_str)
-           year_val = self._get_val(row, 'YEAR', 'year') or str(year)
-           
-           # Severity
-           sev_code = self._get_val(row, 'CRASH CLASSIFICATION CODE', 'crash_classification_code')
-           sev_desc = self._get_val(row, 'CRASH CLASSIFICATION DESCRIPTION', 'crash_classification_description')
-           sev_info = self._severity_map.get(sev_code, self._severity_map.get(sev_desc, 
-                      {'severity': 'O', 'K': 0, 'A': 0, 'B': 0, 'C': 0}))
-           
-           # Collision type
-           moi_code = self._get_val(row, 'MANNER OF IMPACT CODE', 'manner_of_impact_code')
-           moi_desc = self._get_val(row, 'MANNER OF IMPACT DESCRIPTION', 'manner_of_impact_description')
-           collision = self._collision_map.get(moi_code, self._collision_map.get(moi_desc, 'Not Provided'))
-           
-           # Weather
-           weather_desc = self._get_val(row, 'WEATHER 1 DESCRIPTION', 'weather_1_description')
-           weather = self._weather_map.get(weather_desc, 'Not Applicable')
-           
-           # Light
-           light_desc = self._get_val(row, 'LIGHTING CONDITION DESCRIPTION', 'lighting_condition_description')
-           light = self._light_map.get(light_desc, 'Not Applicable')
-           
-           # Surface
-           surf_desc = self._get_val(row, 'ROAD SURFACE DESCRIPTION', 'road_surface_description')
-           surface = self._surface_map.get(surf_desc, 'Not Applicable')
-           
-           # Jurisdiction
-           county_code = self._get_val(row, 'COUNTY CODE', 'county_code')
-           county_name = self._get_val(row, 'COUNTY NAME', 'county_name')
-           juris_info = self._juris_map.get(county_code, self._juris_map.get(county_name, (0, '000. Unknown County')))
-           
-           # Work zone
-           wz = self._get_val(row, 'WORK ZONE', 'work_zone')
-           wz_mapped = '1. Yes' if wz.upper() in ('Y', 'YES') else '2. No' if wz.upper() in ('N', 'NO') else 'Not Provided'
-           
-           # Coordinates
-           lat = self._get_val(row, 'LATITUDE', 'latitude')
-           lon = self._get_val(row, 'LONGITUDE', 'longitude')
-           
-           out = {
-               'OBJECTID': self._row_counter,
-               'Document Nbr': f"DE-{year_val}-{self._row_counter:06d}",
-               'Crash Year': int(year_val) if year_val.isdigit() else year,
-               'Crash Date': crash_date,
-               'Crash Military Time': mil_time,
-               'Crash Severity': sev_info['severity'],
-               'K_People': sev_info['K'],
-               'A_People': sev_info['A'],
-               'B_People': sev_info['B'],
-               'C_People': sev_info['C'],
-               'Persons Injured': sev_info['A'] + sev_info['B'] + sev_info['C'],
-               'Pedestrians Killed': 0,
-               'Pedestrians Injured': 0,
-               'Vehicle Count': 0,
-               'Collision Type': collision,
-               'Weather Condition': weather,
-               'Light Condition': light,
-               'Roadway Surface Condition': surface,
-               'Relation To Roadway': 'Not Provided',
-               'Roadway Alignment': 'Not Applicable',
-               'Roadway Surface Type': 'Not Applicable',
-               'Roadway Defect': 'Not Applicable',
-               'Roadway Description': 'Not Applicable',
-               'Intersection Type': 'Not Provided',
-               'Traffic Control Type': 'Not Applicable',
-               'Traffic Control Status': 'Not Applicable',
-               'Work Zone Related': wz_mapped,
-               'Work Zone Location': '',
-               'Work Zone Type': '',
-               'School Zone': '3. No',
-               'First Harmful Event': 'Not Provided',
-               'First Harmful Event Loc': 'Not Provided',
-               'Alcohol?': self._yn_to_yesno(self._get_val(row, 'ALCOHOL INVOLVED', 'alcohol_involved')),
-               'Animal Related?': 'No',
-               'Unrestrained?': self._yn_to_belt(self._get_val(row, 'SEATBELT USED', 'seatbelt_used')),
-               'Bike?': self._yn_to_yesno(self._get_val(row, 'BICYCLED INVOLVED', 'bicycled_involved')),
-               'Distracted?': 'No',
-               'Drowsy?': 'No',
-               'Drug Related?': self._yn_to_yesno(self._get_val(row, 'DRUG INVOLVED', 'drug_involved')),
-               'Guardrail Related?': 'No',
-               'Hitrun?': 'No',
-               'Lgtruck?': 'No',
-               'Motorcycle?': self._yn_to_yesno(self._get_val(row, 'MOTORCYCLE INVOLVED', 'motorcycle_involved')),
-               'Pedestrian?': self._yn_to_yesno(self._get_val(row, 'PEDESTRIAN INVOLVED', 'pedestrian_involved')),
-               'Speed?': 'No',
-               'Max Speed Diff': '',
-               'RoadDeparture Type': 'NOT_RD',
-               'Intersection Analysis': 'Not Intersection',
-               'Senior?': 'No',
-               'Young?': 'No',
-               'Mainline?': 'No',
-               'Night?': self._is_night(light_desc),
-               'VDOT District': 'DelDOT',
-               'Juris Code': juris_info[0],
-               'Physical Juris Name': juris_info[1],
-               'Functional Class': '7-Local (J,6)',
-               'Facility Type': '3-Two-Way Undivided',
-               'Area Type': 'Urban',
-               'SYSTEM': 'DelDOT Primary',
-               'VSP': '',
-               'Ownership': '1. State Hwy Agency',
-               'Planning District': county_name if county_name else '',
-               'MPO Name': '',
-               'RTE Name': '',
-               'RNS MP': '',
-               'Node': '',
-               'Node Offset (ft)': '',
-               'x': float(lon) if lon else '',
-               'y': float(lat) if lat else '',
-               '_source_state': 'delaware',
-               '_source_file': '',
-           }
-           
-           # Preserve extra source columns
-           for src_col in ['DAY OF WEEK CODE', 'DAY OF WEEK DESCRIPTION',
-                           'CRASH CLASSIFICATION CODE', 'CRASH CLASSIFICATION DESCRIPTION',
-                           'COLLISION ON PRIVATE PROPERTY', 'MANNER OF IMPACT CODE',
-                           'MANNER OF IMPACT DESCRIPTION', 'MOTORCYCLE HELMET USED',
-                           'BICYCLE HELMET USED', 'WEATHER 2 CODE', 'WEATHER 2 DESCRIPTION',
-                           'PRIMARY CONTRIBUTING CIRCUMSTANCE CODE',
-                           'PRIMARY CONTRIBUTING CIRCUMSTANCE DESCRIPTION',
-                           'SCHOOL BUS INVOLVED CODE', 'SCHOOL BUS INVOLVED DESCRIPTION',
-                           'WORKERS PRESENT', 'COUNTY CODE', 'COUNTY NAME']:
-               val = self._get_val(row, src_col, src_col.lower().replace(' ', '_'))
-               if val:
-                   out[src_col] = val
-           
-           return out
-
-3. Register in _NORMALIZERS:
+3. Registered in _NORMALIZERS:
    _NORMALIZERS['delaware'] = DelawareNormalizer
    _NORMALIZERS['delaware_csv'] = DelawareNormalizer
 
-4. Create states/delaware/config.json (content below in §6 Prompt A Config section)
-
-5. Create states/delaware/hierarchy.json (content below)
+4. Config files: states/delaware/config.json, states/delaware/hierarchy.json (see below)
 ```
 
 ### Prompt A — Config Files
+
+> **Note**: The `severityMapping` in config.json is informational only. The actual proportional A/B/C
+> split logic is in `DelawareNormalizer.SEVERITY_MAP` + hash-based assignment in `normalize_row()`.
+> The `knownLimitations` array below has been updated to reflect the proportional split approach.
 
 **`states/delaware/config.json`:**
 ```json
@@ -774,10 +526,9 @@ STATE_SIGNATURES['delaware_csv'] = {
   },
   "columnMapping": {
     "crash_datetime": "Crash Date",
-    "crash_classification_code": "Crash Severity",
+    "crash_classification_description": "Crash Severity",
     "latitude": "y",
     "longitude": "x",
-    "county_code": "Juris Code",
     "county_name": "Physical Juris Name",
     "manner_of_impact_description": "Collision Type",
     "weather_1_description": "Weather Condition",
@@ -785,12 +536,12 @@ STATE_SIGNATURES['delaware_csv'] = {
     "road_surface_description": "Roadway Surface Condition"
   },
   "severityMapping": {
-    "01": "K",
-    "03": "B",
-    "02": "O",
-    "Fatal": "K",
-    "Personal Injury": "B",
-    "Property Damage Only": "O"
+    "fatal crash": "K",
+    "fatality crash": "K",
+    "personal injury crash": "A/B/C (proportional: 8% A, 32% B, 60% C)",
+    "property damage crash": "O",
+    "property damage only": "O",
+    "non-reportable": "O"
   },
   "roadSystems": {
     "DelDOT Primary": {
@@ -805,7 +556,7 @@ STATE_SIGNATURES['delaware_csv'] = {
     },
     "no_interstate": {
       "filter": "Functional Class != '1-Interstate (A,1)'",
-      "note": "WARNING: Delaware data has no Functional Class field. All records default to Local."
+      "note": "WARNING: Delaware data has no Functional Class field. All records default to empty."
     }
   },
   "filterProfiles": {
@@ -829,12 +580,12 @@ STATE_SIGNATURES['delaware_csv'] = {
     "west": -75.79
   },
   "knownLimitations": [
-    "3-level severity (Fatal/Injury/PDO) mapped to K/B/O — no A/C granularity",
+    "3-level severity (Fatal/Injury/PDO) → proportional A/B/C split (8%/32%/60%) for injury crashes",
     "No Ownership column — County Roads and City Roads filters return zero results",
-    "No Functional Class column — No Interstate filter is non-functional",
+    "No Functional Class column — road type filters degraded",
     "No RTE Name, Node, SYSTEM — road-level analysis not possible",
     "No Vehicle Count, Persons Injured counts",
-    "No Document Number — composite IDs generated"
+    "No Document Number — coordinate-based composite IDs generated (DE-YYYYMMDD-HHMM-lat6-lon6)"
   ]
 }
 ```
@@ -1135,8 +886,8 @@ Run these checks after normalization to verify data integrity:
 | 4 | Road type — All Roads | **All records** | No filter |
 | 5 | Jurisdiction dropdown | 3 values: `001. Kent County`, `002. New Castle County`, `003. Sussex County` | Unique values of `Physical Juris Name` |
 | 6 | No raw numeric codes in jurisdiction | No values like "1", "2", "3" without labels | `Physical Juris Name` does not match `/^\d+$/` |
-| 7 | Crash Severity values | Only K, B, O | Unique values of `Crash Severity` |
-| 8 | No A or C severity | **0 records** with A or C (expected — 3-level system) | `Crash Severity in ('A', 'C')` |
+| 7 | Crash Severity values | K, A, B, C, O all present | Unique values of `Crash Severity` |
+| 8 | Injury severity proportional split | ~8% A, ~32% B, ~60% C among injury crashes | Distribution of A/B/C among non-K, non-O records |
 | 9 | SYSTEM values | Only `"DelDOT Primary"` | Unique values of `SYSTEM` |
 | 10 | Coordinates in bounds | All lat 38.45–39.84, lon -75.79 to -75.04 | Bounds check on x, y |
 | 11 | Crash Date format | Matches `M/D/YYYY 5:00:00 AM` | Regex on `Crash Date` |
@@ -1147,9 +898,11 @@ Run these checks after normalization to verify data integrity:
 ### Expected Degradations (Document These for Users)
 - County Roads Only filter: returns 0 results → **Expected** (no ownership data from DE)
 - City Roads Only filter: returns 0 results → **Expected**
-- No Interstate filter: returns ALL results → **Expected** (all default to Local)
-- EPDO scores for injury crashes: approximate → **Expected** (no A/B/C granularity)
+- No Interstate filter: returns ALL results → **Expected** (all records have empty Functional Class)
+- EPDO scores for injury crashes: aggregate-accurate via proportional A/B/C split, but individual crash severity is assigned probabilistically → **Expected**
 - Road-level analysis: not possible → **Expected** (no RTE Name/Node)
+- School Zone: all "No" → **Expected** (no school zone data; school bus involvement ≠ school zone)
+- Speed?/Distracted?: mostly "No" → **Expected** (contributing circumstance code is NA for most records)
 
 ---
 
@@ -1157,9 +910,11 @@ Run these checks after normalization to verify data integrity:
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Injury severity mapping | All → B | Middle-ground; most common injury level nationally |
-| Missing Ownership | Default to "1. State Hwy Agency" | Allows All Roads to work; County/City acknowledged broken |
-| Missing Functional Class | Default to "7-Local (J,6)" | Conservative; doesn't accidentally include as Interstate |
-| Document Number | Composite `DE-YYYY-NNNNNN` | Deterministic, sortable, identifiable |
+| Injury severity mapping | Proportional A/B/C split (8%/32%/60%) via MD5 hash | Aggregate-accurate EPDO; deterministic per crash; avoids 2.3x EPDO inflation of all→A |
+| Missing Ownership | Default to empty string | Honest about data gap; road type filters acknowledged non-functional |
+| Missing Functional Class | Default to empty string | Honest about data gap; avoids misleading filter results |
+| Document Number | Coordinate-based composite `DE-YYYYMMDD-HHMM-lat6-lon6` | Deterministic across runs (unlike sequential counter); enables reproducible hash-based severity |
 | Missing boolean flags | Default to "No" | Conservative; avoids false positives |
-| Night? derivation | From Light Condition | Reliable signal from available data |
+| Speed? / Distracted? | Derived from contributing circumstance codes | Real signal when available; mostly "No" but better than always "No" |
+| Night? derivation | From Light Condition (contains "dark") | Reliable signal from available data |
+| School Zone | Always "No" | School bus involvement ≠ school zone; don't conflate |
