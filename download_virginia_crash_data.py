@@ -195,10 +195,13 @@ def _find_working_rest_service():
     """Try known FeatureServer URLs via direct REST API.
 
     Returns (service_url, total_count) or (None, 0).
+    Selects the endpoint with the highest record count (minimum 1,000).
     """
+    MIN_RECORDS = 1000
     # Try REST_API_BASE first, then the rest of KNOWN_FEATURE_SERVERS
     urls_to_try = [REST_API_BASE] + [u for u in KNOWN_FEATURE_SERVERS if u != REST_API_BASE]
 
+    best_url, best_count = None, 0
     for url in urls_to_try:
         svc_name = url.split('/')[-3]
         count_url = f'{url}/query?where=1%3D1&returnCountOnly=true&f=json'
@@ -206,10 +209,15 @@ def _find_working_rest_service():
         if data and 'count' in data:
             count = data['count']
             logger.info(f"  REST API {svc_name}: {count:,} records")
-            if count > 100000:
-                return url, count
+            if count > best_count:
+                best_url, best_count = url, count
         else:
             logger.info(f"  REST API {svc_name}: failed or blocked")
+
+    if best_url and best_count >= MIN_RECORDS:
+        if best_count < 100000:
+            logger.warning(f"  Best endpoint has only {best_count:,} records (expected 100K+ for statewide)")
+        return best_url, best_count
 
     return None, 0
 
@@ -557,7 +565,7 @@ def download_with_browser(output_path, headless=True, batch_size=5000,
             if cached:
                 count_url = f'{cached}/query?where=1%3D1&returnCountOnly=true&f=json'
                 data = browser_fetch_json(page, count_url, retries=2)
-                if data and 'count' in data and data['count'] > 100000:
+                if data and 'count' in data and data['count'] >= 1000:
                     service_url = cached
                     total_count = data['count']
                     logger.info(f"  Cached URL works: {total_count:,} records")
@@ -618,12 +626,14 @@ def download_with_browser(output_path, headless=True, batch_size=5000,
                         candidate = match.group(1) + '/0'
                         count_url = f'{candidate}/query?where=1%3D1&returnCountOnly=true&f=json'
                         data = browser_fetch_json(page, count_url, retries=3)
-                        if data and 'count' in data and data['count'] > 100000:
-                            service_url = candidate
-                            total_count = data['count']
-                            save_cached_url(service_url)
-                            logger.info(f"  Discovered: {service_url} ({total_count:,} records)")
-                            break
+                        if data and 'count' in data and data['count'] >= 1000:
+                            if data['count'] > total_count:
+                                service_url = candidate
+                                total_count = data['count']
+                                save_cached_url(service_url)
+                                logger.info(f"  Discovered: {service_url} ({total_count:,} records)")
+                            if total_count >= 100000:
+                                break
 
                     # Also check replicafilescache pattern
                     match = re.search(r'rest/services/([^/]+)/FeatureServer', url)
@@ -633,14 +643,16 @@ def download_with_browser(output_path, headless=True, batch_size=5000,
                         if candidate != service_url:
                             count_url = f'{candidate}/query?where=1%3D1&returnCountOnly=true&f=json'
                             data = browser_fetch_json(page, count_url, retries=3)
-                            if data and 'count' in data and data['count'] > 100000:
-                                service_url = candidate
-                                total_count = data['count']
-                                save_cached_url(service_url)
-                                logger.info(f"  Discovered: {service_url} ({total_count:,} records)")
-                                break
+                            if data and 'count' in data and data['count'] >= 1000:
+                                if data['count'] > total_count:
+                                    service_url = candidate
+                                    total_count = data['count']
+                                    save_cached_url(service_url)
+                                    logger.info(f"  Discovered: {service_url} ({total_count:,} records)")
+                                if total_count >= 100000:
+                                    break
 
-            # Try known URLs as fallback
+            # Try known URLs as fallback — pick best (highest count, min 1000)
             if not service_url:
                 logger.info("  Trying known FeatureServer URLs via browser fetch...")
                 for url in KNOWN_FEATURE_SERVERS:
@@ -650,11 +662,12 @@ def download_with_browser(output_path, headless=True, batch_size=5000,
                     if data and 'count' in data:
                         count = data['count']
                         logger.info(f"  {svc_name}: {count:,} records")
-                        if count > 100000:
+                        if count >= 1000 and count > total_count:
                             service_url = url
                             total_count = count
                             save_cached_url(service_url)
-                            break
+                            if count >= 100000:
+                                break
                     else:
                         logger.info(f"  {svc_name}: failed")
 
