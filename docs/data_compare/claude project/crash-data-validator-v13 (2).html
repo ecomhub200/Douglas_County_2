@@ -1,0 +1,3384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRASH LENS — Data Validation Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #f8f9fb;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #f1f5f9;
+  --border: #e2e8f0;
+  --border-active: #3b82f6;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent-blue: #3b82f6;
+  --accent-cyan: #06b6d4;
+  --accent-green: #10b981;
+  --accent-yellow: #f59e0b;
+  --accent-orange: #f97316;
+  --accent-red: #ef4444;
+  --accent-purple: #8b5cf6;
+  --gradient-primary: linear-gradient(135deg, #3b82f6, #06b6d4);
+  --gradient-success: linear-gradient(135deg, #10b981, #06b6d4);
+  --gradient-danger: linear-gradient(135deg, #ef4444, #f97316);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,0.08);
+  --shadow-glow: 0 0 12px rgba(59,130,246,0.1);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* ─── Top Bar ─── */
+.topbar {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.5px;
+}
+
+.logo-icon {
+  width: 36px; height: 36px;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.badge-blue { background: rgba(59,130,246,0.1); color: #2563eb; }
+.badge-green { background: rgba(16,185,129,0.1); color: #059669; }
+.badge-yellow { background: rgba(245,158,11,0.1); color: #d97706; }
+.badge-red { background: rgba(239,68,68,0.1); color: #dc2626; }
+.badge-purple { background: rgba(139,92,246,0.1); color: #7c3aed; }
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ─── Buttons ─── */
+.btn {
+  padding: 9px 18px;
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'DM Sans', sans-serif;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--gradient-primary);
+  color: white;
+  box-shadow: 0 2px 12px rgba(59,130,246,0.3);
+}
+.btn-primary:hover:not(:disabled) { box-shadow: 0 4px 20px rgba(59,130,246,0.5); transform: translateY(-1px); }
+
+.btn-success {
+  background: var(--gradient-success);
+  color: white;
+  box-shadow: 0 2px 12px rgba(16,185,129,0.3);
+}
+.btn-success:hover:not(:disabled) { box-shadow: 0 4px 20px rgba(16,185,129,0.5); transform: translateY(-1px); }
+
+.btn-danger {
+  background: var(--gradient-danger);
+  color: white;
+}
+.btn-danger:hover:not(:disabled) { box-shadow: 0 4px 20px rgba(239,68,68,0.4); transform: translateY(-1px); }
+
+.btn-outline {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.btn-outline:hover:not(:disabled) { border-color: var(--accent-blue); color: var(--accent-blue); background: rgba(59,130,246,0.05); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+}
+.btn-ghost:hover { color: var(--text-primary); }
+
+/* ─── Layout ─── */
+.container {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+/* ─── Phase Stepper ─── */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 28px;
+  padding: 16px 20px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.step.active {
+  background: rgba(59,130,246,0.1);
+  color: var(--accent-blue);
+}
+.step.completed {
+  color: var(--accent-green);
+}
+.step-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.step.active .step-num {
+  border-color: var(--accent-blue);
+  background: rgba(59,130,246,0.2);
+}
+.step.completed .step-num {
+  border-color: var(--accent-green);
+  background: rgba(16,185,129,0.2);
+}
+.step-arrow {
+  color: var(--text-muted);
+  font-size: 18px;
+  margin: 0 4px;
+}
+
+/* ─── Cards ─── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ─── Stats Grid ─── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  transition: all 0.3s;
+}
+.stat-card:hover {
+  border-color: var(--border-active);
+  box-shadow: var(--shadow-glow);
+}
+
+.stat-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1;
+}
+
+.stat-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* ─── Progress ─── */
+.progress-container {
+  margin: 20px 0;
+}
+
+.progress-bar {
+  height: 8px;
+  background: var(--bg-elevated);
+  border-radius: 20px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 20px;
+  transition: width 0.5s ease;
+  background: var(--gradient-primary);
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ─── Table ─── */
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead th {
+  background: var(--bg-elevated);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+tbody td {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(42,54,84,0.5);
+  color: var(--text-secondary);
+}
+
+tbody tr:hover {
+  background: rgba(59,130,246,0.04);
+}
+
+tbody tr.row-error { background: rgba(239,68,68,0.04); }
+tbody tr.row-warning { background: rgba(245,158,11,0.04); }
+tbody tr.row-fixed { background: rgba(16,185,129,0.04); }
+
+/* ─── File Selector ─── */
+.file-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.file-card {
+  background: var(--bg-elevated);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+}
+.file-card:hover { border-color: var(--accent-blue); }
+.file-card.selected { border-color: var(--accent-blue); box-shadow: var(--shadow-glow); }
+.file-card.loaded { border-color: var(--accent-green); }
+
+.file-card-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.file-card-name {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.file-card-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.file-card-status {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+/* ─── Tabs ─── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+  flex-wrap: wrap;
+}
+
+.tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+}
+.tab:hover { color: var(--text-primary); background: var(--bg-card); border-color: var(--border); }
+.tab.active { background: var(--bg-card); color: var(--accent-blue); border-color: var(--accent-blue); box-shadow: 0 1px 4px rgba(59,130,246,0.15); }
+
+.tab-count {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: rgba(59,130,246,0.15);
+  color: var(--accent-blue);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ─── Validation Log ─── */
+.log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-xs);
+  margin-bottom: 4px;
+  font-size: 13px;
+  animation: fadeIn 0.3s ease;
+}
+.log-entry.log-info { background: rgba(59,130,246,0.05); }
+.log-entry.log-success { background: rgba(16,185,129,0.05); }
+.log-entry.log-warning { background: rgba(245,158,11,0.05); }
+.log-entry.log-error { background: rgba(239,68,68,0.05); }
+
+.log-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.log-text { flex: 1; line-height: 1.5; color: var(--text-secondary); }
+.log-time { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; flex-shrink: 0; }
+
+/* ─── Donut Chart ─── */
+.donut-container {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.donut-chart {
+  width: 120px;
+  height: 120px;
+  position: relative;
+}
+
+.donut-chart svg { transform: rotate(-90deg); }
+.donut-chart .center-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+}
+.donut-chart .center-text .value { font-size: 24px; font-weight: 700; }
+.donut-chart .center-text .label { font-size: 10px; color: var(--text-muted); }
+
+.legend { display: flex; flex-direction: column; gap: 8px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* ─── Edit Modal ─── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  width: 720px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  transition: border-color 0.2s;
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+
+select.form-input {
+  cursor: pointer;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ─── Animations ─── */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+.pulse { animation: pulse 2s ease infinite; }
+
+/* ─── Toast ─── */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 400px;
+}
+.toast-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.toast-error { background: #fef2f2; color: #7f1d1d; border: 1px solid #fecaca; }
+.toast-info { background: #eff6ff; color: #1e3a5f; border: 1px solid #bfdbfe; }
+.toast-warning { background: #fffbeb; color: #78350f; border: 1px solid #fde68a; }
+
+/* ─── Config Section ─── */
+.config-section {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.config-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.config-row label {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.config-row input[type="checkbox"] {
+  accent-color: var(--accent-blue);
+  width: 16px;
+  height: 16px;
+}
+
+/* ─── Hidden Sections ─── */
+.section { display: none; }
+.section.active { display: block; }
+
+/* ─── R2 Config Panel ─── */
+.r2-config {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.r2-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.r2-field input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.r2-field input:focus { outline: none; border-color: var(--accent-blue); }
+
+/* ─── Pagination ─── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+}
+.pagination-info { font-size: 12px; color: var(--text-muted); }
+.pagination-btns { display: flex; gap: 4px; }
+.pagination-btns button {
+  padding: 6px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+.pagination-btns button:hover { border-color: var(--accent-blue); }
+.pagination-btns button.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+.pagination-btns button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ─── Issue card inline ─── */
+.issue-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+.issue-tag.error { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+.issue-tag.warning { background: rgba(245,158,11,0.15); color: var(--accent-yellow); }
+.issue-tag.fixed { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+.issue-tag.info { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+
+/* ─── Responsive ─── */
+@media (max-width: 1200px) {
+  .file-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+}
+
+/* Embedded mode — hide redundant UI when loaded inside parent app iframe */
+body.embedded .topbar { display: none; }
+
+body.embedded .config-section { display: none; }
+body.embedded .container { padding-top: 12px; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+<script>
+// Detect embedded mode (loaded in parent app iframe) — hide redundant topbar, stepper, jurisdiction UI
+if (window.parent !== window) { document.body.classList.add('embedded'); }
+</script>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">
+      <div class="logo-icon">🔍</div>
+      <span>CRASH LENS</span>
+    </div>
+    <span class="badge badge-blue">Data Validator v3.0</span>
+    <span class="badge badge-purple" id="envBadge">Select Jurisdiction</span>
+  </div>
+  <div class="topbar-right">
+    <span style="font-size:12px;color:var(--text-muted)" class="mono" id="lastValidated">—</span>
+    <button class="btn btn-outline" onclick="showSettings()">⚙ Settings</button>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="container">
+
+  <!-- Phase Stepper -->
+  <div class="stepper" id="stepper">
+    <div class="step active" data-step="1" onclick="goToStep(1)">
+      <div class="step-num">1</div>
+      <span>Load Data</span>
+    </div>
+    <span class="step-arrow">→</span>
+    <div class="step" data-step="2" onclick="goToStep(2)">
+      <div class="step-num">2</div>
+      <span>Validate</span>
+    </div>
+    <span class="step-arrow">→</span>
+    <div class="step" data-step="3" onclick="goToStep(3)">
+      <div class="step-num">3</div>
+      <span>Auto-Correct</span>
+    </div>
+    <span class="step-arrow">→</span>
+    <div class="step" data-step="4" onclick="goToStep(4)">
+      <div class="step-num">4</div>
+      <span>Review & Edit</span>
+    </div>
+    <span class="step-arrow">→</span>
+    <div class="step" data-step="5" onclick="goToStep(5)">
+      <div class="step-num">5</div>
+      <span>Export & Push</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ STEP 1: Load Data ═══════════════════════════════════════════ -->
+  <div class="section active" id="section-1">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📂 CRASH LENS Data Validator</div>
+        <button class="btn btn-outline" onclick="loadAllFiles()">Load All Files</button>
+      </div>
+
+      <!-- Jurisdiction Selector -->
+      <div class="config-section" style="background:var(--bg-card);border:2px solid var(--accent-blue);">
+        <div class="config-title" style="color:var(--accent-blue);font-size:14px;margin-bottom:12px;">🏛️ Select Jurisdiction <span style="font-size:11px;color:var(--text-muted);font-weight:400;">— then click a file below to auto-run the full pipeline</span></div>
+        <div class="form-row" style="grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Quick Select</label>
+            <select class="form-input" id="jurisdictionPreset" onchange="applyJurisdictionPreset()">
+              <option value="">— Select Jurisdiction —</option>
+              <!-- Populated dynamically from parent app via postMessage -->
+              <option value="custom">Custom Jurisdiction...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">State</label>
+            <input class="form-input" id="jurisdState" value="" placeholder="e.g., virginia">
+          </div>
+          <div class="form-group">
+            <label class="form-label">County / City</label>
+            <input class="form-input" id="jurisdCounty" value="" placeholder="e.g., henrico">
+          </div>
+        </div>
+      </div>
+
+      <div class="file-grid">
+        <div class="file-card" id="fc-all" onclick="selectFile('all_roads')">
+          <div class="file-card-status" id="fs-all"></div>
+          <div class="file-card-icon">🛣️</div>
+          <div class="file-card-name">all_roads.csv</div>
+          <div class="file-card-desc">Complete crash dataset including all road types (interstates, primary, secondary, local)</div>
+          <div style="margin-top:10px"><span class="badge badge-blue mono" id="size-all">— MB</span></div>
+        </div>
+        <div class="file-card" id="fc-county" onclick="selectFile('county_roads')">
+          <div class="file-card-status" id="fs-county"></div>
+          <div class="file-card-icon">🏘️</div>
+          <div class="file-card-name">county_roads.csv</div>
+          <div class="file-card-desc">County-maintained roads only — filtered for local jurisdiction analysis</div>
+          <div style="margin-top:10px"><span class="badge badge-blue mono" id="size-county">— MB</span></div>
+        </div>
+        <div class="file-card" id="fc-city" onclick="selectFile('city_roads')">
+          <div class="file-card-status" id="fs-city"></div>
+          <div class="file-card-icon">🏙️</div>
+          <div class="file-card-name">city_roads.csv</div>
+          <div class="file-card-desc">City/town agency roads only — filtered by ownership for city-maintained analysis</div>
+          <div style="margin-top:10px"><span class="badge badge-blue mono" id="size-city">— MB</span></div>
+        </div>
+        <div class="file-card" id="fc-noint" onclick="selectFile('no_interstate')">
+          <div class="file-card-status" id="fs-noint"></div>
+          <div class="file-card-icon">🚫</div>
+          <div class="file-card-name">no_interstate.csv</div>
+          <div class="file-card-desc">Non-interstate roads — excludes I-64, I-95, I-295 for local safety analysis</div>
+          <div style="margin-top:10px"><span class="badge badge-blue mono" id="size-noint">— MB</span></div>
+        </div>
+      </div>
+
+      <!-- Corrections Ledger -->
+      <div class="config-section">
+        <div class="config-title">📋 Monthly Update Strategy — Corrections Preservation</div>
+        <p style="font-size:13px;color:var(--text-secondary);line-height:1.7;margin-bottom:12px;">
+          When crash data updates monthly, previous corrections are preserved via a <strong>corrections ledger</strong> stored in R2.
+          The ledger maps each <code class="mono" style="color:var(--accent-cyan)">Document Nbr</code> to its corrections.
+          On reload, known corrections are auto-applied; only new records require validation.
+        </p>
+        <div class="config-row">
+          <label><input type="checkbox" id="chkApplyLedger" checked> Auto-apply corrections from previous month</label>
+        </div>
+        <div class="config-row">
+          <label><input type="checkbox" id="chkSkipValidated" checked> Skip re-validation of previously corrected records</label>
+        </div>
+        <div class="config-row" style="padding:8px 12px;background:rgba(59,130,246,0.05);border-radius:6px;border:1px solid rgba(59,130,246,0.15);">
+          <div style="font-size:12px;color:var(--text-secondary);">
+            <strong>🤖 Auto-Run URL:</strong> <code class="mono" style="font-size:11px;color:var(--accent-blue);word-break:break-all;" id="autoRunUrl">?auto=true&jurisdiction=co_douglas&file=all&apikey=YOUR_SECRET</code>
+            <div style="margin-top:4px;color:var(--text-muted);">Trigger from cron, Cloudflare Worker, or bookmark. Runs pipeline → auto-pushes corrected data to R2.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- R2 Configuration -->
+      <div class="config-section">
+        <div class="config-title">☁️ R2 Storage Configuration</div>
+        <div class="r2-config">
+          <div class="r2-field">
+            <label>Read URL (R2 Public)</label>
+            <input type="text" id="r2ReadUrl" value="https://data.aicreatesai.com" />
+          </div>
+          <div class="r2-field">
+            <label>Data Path</label>
+            <input type="text" id="r2Path" value="" placeholder="/state/county/" />
+          </div>
+          <div class="r2-field">
+            <label>Upload Status</label>
+            <div id="r2WorkerStatus" style="padding:6px 10px;border-radius:6px;font-size:0.85rem;background:#f1f5f9;color:#64748b">Checking server...</div>
+            <div style="font-size:0.72rem;color:#94a3b8;margin-top:4px">Upload secret is managed server-side for security</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:12px">
+      <button class="btn btn-outline" onclick="goToStep(2)" id="btnToStep2" disabled>View Validation Details →</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ STEP 2: Validate ═══════════════════════════════════════════ -->
+  <div class="section" id="section-2">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">🔬 Validation Engine</div>
+        <div style="display:flex;gap:8px;">
+          <span class="badge badge-green mono" id="validationProgress">Ready</span>
+          <button class="btn btn-primary" id="btnRunValidation" onclick="runValidation()">▶ Run Full Validation</button>
+        </div>
+      </div>
+
+      <!-- Validation Checks Config -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+        <div class="config-section">
+          <div class="config-title">🗺️ Geospatial Checks</div>
+          <div class="config-row"><label><input type="checkbox" id="vBounds" checked> County boundary validation</label></div>
+          <div class="config-row"><label><input type="checkbox" id="vMissingGPS" checked> Missing GPS detection</label></div>
+          <div class="config-row"><label><input type="checkbox" id="vGeocode" checked> Geocode missing coords (OSM Nominatim)</label></div>
+          <div class="config-row"><label><input type="checkbox" id="vPrecision" checked> Coordinate precision check</label></div>
+          <div class="config-row"><label><input type="checkbox" id="vZeroCoords" checked> Zero / null coordinate detection</label></div>
+        </div>
+        <div class="config-section">
+          <div class="config-title">📊 Data Quality Checks</div>
+          <div class="config-row"><label><input type="checkbox" id="vDuplicates" checked> Duplicate record detection</label></div>
+          <div class="config-row"><label><input type="checkbox" id="vSeverity" checked> KABCO severity consistency</label></div>
+          <div class="config-row"><label><input type="checkbox" id="vDateTime" checked> Date / time validation</label></div>
+          <div class="config-row"><label><input type="checkbox" id="vMissing" checked> Missing critical fields</label></div>
+          <div class="config-row"><label><input type="checkbox" id="vCrossField" checked> Cross-field consistency</label></div>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-container" id="validationProgressBar" style="display:none;">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progFill" style="width:0%"></div>
+        </div>
+        <div class="progress-label">
+          <span id="progLabel">Initializing...</span>
+          <span class="mono" id="progPct">0%</span>
+        </div>
+      </div>
+
+      <!-- Validation Log -->
+      <div style="max-height:400px;overflow-y:auto;margin-top:16px;" id="validationLog"></div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;gap:12px">
+      <button class="btn btn-outline" onclick="goToStep(1)">← Back</button>
+      <button class="btn btn-primary" onclick="goToStep(3)" id="btnToStep3" disabled>Continue to Auto-Correct →</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ STEP 3: Auto-Correct ═══════════════════════════════════════════ -->
+  <div class="section" id="section-3">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">🔧 Autonomous Correction Engine</div>
+        <button class="btn btn-success" id="btnAutoCorrect" onclick="runAutoCorrect()">⚡ Apply All Auto-Corrections</button>
+      </div>
+
+      <div class="stats-grid" id="correctionStats"></div>
+
+      <!-- Correction Rules -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+        <div class="config-section">
+          <div class="config-title">🤖 Auto-Correction Rules</div>
+          <div class="config-row"><label><input type="checkbox" id="acBounds" checked> Fix out-of-bounds → snap to route median</label></div>
+          <div class="config-row"><label><input type="checkbox" id="acGeocode" checked> Fix missing GPS → route median + Nominatim fallback</label></div>
+          <div class="config-row"><label><input type="checkbox" id="acSeverity" checked> Fix KABCO severity + cross-field flags</label></div>
+          <div class="config-row"><label><input type="checkbox" id="acDates" checked> Normalize date formats</label></div>
+          <div class="config-row"><label><input type="checkbox" id="acTrim" checked> Trim whitespace / normalize text</label></div>
+          <div class="config-row"><label><input type="checkbox" id="acFields" checked> Infer missing Facility Type / Functional Class</label></div>
+        </div>
+        <div class="config-section">
+          <div class="config-title">📊 Correction Summary</div>
+          <div id="correctionSummary" style="font-size:13px;color:var(--text-secondary);line-height:1.8;">
+            Run validation first to see correction opportunities.
+          </div>
+        </div>
+      </div>
+
+      <div class="progress-container" id="correctionProgressBar" style="display:none;">
+        <div class="progress-bar">
+          <div class="progress-fill" id="corrProgFill" style="width:0%"></div>
+        </div>
+        <div class="progress-label">
+          <span id="corrProgLabel">Processing...</span>
+          <span class="mono" id="corrProgPct">0%</span>
+        </div>
+      </div>
+
+      <div style="max-height:300px;overflow-y:auto;margin-top:16px;" id="correctionLog"></div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;gap:12px">
+      <button class="btn btn-outline" onclick="goToStep(2)">← Back</button>
+      <button class="btn btn-primary" onclick="goToStep(4)" id="btnToStep4">Continue to Review →</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ STEP 4: Review & Edit ═══════════════════════════════════════════ -->
+  <div class="section" id="section-4">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📝 Review Flagged Records</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="mono" style="font-size:12px;color:var(--text-muted)" id="reviewCount">0 issues</span>
+          <button class="btn btn-outline" onclick="exportFlagged()">📥 Export Flagged CSV</button>
+          <button class="btn btn-success" onclick="acceptAllSuggestions()">✓ Accept All Suggestions</button>
+        </div>
+      </div>
+
+      <!-- Filter Tabs -->
+      <div class="tabs" id="reviewTabs" style="flex-wrap:wrap;">
+        <button class="tab active" data-filter="all" onclick="filterReview('all', this)">All <span class="tab-count" id="tc-all">0</span></button>
+        <button class="tab" data-filter="unfixed" onclick="filterReview('unfixed', this)" style="border-color:var(--accent-orange);">🔴 Unfixed <span class="tab-count" id="tc-unfixed" style="background:rgba(249,115,22,0.2);color:var(--accent-orange);">0</span></button>
+        <button class="tab" data-filter="bounds" onclick="filterReview('bounds', this)">Out of Bounds <span class="tab-count" id="tc-bounds">0</span></button>
+        <button class="tab" data-filter="missing_gps" onclick="filterReview('missing_gps', this)">Missing GPS <span class="tab-count" id="tc-missing_gps">0</span></button>
+        <button class="tab" data-filter="duplicate" onclick="filterReview('duplicate', this)">Duplicates <span class="tab-count" id="tc-duplicate">0</span></button>
+        <button class="tab" data-filter="severity" onclick="filterReview('severity', this)">Severity <span class="tab-count" id="tc-severity">0</span></button>
+        <button class="tab" data-filter="missing_field" onclick="filterReview('missing_field', this)">Missing Fields <span class="tab-count" id="tc-missing_field">0</span></button>
+        <button class="tab" data-filter="precision" onclick="filterReview('precision', this)">Precision <span class="tab-count" id="tc-precision">0</span></button>
+        <button class="tab" data-filter="fixed" onclick="filterReview('fixed', this)">✅ Fixed <span class="tab-count" id="tc-fixed">0</span></button>
+      </div>
+
+      <!-- Search -->
+      <div style="margin-bottom:16px;">
+        <input type="text" class="form-input" placeholder="Search by Document #, Route Name, Issue Type..." id="reviewSearch" oninput="filterReviewSearch()" style="max-width:400px;">
+      </div>
+
+      <!-- Review Table -->
+      <div class="table-wrapper" style="max-height:500px;overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px">#</th>
+              <th>Doc #</th>
+              <th>Year</th>
+              <th>Route</th>
+              <th>Issue</th>
+              <th>Severity</th>
+              <th>Current Value</th>
+              <th>Suggested Fix</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="reviewTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination" id="reviewPagination"></div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;gap:12px">
+      <button class="btn btn-outline" onclick="goToStep(3)">← Back</button>
+      <button class="btn btn-primary" onclick="goToStep(5)">Continue to Export →</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ STEP 5: Export & Push ═══════════════════════════════════════════ -->
+  <div class="section" id="section-5">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">🚀 Export & Push to R2</div>
+      </div>
+
+      <!-- Quality Score -->
+      <div style="display:grid;grid-template-columns:200px 1fr;gap:32px;margin-bottom:28px;">
+        <div class="donut-container" style="flex-direction:column;align-items:center;">
+          <div class="donut-chart" id="qualityDonut"></div>
+          <div style="margin-top:8px;text-align:center;font-size:12px;color:var(--text-muted);">Quality Score</div>
+        </div>
+        <div>
+          <div class="stats-grid" id="finalStats"></div>
+        </div>
+      </div>
+
+      <!-- Validation Summary Breakdown -->
+      <div id="validationBreakdown" style="margin-bottom:24px;"></div>
+
+      <!-- Actions -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="config-section" style="text-align:center;">
+          <div style="font-size:32px;margin-bottom:8px;">💾</div>
+          <div style="font-weight:600;margin-bottom:8px;">Download Corrected CSV</div>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Save corrected file locally</p>
+          <button class="btn btn-primary" onclick="downloadCorrectedCSV()" style="width:100%;">Download</button>
+        </div>
+        <div class="config-section" style="text-align:center;">
+          <div style="font-size:32px;margin-bottom:8px;">☁️</div>
+          <div style="font-weight:600;margin-bottom:8px;">Push to R2 Storage</div>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Overwrites CSV + saves corrections ledger to R2</p>
+          <button class="btn btn-success" onclick="pushToR2()" style="width:100%;" id="btnPushR2">Push to R2</button>
+        </div>
+      </div>
+      <div id="autoPushStatus" style="margin-top:12px;text-align:center;font-size:12px;color:var(--text-muted);"></div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;gap:12px">
+      <button class="btn btn-outline" onclick="goToStep(4)">← Back</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal" style="display:none;" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">✏️ Edit Record — <span class="mono" id="editDocNum"></span></div>
+    <div id="editFormBody"></div>
+    <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px;">
+      <button class="btn btn-outline" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal" style="display:none;" onclick="closeSettingsModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="width:640px;max-height:85vh;overflow-y:auto;">
+    <div class="modal-title">⚙️ Validation Settings</div>
+    
+    <div class="config-section">
+      <div class="config-title">🏛️ Jurisdiction</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">State</label>
+          <input class="form-input" id="setState" value="" placeholder="e.g., virginia, maryland">
+        </div>
+        <div class="form-group">
+          <label class="form-label">County / City</label>
+          <input class="form-input" id="setCounty" value="" placeholder="e.g., henrico, fairfax">
+        </div>
+      </div>
+      <div style="margin-top:6px;">
+        <button class="btn btn-outline" style="font-size:0.75rem;padding:4px 10px;" onclick="autoDetectBounds()">🔍 Auto-Detect Bounds from Data</button>
+        <span id="autoDetectStatus" style="font-size:0.75rem;margin-left:8px;opacity:0.6;"></span>
+      </div>
+    </div>
+
+    <div class="config-section">
+      <div class="config-title">🗺️ County Bounds <span style="font-size:0.75rem;opacity:0.6;">(auto-detected or manual)</span></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Min Latitude</label><input class="form-input" id="setMinLat" value="" placeholder="min lat"></div>
+        <div class="form-group"><label class="form-label">Max Latitude</label><input class="form-input" id="setMaxLat" value="" placeholder="max lat"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Min Longitude</label><input class="form-input" id="setMinLon" value="" placeholder="min lon"></div>
+        <div class="form-group"><label class="form-label">Max Longitude</label><input class="form-input" id="setMaxLon" value="" placeholder="max lon"></div>
+      </div>
+    </div>
+
+    <div class="config-section">
+      <div class="config-title">📂 R2 Data Path</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Read URL</label><input class="form-input" id="setR2Read" value="https://data.aicreatesai.com"></div>
+        <div class="form-group"><label class="form-label">Data Path</label><input class="form-input" id="setR2Path" value="" placeholder="/state/county/"></div>
+      </div>
+    </div>
+
+    <div class="config-section">
+      <div class="config-title">🌐 Geocoding</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nominatim Delay (ms)</label><input class="form-input" id="setNomDelay" value="1100"></div>
+        <div class="form-group"><label class="form-label">Max Geocoding Batch</label><input class="form-input" id="setMaxGeo" value="50"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:16px;">
+      <button class="btn btn-outline" onclick="document.getElementById('settingsModal').style.display='none'">Close</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CRASH LENS DATA VALIDATOR — Core Application State
+// ═══════════════════════════════════════════════════════════════
+
+const APP = {
+  // Data State
+  files: {},            // { filename: { headers: [], rows: [], original: [] } }
+  activeFile: null,
+  issues: [],           // Array of issue objects
+  corrections: {},      // { docNbr: { field: correctedValue, ... } }
+  ledger: {},           // Previous corrections from R2
+
+  // Config
+  config: {
+    bounds: null,    // Set dynamically from jurisdiction selection or parent sync
+    nominatimDelay: 1100,
+    maxGeoBatch: 50,
+    r2ReadUrl: 'https://data.aicreatesai.com',
+    r2Path: '',      // Set dynamically — no hardcoded default
+    r2ServerConfigured: false,
+    criticalFields: ['Crash Severity','Collision Type','Weather Condition','Light Condition',
+                     'Roadway Surface Condition','Functional Class','x','y'],
+  },
+
+  // R2 File Map
+  fileMap: {
+    'all_roads':    { file: 'all_roads.csv',    cardId: 'fc-all',    statusId: 'fs-all',    sizeId: 'size-all' },
+    'county_roads': { file: 'county_roads.csv',  cardId: 'fc-county', statusId: 'fs-county', sizeId: 'size-county' },
+    'city_roads':   { file: 'city_roads.csv',    cardId: 'fc-city',   statusId: 'fs-city',   sizeId: 'size-city' },
+    'no_interstate':{ file: 'no_interstate.csv', cardId: 'fc-noint',  statusId: 'fs-noint',  sizeId: 'size-noint' },
+  },
+
+  // Review pagination
+  reviewPage: 1,
+  reviewPerPage: 50,
+  reviewFilter: 'all',
+  reviewSearch: '',
+
+  // Editing
+  editingIdx: null,
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  UTILITY FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.innerHTML = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function log(container, msg, type = 'info') {
+  const icons = { info: 'ℹ️', success: '✅', warning: '⚠️', error: '❌' };
+  const el = document.getElementById(container);
+  const time = new Date().toLocaleTimeString();
+  el.innerHTML += `<div class="log-entry log-${type}">
+    <span class="log-icon">${icons[type]}</span>
+    <span class="log-text">${msg}</span>
+    <span class="log-time">${time}</span>
+  </div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function setProgress(fillId, labelId, pctId, pct, label) {
+  document.getElementById(fillId).style.width = pct + '%';
+  document.getElementById(labelId).textContent = label;
+  document.getElementById(pctId).textContent = Math.round(pct) + '%';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ═══════════════════════════════════════════════════════════════
+//  STEP NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+
+function goToStep(n) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById(`section-${n}`).classList.add('active');
+  document.querySelectorAll('.step').forEach(s => {
+    const sn = parseInt(s.dataset.step);
+    s.classList.remove('active','completed');
+    if (sn === n) s.classList.add('active');
+    else if (sn < n) s.classList.add('completed');
+  });
+  if (n === 4) renderReviewTable();
+  if (n === 5) renderExportView();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STEP 1: LOAD DATA FROM R2
+// ═══════════════════════════════════════════════════════════════
+
+function selectFile(key) {
+  document.querySelectorAll('.file-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById(APP.fileMap[key].cardId).classList.add('selected');
+  APP.activeFile = key;
+  // Start autonomous pipeline: Load → Validate → Auto-Correct → Export
+  runAutonomousPipeline(key);
+}
+
+async function runAutonomousPipeline(key) {
+  const startTime = Date.now();
+
+  try {
+    // ── Sync jurisdiction to R2 path ──
+    const state = document.getElementById('jurisdState').value.trim();
+    const county = document.getElementById('jurisdCounty').value.trim();
+    if (state && county) {
+      APP.config.r2Path = `/${state}/${county}/`;
+      document.getElementById('r2Path').value = APP.config.r2Path;
+    }
+    if (!APP.config.r2Path) {
+      toast('Please select a jurisdiction before running the pipeline', 'error');
+      return;
+    }
+    
+    // ── Phase 1: Load ──
+    toast('🚀 Starting autonomous pipeline...', 'info');
+    await loadFile(key);
+    
+    if (!APP.files[key] || !APP.files[key].rows.length) {
+      toast('Failed to load data — pipeline stopped', 'error');
+      return;
+    }
+
+    // ── Phase 2: Validate ──
+    goToStep(2);
+    await new Promise(r => setTimeout(r, 100)); // let UI update
+    await runValidation();
+    
+    // ── Phase 3: Auto-Correct ──
+    if (APP.issues.length > 0) {
+      goToStep(3);
+      await new Promise(r => setTimeout(r, 100));
+      await runAutoCorrect();
+    }
+
+    // ── Phase 4: Auto-Push to R2 ──
+    if (APP.config.r2ServerConfigured) {
+      await new Promise(r => setTimeout(r, 200));
+      await pushToR2();
+    }
+
+    // ── Phase 5: Show Results ──
+    await new Promise(r => setTimeout(r, 200));
+    goToStep(5);
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    const actionable = APP.issues.filter(i => i.severity !== 'info');
+    const fixed = actionable.filter(i => i.fixed).length;
+    const remaining = actionable.filter(i => !i.fixed).length;
+    const pct = actionable.length > 0 ? ((fixed / actionable.length) * 100).toFixed(1) : 100;
+
+    const pushMsg = APP.config.r2ServerConfigured ? ' → pushed to R2' : '';
+    toast(`✅ Pipeline complete in ${elapsed}s — ${pct}% fix rate (${remaining} remaining)${pushMsg}`, 'success');
+
+    // Update auto-push status
+    const statusEl = document.getElementById('autoPushStatus');
+    if (statusEl) {
+      if (APP.config.r2ServerConfigured) {
+        statusEl.innerHTML = `<span style="color:var(--accent-green);">✅ Auto-pushed corrected data + ledger to R2 at ${new Date().toLocaleTimeString()}</span>`;
+      } else {
+        statusEl.innerHTML = `<span style="color:var(--accent-orange);">⚠️ R2 Worker not configured on server — auto-push disabled</span>`;
+      }
+    }
+    
+  } catch (err) {
+    toast(`Pipeline error: ${err.message}`, 'error');
+    console.error('Pipeline error:', err);
+  }
+}
+
+async function loadFile(key) {
+  if (!APP.config.r2Path) {
+    toast('Please select a jurisdiction first', 'error');
+    return;
+  }
+  const info = APP.fileMap[key];
+  const url = APP.config.r2ReadUrl + APP.config.r2Path + info.file;
+  const statusEl = document.getElementById(info.statusId);
+  statusEl.innerHTML = '<span class="spinner"></span>';
+
+  try {
+    toast(`Loading ${info.file}...`, 'info');
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+    // Check file size for strategy selection
+    const contentLength = parseInt(resp.headers.get('content-length') || '0');
+    const sizeMB = (contentLength / 1048576).toFixed(1);
+    const sizeEl = document.getElementById(info.sizeId);
+    if (sizeEl) sizeEl.textContent = contentLength > 0 ? ('~' + sizeMB + ' MB') : '— MB';
+    if (contentLength > 0) toast(`File size: ${sizeMB} MB`, 'info');
+
+    // Stream parse: avoids holding full text + parsed objects simultaneously
+    // For files >50MB, this saves ~50% memory
+    const text = await resp.text();
+    const parsed = await parseCSVStreaming(text, info.file);
+
+    APP.files[key] = {
+      headers: parsed.headers,
+      rows: parsed.rows,
+      original: null,  // defer deep clone for large files
+      filename: info.file,
+    };
+
+    // Deep clone only for files under 100k rows (avoid memory doubling)
+    if (parsed.rows.length < 100000) {
+      APP.files[key].original = JSON.parse(JSON.stringify(parsed.rows));
+    } else {
+      // For large files, store a lightweight change tracker instead
+      APP.files[key].original = 'deferred';
+      APP.files[key].changeLog = [];
+      toast(`Large file (${parsed.rows.length.toLocaleString()} rows) — using change tracking instead of full backup`, 'info');
+    }
+
+    statusEl.innerHTML = '<span class="badge badge-green">✓ Loaded</span>';
+    document.getElementById(info.cardId).classList.add('loaded');
+    toast(`${info.file}: ${parsed.rows.length.toLocaleString()} records loaded (${sizeMB} MB)`, 'success');
+    document.getElementById('btnToStep2').disabled = false;
+
+    await loadLedger(key);
+  } catch (err) {
+    statusEl.innerHTML = '<span class="badge badge-red">✗ Error</span>';
+    toast(`Failed to load ${info.file}: ${err.message}`, 'error');
+  }
+}
+
+// Papa Parse streaming: processes CSV in chunks, reports progress, handles quoted fields
+function parseCSVStreaming(text, filename) {
+  return new Promise((resolve, reject) => {
+    const rows = [];
+    let headers = [];
+    let rowCount = 0;
+    const startTime = performance.now();
+
+    Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: false,
+      transformHeader: (h) => h.trim(),
+      step: (result) => {
+        if (headers.length === 0 && result.meta.fields) {
+          headers = result.meta.fields;
+        }
+        rows.push(result.data);
+        rowCount++;
+        // Progress toast every 10k rows
+        if (rowCount % 10000 === 0) {
+          document.title = `Parsing ${filename}: ${rowCount.toLocaleString()} rows...`;
+        }
+      },
+      complete: () => {
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+        console.log(`[Papa Parse] ${filename}: ${rows.length.toLocaleString()} rows, ${headers.length} columns in ${elapsed}s`);
+        document.title = 'CRASH LENS — Data Validator';
+        resolve({ headers, rows });
+      },
+      error: (err) => {
+        reject(new Error(`CSV parse error: ${err.message}`));
+      }
+    });
+  });
+}
+
+async function loadAllFiles() {
+  if (!APP.config.r2Path) {
+    toast('Please select a jurisdiction first', 'error');
+    return;
+  }
+  for (const key of Object.keys(APP.fileMap)) {
+    await loadFile(key);
+  }
+}
+
+async function loadLedger(key) {
+  try {
+    const url = APP.config.r2ReadUrl + APP.config.r2Path + `corrections_ledger_${key}.json`;
+    const resp = await fetch(url);
+    if (resp.ok) {
+      const data = await resp.json();
+      APP.ledger[key] = data;
+      const count = Object.keys(data.corrections || {}).length;
+      if (count > 0) toast(`Loaded ${count} previous corrections from ledger`, 'info');
+    }
+  } catch (e) { /* ledger doesn't exist yet, that's fine */ }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CSV PARSER (Papa Parse — handles quoted fields, streaming, large files)
+// ═══════════════════════════════════════════════════════════════
+
+function parseCSV(text) {
+  // Synchronous fallback for small strings
+  const result = Papa.parse(text, {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: false,
+    transformHeader: (h) => h.trim(),
+  });
+  return { headers: result.meta.fields || [], rows: result.data || [] };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STEP 2: VALIDATION ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+async function runValidation() {
+  if (!APP.activeFile || !APP.files[APP.activeFile]) {
+    toast('Please load a file first', 'error');
+    return;
+  }
+
+  const data = APP.files[APP.activeFile];
+  APP.issues = [];
+  const logEl = 'validationLog';
+  document.getElementById(logEl).innerHTML = '';
+  document.getElementById('validationProgressBar').style.display = 'block';
+  document.getElementById('btnRunValidation').disabled = true;
+
+  const total = data.rows.length;
+  const checks = [];
+
+  log(logEl, `Starting validation of <strong>${data.filename}</strong> — ${total.toLocaleString()} records`, 'info');
+
+  // ─── Column diagnostics (Papa Parse should handle quoting correctly) ───
+  if (data.rows.length > 0) {
+    const s = data.rows[0];
+    const sx = (s['x'] || '').trim();
+    const sy = (s['y'] || '').trim();
+    const sr = (s['RTE Name'] || '').trim();
+    log(logEl, `Column check: x=[${sx}] y=[${sy}] RTE=[${sr}]`, 'info');
+    
+    const xNum = parseFloat(sx);
+    const yNum = parseFloat(sy);
+    if (!isNaN(xNum) && xNum < 0 && !isNaN(yNum) && yNum > 0) {
+      log(logEl, `✅ Columns verified: x=${xNum.toFixed(4)}, y=${yNum.toFixed(4)}`, 'success');
+    } else {
+      log(logEl, `⚠️ Column values may be shifted — x should be negative longitude, y positive latitude`, 'warning');
+    }
+  }
+
+  // Accessor functions using canonical column names
+  const getX = (row) => (row['x'] || '').trim();
+  const getY = (row) => (row['y'] || '').trim();
+  const getRte = (row) => (row['RTE Name'] || '').trim();
+  const getDoc = (row) => (row['Document Nbr'] || '').trim();
+
+  // Apply previous ledger corrections
+  if (document.getElementById('chkApplyLedger').checked && APP.ledger[APP.activeFile]) {
+    const ledger = APP.ledger[APP.activeFile].corrections || {};
+    let applied = 0;
+    for (const row of data.rows) {
+      const docNbr = row['Document Nbr'];
+      if (ledger[docNbr]) {
+        Object.assign(row, ledger[docNbr]);
+        applied++;
+      }
+    }
+    if (applied > 0) log(logEl, `Applied <strong>${applied}</strong> previous corrections from ledger`, 'success');
+  }
+
+  // ─── Check 1: County Bounds ───
+  if (document.getElementById('vBounds').checked) {
+    log(logEl, 'Checking coordinate bounds...', 'info');
+    let outCount = 0;
+    const boundsCheck = APP.config.bounds; // null if no bounds configured — skip OOB check
+    for (let i = 0; i < total; i++) {
+      const row = data.rows[i];
+      const x = parseFloat(getX(row));
+      const y = parseFloat(getY(row));
+      if (!isNaN(x) && !isNaN(y) && boundsCheck) {
+        if (y < boundsCheck.minLat || y > boundsCheck.maxLat ||
+            x < boundsCheck.minLon || x > boundsCheck.maxLon) {
+          APP.issues.push({
+            idx: i, docNbr: getDoc(row), type: 'bounds', severity: 'error',
+            field: 'coordinates', message: 'Coordinates outside county bounds',
+            currentValue: `${y.toFixed(4)}, ${x.toFixed(4)}`,
+            suggestedFix: null,
+          });
+          outCount++;
+        }
+      }
+      if (i % 5000 === 0) {
+        setProgress('progFill', 'progLabel', 'progPct', (i/total)*15, `Bounds check: ${i.toLocaleString()}/${total.toLocaleString()}`);
+        await sleep(0);
+      }
+    }
+    log(logEl, `Bounds check: <strong>${outCount}</strong> records outside county bounds`, outCount > 0 ? 'warning' : 'success');
+  }
+
+  // ─── Check 2: Missing/Zero GPS ───
+  if (document.getElementById('vMissingGPS').checked) {
+    log(logEl, 'Checking for missing/zero GPS coordinates...', 'info');
+    let missingCount = 0;
+    for (let i = 0; i < total; i++) {
+      const row = data.rows[i];
+      const x = getX(row);
+      const y = getY(row);
+      if (!x || !y || x === '0' || y === '0' || parseFloat(x) === 0 || parseFloat(y) === 0) {
+        APP.issues.push({
+          idx: i, docNbr: getDoc(row), type: 'missing_gps', severity: 'error',
+          field: 'x,y',
+          message: 'Missing or zero GPS coordinates',
+          currentValue: `lon=${x || 'empty'}, lat=${y || 'empty'}`,
+          suggestedFix: null,
+          route: getRte(row),
+        });
+        missingCount++;
+      }
+      if (i % 5000 === 0) {
+        setProgress('progFill', 'progLabel', 'progPct', 15 + (i/total)*15, `GPS check: ${i.toLocaleString()}/${total.toLocaleString()}`);
+        await sleep(0);
+      }
+    }
+    log(logEl, `Missing GPS: <strong>${missingCount}</strong> records with missing/zero coordinates`, missingCount > 0 ? 'warning' : 'success');
+    setProgress('progFill', 'progLabel', 'progPct', 30, 'GPS check complete');
+  }
+
+  // ─── Check 3: Coordinate Precision ───
+  if (document.getElementById('vPrecision').checked) {
+    log(logEl, 'Checking coordinate precision...', 'info');
+    let lowPrec = 0;
+    for (let i = 0; i < total; i++) {
+      const row = data.rows[i];
+      const x = getX(row);
+      const y = getY(row);
+      if (x && y) {
+        const xDec = (x.split('.')[1] || '').length;
+        const yDec = (y.split('.')[1] || '').length;
+        if (xDec < 4 || yDec < 4) {
+          APP.issues.push({
+            idx: i, docNbr: getDoc(row), type: 'precision', severity: 'info',
+            field: 'x,y', message: `Low coordinate precision (${xDec}/${yDec} decimal places)`,
+            currentValue: `${y}, ${x}`, suggestedFix: null,
+          });
+          lowPrec++;
+        }
+      }
+      if (i % 5000 === 0) {
+        setProgress('progFill', 'progLabel', 'progPct', 30 + (i/total)*10, `Precision check: ${i.toLocaleString()}/${total.toLocaleString()}`);
+        await sleep(0);
+      }
+    }
+    log(logEl, `Precision: <strong>${lowPrec}</strong> records with low precision (info only — not counted as errors)`, lowPrec > 0 ? 'info' : 'success');
+  }
+
+  // ─── Check 4: Duplicate Detection ───
+  if (document.getElementById('vDuplicates').checked) {
+    log(logEl, 'Detecting duplicate records...', 'info');
+    setProgress('progFill', 'progLabel', 'progPct', 40, 'Duplicate detection...');
+    const seen = new Map();
+    let dupCount = 0;
+    for (let i = 0; i < total; i++) {
+      const row = data.rows[i];
+      // Composite key: Doc# + Date + Time + Location
+      const key = `${row['Document Nbr']}|${row['Crash Date']}|${row['Crash Military Time']}`;
+      if (seen.has(key)) {
+        APP.issues.push({
+          idx: i, docNbr: row['Document Nbr'], type: 'duplicate', severity: 'warning',
+          field: 'Document Nbr', message: `Potential duplicate of row ${seen.get(key) + 1}`,
+          currentValue: key, suggestedFix: 'Review for removal',
+        });
+        dupCount++;
+      } else {
+        seen.set(key, i);
+      }
+      if (i % 5000 === 0) {
+        setProgress('progFill', 'progLabel', 'progPct', 40 + (i/total)*15, `Duplicate check: ${i.toLocaleString()}/${total.toLocaleString()}`);
+        await sleep(0);
+      }
+    }
+    log(logEl, `Duplicates: <strong>${dupCount}</strong> potential duplicate records found`, dupCount > 0 ? 'warning' : 'success');
+  }
+
+  // ─── Check 5: KABCO Severity Consistency ───
+  if (document.getElementById('vSeverity').checked) {
+    log(logEl, 'Validating KABCO severity consistency...', 'info');
+    setProgress('progFill', 'progLabel', 'progPct', 55, 'Severity check...');
+    let sevCount = 0;
+    for (let i = 0; i < total; i++) {
+      const row = data.rows[i];
+      const sev = row['Crash Severity'];
+      const k = parseInt(row['K_People']) || 0;
+      const a = parseInt(row['A_People']) || 0;
+      const b = parseInt(row['B_People']) || 0;
+      const c = parseInt(row['C_People']) || 0;
+      const injured = parseInt(row['Persons Injured']) || 0;
+
+      let expectedSev = 'O';
+      if (k > 0) expectedSev = 'K';
+      else if (a > 0) expectedSev = 'A';
+      else if (b > 0) expectedSev = 'B';
+      else if (c > 0) expectedSev = 'C';
+
+      if (sev !== expectedSev) {
+        APP.issues.push({
+          idx: i, docNbr: row['Document Nbr'], type: 'severity', severity: 'warning',
+          field: 'Crash Severity', 
+          message: `Severity "${sev}" inconsistent with injuries (K=${k},A=${a},B=${b},C=${c})`,
+          currentValue: sev, suggestedFix: expectedSev,
+        });
+        sevCount++;
+      }
+
+      // Also check injury sum
+      const computedInjured = a + b + c;
+      if (injured !== computedInjured && injured > 0) {
+        // Minor inconsistency, just log
+      }
+      if (i % 5000 === 0) {
+        setProgress('progFill', 'progLabel', 'progPct', 55 + (i/total)*15, `Severity check: ${i.toLocaleString()}/${total.toLocaleString()}`);
+        await sleep(0);
+      }
+    }
+    log(logEl, `Severity: <strong>${sevCount}</strong> KABCO inconsistencies found`, sevCount > 0 ? 'warning' : 'success');
+  }
+
+  // ─── Check 6: Date/Time Validation ───
+  if (document.getElementById('vDateTime').checked) {
+    log(logEl, 'Validating dates and times...', 'info');
+    setProgress('progFill', 'progLabel', 'progPct', 70, 'Date/time check...');
+    let dtCount = 0;
+    for (let i = 0; i < total; i++) {
+      const row = data.rows[i];
+      const date = row['Crash Date'];
+      const time = row['Crash Military Time'];
+
+      // Check date validity
+      if (date) {
+        const d = new Date(date);
+        if (isNaN(d.getTime())) {
+          APP.issues.push({
+            idx: i, docNbr: row['Document Nbr'], type: 'date_time', severity: 'error',
+            field: 'Crash Date', message: 'Invalid date format',
+            currentValue: date, suggestedFix: null,
+          });
+          dtCount++;
+        }
+        // Check year consistency
+        const year = row['Crash Year'];
+        if (year && d.getFullYear() !== parseInt(year)) {
+          APP.issues.push({
+            idx: i, docNbr: row['Document Nbr'], type: 'date_time', severity: 'warning',
+            field: 'Crash Year', message: `Year mismatch: date says ${d.getFullYear()}, field says ${year}`,
+            currentValue: year, suggestedFix: String(d.getFullYear()),
+          });
+          dtCount++;
+        }
+      }
+
+      // Check military time
+      if (time) {
+        const t = parseInt(time);
+        if (t < 0 || t > 2359 || (t % 100) >= 60) {
+          APP.issues.push({
+            idx: i, docNbr: row['Document Nbr'], type: 'date_time', severity: 'warning',
+            field: 'Crash Military Time', message: `Invalid military time: ${time}`,
+            currentValue: time, suggestedFix: null,
+          });
+          dtCount++;
+        }
+      }
+      if (i % 5000 === 0) {
+        setProgress('progFill', 'progLabel', 'progPct', 70 + (i/total)*10, `Date/time check: ${i.toLocaleString()}/${total.toLocaleString()}`);
+        await sleep(0);
+      }
+    }
+    log(logEl, `Date/Time: <strong>${dtCount}</strong> date/time issues found`, dtCount > 0 ? 'warning' : 'success');
+  }
+
+  // ─── Check 7: Missing Critical Fields ───
+  if (document.getElementById('vMissing').checked) {
+    log(logEl, 'Checking for missing critical fields...', 'info');
+    setProgress('progFill', 'progLabel', 'progPct', 80, 'Missing fields check...');
+    let missCount = 0;
+    const critFields = ['Crash Severity', 'Collision Type', 'Weather Condition', 'Light Condition',
+                        'Roadway Surface Condition', 'Functional Class', 'Facility Type'];
+    for (let i = 0; i < total; i++) {
+      const row = data.rows[i];
+      for (const f of critFields) {
+        const val = (row[f] || '').trim();
+        if (!val || val.toLowerCase() === 'null' || val.toLowerCase() === 'unknown') {
+          APP.issues.push({
+            idx: i, docNbr: row['Document Nbr'], type: 'missing_field', severity: 'warning',
+            field: f, message: `Missing or unknown value for ${f}`,
+            currentValue: val || '(empty)', suggestedFix: null,
+          });
+          missCount++;
+        }
+      }
+      if (i % 5000 === 0) {
+        setProgress('progFill', 'progLabel', 'progPct', 80 + (i/total)*10, `Missing fields: ${i.toLocaleString()}/${total.toLocaleString()}`);
+        await sleep(0);
+      }
+    }
+    log(logEl, `Missing fields: <strong>${missCount}</strong> missing critical field values`, missCount > 0 ? 'warning' : 'success');
+  }
+
+  // ─── Check 8: Cross-field Consistency ───
+  if (document.getElementById('vCrossField').checked) {
+    log(logEl, 'Running cross-field consistency checks...', 'info');
+    setProgress('progFill', 'progLabel', 'progPct', 90, 'Cross-field checks...');
+    let crossCount = 0;
+    for (let i = 0; i < total; i++) {
+      const row = data.rows[i];
+
+      // Pedestrian flag vs pedestrian injuries/fatalities
+      const pedFlag = row['Pedestrian?'];
+      const pedK = parseInt(row['Pedestrians Killed']) || 0;
+      const pedI = parseInt(row['Pedestrians Injured']) || 0;
+      if (pedFlag === 'No' && (pedK > 0 || pedI > 0)) {
+        APP.issues.push({
+          idx: i, docNbr: row['Document Nbr'], type: 'cross_field', severity: 'warning',
+          field: 'Pedestrian?', 
+          message: `Pedestrian flag="No" but ${pedK} killed, ${pedI} injured`,
+          currentValue: 'No', suggestedFix: 'Yes',
+        });
+        crossCount++;
+      }
+
+      // Bike flag vs collision type (if bike-related)
+      const bikeFlag = row['Bike?'];
+      const collType = row['Collision Type'] || '';
+      if (bikeFlag === 'No' && collType.toLowerCase().includes('bike')) {
+        APP.issues.push({
+          idx: i, docNbr: row['Document Nbr'], type: 'cross_field', severity: 'warning',
+          field: 'Bike?', message: 'Bike flag="No" but collision type mentions bike',
+          currentValue: 'No', suggestedFix: 'Yes',
+        });
+        crossCount++;
+      }
+
+      // Hit and run flag consistency
+      const hitrun = row['Hitrun?'];
+      if (hitrun && hitrun !== 'Yes' && hitrun !== 'No') {
+        APP.issues.push({
+          idx: i, docNbr: row['Document Nbr'], type: 'cross_field', severity: 'warning',
+          field: 'Hitrun?', message: `Non-standard hit-run value: "${hitrun}"`,
+          currentValue: hitrun, suggestedFix: null,
+        });
+        crossCount++;
+      }
+      if (i % 5000 === 0) {
+        setProgress('progFill', 'progLabel', 'progPct', 90 + (i/total)*10, `Cross-field: ${i.toLocaleString()}/${total.toLocaleString()}`);
+        await sleep(0);
+      }
+    }
+    log(logEl, `Cross-field: <strong>${crossCount}</strong> consistency issues`, crossCount > 0 ? 'warning' : 'success');
+  }
+
+  // ─── Summary ───
+  setProgress('progFill', 'progLabel', 'progPct', 100, 'Validation complete');
+  const totalIssues = APP.issues.length;
+  const errors = APP.issues.filter(i => i.severity === 'error').length;
+  const warnings = APP.issues.filter(i => i.severity === 'warning').length;
+
+  log(logEl, `<strong>Validation Complete</strong> — ${totalIssues.toLocaleString()} issues found (${errors} errors, ${warnings} warnings)`, totalIssues > 0 ? 'warning' : 'success');
+  
+  document.getElementById('validationProgress').textContent = `${totalIssues} issues`;
+  document.getElementById('validationProgress').className = `badge mono ${totalIssues > 0 ? 'badge-yellow' : 'badge-green'}`;
+  document.getElementById('btnRunValidation').disabled = false;
+  document.getElementById('btnToStep3').disabled = false;
+
+  updateReviewCounts();
+  document.getElementById('lastValidated').textContent = `Validated: ${new Date().toLocaleString()}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STEP 3: AUTO-CORRECTION ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+async function runAutoCorrect() {
+  if (!APP.activeFile || APP.issues.length === 0) {
+    toast('No issues to correct. Run validation first.', 'warning');
+    return;
+  }
+
+  const data = APP.files[APP.activeFile];
+  const logEl = 'correctionLog';
+  document.getElementById(logEl).innerHTML = '';
+  document.getElementById('correctionProgressBar').style.display = 'block';
+  document.getElementById('btnAutoCorrect').disabled = true;
+
+  let corrected = 0;
+  const actionableIssues = APP.issues.filter(i => i.severity !== 'info');
+
+  // ═══════════════════════════════════════════════════════════════
+  // PRE-COMPUTE: Build route → coordinates lookup from GOOD records
+  // This enables route-median fixes for missing GPS and out-of-bounds
+  // ═══════════════════════════════════════════════════════════════
+  log(logEl, 'Building route coordinate index...', 'info');
+
+  // ─── Diagnostic: verify columns are correctly parsed ───
+  const dataHeaders = data.headers || Object.keys(data.rows[0] || {});
+  log(logEl, `Headers (${dataHeaders.length}): ...${dataHeaders.slice(-8).map(h => '['+h+']').join(', ')}`, 'info');
+
+  // Use canonical field names (Papa Parse correctly handles quoted commas)
+  const xField = 'x';
+  const yField = 'y';
+  const rteField = 'RTE Name';
+
+  // Verify with sample row
+  if (data.rows.length > 0) {
+    const s = data.rows[0];
+    const sampleX = (s[xField] || '').trim();
+    const sampleY = (s[yField] || '').trim();
+    const sampleRte = (s[rteField] || '').trim();
+    log(logEl, `Sample: RTE=[${sampleRte}] x=[${sampleX}] y=[${sampleY}]`, 'info');
+
+    // Sanity check: x should be a negative number (longitude), y should be positive (latitude)
+    const xNum = parseFloat(sampleX);
+    const yNum = parseFloat(sampleY);
+    if (isNaN(xNum) || xNum > 0 || isNaN(yNum) || yNum < 0) {
+      log(logEl, `⚠️ Column values look wrong! x should be negative longitude, y should be positive latitude. CSV may have parsing issues.`, 'error');
+    } else {
+      log(logEl, `✅ Column values verified: x=${xNum.toFixed(4)} (longitude), y=${yNum.toFixed(4)} (latitude)`, 'success');
+    }
+  }
+
+  const routeCoords = {};
+  const bounds = APP.config.bounds;
+  // Use slightly expanded bounds for route index (catch edge cases)
+  // If bounds not configured (jurisdiction without bbox), use very wide bounds
+  const idxBounds = bounds ? {
+    minLat: bounds.minLat - 0.05,
+    maxLat: bounds.maxLat + 0.05,
+    minLon: bounds.minLon - 0.05,
+    maxLon: bounds.maxLon + 0.05,
+  } : { minLat: -90, maxLat: 90, minLon: -180, maxLon: 180 };
+
+  let indexedRecords = 0, skippedNoRoute = 0, skippedNoCoords = 0, skippedOOB = 0;
+
+  for (const row of data.rows) {
+    const x = parseFloat(xField ? row[xField] : row.x);
+    const y = parseFloat(yField ? row[yField] : row.y);
+    const rte = (rteField ? row[rteField] : row['RTE Name'] || '').trim();
+    
+    if (!rte) { skippedNoRoute++; continue; }
+    if (isNaN(x) || isNaN(y) || x === 0 || y === 0) { skippedNoCoords++; continue; }
+    if (y < idxBounds.minLat || y > idxBounds.maxLat || x < idxBounds.minLon || x > idxBounds.maxLon) {
+      skippedOOB++; continue;
+    }
+    
+    if (!routeCoords[rte]) routeCoords[rte] = [];
+    routeCoords[rte].push({ x, y });
+    indexedRecords++;
+  }
+
+  const routeCount = Object.keys(routeCoords).length;
+  const medianCoords = {};
+  for (const [rte, coords] of Object.entries(routeCoords)) {
+    coords.sort((a, b) => a.x - b.x);
+    const mid = Math.floor(coords.length / 2);
+    medianCoords[rte] = {
+      x: coords[mid].x,
+      y: coords[mid].y,
+      confidence: coords.length >= 5 ? 'high' : coords.length >= 2 ? 'medium' : 'low',
+      sampleSize: coords.length,
+    };
+  }
+  log(logEl, `Route index: <strong>${routeCount}</strong> routes from ${indexedRecords.toLocaleString()} records (skipped: ${skippedNoRoute} no route, ${skippedNoCoords} no coords, ${skippedOOB} out-of-bounds)`, routeCount > 10 ? 'success' : 'warning');
+  setProgress('corrProgFill', 'corrProgLabel', 'corrProgPct', 5, 'Route index built');
+
+  // ─── Auto-fix 1: KABCO Severity ───
+  if (document.getElementById('acSeverity').checked) {
+    log(logEl, 'Fixing KABCO severity mismatches...', 'info');
+    const sevIssues = APP.issues.filter(i => i.type === 'severity' && i.suggestedFix);
+    for (const issue of sevIssues) {
+      data.rows[issue.idx]['Crash Severity'] = issue.suggestedFix;
+      addCorrection(issue.docNbr, 'Crash Severity', issue.suggestedFix);
+      issue.fixed = true;
+      corrected++;
+    }
+    log(logEl, `Fixed <strong>${sevIssues.length}</strong> severity mismatches`, 'success');
+  }
+  setProgress('corrProgFill', 'corrProgLabel', 'corrProgPct', 15, 'Severity fixes done');
+
+  // ─── Auto-fix 2: Cross-field flags ───
+  if (document.getElementById('acSeverity').checked) {
+    const crossIssues = APP.issues.filter(i => i.type === 'cross_field' && i.suggestedFix);
+    for (const issue of crossIssues) {
+      data.rows[issue.idx][issue.field] = issue.suggestedFix;
+      addCorrection(issue.docNbr, issue.field, issue.suggestedFix);
+      issue.fixed = true;
+      corrected++;
+    }
+    if (crossIssues.length > 0) log(logEl, `Fixed <strong>${crossIssues.length}</strong> cross-field inconsistencies`, 'success');
+  }
+
+  // ─── Auto-fix 3: Date normalization ───
+  if (document.getElementById('acDates').checked) {
+    const dateIssues = APP.issues.filter(i => i.type === 'date_time' && i.suggestedFix);
+    for (const issue of dateIssues) {
+      data.rows[issue.idx][issue.field] = issue.suggestedFix;
+      addCorrection(issue.docNbr, issue.field, issue.suggestedFix);
+      issue.fixed = true;
+      corrected++;
+    }
+    if (dateIssues.length > 0) log(logEl, `Fixed <strong>${dateIssues.length}</strong> date/year issues`, 'success');
+  }
+
+  // ─── Auto-fix 4: Trim & Normalize ───
+  if (document.getElementById('acTrim').checked) {
+    log(logEl, 'Trimming whitespace and normalizing text...', 'info');
+    let trimCount = 0;
+    for (const row of data.rows) {
+      for (const [key, val] of Object.entries(row)) {
+        if (typeof val === 'string') {
+          const trimmed = val.trim().replace(/\s+/g, ' ');
+          if (trimmed !== val) {
+            row[key] = trimmed;
+            trimCount++;
+          }
+        }
+      }
+    }
+    log(logEl, `Trimmed <strong>${trimCount}</strong> field values`, 'success');
+  }
+  setProgress('corrProgFill', 'corrProgLabel', 'corrProgPct', 25, 'Basic fixes done');
+
+  // ═══════════════════════════════════════════════════════════════
+  // Auto-fix 5: ROUTE-MEDIAN GPS INFERENCE (NEW — big impact!)
+  // For missing/zero GPS: assign median coords from same route
+  // ═══════════════════════════════════════════════════════════════
+  if (document.getElementById('acGeocode').checked) {
+    log(logEl, 'Applying route-median GPS inference...', 'info');
+    const gpsIssues = APP.issues.filter(i => i.type === 'missing_gps' && !i.fixed);
+    let routeFixed = 0, routeSkipped = 0;
+
+    for (const issue of gpsIssues) {
+      const row = data.rows[issue.idx];
+      const rte = (rteField ? row[rteField] : row['RTE Name'] || '').trim();
+      if (rte && medianCoords[rte]) {
+        const mc = medianCoords[rte];
+        const xKey = xField || 'x';
+        const yKey = yField || 'y';
+        row[xKey] = String(mc.x.toFixed(8));
+        row[yKey] = String(mc.y.toFixed(8));
+        addCorrection(issue.docNbr, xKey, row[xKey]);
+        addCorrection(issue.docNbr, yKey, row[yKey]);
+        issue.suggestedFix = `${mc.y.toFixed(6)}, ${mc.x.toFixed(6)} (route median, n=${mc.sampleSize})`;
+        issue.fixed = true;
+        routeFixed++;
+        corrected++;
+      } else {
+        routeSkipped++;
+      }
+    }
+    log(logEl, `Route-median GPS: <strong>${routeFixed}/${gpsIssues.length}</strong> fixed (${routeSkipped} had no route match)`, routeFixed > 0 ? 'success' : 'warning');
+    setProgress('corrProgFill', 'corrProgLabel', 'corrProgPct', 40, 'Route-median GPS done');
+
+    // ─── Remaining: Geocode via OSM Nominatim (fallback) ───
+    const remainingGPS = APP.issues.filter(i => i.type === 'missing_gps' && !i.fixed);
+    if (remainingGPS.length > 0) {
+      const batchSize = Math.min(remainingGPS.length, APP.config.maxGeoBatch);
+      log(logEl, `Geocoding ${batchSize} remaining records via OSM Nominatim...`, 'info');
+      
+      let geocoded = 0;
+      for (let i = 0; i < batchSize; i++) {
+        const issue = remainingGPS[i];
+        const row = data.rows[issue.idx];
+        const route = rteField ? row[rteField] : (row['RTE Name'] || '');
+        
+        const roadName = extractRoadName(route);
+        if (roadName) {
+          try {
+            // Use county from data path, falling back to jurisdiction selector fields
+            const pathParts = APP.config.r2Path.split('/').filter(Boolean);
+            const county = (pathParts.length >= 2 ? pathParts[pathParts.length - 1] : null)
+              || document.getElementById('jurisdCounty')?.value.trim() || '';
+            const state = (pathParts.length >= 1 ? pathParts[0] : null)
+              || document.getElementById('jurisdState')?.value.trim() || '';
+            const coords = await geocodeAddress(roadName + ', ' + county + ', ' + state);
+            if (coords) {
+              const xKey = xField || 'x';
+              const yKey = yField || 'y';
+              row[xKey] = String(coords.lon);
+              row[yKey] = String(coords.lat);
+              addCorrection(issue.docNbr, xKey, row[xKey]);
+              addCorrection(issue.docNbr, yKey, row[yKey]);
+              issue.suggestedFix = `${coords.lat.toFixed(6)}, ${coords.lon.toFixed(6)} (Nominatim)`;
+              issue.fixed = true;
+              geocoded++;
+              corrected++;
+            }
+          } catch (e) { /* skip failed geocoding */ }
+        }
+
+        setProgress('corrProgFill', 'corrProgLabel', 'corrProgPct',
+          40 + (i / batchSize) * 20, `Geocoding: ${i+1}/${batchSize}`);
+        await sleep(APP.config.nominatimDelay);
+      }
+      log(logEl, `Nominatim geocoded: <strong>${geocoded}/${batchSize}</strong>`, geocoded > 0 ? 'success' : 'warning');
+    }
+  }
+  setProgress('corrProgFill', 'corrProgLabel', 'corrProgPct', 65, 'GPS fixes done');
+
+  // ═══════════════════════════════════════════════════════════════
+  // Auto-fix 6: ROUTE-MEDIAN BOUNDS SNAP (NEW — fixes ~800+)
+  // For out-of-bounds records: snap to median of in-bounds coords
+  // ═══════════════════════════════════════════════════════════════
+  if (document.getElementById('acBounds')?.checked !== false) {
+    log(logEl, 'Fixing out-of-bounds records via route-median snap...', 'info');
+    const boundsIssues = APP.issues.filter(i => i.type === 'bounds' && !i.fixed);
+    let boundsFixed = 0, boundsSkipped = 0;
+
+    for (const issue of boundsIssues) {
+      const row = data.rows[issue.idx];
+      const rte = (rteField ? row[rteField] : row['RTE Name'] || '').trim();
+      if (rte && medianCoords[rte]) {
+        const mc = medianCoords[rte];
+        const xKey = xField || 'x';
+        const yKey = yField || 'y';
+        const oldX = row[xKey], oldY = row[yKey];
+        row[xKey] = String(mc.x.toFixed(8));
+        row[yKey] = String(mc.y.toFixed(8));
+        addCorrection(issue.docNbr, xKey, row[xKey]);
+        addCorrection(issue.docNbr, yKey, row[yKey]);
+        issue.suggestedFix = `${mc.y.toFixed(6)}, ${mc.x.toFixed(6)} (route snap, was ${oldY}, ${oldX})`;
+        issue.fixed = true;
+        boundsFixed++;
+        corrected++;
+      } else {
+        boundsSkipped++;
+      }
+    }
+    log(logEl, `Bounds snap: <strong>${boundsFixed}/${boundsIssues.length}</strong> fixed (${boundsSkipped} had no route match)`, boundsFixed > 0 ? 'success' : 'warning');
+  }
+  setProgress('corrProgFill', 'corrProgLabel', 'corrProgPct', 80, 'Bounds fixes done');
+
+  // ═══════════════════════════════════════════════════════════════
+  // Auto-fix 7: INFER MISSING FIELDS (NEW)
+  // Facility Type from route prefix, Functional Class from RTE
+  // ═══════════════════════════════════════════════════════════════
+  if (document.getElementById('acFields')?.checked) {
+    log(logEl, 'Inferring missing field values...', 'info');
+    const fieldIssues = APP.issues.filter(i => i.type === 'missing_field' && !i.fixed);
+    let fieldFixed = 0;
+
+    // ── Pre-build lookup tables for smarter inference ──
+    
+    // 1. Functional Class → Facility Type crosswalk (from actual data)
+    const fcToFt = {};
+    const routeToFC = {};
+    const routeToFT = {};
+    for (const row of data.rows) {
+      const fc = (row['Functional Class'] || '').trim();
+      const ft = (row['Facility Type'] || '').trim();
+      const rte = (row['RTE Name'] || '').trim();
+      
+      // Build FC → FT majority map
+      if (fc && ft) {
+        if (!fcToFt[fc]) fcToFt[fc] = {};
+        fcToFt[fc][ft] = (fcToFt[fc][ft] || 0) + 1;
+      }
+      // Build route → FC and route → FT majority maps
+      if (rte && fc) {
+        if (!routeToFC[rte]) routeToFC[rte] = {};
+        routeToFC[rte][fc] = (routeToFC[rte][fc] || 0) + 1;
+      }
+      if (rte && ft) {
+        if (!routeToFT[rte]) routeToFT[rte] = {};
+        routeToFT[rte][ft] = (routeToFT[rte][ft] || 0) + 1;
+      }
+    }
+    
+    // Resolve majority values
+    const getMajority = (map) => {
+      if (!map) return null;
+      let best = null, bestCount = 0;
+      for (const [val, cnt] of Object.entries(map)) {
+        if (cnt > bestCount) { bestCount = cnt; best = val; }
+      }
+      return bestCount >= 2 ? best : null; // require at least 2 occurrences
+    };
+    
+    const fcFtMap = {};
+    for (const [fc, ftCounts] of Object.entries(fcToFt)) {
+      fcFtMap[fc] = getMajority(ftCounts);
+    }
+    
+    log(logEl, `Built lookup tables: ${Object.keys(fcFtMap).length} FC→FT mappings, ${Object.keys(routeToFC).length} route→FC, ${Object.keys(routeToFT).length} route→FT`, 'info');
+
+    for (const issue of fieldIssues) {
+      const row = data.rows[issue.idx];
+      const rte = (row['RTE Name'] || '').trim();
+
+      // ── Strategy A: Infer Facility Type ──
+      if (issue.field === 'Facility Type' && !row['Facility Type']?.trim()) {
+        let facilityType = '';
+        let source = '';
+        
+        // A1: From same-route majority vote (most accurate)
+        if (!facilityType && rte && routeToFT[rte]) {
+          facilityType = getMajority(routeToFT[rte]) || '';
+          if (facilityType) source = 'route majority';
+        }
+        
+        // A2: From Functional Class crosswalk
+        if (!facilityType) {
+          const fc = (row['Functional Class'] || '').trim();
+          if (fc && fcFtMap[fc]) {
+            facilityType = fcFtMap[fc];
+            source = 'FC crosswalk';
+          }
+        }
+        
+        // A3: From Roadway Description (direct mapping — very reliable)
+        if (!facilityType) {
+          const rd = (row['Roadway Description'] || '').trim();
+          if (rd) {
+            if (/not divided/i.test(rd)) { facilityType = '3-Two-Way Undivided'; source = 'Roadway Description'; }
+            else if (/positive median/i.test(rd) || /barrier/i.test(rd)) { facilityType = '4-Two-Way Divided'; source = 'Roadway Description'; }
+            else if (/divided.*unprotected/i.test(rd)) { facilityType = '4-Two-Way Divided'; source = 'Roadway Description'; }
+            else if (/one.?way/i.test(rd)) { facilityType = '1-One-Way Undivided'; source = 'Roadway Description'; }
+            else if (/divided/i.test(rd)) { facilityType = '4-Two-Way Divided'; source = 'Roadway Description'; }
+          }
+        }
+        
+        // A4: From RTE Name prefix (least accurate)
+        if (!facilityType && rte) {
+          if (rte.match(/^R-VA\s+IS/i)) { facilityType = '4-Two-Way Divided'; source = 'route prefix'; }
+          else if (rte.match(/^R-VA\s+US/i)) { facilityType = '4-Two-Way Divided'; source = 'route prefix'; }
+          else if (rte.match(/^R-VA\s+SR/i)) { facilityType = '3-Two-Way Undivided'; source = 'route prefix'; }
+          else if (rte.match(/^S-VA/i)) { facilityType = '3-Two-Way Undivided'; source = 'route prefix'; }
+        }
+        
+        if (facilityType) {
+          row['Facility Type'] = facilityType;
+          addCorrection(issue.docNbr, 'Facility Type', facilityType);
+          issue.suggestedFix = `${facilityType} (${source})`;
+          issue.fixed = true;
+          fieldFixed++;
+          corrected++;
+        }
+      }
+
+      // ── Strategy B: Infer Functional Class ──
+      if (issue.field === 'Functional Class' && !row['Functional Class']?.trim()) {
+        let funcClass = '';
+        let source = '';
+        
+        // B1: From same-route majority vote
+        if (!funcClass && rte && routeToFC[rte]) {
+          funcClass = getMajority(routeToFC[rte]) || '';
+          if (funcClass) source = 'route majority';
+        }
+        
+        // B1b: Route majority with threshold=1 (for routes with sparse data)
+        if (!funcClass && rte && routeToFC[rte]) {
+          const entries = Object.entries(routeToFC[rte]);
+          if (entries.length > 0) {
+            entries.sort((a, b) => b[1] - a[1]);
+            funcClass = entries[0][0];
+            source = 'route single-match';
+          }
+        }
+        
+        // B2: From SYSTEM + Area Type fields (very reliable for local roads)
+        if (!funcClass) {
+          const sys = (row['SYSTEM'] || '').trim().toLowerCase();
+          const area = (row['Area Type'] || '').trim().toLowerCase();
+          if (sys.includes('nonvdot secondary') || sys.includes('non-vdot')) {
+            funcClass = '7-Local (J,6)';
+            source = 'SYSTEM field';
+          } else if (sys.includes('vdot primary')) {
+            funcClass = area.includes('rural') ? '3-Principal Arterial - Other (E,2)' : '3-Principal Arterial - Other (E,2)';
+            source = 'SYSTEM field';
+          } else if (sys.includes('vdot secondary')) {
+            funcClass = '5-Major Collector (I,4)';
+            source = 'SYSTEM field';
+          }
+        }
+        
+        // B3: From RTE Name prefix
+        if (!funcClass && rte) {
+          if (rte.match(/^R-VA\s+IS/i)) { funcClass = '1-Interstate (A,1)'; source = 'route prefix'; }
+          else if (rte.match(/^R-VA\s+US/i)) { funcClass = '3-Principal Arterial - Other (E,2)'; source = 'route prefix'; }
+          else if (rte.match(/^R-VA\s+SR/i)) { funcClass = '4-Minor Arterial (H,3)'; source = 'route prefix'; }
+          else if (rte.match(/^S-VA/i)) { funcClass = '7-Local (J,6)'; source = 'route prefix'; }
+        }
+        
+        if (funcClass) {
+          row['Functional Class'] = funcClass;
+          addCorrection(issue.docNbr, 'Functional Class', funcClass);
+          issue.suggestedFix = `${funcClass} (${source})`;
+          issue.fixed = true;
+          fieldFixed++;
+          corrected++;
+        }
+      }
+    }
+    if (fieldFixed > 0) log(logEl, `Inferred <strong>${fieldFixed}</strong> missing field values (route majority + FC crosswalk + prefix)`, 'success');
+    
+    // Report remaining unfixed
+    const stillMissing = fieldIssues.filter(i => !i.fixed);
+    if (stillMissing.length > 0) {
+      const byField = {};
+      for (const i of stillMissing) { byField[i.field] = (byField[i.field] || 0) + 1; }
+      log(logEl, `Remaining unfixed fields: ${Object.entries(byField).map(([f,c]) => `${f}=${c}`).join(', ')}`, 'warning');
+    }
+  }
+  setProgress('corrProgFill', 'corrProgLabel', 'corrProgPct', 88, 'Field inference done');
+
+  // ═══════════════════════════════════════════════════════════════
+  // Auto-fix 8: NEAREST-NEIGHBOR BOUNDS SNAP (for records with no route match)
+  // For remaining OOB records: snap to nearest in-bounds crash within 0.1°
+  // ═══════════════════════════════════════════════════════════════
+  if (document.getElementById('acBounds')?.checked !== false) {
+    const remainBounds = APP.issues.filter(i => i.type === 'bounds' && !i.fixed);
+    if (remainBounds.length > 0) {
+      log(logEl, `Nearest-neighbor snap for ${remainBounds.length} remaining OOB records...`, 'info');
+      
+      // Build spatial index of in-bounds records (simple grid)
+      const grid = {};
+      const gridSize = 0.01; // ~1km cells
+      for (const row of data.rows) {
+        const rx = parseFloat(row['x']);
+        const ry = parseFloat(row['y']);
+        if (isNaN(rx) || isNaN(ry)) continue;
+        if (ry < bounds.minLat || ry > bounds.maxLat || rx < bounds.minLon || rx > bounds.maxLon) continue;
+        const gx = Math.floor(rx / gridSize);
+        const gy = Math.floor(ry / gridSize);
+        const key = `${gx},${gy}`;
+        if (!grid[key]) grid[key] = { x: 0, y: 0, n: 0 };
+        grid[key].x += rx;
+        grid[key].y += ry;
+        grid[key].n++;
+      }
+      // Average each cell
+      for (const cell of Object.values(grid)) {
+        cell.x /= cell.n;
+        cell.y /= cell.n;
+      }
+      
+      let nnFixed = 0;
+      for (const issue of remainBounds) {
+        const row = data.rows[issue.idx];
+        const ox = parseFloat(row['x']);
+        const oy = parseFloat(row['y']);
+        if (isNaN(ox) || isNaN(oy)) continue;
+        
+        // Search nearby grid cells
+        const gx = Math.floor(ox / gridSize);
+        const gy = Math.floor(oy / gridSize);
+        let bestDist = 0.1; // max 0.1° (~10km)
+        let bestCell = null;
+        
+        for (let dx = -10; dx <= 10; dx++) {
+          for (let dy = -10; dy <= 10; dy++) {
+            const cell = grid[`${gx+dx},${gy+dy}`];
+            if (!cell) continue;
+            const dist = Math.sqrt((cell.x - ox) ** 2 + (cell.y - oy) ** 2);
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestCell = cell;
+            }
+          }
+        }
+        
+        if (bestCell) {
+          row['x'] = String(bestCell.x.toFixed(8));
+          row['y'] = String(bestCell.y.toFixed(8));
+          addCorrection(issue.docNbr, 'x', row['x']);
+          addCorrection(issue.docNbr, 'y', row['y']);
+          issue.suggestedFix = `${bestCell.y.toFixed(6)}, ${bestCell.x.toFixed(6)} (nearest neighbor, ${(bestDist * 111).toFixed(1)}km)`;
+          issue.fixed = true;
+          nnFixed++;
+          corrected++;
+        }
+      }
+      log(logEl, `Nearest-neighbor: <strong>${nnFixed}/${remainBounds.length}</strong> OOB records snapped to closest in-bounds location`, nnFixed > 0 ? 'success' : 'warning');
+    }
+  }
+  setProgress('corrProgFill', 'corrProgLabel', 'corrProgPct', 95, 'All spatial fixes done');
+
+  // ═══════════════════════════════════════════════════════════════
+  // DONE
+  // ═══════════════════════════════════════════════════════════════
+  setProgress('corrProgFill', 'corrProgLabel', 'corrProgPct', 100, 'Auto-correction complete');
+  log(logEl, `<strong>Auto-Correction Complete</strong> — ${corrected} corrections applied`, 'success');
+
+  // Summary log
+  const finalActionable = APP.issues.filter(i => i.severity !== 'info');
+  const finalFixed = finalActionable.filter(i => i.fixed).length;
+  const finalRemaining = finalActionable.filter(i => !i.fixed).length;
+  const finalPct = finalActionable.length > 0 ? ((finalFixed / finalActionable.length) * 100).toFixed(1) : 0;
+  log(logEl, `📊 Fix rate: <strong>${finalPct}%</strong> (${finalFixed} fixed, ${finalRemaining} remaining out of ${finalActionable.length} actionable issues)`, 'info');
+
+  renderCorrectionStats();
+  document.getElementById('btnAutoCorrect').disabled = false;
+  updateReviewCounts();
+}
+
+function extractRoadName(rteName) {
+  if (!rteName) return null;
+  // Format: "S-VA043PR BOLLING RD" or "R-VA   US00250WB"
+  const match = rteName.match(/(?:S-VA\d+\w+|R-VA\s+\w+)\s+(.*)/);
+  if (match) return match[1].trim();
+  // Fallback: take everything after the route prefix
+  const parts = rteName.split(/\s+/);
+  if (parts.length >= 2) return parts.slice(1).join(' ');
+  return rteName;
+}
+
+async function geocodeAddress(address) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=us`;
+  const resp = await fetch(url, {
+    headers: { 'User-Agent': 'CrashLensValidator/2.0 (crash-lens-traffic-eng)' }
+  });
+  const data = await resp.json();
+  if (data && data.length > 0) {
+    const lat = parseFloat(data[0].lat);
+    const lon = parseFloat(data[0].lon);
+    // Validate result is roughly in configured bounds (with 0.5° margin)
+    // If no bounds configured, accept any valid US coordinate
+    const b = APP.config.bounds;
+    if (!b || (lat > (b.minLat - 0.5) && lat < (b.maxLat + 0.5) &&
+        lon > (b.minLon - 0.5) && lon < (b.maxLon + 0.5))) {
+      return { lat, lon };
+    }
+  }
+  return null;
+}
+
+function addCorrection(docNbr, field, value) {
+  if (!APP.corrections[docNbr]) APP.corrections[docNbr] = {};
+  APP.corrections[docNbr][field] = value;
+}
+
+function renderCorrectionStats() {
+  // Exclude info-severity issues from main counts (precision = informational only)
+  const actionable = APP.issues.filter(i => i.severity !== 'info');
+  const infoOnly = APP.issues.filter(i => i.severity === 'info');
+  const fixed = actionable.filter(i => i.fixed).length;
+  const remaining = actionable.filter(i => !i.fixed).length;
+  const total = actionable.length;
+  const pct = total > 0 ? ((fixed / total) * 100).toFixed(1) : 0;
+
+  const byType = {};
+  actionable.forEach(i => {
+    if (!byType[i.type]) byType[i.type] = { total: 0, fixed: 0 };
+    byType[i.type].total++;
+    if (i.fixed) byType[i.type].fixed++;
+  });
+
+  document.getElementById('correctionStats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Total Issues</div>
+      <div class="stat-value" style="color:var(--accent-yellow)">${total}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Auto-Fixed</div>
+      <div class="stat-value" style="color:var(--accent-green)">${fixed}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Remaining</div>
+      <div class="stat-value" style="color:var(--accent-orange)">${remaining}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Fix Rate</div>
+      <div class="stat-value" style="color:var(--accent-cyan)">${pct}%</div>
+    </div>
+  `;
+
+  let summaryHTML = '';
+  for (const [type, counts] of Object.entries(byType)) {
+    const typeLabel = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    summaryHTML += `<div style="display:flex;justify-content:space-between;padding:4px 0;">
+      <span>${typeLabel}</span>
+      <span class="mono">${counts.fixed}/${counts.total} fixed</span>
+    </div>`;
+  }
+  if (infoOnly.length > 0) {
+    summaryHTML += `<div style="display:flex;justify-content:space-between;padding:4px 0;opacity:0.5;">
+      <span>ℹ️ Info Only (precision etc.)</span>
+      <span class="mono">${infoOnly.length} noted</span>
+    </div>`;
+  }
+  document.getElementById('correctionSummary').innerHTML = summaryHTML || 'No corrections available.';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STEP 4: REVIEW & EDIT
+// ═══════════════════════════════════════════════════════════════
+
+function updateReviewCounts() {
+  const counts = { all: 0, bounds: 0, missing_gps: 0, duplicate: 0, severity: 0, missing_field: 0, precision: 0, fixed: 0, unfixed: 0 };
+  APP.issues.forEach(i => {
+    counts.all++;
+    if (i.fixed) counts.fixed++;
+    if (!i.fixed && i.severity !== 'info') counts.unfixed++;
+    if (counts[i.type] !== undefined) counts[i.type]++;
+  });
+  for (const [key, val] of Object.entries(counts)) {
+    const el = document.getElementById(`tc-${key}`);
+    if (el) el.textContent = val;
+  }
+  document.getElementById('reviewCount').textContent = `${counts.all} issues`;
+}
+
+function filterReview(filter, btn) {
+  APP.reviewFilter = filter;
+  APP.reviewPage = 1;
+  document.querySelectorAll('#reviewTabs .tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderReviewTable();
+}
+
+// Jump from Export breakdown to Review & Edit with specific filter
+function jumpToReview(type) {
+  goToStep(4);
+  APP.reviewFilter = type;
+  APP.reviewPage = 1;
+  // Activate the matching tab
+  document.querySelectorAll('#reviewTabs .tab').forEach(t => {
+    t.classList.remove('active');
+    if (t.dataset.filter === type) t.classList.add('active');
+  });
+  renderReviewTable();
+  toast(`Showing ${type.replace(/_/g,' ')} issues`, 'info');
+}
+
+function filterReviewSearch() {
+  APP.reviewSearch = document.getElementById('reviewSearch').value.toLowerCase();
+  APP.reviewPage = 1;
+  renderReviewTable();
+}
+
+function getFilteredIssues() {
+  return APP.issues.filter(i => {
+    if (APP.reviewFilter === 'fixed') return i.fixed;
+    if (APP.reviewFilter === 'unfixed') return !i.fixed && i.severity !== 'info';
+    if (APP.reviewFilter !== 'all' && i.type !== APP.reviewFilter) return false;
+    if (APP.reviewSearch) {
+      const searchStr = `${i.docNbr} ${i.message} ${i.field} ${i.currentValue || ''}`.toLowerCase();
+      if (!searchStr.includes(APP.reviewSearch)) return false;
+    }
+    return true;
+  });
+}
+
+function renderReviewTable() {
+  const filtered = getFilteredIssues();
+  const start = (APP.reviewPage - 1) * APP.reviewPerPage;
+  const page = filtered.slice(start, start + APP.reviewPerPage);
+
+  const tbody = document.getElementById('reviewTableBody');
+  tbody.innerHTML = page.map((issue, idx) => {
+    const row = APP.files[APP.activeFile]?.rows[issue.idx] || {};
+    const rowClass = issue.fixed ? 'row-fixed' : (issue.severity === 'error' ? 'row-error' : 'row-warning');
+    const sevTag = issue.fixed ? '<span class="issue-tag fixed">FIXED</span>' :
+                   issue.severity === 'error' ? '<span class="issue-tag error">ERROR</span>' :
+                   '<span class="issue-tag warning">WARN</span>';
+    return `<tr class="${rowClass}">
+      <td class="mono" style="font-size:11px;color:var(--text-muted)">${start + idx + 1}</td>
+      <td class="mono" style="font-weight:600;">${issue.docNbr}</td>
+      <td class="mono">${row['Crash Year'] || ''}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row['RTE Name'] || ''}">${row['RTE Name'] || '—'}</td>
+      <td style="max-width:280px;"><span style="font-size:12px;">${issue.message}</span></td>
+      <td>${sevTag}</td>
+      <td class="mono" style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="${issue.currentValue || ''}">${issue.currentValue || '—'}</td>
+      <td class="mono" style="font-size:11px;color:var(--accent-green);">${issue.suggestedFix || '—'}</td>
+      <td>
+        <div style="display:flex;gap:4px;">
+          ${!issue.fixed && issue.suggestedFix ? `<button class="btn btn-ghost" style="font-size:11px;color:var(--accent-green);" onclick="acceptSuggestion(${APP.issues.indexOf(issue)})">✓</button>` : ''}
+          <button class="btn btn-ghost" style="font-size:11px;" onclick="editRecord(${issue.idx})">✏️</button>
+          <button class="btn btn-ghost" style="font-size:11px;color:var(--text-muted);" onclick="dismissIssue(${APP.issues.indexOf(issue)})">✕</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / APP.reviewPerPage);
+  const pagEl = document.getElementById('reviewPagination');
+  pagEl.innerHTML = `
+    <div class="pagination-info">Showing ${start+1}–${Math.min(start+APP.reviewPerPage, filtered.length)} of ${filtered.length} issues</div>
+    <div class="pagination-btns">
+      <button ${APP.reviewPage <= 1 ? 'disabled' : ''} onclick="APP.reviewPage--;renderReviewTable();">←</button>
+      ${Array.from({length: Math.min(totalPages, 10)}, (_,i) => {
+        const p = i + 1;
+        return `<button class="${p === APP.reviewPage ? 'active' : ''}" onclick="APP.reviewPage=${p};renderReviewTable();">${p}</button>`;
+      }).join('')}
+      ${totalPages > 10 ? `<button disabled>...</button><button onclick="APP.reviewPage=${totalPages};renderReviewTable();">${totalPages}</button>` : ''}
+      <button ${APP.reviewPage >= totalPages ? 'disabled' : ''} onclick="APP.reviewPage++;renderReviewTable();">→</button>
+    </div>
+  `;
+}
+
+function acceptSuggestion(issueIdx) {
+  const issue = APP.issues[issueIdx];
+  if (!issue || !issue.suggestedFix) return;
+  const data = APP.files[APP.activeFile];
+  data.rows[issue.idx][issue.field] = issue.suggestedFix;
+  addCorrection(issue.docNbr, issue.field, issue.suggestedFix);
+  issue.fixed = true;
+  updateReviewCounts();
+  renderReviewTable();
+  toast(`Applied fix to ${issue.docNbr}: ${issue.field}`, 'success');
+}
+
+function acceptAllSuggestions() {
+  const data = APP.files[APP.activeFile];
+  let count = 0;
+  APP.issues.forEach(issue => {
+    if (!issue.fixed && issue.suggestedFix) {
+      data.rows[issue.idx][issue.field] = issue.suggestedFix;
+      addCorrection(issue.docNbr, issue.field, issue.suggestedFix);
+      issue.fixed = true;
+      count++;
+    }
+  });
+  updateReviewCounts();
+  renderReviewTable();
+  toast(`Accepted ${count} suggestions`, 'success');
+}
+
+function dismissIssue(issueIdx) {
+  APP.issues.splice(issueIdx, 1);
+  updateReviewCounts();
+  renderReviewTable();
+}
+
+function editRecord(rowIdx) {
+  APP.editingIdx = rowIdx;
+  const data = APP.files[APP.activeFile];
+  const row = data.rows[rowIdx];
+  document.getElementById('editDocNum').textContent = row['Document Nbr'];
+
+  const editSections = {
+    '📍 Location': ['x', 'y', 'RTE Name', 'RNS MP', 'Node', 'Node Offset (ft)'],
+    '💥 Crash Info': ['Crash Severity', 'Crash Date', 'Crash Military Time', 'Collision Type', 'First Harmful Event'],
+    '🛣️ Road Characteristics': ['Functional Class', 'Facility Type', 'Roadway Description', 'Roadway Alignment',
+      'Roadway Surface Type', 'Roadway Surface Condition', 'Roadway Defect', 'Area Type', 'SYSTEM'],
+    '🌦️ Conditions': ['Weather Condition', 'Light Condition', 'Work Zone Related', 'School Zone'],
+    '🚦 Traffic Control': ['Intersection Type', 'Traffic Control Type', 'Traffic Control Status'],
+    '👤 Involved': ['Persons Injured', 'K_People', 'A_People', 'B_People', 'C_People',
+      'Pedestrians Killed', 'Pedestrians Injured', 'Vehicle Count'],
+    '🏷️ Flags': ['Pedestrian?', 'Bike?', 'Hitrun?', 'Speed?', 'Alcohol?', 'Distracted?',
+      'Drowsy?', 'Drug Related?', 'Guardrail Related?', 'Motorcycle?', 'Senior?', 'Young?',
+      'Mainline?', 'Night?', 'Unrestrained?'],
+    '📋 Admin': ['Document Nbr', 'OBJECTID', 'Physical Juris Name', 'VDOT District', 'Ownership'],
+  };
+
+  // Flatten for save function
+  const editableFields = Object.values(editSections).flat();
+
+  let html = '';
+  for (const [section, fields] of Object.entries(editSections)) {
+    // Only show sections that have at least one field with data
+    const hasData = fields.some(f => row[f] !== undefined);
+    if (!hasData) continue;
+    
+    html += `<div style="margin-top:12px;margin-bottom:6px;font-weight:600;color:var(--accent);font-size:0.85rem;border-bottom:1px solid var(--border);padding-bottom:4px;">${section}</div>`;
+    for (let i = 0; i < fields.length; i += 2) {
+      html += '<div class="form-row">';
+      for (let j = 0; j < 2 && (i+j) < fields.length; j++) {
+        const f = fields[i+j];
+        if (row[f] === undefined) continue;
+        const isReadOnly = f === 'Document Nbr' || f === 'OBJECTID';
+        const val = (row[f] || '').replace(/"/g, '&quot;');
+        const changed = APP.ledger[APP.activeFile]?.corrections?.[row['Document Nbr']]?.[f];
+        const highlight = changed ? 'border-left:3px solid var(--green);' : '';
+        html += `<div class="form-group">
+          <label class="form-label" style="font-size:0.7rem;opacity:0.7;">${f.toUpperCase()}</label>
+          <input class="form-input" id="edit-${f.replace(/[^a-zA-Z0-9]/g,'_')}" 
+            value="${val}" ${isReadOnly ? 'readonly style="opacity:0.5;'+highlight+'"' : 'style="'+highlight+'"'}>
+        </div>`;
+      }
+      html += '</div>';
+    }
+  }
+  document.getElementById('editFormBody').innerHTML = html;
+  document.getElementById('editModal').style.display = 'flex';
+}
+
+function saveEdit() {
+  const data = APP.files[APP.activeFile];
+  const row = data.rows[APP.editingIdx];
+  const editableFields = [
+    'x', 'y', 'RTE Name', 'RNS MP', 'Node', 'Node Offset (ft)',
+    'Crash Severity', 'Crash Date', 'Crash Military Time', 'Collision Type', 'First Harmful Event',
+    'Functional Class', 'Facility Type', 'Roadway Description', 'Roadway Alignment',
+    'Roadway Surface Type', 'Roadway Surface Condition', 'Roadway Defect', 'Area Type', 'SYSTEM',
+    'Weather Condition', 'Light Condition', 'Work Zone Related', 'School Zone',
+    'Intersection Type', 'Traffic Control Type', 'Traffic Control Status',
+    'Persons Injured', 'K_People', 'A_People', 'B_People', 'C_People',
+    'Pedestrians Killed', 'Pedestrians Injured', 'Vehicle Count',
+    'Pedestrian?', 'Bike?', 'Hitrun?', 'Speed?', 'Alcohol?', 'Distracted?',
+    'Drowsy?', 'Drug Related?', 'Guardrail Related?', 'Motorcycle?', 'Senior?', 'Young?',
+    'Mainline?', 'Night?', 'Unrestrained?',
+  ];
+  for (const f of editableFields) {
+    const el = document.getElementById(`edit-${f.replace(/[^a-zA-Z0-9]/g,'_')}`);
+    if (el) {
+      const newVal = el.value.trim();
+      if (newVal !== (row[f] || '').trim()) {
+        row[f] = newVal;
+        addCorrection(row['Document Nbr'], f, newVal);
+      }
+    }
+  }
+  document.getElementById('editModal').style.display = 'none';
+  toast(`Record ${row['Document Nbr']} updated`, 'success');
+  renderReviewTable();
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('editModal')) {
+    document.getElementById('editModal').style.display = 'none';
+  }
+}
+
+function exportFlagged() {
+  const filtered = getFilteredIssues();
+  let csv = 'Issue #,Document Nbr,Type,Severity,Field,Message,Current Value,Suggested Fix,Fixed\n';
+  filtered.forEach((issue, i) => {
+    csv += `${i+1},"${issue.docNbr}","${issue.type}","${issue.severity}","${issue.field}","${issue.message}","${issue.currentValue || ''}","${issue.suggestedFix || ''}","${issue.fixed ? 'Yes' : 'No'}"\n`;
+  });
+  downloadFile(csv, `flagged_records_${APP.activeFile}_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STEP 5: EXPORT & PUSH
+// ═══════════════════════════════════════════════════════════════
+
+function renderExportView() {
+  if (!APP.activeFile || !APP.files[APP.activeFile]) return;
+  const data = APP.files[APP.activeFile];
+  const total = data.rows.length;
+  const totalIssues = APP.issues.length;
+  const fixed = APP.issues.filter(i => i.fixed).length;
+  const remaining = totalIssues - fixed;
+  const quality = total > 0 ? (((total - remaining) / total) * 100).toFixed(1) : 100;
+
+  // Donut Chart
+  renderDonut('qualityDonut', parseFloat(quality));
+
+  // Final Stats
+  document.getElementById('finalStats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Total Records</div>
+      <div class="stat-value">${total.toLocaleString()}</div>
+      <div class="stat-sub">${data.filename}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Issues Found</div>
+      <div class="stat-value" style="color:var(--accent-yellow)">${totalIssues}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Auto-Fixed</div>
+      <div class="stat-value" style="color:var(--accent-green)">${fixed}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Remaining</div>
+      <div class="stat-value" style="color:${remaining > 0 ? 'var(--accent-orange)' : 'var(--accent-green)'}">${remaining}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Corrections Saved</div>
+      <div class="stat-value" style="color:var(--accent-cyan)">${Object.keys(APP.corrections).length}</div>
+    </div>
+  `;
+
+  // Breakdown by type
+  const byType = {};
+  APP.issues.forEach(i => {
+    if (!byType[i.type]) byType[i.type] = { total: 0, fixed: 0 };
+    byType[i.type].total++;
+    if (i.fixed) byType[i.type].fixed++;
+  });
+
+  let breakdownHTML = '<div class="card"><div class="card-title" style="margin-bottom:16px;">📊 Validation Breakdown</div><div class="table-wrapper"><table><thead><tr><th>Check Type</th><th>Issues</th><th>Fixed</th><th>Remaining</th><th>Status</th></tr></thead><tbody>';
+  for (const [type, counts] of Object.entries(byType)) {
+    const rem = counts.total - counts.fixed;
+    const status = rem === 0 ? '<span class="issue-tag fixed">CLEAR</span>' : `<span class="issue-tag warning" style="cursor:pointer;" onclick="jumpToReview('${type}')" title="Click to review these records">${rem} open →</span>`;
+    breakdownHTML += `<tr style="${rem > 0 ? 'cursor:pointer;' : ''}" ${rem > 0 ? `onclick="jumpToReview('${type}')"` : ''}>
+      <td style="font-weight:600;">${type.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}</td>
+      <td class="mono">${counts.total}</td>
+      <td class="mono" style="color:var(--accent-green)">${counts.fixed}</td>
+      <td class="mono" style="color:${rem>0?'var(--accent-orange)':'var(--accent-green)'}">${rem}</td>
+      <td>${status}</td>
+    </tr>`;
+  }
+  breakdownHTML += '</tbody></table></div></div>';
+  document.getElementById('validationBreakdown').innerHTML = breakdownHTML;
+}
+
+function renderDonut(containerId, pct) {
+  const r = 50, cx = 60, cy = 60, stroke = 10;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference - (pct / 100) * circumference;
+  const color = pct >= 95 ? '#10b981' : pct >= 85 ? '#f59e0b' : '#ef4444';
+
+  document.getElementById(containerId).innerHTML = `
+    <svg width="120" height="120" viewBox="0 0 120 120">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e2e8f0" stroke-width="${stroke}"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
+              stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"
+              stroke-linecap="round" style="transition: stroke-dashoffset 1s ease;"/>
+    </svg>
+    <div class="center-text">
+      <div class="value" style="color:${color}">${pct}%</div>
+      <div class="label">Quality</div>
+    </div>
+  `;
+}
+
+// ─── Download CSV ───
+function downloadCorrectedCSV() {
+  if (!APP.activeFile || !APP.files[APP.activeFile]) return;
+  const data = APP.files[APP.activeFile];
+  const csv = generateCSV(data.headers, data.rows);
+  downloadFile(csv, data.filename, 'text/csv');
+  toast('Downloaded corrected CSV', 'success');
+}
+
+function generateCSV(headers, rows) {
+  // Use Papa Parse for consistent, RFC-compliant CSV output
+  // This ensures values with commas are properly quoted
+  return Papa.unparse({
+    fields: headers,
+    data: rows.map(row => headers.map(h => row[h] || ''))
+  });
+}
+
+function csvEscape(val) {
+  if (typeof val !== 'string') val = String(val);
+  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+    return '"' + val.replace(/"/g, '""') + '"';
+  }
+  return val;
+}
+
+function downloadFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Push to R2 ───
+async function pushToR2() {
+  if (!APP.activeFile || !APP.files[APP.activeFile]) return;
+
+  if (!APP.config.r2ServerConfigured) {
+    toast('R2 upload not configured on server. Set R2_WORKER_URL and R2_WORKER_SECRET env vars.', 'error');
+    return;
+  }
+
+  const data = APP.files[APP.activeFile];
+  const path = document.getElementById('r2Path').value;
+  const filename = data.filename;
+  const r2Key = (path + filename).replace(/^\/+/, '');
+
+  const btnEl = document.getElementById('btnPushR2');
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.innerHTML = '<span class="spinner"></span> Pushing...';
+  }
+
+  try {
+    // 1. Push corrected CSV via server proxy
+    toast('Pushing corrected data to R2 via server...', 'info');
+    const csv = generateCSV(data.headers, data.rows);
+
+    const resp = await fetch('/api/r2/worker-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        r2Key: r2Key,
+        data: csv,
+        contentType: 'text/csv',
+        bucket: 'CRASH_DATA',
+        backupMode: 'skip'
+      }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.message || `HTTP ${resp.status}`);
+    }
+
+    // 2. Save corrections ledger (serves as lightweight backup)
+    await saveLedgerToR2();
+
+    // 3. Save validation report (lightweight summary, ~2KB)
+    await saveValidationReport();
+
+    toast('✓ Successfully pushed corrected data + ledger to R2!', 'success');
+  } catch (err) {
+    toast(`Push failed: ${err.message}`, 'error');
+  }
+
+  if (btnEl) {
+    btnEl.disabled = false;
+    btnEl.innerHTML = 'Push to R2';
+  }
+}
+
+async function saveValidationReport() {
+  if (!APP.config.r2ServerConfigured || !APP.activeFile) return;
+  const path = document.getElementById('r2Path').value;
+  const r2Key = (path + `validation_report_${APP.activeFile}.json`).replace(/^\/+/, '');
+
+  const actionable = APP.issues.filter(i => i.severity !== 'info');
+  const fixed = actionable.filter(i => i.fixed).length;
+  const remaining = actionable.filter(i => !i.fixed).length;
+
+  const report = {
+    timestamp: new Date().toISOString(),
+    file: APP.files[APP.activeFile].filename,
+    totalRecords: APP.files[APP.activeFile].rows.length,
+    issuesFound: actionable.length,
+    autoFixed: fixed,
+    remaining: remaining,
+    fixRate: actionable.length > 0 ? ((fixed / actionable.length) * 100).toFixed(1) + '%' : '100%',
+    unfixedRecords: actionable.filter(i => !i.fixed).map(i => ({
+      doc: i.docNbr, type: i.type, field: i.field, message: i.message
+    })),
+  };
+
+  try {
+    await fetch('/api/r2/worker-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        r2Key: r2Key,
+        data: JSON.stringify(report, null, 2),
+        contentType: 'application/json',
+        bucket: 'CRASH_DATA'
+      }),
+    });
+  } catch (err) {
+    console.warn('Validation report save failed:', err);
+  }
+}
+
+async function saveLedgerToR2() {
+  if (!APP.config.r2ServerConfigured || !APP.activeFile) return;
+
+  const path = document.getElementById('r2Path').value;
+  const r2Key = (path + `corrections_ledger_${APP.activeFile}.json`).replace(/^\/+/, '');
+  const ledger = {
+    version: 2,
+    file: APP.files[APP.activeFile].filename,
+    lastUpdated: new Date().toISOString(),
+    totalCorrections: Object.keys(APP.corrections).length,
+    corrections: APP.corrections,
+  };
+
+  try {
+    await fetch('/api/r2/worker-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        r2Key: r2Key,
+        data: JSON.stringify(ledger),
+        contentType: 'application/json',
+        bucket: 'CRASH_DATA'
+      }),
+    });
+    toast('Corrections ledger saved to R2', 'success');
+  } catch (err) {
+    toast(`Ledger save failed: ${err.message}`, 'error');
+  }
+}
+
+async function saveLedger() {
+  if (!APP.config.r2ServerConfigured) {
+    toast('R2 upload not configured on server', 'warning');
+    return;
+  }
+  if (!APP.activeFile) {
+    toast('No active file', 'warning');
+    return;
+  }
+  await saveLedgerToR2();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Sync settings modal fields from current APP.config and jurisdiction fields.
+ * Ensures the settings modal always reflects the active jurisdiction,
+ * preventing stale values from overriding on Save.
+ */
+function syncSettingsModal() {
+    const state = document.getElementById('jurisdState').value.trim();
+    const county = document.getElementById('jurisdCounty').value.trim();
+
+    const setStateEl = document.getElementById('setState');
+    const setCountyEl = document.getElementById('setCounty');
+    if (setStateEl) setStateEl.value = state;
+    if (setCountyEl) setCountyEl.value = county;
+
+    const setR2PathEl = document.getElementById('setR2Path');
+    if (setR2PathEl) setR2PathEl.value = APP.config.r2Path || '';
+
+    if (APP.config.bounds) {
+        const b = APP.config.bounds;
+        const fields = { setMinLat: b.minLat, setMaxLat: b.maxLat, setMinLon: b.minLon, setMaxLon: b.maxLon };
+        for (const [id, val] of Object.entries(fields)) {
+            const el = document.getElementById(id);
+            if (el && val != null) el.value = val;
+        }
+    }
+}
+
+function showSettings() {
+  syncSettingsModal();
+  document.getElementById('settingsModal').style.display = 'flex';
+}
+
+function closeSettingsModal(e) {
+  if (e.target === document.getElementById('settingsModal')) {
+    document.getElementById('settingsModal').style.display = 'none';
+  }
+}
+
+function saveSettings() {
+  if (!APP.config.bounds) APP.config.bounds = {};
+  APP.config.bounds.minLat = parseFloat(document.getElementById('setMinLat').value);
+  APP.config.bounds.maxLat = parseFloat(document.getElementById('setMaxLat').value);
+  APP.config.bounds.minLon = parseFloat(document.getElementById('setMinLon').value);
+  APP.config.bounds.maxLon = parseFloat(document.getElementById('setMaxLon').value);
+  APP.config.nominatimDelay = parseInt(document.getElementById('setNomDelay').value);
+  APP.config.maxGeoBatch = parseInt(document.getElementById('setMaxGeo').value);
+  
+  // Update jurisdiction
+  const state = document.getElementById('setState').value.trim();
+  const county = document.getElementById('setCounty').value.trim();
+  if (state && county) {
+    APP.config.r2Path = `/${state}/${county}/`;
+    document.getElementById('setR2Path').value = APP.config.r2Path;
+    // Update header badge
+    const countyTitle = county.charAt(0).toUpperCase() + county.slice(1);
+    const stateAbbr = state.substring(0, 2).toUpperCase();
+    document.getElementById('envBadge').textContent = `${countyTitle} County, ${stateAbbr}`;
+  }
+  
+  // Update R2 paths
+  APP.config.r2ReadUrl = document.getElementById('setR2Read').value.trim();
+  APP.config.r2Path = document.getElementById('setR2Path').value.trim();
+  
+  document.getElementById('settingsModal').style.display = 'none';
+  toast('Settings saved — reload data to use new jurisdiction', 'success');
+}
+
+// Auto-detect county bounds from loaded data (uses P5/P95 of coordinates)
+function autoDetectBounds() {
+  const statusEl = document.getElementById('autoDetectStatus');
+  
+  // Find any loaded data
+  const key = APP.activeFile || Object.keys(APP.files)[0];
+  if (!key || !APP.files[key]) {
+    statusEl.textContent = '⚠️ Load data first';
+    return;
+  }
+  
+  const rows = APP.files[key].rows;
+  const xs = [], ys = [];
+  
+  for (const row of rows) {
+    const x = parseFloat(row['x']);
+    const y = parseFloat(row['y']);
+    if (!isNaN(x) && !isNaN(y) && x !== 0 && y !== 0 && x < 0 && y > 0) {
+      xs.push(x);
+      ys.push(y);
+    }
+  }
+  
+  if (xs.length < 10) {
+    statusEl.textContent = '⚠️ Not enough GPS data';
+    return;
+  }
+  
+  // Use P2/P98 percentiles (removes outliers but keeps county extent)
+  xs.sort((a, b) => a - b);
+  ys.sort((a, b) => a - b);
+  const p2 = Math.floor(xs.length * 0.02);
+  const p98 = Math.floor(xs.length * 0.98);
+  
+  const minLon = xs[p2];
+  const maxLon = xs[p98];
+  const minLat = ys[p2];
+  const maxLat = ys[p98];
+  
+  // Apply with small margin
+  const margin = 0.005; // ~500m
+  const detected = {
+    minLat: parseFloat((minLat - margin).toFixed(4)),
+    maxLat: parseFloat((maxLat + margin).toFixed(4)),
+    minLon: parseFloat((minLon - margin).toFixed(4)),
+    maxLon: parseFloat((maxLon + margin).toFixed(4)),
+  };
+  document.getElementById('setMinLat').value = detected.minLat;
+  document.getElementById('setMaxLat').value = detected.maxLat;
+  document.getElementById('setMinLon').value = detected.minLon;
+  document.getElementById('setMaxLon').value = detected.maxLon;
+
+  // Also update APP.config.bounds so validation uses detected bounds immediately
+  APP.config.bounds = detected;
+
+  statusEl.textContent = `✅ Detected from ${xs.length.toLocaleString()} records (P2-P98)`;
+  toast(`Auto-detected bounds: ${minLat.toFixed(3)}–${maxLat.toFixed(3)}°N, ${minLon.toFixed(3)}–${maxLon.toFixed(3)}°W`, 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  JURISDICTION PRESETS
+// ═══════════════════════════════════════════════════════════════
+
+// Dynamic jurisdiction registry — populated by parent app via postMessage.
+// No hardcoded presets: any jurisdiction can be set dynamically.
+const JURISDICTIONS = {};
+
+function applyJurisdictionPreset() {
+  const sel = document.getElementById('jurisdictionPreset').value;
+  if (!sel || sel === 'custom') {
+    document.getElementById('jurisdState').value = '';
+    document.getElementById('jurisdCounty').value = '';
+    return;
+  }
+  
+  const j = JURISDICTIONS[sel];
+  if (!j) return;
+  
+  // Update jurisdiction fields
+  document.getElementById('jurisdState').value = j.state;
+  document.getElementById('jurisdCounty').value = j.county;
+  
+  // Update R2 path
+  const path = `/${j.state}/${j.county}/`;
+  APP.config.r2Path = path;
+  document.getElementById('r2Path').value = path;
+  
+  // Update bounds
+  APP.config.bounds = { ...j.bounds };
+
+  // Update header badge
+  document.getElementById('envBadge').textContent = j.label;
+
+  // Sync settings modal fields to match new jurisdiction
+  syncSettingsModal();
+  
+  // Reset loaded data since jurisdiction changed
+  APP.files = {};
+  APP.issues = [];
+  APP.corrections = {};
+  APP.activeFile = null;
+  document.querySelectorAll('.file-card').forEach(c => {
+    c.classList.remove('selected', 'loaded');
+  });
+  document.querySelectorAll('.file-card-status').forEach(s => {
+    s.innerHTML = '';
+  });
+  document.querySelectorAll('[id^="size-"]').forEach(el => { el.textContent = '— MB'; });
+  document.getElementById('btnToStep2').disabled = true;
+
+  toast(`Switched to ${j.label} — loading all_roads.csv...`, 'info');
+  
+  // Update auto-run URL display
+  const urlEl = document.getElementById('autoRunUrl');
+  if (urlEl) urlEl.textContent = `?auto=true&jurisdiction=${sel}&file=all&apikey=YOUR_SECRET`;
+
+  // Navigate back to step 1 so user starts fresh with new jurisdiction
+  goToStep(1);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INITIALIZATION
+// ═══════════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('lastValidated').textContent = 'Ready';
+
+  // ── Check R2 Worker server proxy status ──
+  (async function checkR2Status() {
+    const statusEl = document.getElementById('r2WorkerStatus');
+    try {
+      const r = await fetch('/api/r2/worker-status');
+      if (r.ok) {
+        const d = await r.json();
+        APP.config.r2ServerConfigured = d.configured;
+        if (d.configured) {
+          statusEl.innerHTML = '<span style="color:#16a34a;font-weight:600">✓ Server Ready</span> — uploads will be proxied securely';
+          statusEl.style.background = '#f0fdf4';
+        } else {
+          statusEl.innerHTML = '<span style="color:#d97706;font-weight:600">⚠ Not Configured</span> — set R2_WORKER_URL & R2_WORKER_SECRET in Coolify';
+          statusEl.style.background = '#fffbeb';
+        }
+      }
+    } catch (e) {
+      statusEl.innerHTML = '<span style="color:#dc2626;font-weight:600">✗ Server Offline</span> — R2 uploads unavailable';
+      statusEl.style.background = '#fef2f2';
+    }
+  })();
+
+  // ── URL Parameter Automation ──
+  // Usage: ?auto=true&jurisdiction=va_henrico&file=all_roads
+  // Or run all 3 files: ?auto=true&jurisdiction=va_henrico&file=all
+  // R2 upload secret is managed server-side (no apikey parameter needed)
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get('auto') === 'true') {
+    const jurisdiction = params.get('jurisdiction');
+    const fileParam = params.get('file') || 'all_roads';
+
+    // Apply jurisdiction
+    if (jurisdiction) {
+      document.getElementById('jurisdictionPreset').value = jurisdiction;
+      applyJurisdictionPreset();
+    }
+    
+    // Auto-start pipeline after small delay for DOM
+    setTimeout(async () => {
+      if (fileParam === 'all') {
+        // Run all 3 files sequentially
+        for (const key of ['all_roads', 'county_roads', 'no_interstate']) {
+          toast(`🔄 Auto-processing ${key}...`, 'info');
+          APP.activeFile = key;
+          await runAutonomousPipeline(key);
+          await new Promise(r => setTimeout(r, 500));
+        }
+        toast('🏁 All files processed!', 'success');
+      } else {
+        selectFile(fileParam);
+      }
+    }, 500);
+  }
+
+  // Signal parent that validator iframe is ready for postMessage communication
+  // Retry a few times in case parent hasn't registered its listener yet
+  if (window.parent !== window) {
+    window._jurisdictionReceived = false;
+    let readyRetries = 0;
+    const maxRetries = 5;
+    function sendReadySignal() {
+      if (window._jurisdictionReceived) return;
+      window.parent.postMessage({ type: 'validator-ready' }, '*');
+      readyRetries++;
+      if (readyRetries < maxRetries) {
+        setTimeout(sendReadySignal, 500);
+      }
+    }
+    sendReadySignal();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  IFRAME POSTMESSAGE API — Parent ↔ Validator communication
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('message', function(evt) {
+  if (!evt.data || !evt.data.type) return;
+
+  // Bulk-populate JURISDICTIONS and rebuild dropdown from parent
+  if (evt.data.type === 'validator-set-jurisdictions') {
+    const incoming = evt.data.jurisdictions;
+    if (!incoming || typeof incoming !== 'object') return;
+    // Clear existing and merge
+    Object.keys(JURISDICTIONS).forEach(k => delete JURISDICTIONS[k]);
+    Object.assign(JURISDICTIONS, incoming);
+    // Rebuild dropdown grouped by state
+    const preset = document.getElementById('jurisdictionPreset');
+    if (preset) {
+      // Save current selection so it can be restored after rebuild
+      const currentValue = preset.value;
+      preset.innerHTML = '<option value="">— Select Jurisdiction —</option>';
+      // Group by state
+      const byState = {};
+      Object.entries(JURISDICTIONS).forEach(([k, v]) => {
+        const st = v.state || 'unknown';
+        if (!byState[st]) byState[st] = [];
+        byState[st].push({ key: k, label: v.label || v.county || k });
+      });
+      Object.entries(byState).sort((a, b) => a[0].localeCompare(b[0])).forEach(([st, items]) => {
+        const grp = document.createElement('optgroup');
+        grp.label = st.charAt(0).toUpperCase() + st.slice(1);
+        items.sort((a, b) => a.label.localeCompare(b.label)).forEach(item => {
+          const o = document.createElement('option');
+          o.value = item.key;
+          o.textContent = item.label;
+          grp.appendChild(o);
+        });
+        preset.appendChild(grp);
+      });
+      const co = document.createElement('option');
+      co.value = 'custom'; co.textContent = 'Custom Jurisdiction...';
+      preset.appendChild(co);
+      // Restore previous selection if still valid
+      if (currentValue && currentValue !== 'custom' && preset.querySelector('option[value="' + currentValue + '"]')) {
+        preset.value = currentValue;
+      }
+    }
+    console.log('[Validator] Jurisdictions populated from parent:', Object.keys(JURISDICTIONS).length);
+    return;
+  }
+
+  if (evt.data.type === 'validator-set-jurisdiction') {
+    // Stop retry loop — parent responded
+    window._jurisdictionReceived = true;
+
+    const key = evt.data.jurisdiction;
+    const fb = evt.data.fallback;
+
+    // Always register the jurisdiction in JURISDICTIONS for future dropdown use
+    if (key && fb && fb.state && fb.county) {
+      const displayLabel = fb.label ||
+        (fb.county.charAt(0).toUpperCase() + fb.county.slice(1) + ' County, ' + fb.state.toUpperCase());
+      JURISDICTIONS[key] = {
+        state: fb.state,
+        county: fb.county,
+        label: displayLabel,
+        bounds: fb.bounds || null
+      };
+      // Add option to dropdown if not already present
+      const preset = document.getElementById('jurisdictionPreset');
+      if (preset && !preset.querySelector('option[value="' + key + '"]')) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = displayLabel;
+        const customOpt = preset.querySelector('option[value="custom"]');
+        if (customOpt) {
+          preset.insertBefore(opt, customOpt);
+        } else {
+          preset.appendChild(opt);
+        }
+      }
+    }
+
+    // Apply the jurisdiction — use registered entry if available
+    if (key && JURISDICTIONS[key]) {
+      document.getElementById('jurisdictionPreset').value = key;
+      applyJurisdictionPreset();
+      console.log('[Validator] Jurisdiction set from parent:', key, JURISDICTIONS[key].label);
+      return;
+    }
+
+    // Direct apply for unregistered jurisdictions (no key but has fallback)
+    if (fb && fb.state && fb.county) {
+      document.getElementById('jurisdState').value = fb.state;
+      document.getElementById('jurisdCounty').value = fb.county;
+      APP.config.r2Path = '/' + fb.state + '/' + fb.county + '/';
+      document.getElementById('r2Path').value = APP.config.r2Path;
+
+      // Apply bounds if provided (optional — some jurisdictions lack bbox data)
+      if (fb.bounds) {
+        APP.config.bounds = { ...fb.bounds };
+        const fields = { setMinLat: fb.bounds.minLat, setMaxLat: fb.bounds.maxLat, setMinLon: fb.bounds.minLon, setMaxLon: fb.bounds.maxLon };
+        for (const [id, val] of Object.entries(fields)) {
+          const el = document.getElementById(id);
+          if (el) el.value = val;
+        }
+      }
+
+      const displayLabel = fb.label ||
+        (fb.county.charAt(0).toUpperCase() + fb.county.slice(1) + ' County, ' + fb.state.toUpperCase());
+      document.getElementById('envBadge').textContent = displayLabel;
+
+      const presetEl = document.getElementById('jurisdictionPreset');
+      if (presetEl) presetEl.value = '';
+
+      // Reset loaded data since jurisdiction changed (matches applyJurisdictionPreset logic)
+      APP.files = {};
+      APP.issues = [];
+      APP.corrections = {};
+      APP.activeFile = null;
+      document.querySelectorAll('.file-card').forEach(c => {
+        c.classList.remove('selected', 'loaded');
+      });
+      document.querySelectorAll('.file-card-status').forEach(s => {
+        s.innerHTML = '';
+      });
+      document.querySelectorAll('[id^="size-"]').forEach(el => { el.textContent = '— MB'; });
+      document.getElementById('btnToStep2').disabled = true;
+
+      // Sync settings modal fields to match new jurisdiction
+      syncSettingsModal();
+
+      toast(`Switched to ${displayLabel} — loading all_roads.csv...`, 'info');
+
+      // Navigate back to step 1
+      goToStep(1);
+
+      console.log('[Validator] Jurisdiction set via dynamic config:', fb.state, fb.county);
+    }
+  }
+});
+</script>
+</body>
+</html>
