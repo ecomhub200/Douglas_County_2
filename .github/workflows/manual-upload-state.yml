@@ -8,7 +8,7 @@
 #
 # WORKFLOW:
 #   1. User manually uploads raw crash CSV to R2 at:
-#        {state}/_state/statewide_all_roads.csv  (or .csv.gz)
+#        {state}/_state/statewide_all_roads.csv.gz  (or .csv)
 #   2. User triggers this workflow
 #   3. Workflow downloads from R2 → normalizes → re-uploads → triggers pipeline
 #
@@ -16,7 +16,7 @@
 # It is manual-only (workflow_dispatch) — never scheduled.
 #
 # R2 upload instructions (using AWS CLI or Cloudflare Dashboard):
-#   aws s3 cp my_crash_data.csv s3://crash-lens-data/{state}/_state/statewide_all_roads.csv \
+#   aws s3 cp my_crash_data.csv.gz s3://crash-lens-data/{state}/_state/statewide_all_roads.csv.gz \
 #     --endpoint-url https://{CF_ACCOUNT_ID}.r2.cloudflarestorage.com
 # ==============================================================================
 
@@ -63,7 +63,7 @@ on:
           - wisconsin
 
       r2_raw_key:
-        description: 'R2 key of uploaded raw CSV (e.g. colorado/_state/statewide_all_roads.csv). Leave blank for default: {state}/_state/statewide_all_roads.csv'
+        description: 'R2 key of uploaded raw CSV (e.g. colorado/_state/statewide_all_roads.csv.gz). Leave blank for default: {state}/_state/statewide_all_roads.csv.gz'
         required: false
         default: ''
         type: string
@@ -220,7 +220,7 @@ jobs:
 
           # Default R2 key if not provided — uses same naming convention as automated downloads
           if [ -z "$R2_RAW_KEY" ]; then
-            R2_RAW_KEY="${R2_PREFIX}/_state/statewide_all_roads.csv"
+            R2_RAW_KEY="${R2_PREFIX}/_state/statewide_all_roads.csv.gz"
           fi
 
           echo "=========================================="
