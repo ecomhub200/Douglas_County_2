@@ -978,6 +978,28 @@ def split_road_types(df, jurisdiction, data_dir):
     sys_col = next((cols_lower[cl] for cl in cols_lower if cl in ('system', 'sys_id', 'road_system', 'route_syst')), None)
     own_col = next((cols_lower[cl] for cl in cols_lower if 'ownership' in cl), None)
 
+    # Decode raw ArcGIS numeric codes if present (download returns '1'-'5')
+    if sys_col:
+        system_decode = {
+            '1': 'NonVDOT primary', '2': 'NonVDOT secondary',
+            '3': 'VDOT Interstate', '4': 'VDOT Primary', '5': 'VDOT Secondary',
+        }
+        raw = df[sys_col].astype(str).str.strip()
+        if raw.isin(system_decode.keys()).any() and not raw.str.contains('VDOT', na=False).any():
+            df[sys_col] = raw.map(system_decode).fillna(df[sys_col])
+            logger.info(f"  Decoded SYSTEM numeric codes → text values")
+
+    if own_col:
+        ownership_decode = {
+            '1': '1. State Hwy Agency', '2': '2. County Hwy Agency',
+            '3': '3. City or Town Hwy Agency', '4': '4. Federal Roads',
+            '5': '5. Toll Roads Maintained by Others', '6': '6. Private/Unknown Roads',
+        }
+        raw = df[own_col].astype(str).str.strip()
+        if raw.isin(ownership_decode.keys()).any() and not raw.str.contains('Hwy Agency', na=False).any():
+            df[own_col] = raw.map(ownership_decode).fillna(df[own_col])
+            logger.info(f"  Decoded Ownership numeric codes → text values")
+
     if sys_col:
         logger.info(f"  System '{sys_col}': {df[sys_col].value_counts().head(8).to_dict()}")
         county_vals = {'NonVDOT secondary', 'NONVDOT', 'Non-VDOT', 'SECONDARY', 'Secondary'}
@@ -986,7 +1008,7 @@ def split_road_types(df, jurisdiction, data_dir):
             county.to_csv(str(data_dir / f'{jurisdiction}_county_roads.csv'), index=False)
             logger.info(f"  county_roads: {len(county):,}")
 
-        interstate_vals = {'Interstate', 'INTERSTATE', 'IS'}
+        interstate_vals = {'VDOT Interstate', 'Interstate', 'INTERSTATE', 'IS'}
         no_int = df[~df[sys_col].astype(str).str.strip().isin(interstate_vals)]
         if len(no_int) < len(df):
             no_int.to_csv(str(data_dir / f'{jurisdiction}_no_interstate.csv'), index=False)
