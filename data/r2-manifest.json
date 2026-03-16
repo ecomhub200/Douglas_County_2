@@ -1,8 +1,8 @@
 {
   "version": 3,
   "_comment": "Version 3: Added gzip support (contentEncoding, uncompressedSize) for state-level datasets. Statewide CSVs stored at {state}/_state/. Aggregate JSONs at {state}/_statewide/, _region/, _mpo/, _federal/.",
-  "r2BaseUrl": "https://data.aicreatesai.com",
-  "updated": "2026-02-16T00:45:07.223028+00:00",
+  "r2BaseUrl": "https://data.aicreatesai.com\r\n",
+  "updated": "2026-03-16T11:48:43.301442+00:00",
   "files": {
     "colorado/douglas/standardized.csv": {
       "size": 18447410,
@@ -48,8 +48,9 @@
       "uploaded": "2026-02-13T04:00:00.000000+00:00"
     },
     "virginia/henrico/all_roads.csv": {
-      "size": 34478899,
-      "uploaded": "2026-02-13T04:00:00.000000+00:00"
+      "size": 14532604,
+      "md5": "f1c917fb67f8d09370d2a96c7072ef10",
+      "uploaded": "2026-03-16T11:48:45.519658+00:00"
     },
     "virginia/henrico/forecasts_county_roads.json": {
       "size": 358029,
