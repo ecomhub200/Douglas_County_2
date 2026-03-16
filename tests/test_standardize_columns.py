@@ -282,29 +282,25 @@ class TestUnrestrainedDecode(unittest.TestCase):
 
 class TestSystemDecode(unittest.TestCase):
 
-    def test_vdot_interstate(self):
-        df = standardize_columns(_make_df({'SYSTEM': '1'}))
-        self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Interstate')
-
-    def test_vdot_primary(self):
-        df = standardize_columns(_make_df({'SYSTEM': '2'}))
-        self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Primary')
-
-    def test_vdot_secondary(self):
-        df = standardize_columns(_make_df({'SYSTEM': '3'}))
-        self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Secondary')
-
     def test_nonvdot_primary(self):
-        df = standardize_columns(_make_df({'SYSTEM': '4'}))
+        df = standardize_columns(_make_df({'SYSTEM': '1'}))
         self.assertEqual(df['SYSTEM'].iloc[0], 'NonVDOT primary')
 
     def test_nonvdot_secondary(self):
-        df = standardize_columns(_make_df({'SYSTEM': '5'}))
+        df = standardize_columns(_make_df({'SYSTEM': '2'}))
         self.assertEqual(df['SYSTEM'].iloc[0], 'NonVDOT secondary')
 
-    def test_non_vdot(self):
-        df = standardize_columns(_make_df({'SYSTEM': '6'}))
-        self.assertEqual(df['SYSTEM'].iloc[0], 'Non-VDOT')
+    def test_vdot_interstate(self):
+        df = standardize_columns(_make_df({'SYSTEM': '3'}))
+        self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Interstate')
+
+    def test_vdot_primary(self):
+        df = standardize_columns(_make_df({'SYSTEM': '4'}))
+        self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Primary')
+
+    def test_vdot_secondary(self):
+        df = standardize_columns(_make_df({'SYSTEM': '5'}))
+        self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Secondary')
 
 
 class TestOwnershipDecode(unittest.TestCase):
@@ -464,13 +460,13 @@ class TestCrashDateDecode(unittest.TestCase):
     def test_epoch_date_format(self):
         df = standardize_columns(_make_df({'CRASH_DT': '1489554000000'}))
         date_val = df['Crash Date'].iloc[0]
-        # Format should be M/D/YYYY H:MM
-        self.assertRegex(date_val, r'^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2}$')
+        # Format should be M/D/YYYY H:MM:SS AM (12-hour with seconds and AM/PM)
+        self.assertRegex(date_val, r'^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2}:\d{2} [AP]M$')
 
     def test_non_epoch_passthrough(self):
         """Already-formatted dates should pass through unchanged."""
-        df = standardize_columns(_make_df({'CRASH_DT': '3/15/2017 4:00'}))
-        self.assertEqual(df['Crash Date'].iloc[0], '3/15/2017 4:00')
+        df = standardize_columns(_make_df({'CRASH_DT': '3/15/2017 5:00:00 AM'}))
+        self.assertEqual(df['Crash Date'].iloc[0], '3/15/2017 5:00:00 AM')
 
 
 class TestWorkZoneDecode(unittest.TestCase):
@@ -534,6 +530,245 @@ class TestFirstHarmfulEventDecode(unittest.TestCase):
         self.assertEqual(df['First Harmful Event Loc'].iloc[0], '4. Roadside')
 
 
+class TestColumnAliases(unittest.TestCase):
+    """Verify VDOT website download column renames."""
+
+    def test_hit_and_run_renamed(self):
+        df = pd.DataFrame([{'Hit & Run?': '1', 'SYSTEM': 'VDOT Primary'}])
+        df = standardize_columns(df)
+        self.assertIn('Hitrun?', df.columns)
+        self.assertNotIn('Hit & Run?', df.columns)
+        self.assertEqual(df['Hitrun?'].iloc[0], 'Yes')
+
+    def test_large_vehicle_renamed(self):
+        df = pd.DataFrame([{'Large Vehicle?': '0', 'SYSTEM': 'VDOT Primary'}])
+        df = standardize_columns(df)
+        self.assertIn('Lgtruck?', df.columns)
+        self.assertEqual(df['Lgtruck?'].iloc[0], 'No')
+
+    def test_unbelted_renamed(self):
+        df = pd.DataFrame([{'UnBelted?': '1', 'SYSTEM': 'VDOT Primary'}])
+        df = standardize_columns(df)
+        self.assertIn('Unrestrained?', df.columns)
+        self.assertEqual(df['Unrestrained?'].iloc[0], 'Unbelted')
+
+    def test_senior_driver_renamed(self):
+        df = pd.DataFrame([{'Senior Driver?': '1', 'SYSTEM': 'VDOT Primary'}])
+        df = standardize_columns(df)
+        self.assertIn('Senior?', df.columns)
+        self.assertEqual(df['Senior?'].iloc[0], 'Yes')
+
+    def test_young_driver_renamed(self):
+        df = pd.DataFrame([{'Young Driver?': '0', 'SYSTEM': 'VDOT Primary'}])
+        df = standardize_columns(df)
+        self.assertIn('Young?', df.columns)
+        self.assertEqual(df['Young?'].iloc[0], 'No')
+
+
+class TestSentinelValues(unittest.TestCase):
+    """Verify 0 and 99 sentinel codes are decoded correctly."""
+
+    def test_collision_type_not_applicable(self):
+        df = standardize_columns(_make_df({'COLLISION_TYPE': '0'}))
+        self.assertEqual(df['Collision Type'].iloc[0], 'Not Applicable')
+
+    def test_collision_type_not_provided(self):
+        df = standardize_columns(_make_df({'COLLISION_TYPE': '99'}))
+        self.assertEqual(df['Collision Type'].iloc[0], 'Not Provided')
+
+    def test_weather_not_applicable(self):
+        df = standardize_columns(_make_df({'WEATHER_CONDITION': '99'}))
+        self.assertEqual(df['Weather Condition'].iloc[0], 'Not Applicable')
+
+    def test_light_not_applicable(self):
+        df = standardize_columns(_make_df({'LIGHT_CONDITION': '99'}))
+        self.assertEqual(df['Light Condition'].iloc[0], 'Not Applicable')
+
+    def test_surface_cond_not_applicable(self):
+        df = standardize_columns(_make_df({'ROADWAY_SURFACE_COND': '0'}))
+        self.assertEqual(df['Roadway Surface Condition'].iloc[0], 'Not Applicable')
+
+    def test_surface_cond_not_provided(self):
+        df = standardize_columns(_make_df({'ROADWAY_SURFACE_COND': '99'}))
+        self.assertEqual(df['Roadway Surface Condition'].iloc[0], 'Not Provided')
+
+    def test_relation_roadway_not_applicable(self):
+        df = standardize_columns(_make_df({'RELATION_TO_ROADWAY': '0'}))
+        self.assertEqual(df['Relation To Roadway'].iloc[0], 'Not Applicable')
+
+    def test_relation_roadway_not_provided(self):
+        df = standardize_columns(_make_df({'RELATION_TO_ROADWAY': '99'}))
+        self.assertEqual(df['Relation To Roadway'].iloc[0], 'Not Provided')
+
+    def test_roadway_alignment_not_applicable(self):
+        df = standardize_columns(_make_df({'ROADWAY_ALIGNMENT': '99'}))
+        self.assertEqual(df['Roadway Alignment'].iloc[0], 'Not Applicable')
+
+    def test_surface_type_not_applicable(self):
+        df = standardize_columns(_make_df({'ROADWAY_SURFACE_TYPE': '99'}))
+        self.assertEqual(df['Roadway Surface Type'].iloc[0], 'Not Applicable')
+
+    def test_roadway_defect_not_applicable(self):
+        df = standardize_columns(_make_df({'ROADWAY_DEFECT': '0'}))
+        self.assertEqual(df['Roadway Defect'].iloc[0], 'Not Applicable')
+
+    def test_roadway_defect_not_provided(self):
+        df = standardize_columns(_make_df({'ROADWAY_DEFECT': '99'}))
+        self.assertEqual(df['Roadway Defect'].iloc[0], 'Not Provided')
+
+    def test_roadway_desc_not_applicable(self):
+        df = standardize_columns(_make_df({'ROADWAY_DESCRIPTION': '0'}))
+        self.assertEqual(df['Roadway Description'].iloc[0], 'Not Applicable')
+
+    def test_roadway_desc_not_provided(self):
+        df = standardize_columns(_make_df({'ROADWAY_DESCRIPTION': '99'}))
+        self.assertEqual(df['Roadway Description'].iloc[0], 'Not Provided')
+
+    def test_intersection_type_not_applicable(self):
+        df = standardize_columns(_make_df({'INTERSECTION_TYPE': '0'}))
+        self.assertEqual(df['Intersection Type'].iloc[0], 'Not Applicable')
+
+    def test_intersection_type_not_provided(self):
+        df = standardize_columns(_make_df({'INTERSECTION_TYPE': '99'}))
+        self.assertEqual(df['Intersection Type'].iloc[0], 'Not Provided')
+
+    def test_traffic_control_not_applicable(self):
+        df = standardize_columns(_make_df({'TRAFFIC_CONTROL_TYPE': '99'}))
+        self.assertEqual(df['Traffic Control Type'].iloc[0], 'Not Applicable')
+
+    def test_traffic_ctrl_status_not_applicable(self):
+        df = standardize_columns(_make_df({'TRFC_CTRL_STATUS_TYPE': '0'}))
+        self.assertEqual(df['Traffic Control Status'].iloc[0], 'Not Applicable')
+
+    def test_traffic_ctrl_status_not_provided(self):
+        df = standardize_columns(_make_df({'TRFC_CTRL_STATUS_TYPE': '99'}))
+        self.assertEqual(df['Traffic Control Status'].iloc[0], 'Not Provided')
+
+    def test_work_zone_related_not_applicable(self):
+        df = standardize_columns(_make_df({'WORK_ZONE_RELATED': '0'}))
+        self.assertEqual(df['Work Zone Related'].iloc[0], 'Not Applicable')
+
+    def test_school_zone_not_applicable(self):
+        df = standardize_columns(_make_df({'SCHOOL_ZONE': '0'}))
+        self.assertEqual(df['School Zone'].iloc[0], 'Not Applicable')
+
+    def test_first_harmful_loc_not_applicable(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT_LOC': '0'}))
+        self.assertEqual(df['First Harmful Event Loc'].iloc[0], 'Not Applicable')
+
+    def test_first_harmful_loc_not_provided(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT_LOC': '99'}))
+        self.assertEqual(df['First Harmful Event Loc'].iloc[0], 'Not Provided')
+
+
+class TestCorrectedLabels(unittest.TestCase):
+    """Verify corrected label text matches frontend expectations."""
+
+    def test_collision_type_train(self):
+        df = standardize_columns(_make_df({'COLLISION_TYPE': '7'}))
+        self.assertEqual(df['Collision Type'].iloc[0], '7. Train')
+
+    def test_collision_type_bicyclist(self):
+        df = standardize_columns(_make_df({'COLLISION_TYPE': '13'}))
+        self.assertEqual(df['Collision Type'].iloc[0], '13. Bicyclist')
+
+    def test_collision_type_motorcyclist(self):
+        df = standardize_columns(_make_df({'COLLISION_TYPE': '14'}))
+        self.assertEqual(df['Collision Type'].iloc[0], '14. Motorcyclist')
+
+    def test_weather_smoke_dust(self):
+        df = standardize_columns(_make_df({'WEATHER_CONDITION': '8'}))
+        self.assertEqual(df['Weather Condition'].iloc[0], '8. Smoke/Dust')
+
+    def test_weather_blowing_sand(self):
+        df = standardize_columns(_make_df({'WEATHER_CONDITION': '10'}))
+        self.assertEqual(df['Weather Condition'].iloc[0], '10. Blowing Sand, Soil, Dirt, or Snow')
+
+    def test_surface_oil_other_fluids(self):
+        df = standardize_columns(_make_df({'ROADWAY_SURFACE_COND': '6'}))
+        self.assertEqual(df['Roadway Surface Condition'].iloc[0], '6. Oil/Other Fluids')
+
+    def test_surface_type_dirt(self):
+        df = standardize_columns(_make_df({'ROADWAY_SURFACE_TYPE': '5'}))
+        self.assertEqual(df['Roadway Surface Type'].iloc[0], '5. Dirt')
+
+    def test_traffic_control_rr_markings_signs(self):
+        df = standardize_columns(_make_df({'TRAFFIC_CONTROL_TYPE': '10'}))
+        self.assertEqual(df['Traffic Control Type'].iloc[0], '10. Railroad Crossing With Markings and Signs')
+
+    def test_traffic_control_rr_signals(self):
+        df = standardize_columns(_make_df({'TRAFFIC_CONTROL_TYPE': '11'}))
+        self.assertEqual(df['Traffic Control Type'].iloc[0], '11. Railroad Crossing With Signals')
+
+    def test_traffic_ctrl_status_missing(self):
+        df = standardize_columns(_make_df({'TRFC_CTRL_STATUS_TYPE': '5'}))
+        self.assertEqual(df['Traffic Control Status'].iloc[0], '5. Yes - Missing')
+
+    def test_relation_railway_grade(self):
+        df = standardize_columns(_make_df({'RELATION_TO_ROADWAY': '14'}))
+        self.assertEqual(df['Relation To Roadway'].iloc[0], '14. Railway Grade Crossing')
+
+    def test_relation_other_crossing(self):
+        df = standardize_columns(_make_df({'RELATION_TO_ROADWAY': '15'}))
+        self.assertEqual(df['Relation To Roadway'].iloc[0], '15. Other Crossing (Crossing for Bikes, School, etc.)')
+
+    def test_first_harmful_other_traffic_barrier(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT': '16'}))
+        self.assertEqual(df['First Harmful Event'].iloc[0], '16. Other Traffic Barrier')
+
+    def test_first_harmful_train(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT': '21'}))
+        self.assertEqual(df['First Harmful Event'].iloc[0], '21. Train')
+
+    def test_first_harmful_work_zone_equipment(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT': '24'}))
+        self.assertEqual(df['First Harmful Event'].iloc[0], '24. Work Zone Maintenance Equipment')
+
+    def test_first_harmful_downhill_runaway(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT': '31'}))
+        self.assertEqual(df['First Harmful Event'].iloc[0], '31. Downhill Runaway')
+
+    def test_first_harmful_cargo_loss(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT': '32'}))
+        self.assertEqual(df['First Harmful Event'].iloc[0], '32. Cargo Loss or Shift')
+
+    def test_first_harmful_explosion_fire(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT': '33'}))
+        self.assertEqual(df['First Harmful Event'].iloc[0], '33. Explosion or Fire')
+
+    def test_first_harmful_separation(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT': '34'}))
+        self.assertEqual(df['First Harmful Event'].iloc[0], '34. Separation of Units')
+
+    def test_first_harmful_cross_median(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT': '35'}))
+        self.assertEqual(df['First Harmful Event'].iloc[0], '35. Cross Median')
+
+    def test_first_harmful_immersion(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT': '38'}))
+        self.assertEqual(df['First Harmful Event'].iloc[0], '38. Immersion')
+
+    def test_first_harmful_non_collision_unknown(self):
+        df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT': '41'}))
+        self.assertEqual(df['First Harmful Event'].iloc[0], '41. Non-Collision Unknown')
+
+    def test_work_zone_type_intermittent(self):
+        df = standardize_columns(_make_df({'WORK_ZONE_TYPE': '4'}))
+        self.assertEqual(df['Work Zone Type'].iloc[0], '4. Intermittent or Moving Work')
+
+
+class TestFacilityTypeNewCodes(unittest.TestCase):
+    """Verify new Facility Type codes."""
+
+    def test_one_way_divided(self):
+        df = standardize_columns(_make_df({'FAC': 'OWD'}))
+        self.assertEqual(df['Facility Type'].iloc[0], '2-One-Way Divided')
+
+    def test_reversible(self):
+        df = standardize_columns(_make_df({'FAC': 'REX'}))
+        self.assertEqual(df['Facility Type'].iloc[0], '5-Reversible Exclusively (e.g. 395R)')
+
+
 class TestIdempotency(unittest.TestCase):
     """Running standardize_columns on already-decoded data should not change it."""
 
@@ -543,11 +778,11 @@ class TestIdempotency(unittest.TestCase):
             'OBJECTID': '1',
             'Document Nbr': '170785244',
             'Crash Year': '2017',
-            'Crash Date': '3/15/2017 4:00',
+            'Crash Date': '3/15/2017 5:00:00 AM',
             'Crash Severity': 'O',
             'Collision Type': '4. Sideswipe - Same Direction',
             'Weather Condition': '1. No Adverse Condition (Clear/Cloudy)',
-            'SYSTEM': 'NonVDOT secondary',
+            'SYSTEM': 'VDOT Secondary',
             'Ownership': '3. City or Town Hwy Agency',
             'Functional Class': '7-Local (J,6)',
             'Facility Type': '3-Two-Way Undivided',
@@ -625,7 +860,7 @@ class TestFullRowIntegration(unittest.TestCase):
             'Functional Class': '7-Local (J,6)',
             'Facility Type': '3-Two-Way Undivided',
             'Area Type': 'Urban',
-            'SYSTEM': 'NonVDOT secondary',
+            'SYSTEM': 'VDOT Secondary',
             'Ownership': '3. City or Town Hwy Agency',
             'Planning District': 'Hampton Roads',
             'MPO Name': 'HAMP',
@@ -676,7 +911,8 @@ class TestReferenceDataComparison(unittest.TestCase):
         prev_idx = {h: i for i, h in enumerate(prev_headers)}
         prev_by_doc = {row[prev_idx['Document Nbr']]: row for row in all_prev}
 
-        # Compare (excluding x/y precision and Crash Date hour)
+        # Compare (excluding x/y precision, Crash Date format, and SYSTEM
+        # which had incorrect mapping in the previous version dataset)
         checked = 0
         field_mismatches = {}
         for _, row in df2.iterrows():
@@ -685,7 +921,7 @@ class TestReferenceDataComparison(unittest.TestCase):
                 prev_row = prev_by_doc[doc]
                 checked += 1
                 for col in prev_headers:
-                    if col in ('x', 'y', 'Crash Date'):
+                    if col in ('x', 'y', 'Crash Date', 'SYSTEM'):
                         continue
                     if col in df2.columns:
                         new_val = str(row[col]).strip()

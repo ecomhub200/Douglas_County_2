@@ -68,12 +68,11 @@ VALUE_DECODE_MAP = {
         '6': '6. Private/Unknown Roads',
     },
     'SYSTEM': {
-        '1': 'VDOT Interstate',
-        '2': 'VDOT Primary',
-        '3': 'VDOT Secondary',
-        '4': 'NonVDOT primary',
-        '5': 'NonVDOT secondary',
-        '6': 'Non-VDOT',
+        '1': 'NonVDOT primary',
+        '2': 'NonVDOT secondary',
+        '3': 'VDOT Interstate',
+        '4': 'VDOT Primary',
+        '5': 'VDOT Secondary',
     },
     'Functional Class': {
         'INT': '1-Interstate (A,1)',

@@ -297,8 +297,8 @@ def standardize_columns_virginia(df):
         # Decode SYSTEM codes
         if 'SYSTEM' in df.columns:
             system_map = {
-                '1': 'VDOT Interstate', '2': 'VDOT Primary', '3': 'VDOT Secondary',
-                '4': 'NonVDOT primary', '5': 'NonVDOT secondary', '6': 'Non-VDOT',
+                '1': 'NonVDOT primary', '2': 'NonVDOT secondary',
+                '3': 'VDOT Interstate', '4': 'VDOT Primary', '5': 'VDOT Secondary',
             }
             raw = df['SYSTEM'].astype(str).str.strip()
             if raw.isin(system_map.keys()).any() and not raw.str.contains('VDOT', na=False).any():

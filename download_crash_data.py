@@ -761,6 +761,15 @@ def standardize_columns(df):
         'ANIMAL': 'Animal Related?',
     })
 
+    # Column aliases for VDOT website download format (renamed columns)
+    column_mapping.update({
+        'Hit & Run?': 'Hitrun?',
+        'Large Vehicle?': 'Lgtruck?',
+        'UnBelted?': 'Unrestrained?',
+        'Senior Driver?': 'Senior?',
+        'Young Driver?': 'Young?',
+    })
+
     # Rename columns that exist
     rename_dict = {k: v for k, v in column_mapping.items() if k in df.columns}
     df = df.rename(columns=rename_dict)
@@ -796,7 +805,7 @@ def standardize_columns(df):
                     from datetime import datetime as _dt
                     ts = int(float(val)) / 1000  # ms → seconds
                     dt = _dt.fromtimestamp(ts, tz=timezone.utc)
-                    return dt.strftime('%-m/%-d/%Y %-H:%M')
+                    return dt.strftime('%-m/%-d/%Y %-I:%M:%S %p')
                 except (ValueError, TypeError, OSError):
                     return val
             df['Crash Date'] = raw.apply(_epoch_to_date)
@@ -813,12 +822,11 @@ def standardize_columns(df):
 
     # ── SYSTEM ──
     _decode_column('SYSTEM', {
-        '1': 'VDOT Interstate',
-        '2': 'VDOT Primary',
-        '3': 'VDOT Secondary',
-        '4': 'NonVDOT primary',
-        '5': 'NonVDOT secondary',
-        '6': 'Non-VDOT',
+        '1': 'NonVDOT primary',
+        '2': 'NonVDOT secondary',
+        '3': 'VDOT Interstate',
+        '4': 'VDOT Primary',
+        '5': 'VDOT Secondary',
     }, skip_if_contains='VDOT')
 
     # ── Functional Class ──
@@ -835,45 +843,47 @@ def standardize_columns(df):
     # ── Facility Type ──
     _decode_column('Facility Type', {
         'OUD': '1-One-Way Undivided',
-        'OWA': '2-One-Way',
+        'OWD': '2-One-Way Divided',
         'TUD': '3-Two-Way Undivided',
-        'TDD': '4-Two-Way Divided',
         'TWD': '4-Two-Way Divided',
+        'REX': '5-Reversible Exclusively (e.g. 395R)',
     }, skip_if_contains='Way')
 
     # ── Collision Type ──
     _decode_column('Collision Type', {
+        '0': 'Not Applicable',
         '1': '1. Rear End',
         '2': '2. Angle',
         '3': '3. Head On',
         '4': '4. Sideswipe - Same Direction',
         '5': '5. Sideswipe - Opposite Direction',
         '6': '6. Fixed Object in Road',
-        '7': '7. Parked Vehicle',
+        '7': '7. Train',
         '8': '8. Non-Collision',
         '9': '9. Fixed Object - Off Road',
         '10': '10. Deer',
         '11': '11. Other Animal',
         '12': '12. Ped',
-        '13': '13. Bicycle',
-        '14': '14. Train',
+        '13': '13. Bicyclist',
+        '14': '14. Motorcyclist',
         '15': '15. Backed Into',
         '16': '16. Other',
+        '99': 'Not Provided',
     }, skip_if_contains='Rear End')
 
     # ── Weather Condition ──
     _decode_column('Weather Condition', {
         '1': '1. No Adverse Condition (Clear/Cloudy)',
-        '2': '2. Blowing Sand, Dirt, Snow',
         '3': '3. Fog',
         '4': '4. Mist',
         '5': '5. Rain',
         '6': '6. Snow',
         '7': '7. Sleet/Hail',
-        '8': '8. Smoke',
+        '8': '8. Smoke/Dust',
         '9': '9. Other',
-        '10': '10. Unknown',
+        '10': '10. Blowing Sand, Soil, Dirt, or Snow',
         '11': '11. Severe Crosswinds',
+        '99': 'Not Applicable',
     }, skip_if_contains='Adverse')
 
     # ── Light Condition ──
@@ -885,25 +895,29 @@ def standardize_columns(df):
         '5': '5. Darkness - Road Not Lighted',
         '6': '6. Darkness - Unknown Road Lighting',
         '7': '7. Unknown',
+        '99': 'Not Applicable',
     }, skip_if_contains='Dawn')
 
     # ── Roadway Surface Condition ──
     _decode_column('Roadway Surface Condition', {
+        '0': 'Not Applicable',
         '1': '1. Dry',
         '2': '2. Wet',
         '3': '3. Snowy',
         '4': '4. Icy',
         '5': '5. Muddy',
-        '6': '6. Oily',
+        '6': '6. Oil/Other Fluids',
         '7': '7. Other',
         '8': '8. Natural Debris',
         '9': '9. Water (Standing, Moving)',
         '10': '10. Slush',
         '11': '11. Sand, Dirt, Gravel',
+        '99': 'Not Provided',
     }, skip_if_contains='Dry')
 
     # ── Relation To Roadway ──
     _decode_column('Relation To Roadway', {
+        '0': 'Not Applicable',
         '1': '1. Main-Line Roadway',
         '2': '2. Acceleration/Deceleration Lanes',
         '3': '3. Gore Area (b/w Ramp and Highway Edgelines)',
@@ -917,6 +931,9 @@ def standardize_columns(df):
         '11': '11. Intersection Related - Outside 150 Feet',
         '12': '12. Crossover Related',
         '13': '13. Driveway, Alley-Access - Related',
+        '14': '14. Railway Grade Crossing',
+        '15': '15. Other Crossing (Crossing for Bikes, School, etc.)',
+        '99': 'Not Provided',
     }, skip_if_contains='Main-Line')
 
     # ── Roadway Alignment ──
@@ -931,6 +948,7 @@ def standardize_columns(df):
         '8': '8. Dip - Curve',
         '9': '9. Other',
         '10': '10. On/Off Ramp',
+        '99': 'Not Applicable',
     }, skip_if_contains='Straight')
 
     # ── Roadway Surface Type ──
@@ -939,12 +957,14 @@ def standardize_columns(df):
         '2': '2. Blacktop, Asphalt, Bituminous',
         '3': '3. Brick or Block',
         '4': '4. Slag, Gravel, Stone',
-        '5': '5. Unpaved',
+        '5': '5. Dirt',
         '6': '6. Other',
+        '99': 'Not Applicable',
     }, skip_if_contains='Concrete')
 
     # ── Roadway Defect ──
     _decode_column('Roadway Defect', {
+        '0': 'Not Applicable',
         '1': '1. No Defects',
         '2': '2. Holes, Ruts, Bumps',
         '3': '3. Soft or Low Shoulder',
@@ -955,26 +975,31 @@ def standardize_columns(df):
         '8': '8. Roadway Obstructed',
         '9': '9. Other',
         '10': '10. Edge Pavement Drop Off',
+        '99': 'Not Provided',
     }, skip_if_contains='No Defects')
 
     # ── Roadway Description ──
     _decode_column('Roadway Description', {
+        '0': 'Not Applicable',
         '1': '1. Two-Way, Not Divided',
         '2': '2. Two-Way, Divided, Unprotected Median',
         '3': '3. Two-Way, Divided, Positive Median Barrier',
         '4': '4. One-Way, Not Divided',
         '5': '5. Unknown',
+        '99': 'Not Provided',
     }, skip_if_contains='Two-Way')
 
     # ── Intersection Type ──
     _decode_column('Intersection Type', {
+        '0': 'Not Applicable',
         '1': '1. Not at Intersection',
         '2': '2. Two Approaches',
         '3': '3. Three Approaches',
         '4': '4. Four Approaches',
         '5': '5. Five-Point, or More',
         '6': '6. Roundabout',
-    }, skip_if_contains='Intersection')
+        '99': 'Not Provided',
+    }, skip_if_contains='Not at Intersection')
 
     # ── Traffic Control Type ──
     _decode_column('Traffic Control Type', {
@@ -987,37 +1012,44 @@ def standardize_columns(df):
         '7': '7. No Passing Lines',
         '8': '8. Yield Sign',
         '9': '9. One Way Road or Street',
-        '10': '10. Railroad Crossing With Signals Only',
-        '11': '11. Railroad Crossing With Gate Only',
+        '10': '10. Railroad Crossing With Markings and Signs',
+        '11': '11. Railroad Crossing With Signals',
         '12': '12. Railroad Crossing With Gate and Signals',
         '13': '13. Other',
         '14': '14. Ped Crosswalk',
         '15': '15. Reduced Speed - School Zone',
         '16': '16. Reduced Speed - Work Zone',
         '17': '17. Highway Safety Corridor',
-    }, skip_if_contains='Traffic Control')
+        '99': 'Not Applicable',
+    }, skip_if_contains='No Traffic Control')
 
     # ── Traffic Control Status ──
     _decode_column('Traffic Control Status', {
+        '0': 'Not Applicable',
         '1': '1. Yes - Working',
         '2': '2. Yes - Working and Obscured',
         '3': '3. Yes - Not Working',
         '4': '4. Yes - Not Working and Obscured',
-        '5': '5. No',
+        '5': '5. Yes - Missing',
         '6': '6. No Traffic Control Device Present',
+        '99': 'Not Provided',
     }, skip_if_contains='Working')
 
     # ── Work Zone Related ──
     _decode_column('Work Zone Related', {
+        '0': 'Not Applicable',
         '1': '1. Yes',
         '2': '2. No',
+        '99': 'Not Provided',
     }, skip_if_contains='Yes')
 
     # ── School Zone ──
     _decode_column('School Zone', {
+        '0': 'Not Applicable',
         '1': '1. Yes',
         '2': '2. Yes - With School Activity',
         '3': '3. No',
+        '99': 'Not Provided',
     }, skip_if_contains='Yes')
 
     # ── First Harmful Event ──
@@ -1037,37 +1069,38 @@ def standardize_columns(df):
         '13': '13. Curb',
         '14': '14. Ditch',
         '15': '15. Other Fixed Object',
-        '16': '16. Traffic Island',
+        '16': '16. Other Traffic Barrier',
         '17': '17. Traffic Sign Support',
         '18': '18. Mailbox',
         '19': '19. Ped',
         '20': '20. Motor Vehicle In Transport',
-        '21': '21. Railroad Train',
+        '21': '21. Train',
         '22': '22. Bicycle',
         '23': '23. Animal',
-        '24': '24. Ridden Animal',
+        '24': '24. Work Zone Maintenance Equipment',
         '25': '25. Other Movable Object',
         '26': '26. Unknown Movable Object',
         '27': '27. Other',
         '28': '28. Ran Off Road',
         '29': '29. Jack Knife',
         '30': '30. Overturn (Rollover)',
-        '31': '31. Fire/Explosion',
-        '32': '32. Immersion/Submersion',
-        '33': '33. Cargo Loss or Shift',
-        '34': '34. Equipment Failure',
-        '35': '35. Separated Unit',
+        '31': '31. Downhill Runaway',
+        '32': '32. Cargo Loss or Shift',
+        '33': '33. Explosion or Fire',
+        '34': '34. Separation of Units',
+        '35': '35. Cross Median',
         '36': '36. Cross Centerline',
         '37': '37. Equipment Failure (Tire, etc)',
-        '38': '38. Downhill Runaway',
+        '38': '38. Immersion',
         '39': '39. Fell/Jumped From Vehicle',
         '40': '40. Thrown or Falling Object',
-        '41': '41. Other Non-Collision',
+        '41': '41. Non-Collision Unknown',
         '42': '42. Other Non-Collision',
     }, skip_if_contains='Bank Or Ledge')
 
     # ── First Harmful Event Location ──
     _decode_column('First Harmful Event Loc', {
+        '0': 'Not Applicable',
         '1': '1. On Roadway',
         '2': '2. Shoulder',
         '3': '3. Median',
@@ -1077,6 +1110,7 @@ def standardize_columns(df):
         '7': '7. In Parking Lane or Zone',
         '8': '8. Off Roadway, Location Unknown',
         '9': '9. Outside Right-of-Way',
+        '99': 'Not Provided',
     }, skip_if_contains='On Roadway')
 
     # ── VDOT District ──
@@ -1267,6 +1301,7 @@ def standardize_columns(df):
         '2': '2. Transition Area',
         '3': '3. Activity Area',
         '4': '4. Termination Area',
+        '99': '',
     }, skip_if_contains='Warning')
 
     # ── Work Zone Type ──
@@ -1275,8 +1310,9 @@ def standardize_columns(df):
         '1': '1. Lane Closure',
         '2': '2. Lane Shift/Crossover',
         '3': '3. Work on Shoulder or Median',
-        '4': '4. Intermittent/Moving Work',
+        '4': '4. Intermittent or Moving Work',
         '5': '5. Other',
+        '99': '',
     }, skip_if_contains='Lane Closure')
 
     return df
