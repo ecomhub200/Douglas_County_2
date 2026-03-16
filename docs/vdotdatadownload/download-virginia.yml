@@ -1,16 +1,18 @@
 # ==============================================================================
-# Virginia State Download Workflow (Playwright-Based)
+# Virginia State Download Workflow (v9 — Hub CSV Export + FeatureServer Fallback)
 # ==============================================================================
-# Downloads crash data from Virginia Roads using Playwright to bypass
-# bot-detection on CSV downloads, then triggers pipeline.yml for processing.
+# Downloads crash data from Virginia Roads Open Data Hub.
 #
-# Why Playwright?
-#   virginiaroads.org blocks programmatic CSV downloads (403 Forbidden) from
-#   server IPs but serves the page fine in a browser. Playwright simulates a
-#   real Chromium browser session. Same approach as download-cdot-crash-data.yml.
+# Download strategy (tried in order):
+#   1. Hub CSV Export — Playwright clicks "Download CSV" on the Hub page (primary)
+#   2. Direct REST API — Plain HTTP to ArcGIS FeatureServer (may need auth token)
+#   3. Playwright FeatureServer — Browser-routed FeatureServer queries (legacy)
+#
+# As of March 2026, VDOT's FeatureServer endpoints require authentication tokens,
+# so the Hub CSV export via Playwright is the primary download method.
 #
 # Flow:
-#   Playwright download → Filter jurisdiction → Split road types → Upload R2 → Pipeline
+#   Hub CSV download → Filter jurisdiction → Split road types → Upload R2 → Pipeline
 #
 # Scope options:
 #   - jurisdiction: Download statewide, filter + split single county
@@ -23,8 +25,10 @@ name: "Download: Virginia"
 
 on:
   schedule:
-    # First Monday of each month at 11:00 UTC (6:00 AM ET)
+    # Monthly incremental: First Monday of each month at 11:00 UTC (6:00 AM ET)
     - cron: '0 11 1-7 * 1'
+    # Quarterly full refresh: 1st of Jan/Apr/Jul/Oct at 08:00 UTC
+    - cron: '0 8 1 1,4,7,10 *'
 
   workflow_dispatch:
     inputs:
@@ -78,8 +82,17 @@ on:
           - sawmpo
           - wvmpo
 
+      download_mode:
+        description: 'Download mode (incremental=only new records, full=all records)'
+        required: false
+        type: choice
+        default: 'incremental'
+        options:
+          - incremental
+          - full
+
       force_download:
-        description: 'Force re-download (skip cache)'
+        description: 'Force re-download (skip cache, implies full)'
         required: false
         type: boolean
         default: false
@@ -162,16 +175,31 @@ jobs:
 
       - name: Download Virginia crash data (Playwright)
         id: download
-        timeout-minutes: 30
+        timeout-minutes: 60
         run: |
           SCOPE="${{ steps.params.outputs.scope }}"
           SELECTION="${{ steps.params.outputs.selection }}"
           FORCE="${{ github.event.inputs.force_download }}"
+          MODE="${{ github.event.inputs.download_mode || 'incremental' }}"
+
+          # Quarterly schedule (cron 0 8 1 1,4,7,10 *) triggers full download
+          # Monthly schedule triggers incremental
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            HOUR=$(date -u '+%H')
+            if [ "$HOUR" = "08" ]; then
+              MODE="full"
+              echo "Quarterly full refresh triggered by schedule"
+            else
+              MODE="incremental"
+              echo "Monthly incremental triggered by schedule"
+            fi
+          fi
 
           echo "=========================================="
           echo "Downloading Virginia Crash Data (Playwright)"
           echo "  Scope:     $SCOPE"
           echo "  Selection: ${SELECTION:-statewide}"
+          echo "  Mode:      $MODE"
           echo "  Started:   $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "=========================================="
 
@@ -179,7 +207,10 @@ jobs:
 
           if [ "$FORCE" = "true" ]; then
             ARGS="$ARGS --force"
+          elif [ "$MODE" = "full" ]; then
+            ARGS="$ARGS --full"
           fi
+          # Default: incremental (no flag needed)
 
           # Always download statewide, then filter downstream
           if [ "$SCOPE" = "statewide" ]; then
@@ -187,6 +218,8 @@ jobs:
           else
             ARGS="$ARGS --jurisdiction ${SELECTION:-henrico}"
           fi
+
+          echo "download_mode=$MODE" >> $GITHUB_OUTPUT
 
           python download_virginia_crash_data.py $ARGS
 
@@ -268,6 +301,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add data/r2-manifest.json 2>/dev/null || true
+          git add data/virginia_download_manifest.json 2>/dev/null || true
           git add data/.validation/ 2>/dev/null || true
           git add data/.geocode_cache.json 2>/dev/null || true
 
@@ -295,22 +329,23 @@ jobs:
             RECORDS=$(( $(wc -l < "$CSV_PATH") - 1 ))
           fi
 
-          cat >> $GITHUB_STEP_SUMMARY <<EOF
-          ## Virginia Crash Data Download ($SCOPE)
-
-          | Metric | Value |
-          |--------|-------|
-          | Scope | $SCOPE |
-          | Selection | ${SELECTION:-statewide} |
-          | Records | ${RECORDS} |
-          | Method | Playwright (browser-based) |
-          | Output | ${CSV_PATH:-N/A} |
-          | Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
-
-          **Download method:** Playwright Chromium browser simulates real user to bypass
-          virginiaroads.org bot-detection (403 Forbidden on programmatic CSV requests).
-          Falls back to ArcGIS REST API pagination if browser download fails.
-          EOF
+          {
+            echo '## Virginia Crash Data Download'
+            echo ''
+            echo '| Metric | Value |'
+            echo '|--------|-------|'
+            echo "| Scope | $SCOPE |"
+            echo "| Selection | ${SELECTION:-statewide} |"
+            echo "| Records | ${RECORDS} |"
+            echo "| Mode | ${{ steps.download.outputs.download_mode || 'incremental' }} |"
+            echo '| Method | Hub CSV Export → REST API → Playwright FeatureServer |'
+            echo "| Output | ${CSV_PATH:-N/A} |"
+            echo "| Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |"
+            echo ''
+            echo '**Download method (v9):** Primary: Playwright clicks CSV download button on'
+            echo 'Virginia Roads Hub page. Fallback: REST API or Playwright-routed FeatureServer'
+            echo 'queries. Hub export bypasses FeatureServer auth token requirements.'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # Trigger unified pipeline
   trigger-pipeline:
