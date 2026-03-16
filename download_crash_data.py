@@ -761,69 +761,559 @@ def standardize_columns(df):
         'ANIMAL': 'Animal Related?',
     })
 
+    # Column aliases for VDOT website download format (renamed columns)
+    column_mapping.update({
+        'Hit & Run?': 'Hitrun?',
+        'Large Vehicle?': 'Lgtruck?',
+        'UnBelted?': 'Unrestrained?',
+        'Senior Driver?': 'Senior?',
+        'Young Driver?': 'Young?',
+    })
+
     # Rename columns that exist
     rename_dict = {k: v for k, v in column_mapping.items() if k in df.columns}
     df = df.rename(columns=rename_dict)
 
     # ── Decode ArcGIS FeatureServer coded domain values ──
     # The FeatureServer API returns raw numeric/abbreviated codes instead of
-    # human-readable text (e.g., OWNERSHIP=3 instead of "3. City or Town Hwy Agency").
-    # These mappings are derived from the VDOT ArcGIS service field domains.
+    # human-readable text. These mappings match the previous VDOT data format
+    # that the frontend was built on.
 
-    # Ownership codes → text labels
-    if 'Ownership' in df.columns:
-        ownership_map = {
-            '1': '1. State Hwy Agency',
-            '2': '2. County Hwy Agency',
-            '3': '3. City or Town Hwy Agency',
-            '4': '4. Federal Roads',
-            '5': '5. State Toll Authority',
-            '6': '6. Other',
-        }
-        raw = df['Ownership'].astype(str).str.strip()
-        # Only decode if values are numeric codes (not already decoded text)
-        if raw.isin(ownership_map.keys()).any() and not raw.str.contains('Hwy Agency', na=False).any():
-            df['Ownership'] = raw.map(ownership_map).fillna(df['Ownership'])
+    def _decode_column(col_name, code_map, skip_if_contains=None):
+        """Decode a column's coded values to text labels (only if values are coded)."""
+        if col_name not in df.columns:
+            return
+        raw = df[col_name].astype(str).str.strip()
+        if not raw.isin(code_map.keys()).any():
+            return
+        if skip_if_contains and raw.str.contains(skip_if_contains, na=False).any():
+            return
+        df[col_name] = raw.map(code_map).fillna(df[col_name])
 
-    # SYSTEM codes → text labels
-    if 'SYSTEM' in df.columns:
-        system_map = {
-            '1': 'Interstate',
-            '2': 'Primary',
-            '3': 'Secondary',
-            '4': 'NonVDOT primary',
-            '5': 'NonVDOT secondary',
-            '6': 'Non-VDOT',
-        }
-        raw = df['SYSTEM'].astype(str).str.strip()
-        if raw.isin(system_map.keys()).any() and not raw.str.contains('VDOT', na=False).any():
-            df['SYSTEM'] = raw.map(system_map).fillna(df['SYSTEM'])
+    # ── Date conversion: epoch milliseconds → formatted date ──
+    # ArcGIS FeatureServer stores dates as epoch ms in UTC.
+    # The previous VDOT dataset used M/D/YYYY H:MM in UTC (no offset).
+    if 'Crash Date' in df.columns:
+        import pandas as pd
+        from datetime import timezone
+        raw = df['Crash Date'].astype(str).str.strip()
+        # Check if values look like epoch milliseconds (13+ digit numbers)
+        sample = raw.dropna().iloc[:5] if len(raw) > 0 else pd.Series()
+        if len(sample) > 0 and sample.str.match(r'^\d{10,}$').any():
+            def _epoch_to_date(val):
+                try:
+                    from datetime import datetime as _dt
+                    ts = int(float(val)) / 1000  # ms → seconds
+                    dt = _dt.fromtimestamp(ts, tz=timezone.utc)
+                    return dt.strftime('%-m/%-d/%Y %-I:%M:%S %p')
+                except (ValueError, TypeError, OSError):
+                    return val
+            df['Crash Date'] = raw.apply(_epoch_to_date)
 
-    # Functional Class codes → text labels
-    if 'Functional Class' in df.columns:
-        func_class_map = {
-            'INT': '1-Interstate (A,1)',
-            'OFE': '2-Principal Arterial - Other Freeways and Expressways (B)',
-            'OPA': '3-Principal Arterial - Other (E,2)',
-            'MIA': '4-Minor Arterial (H,3)',
-            'MAC': '5-Major Collector (I,4)',
-            'MIC': '6-Minor Collector (5)',
-            'LOC': '7-Local (J,6)',
-        }
-        raw = df['Functional Class'].astype(str).str.strip()
-        if raw.isin(func_class_map.keys()).any() and not raw.str.contains('Interstate', na=False).any():
-            df['Functional Class'] = raw.map(func_class_map).fillna(df['Functional Class'])
+    # ── Ownership ──
+    _decode_column('Ownership', {
+        '1': '1. State Hwy Agency',
+        '2': '2. County Hwy Agency',
+        '3': '3. City or Town Hwy Agency',
+        '4': '4. Federal Roads',
+        '5': '5. Toll Roads Maintained by Others',
+        '6': '6. Private/Unknown Roads',
+    }, skip_if_contains='Hwy Agency')
 
-    # Facility Type codes → text labels
-    if 'Facility Type' in df.columns:
-        facility_map = {
-            'TUD': 'Two-Way Undivided',
-            'TDD': 'Two-Way Divided',
-            'OWA': 'One-Way',
+    # ── SYSTEM ──
+    _decode_column('SYSTEM', {
+        '1': 'NonVDOT primary',
+        '2': 'NonVDOT secondary',
+        '3': 'VDOT Interstate',
+        '4': 'VDOT Primary',
+        '5': 'VDOT Secondary',
+    }, skip_if_contains='VDOT')
+
+    # ── Functional Class ──
+    _decode_column('Functional Class', {
+        'INT': '1-Interstate (A,1)',
+        'OFE': '2-Principal Arterial - Other Freeways and Expressways (B)',
+        'OPA': '3-Principal Arterial - Other (E,2)',
+        'MIA': '4-Minor Arterial (H,3)',
+        'MAC': '5-Major Collector (I,4)',
+        'MIC': '6-Minor Collector (5)',
+        'LOC': '7-Local (J,6)',
+    }, skip_if_contains='Interstate')
+
+    # ── Facility Type ──
+    _decode_column('Facility Type', {
+        'OUD': '1-One-Way Undivided',
+        'OWD': '2-One-Way Divided',
+        'TUD': '3-Two-Way Undivided',
+        'TWD': '4-Two-Way Divided',
+        'REX': '5-Reversible Exclusively (e.g. 395R)',
+    }, skip_if_contains='Way')
+
+    # ── Collision Type ──
+    _decode_column('Collision Type', {
+        '0': 'Not Applicable',
+        '1': '1. Rear End',
+        '2': '2. Angle',
+        '3': '3. Head On',
+        '4': '4. Sideswipe - Same Direction',
+        '5': '5. Sideswipe - Opposite Direction',
+        '6': '6. Fixed Object in Road',
+        '7': '7. Train',
+        '8': '8. Non-Collision',
+        '9': '9. Fixed Object - Off Road',
+        '10': '10. Deer',
+        '11': '11. Other Animal',
+        '12': '12. Ped',
+        '13': '13. Bicyclist',
+        '14': '14. Motorcyclist',
+        '15': '15. Backed Into',
+        '16': '16. Other',
+        '99': 'Not Provided',
+    }, skip_if_contains='Rear End')
+
+    # ── Weather Condition ──
+    _decode_column('Weather Condition', {
+        '1': '1. No Adverse Condition (Clear/Cloudy)',
+        '3': '3. Fog',
+        '4': '4. Mist',
+        '5': '5. Rain',
+        '6': '6. Snow',
+        '7': '7. Sleet/Hail',
+        '8': '8. Smoke/Dust',
+        '9': '9. Other',
+        '10': '10. Blowing Sand, Soil, Dirt, or Snow',
+        '11': '11. Severe Crosswinds',
+        '99': 'Not Applicable',
+    }, skip_if_contains='Adverse')
+
+    # ── Light Condition ──
+    _decode_column('Light Condition', {
+        '1': '1. Dawn',
+        '2': '2. Daylight',
+        '3': '3. Dusk',
+        '4': '4. Darkness - Road Lighted',
+        '5': '5. Darkness - Road Not Lighted',
+        '6': '6. Darkness - Unknown Road Lighting',
+        '7': '7. Unknown',
+        '99': 'Not Applicable',
+    }, skip_if_contains='Dawn')
+
+    # ── Roadway Surface Condition ──
+    _decode_column('Roadway Surface Condition', {
+        '0': 'Not Applicable',
+        '1': '1. Dry',
+        '2': '2. Wet',
+        '3': '3. Snowy',
+        '4': '4. Icy',
+        '5': '5. Muddy',
+        '6': '6. Oil/Other Fluids',
+        '7': '7. Other',
+        '8': '8. Natural Debris',
+        '9': '9. Water (Standing, Moving)',
+        '10': '10. Slush',
+        '11': '11. Sand, Dirt, Gravel',
+        '99': 'Not Provided',
+    }, skip_if_contains='Dry')
+
+    # ── Relation To Roadway ──
+    _decode_column('Relation To Roadway', {
+        '0': 'Not Applicable',
+        '1': '1. Main-Line Roadway',
+        '2': '2. Acceleration/Deceleration Lanes',
+        '3': '3. Gore Area (b/w Ramp and Highway Edgelines)',
+        '4': '4. Collector/Distributor Road',
+        '5': '5. On Entrance/Exit Ramp',
+        '6': '6. Intersection at end of Ramp',
+        '7': '7. Other location not listed above within an interchange area (median, shoulder , roadside)',
+        '8': '8. Non-Intersection',
+        '9': '9. Within Intersection',
+        '10': '10. Intersection Related - Within 150 Feet',
+        '11': '11. Intersection Related - Outside 150 Feet',
+        '12': '12. Crossover Related',
+        '13': '13. Driveway, Alley-Access - Related',
+        '14': '14. Railway Grade Crossing',
+        '15': '15. Other Crossing (Crossing for Bikes, School, etc.)',
+        '99': 'Not Provided',
+    }, skip_if_contains='Main-Line')
+
+    # ── Roadway Alignment ──
+    _decode_column('Roadway Alignment', {
+        '1': '1. Straight - Level',
+        '2': '2. Curve - Level',
+        '3': '3. Grade - Straight',
+        '4': '4. Grade - Curve',
+        '5': '5. Hillcrest - Straight',
+        '6': '6. Hillcrest - Curve',
+        '7': '7. Dip - Straight',
+        '8': '8. Dip - Curve',
+        '9': '9. Other',
+        '10': '10. On/Off Ramp',
+        '99': 'Not Applicable',
+    }, skip_if_contains='Straight')
+
+    # ── Roadway Surface Type ──
+    _decode_column('Roadway Surface Type', {
+        '1': '1. Concrete',
+        '2': '2. Blacktop, Asphalt, Bituminous',
+        '3': '3. Brick or Block',
+        '4': '4. Slag, Gravel, Stone',
+        '5': '5. Dirt',
+        '6': '6. Other',
+        '99': 'Not Applicable',
+    }, skip_if_contains='Concrete')
+
+    # ── Roadway Defect ──
+    _decode_column('Roadway Defect', {
+        '0': 'Not Applicable',
+        '1': '1. No Defects',
+        '2': '2. Holes, Ruts, Bumps',
+        '3': '3. Soft or Low Shoulder',
+        '4': '4. Under Repair',
+        '5': '5. Loose Material',
+        '6': '6. Restricted Width',
+        '7': '7. Slick Pavement',
+        '8': '8. Roadway Obstructed',
+        '9': '9. Other',
+        '10': '10. Edge Pavement Drop Off',
+        '99': 'Not Provided',
+    }, skip_if_contains='No Defects')
+
+    # ── Roadway Description ──
+    _decode_column('Roadway Description', {
+        '0': 'Not Applicable',
+        '1': '1. Two-Way, Not Divided',
+        '2': '2. Two-Way, Divided, Unprotected Median',
+        '3': '3. Two-Way, Divided, Positive Median Barrier',
+        '4': '4. One-Way, Not Divided',
+        '5': '5. Unknown',
+        '99': 'Not Provided',
+    }, skip_if_contains='Two-Way')
+
+    # ── Intersection Type ──
+    _decode_column('Intersection Type', {
+        '0': 'Not Applicable',
+        '1': '1. Not at Intersection',
+        '2': '2. Two Approaches',
+        '3': '3. Three Approaches',
+        '4': '4. Four Approaches',
+        '5': '5. Five-Point, or More',
+        '6': '6. Roundabout',
+        '99': 'Not Provided',
+    }, skip_if_contains='Not at Intersection')
+
+    # ── Traffic Control Type ──
+    _decode_column('Traffic Control Type', {
+        '1': '1. No Traffic Control',
+        '2': '2. Officer or Flagger',
+        '3': '3. Traffic Signal',
+        '4': '4. Stop Sign',
+        '5': '5. Slow or Warning Sign',
+        '6': '6. Traffic Lanes Marked',
+        '7': '7. No Passing Lines',
+        '8': '8. Yield Sign',
+        '9': '9. One Way Road or Street',
+        '10': '10. Railroad Crossing With Markings and Signs',
+        '11': '11. Railroad Crossing With Signals',
+        '12': '12. Railroad Crossing With Gate and Signals',
+        '13': '13. Other',
+        '14': '14. Ped Crosswalk',
+        '15': '15. Reduced Speed - School Zone',
+        '16': '16. Reduced Speed - Work Zone',
+        '17': '17. Highway Safety Corridor',
+        '99': 'Not Applicable',
+    }, skip_if_contains='No Traffic Control')
+
+    # ── Traffic Control Status ──
+    _decode_column('Traffic Control Status', {
+        '0': 'Not Applicable',
+        '1': '1. Yes - Working',
+        '2': '2. Yes - Working and Obscured',
+        '3': '3. Yes - Not Working',
+        '4': '4. Yes - Not Working and Obscured',
+        '5': '5. Yes - Missing',
+        '6': '6. No Traffic Control Device Present',
+        '99': 'Not Provided',
+    }, skip_if_contains='Working')
+
+    # ── Work Zone Related ──
+    _decode_column('Work Zone Related', {
+        '0': 'Not Applicable',
+        '1': '1. Yes',
+        '2': '2. No',
+        '99': 'Not Provided',
+    }, skip_if_contains='Yes')
+
+    # ── School Zone ──
+    _decode_column('School Zone', {
+        '0': 'Not Applicable',
+        '1': '1. Yes',
+        '2': '2. Yes - With School Activity',
+        '3': '3. No',
+        '99': 'Not Provided',
+    }, skip_if_contains='Yes')
+
+    # ── First Harmful Event ──
+    _decode_column('First Harmful Event', {
+        '1': '1. Bank Or Ledge',
+        '2': '2. Trees',
+        '3': '3. Utility Pole',
+        '4': '4. Fence Or Post',
+        '5': '5. Guard Rail',
+        '6': '6. Parked Vehicle',
+        '7': '7. Tunnel, Bridge, Underpass, Culvert, etc.',
+        '8': '8. Sign, Traffic Signal',
+        '9': '9. Impact Cushioning Device',
+        '10': '10. Other',
+        '11': '11. Jersey Wall',
+        '12': '12. Building/Structure',
+        '13': '13. Curb',
+        '14': '14. Ditch',
+        '15': '15. Other Fixed Object',
+        '16': '16. Other Traffic Barrier',
+        '17': '17. Traffic Sign Support',
+        '18': '18. Mailbox',
+        '19': '19. Ped',
+        '20': '20. Motor Vehicle In Transport',
+        '21': '21. Train',
+        '22': '22. Bicycle',
+        '23': '23. Animal',
+        '24': '24. Work Zone Maintenance Equipment',
+        '25': '25. Other Movable Object',
+        '26': '26. Unknown Movable Object',
+        '27': '27. Other',
+        '28': '28. Ran Off Road',
+        '29': '29. Jack Knife',
+        '30': '30. Overturn (Rollover)',
+        '31': '31. Downhill Runaway',
+        '32': '32. Cargo Loss or Shift',
+        '33': '33. Explosion or Fire',
+        '34': '34. Separation of Units',
+        '35': '35. Cross Median',
+        '36': '36. Cross Centerline',
+        '37': '37. Equipment Failure (Tire, etc)',
+        '38': '38. Immersion',
+        '39': '39. Fell/Jumped From Vehicle',
+        '40': '40. Thrown or Falling Object',
+        '41': '41. Non-Collision Unknown',
+        '42': '42. Other Non-Collision',
+    }, skip_if_contains='Bank Or Ledge')
+
+    # ── First Harmful Event Location ──
+    _decode_column('First Harmful Event Loc', {
+        '0': 'Not Applicable',
+        '1': '1. On Roadway',
+        '2': '2. Shoulder',
+        '3': '3. Median',
+        '4': '4. Roadside',
+        '5': '5. Gore',
+        '6': '6. Separator',
+        '7': '7. In Parking Lane or Zone',
+        '8': '8. Off Roadway, Location Unknown',
+        '9': '9. Outside Right-of-Way',
+        '99': 'Not Provided',
+    }, skip_if_contains='On Roadway')
+
+    # ── VDOT District ──
+    _decode_column('VDOT District', {
+        '1': '1. Bristol',
+        '2': '2. Salem',
+        '3': '3. Lynchburg',
+        '4': '4. Richmond',
+        '5': '5. Hampton Roads',
+        '6': '6. Fredericksburg',
+        '7': '7. Culpeper',
+        '8': '8. Staunton',
+        '9': '9. Northern Virginia',
+    }, skip_if_contains='Bristol')
+
+    # ── Area Type ──
+    _decode_column('Area Type', {
+        '0': 'Rural',
+        '1': 'Urban',
+    }, skip_if_contains='Rural')
+
+    # ── Physical Juris Name (jurisdiction code → name) ──
+    if 'Physical Juris Name' in df.columns:
+        juris_map = {
+            '0': '000. Arlington County', '1': '001. Accomack County',
+            '2': '002. Albemarle County', '3': '003. Alleghany County',
+            '4': '004. Amelia County', '5': '005. Amherst County',
+            '6': '006. Appomattox County', '7': '007. Augusta County',
+            '8': '008. Bath County', '9': '009. Bedford County',
+            '10': '010. Bland County', '11': '011. Botetourt County',
+            '12': '012. Brunswick County', '13': '013. Buchanan County',
+            '14': '014. Buckingham County', '15': '015. Campbell County',
+            '16': '016. Caroline County', '17': '017. Carroll County',
+            '18': '018. Charles City County', '19': '019. Charlotte County',
+            '20': '020. Chesterfield County', '21': '021. Clarke County',
+            '22': '022. Craig County', '23': '023. Culpeper County',
+            '24': '024. Cumberland County', '25': '025. Dickenson County',
+            '26': '026. Dinwiddie County', '27': '027. Emporia',
+            '28': '028. Essex County', '29': '029. Fairfax County',
+            '30': '030. Fauquier County', '31': '031. Floyd County',
+            '32': '032. Fluvanna County', '33': '033. Franklin County',
+            '34': '034. Frederick County', '35': '035. Giles County',
+            '36': '036. Gloucester County', '37': '037. Goochland County',
+            '38': '038. Grayson County', '39': '039. Greene County',
+            '40': '040. Greensville County', '41': '041. Halifax County',
+            '42': '042. Hanover County', '43': '043. Henrico County',
+            '44': '044. Henry County', '45': '045. Highland County',
+            '46': '046. Isle of Wight County', '47': '047. James City County',
+            '48': '048. King George County', '49': '049. King & Queen County',
+            '50': '050. King William County', '51': '051. Lancaster County',
+            '52': '052. Lee County', '53': '053. Loudoun County',
+            '54': '054. Louisa County', '55': '055. Lunenburg County',
+            '56': '056. Madison County', '57': '057. Mathews County',
+            '58': '058. Mecklenburg County', '59': '059. Middlesex County',
+            '60': '060. Montgomery County', '61': '061. Nansemond County',
+            '62': '062. Nelson County', '63': '063. New Kent County',
+            '64': '064. Norfolk County', '65': '065. Northampton County',
+            '66': '066. Northumberland County', '67': '067. Nottoway County',
+            '68': '068. Orange County', '69': '069. Page County',
+            '70': '070. Patrick County', '71': '071. Pittsylvania County',
+            '72': '072. Powhatan County', '73': '073. Prince Edward County',
+            '74': '074. Prince George County', '75': '075. Princess Anne County',
+            '76': '076. Prince William County', '77': '077. Pulaski County',
+            '78': '078. Rappahannock County', '79': '079. Richmond County',
+            '80': '080. Roanoke County', '81': '081. Rockbridge County',
+            '82': '082. Rockingham County', '83': '083. Russell County',
+            '84': '084. Scott County', '85': '085. Shenandoah County',
+            '86': '086. Smyth County', '87': '087. Southampton County',
+            '88': '088. Spotsylvania County', '89': '089. Stafford County',
+            '90': '090. Surry County', '91': '091. Sussex County',
+            '92': '092. Tazewell County', '93': '093. Warren County',
+            '94': '094. Warwick County', '95': '095. Washington County',
+            '96': '096. Westmoreland County', '97': '097. Wise County',
+            '98': '098. Wythe County', '99': '099. York County',
+            '100': '100. City of Alexandria', '101': '101. Town of Big Stone Gap',
+            '102': '102. City of Bristol', '103': '103. City of Buena Vista',
+            '104': '104. City of Charlottesville', '105': '105. Town of Clifton Forge',
+            '106': '106. City of Colonial Heights', '107': '107. City of Covington',
+            '108': '108. City of Danville', '109': '109. Town of Elkton',
+            '110': '110. City of Falls Church', '111': '111. City of Fredericksburg',
+            '112': '112. Town of Front Royal', '113': '113. City of Galax',
+            '114': '114. City of Hampton', '115': '115. City of Harrisonburg',
+            '116': '116. City of Hopewell', '117': '117. City of Lexington',
+            '118': '118. City of Lynchburg', '119': '119. Town of Marion',
+            '120': '120. City of Martinsville', '121': '121. City of Newport News',
+            '122': '122. City of Norfolk', '123': '123. City of Petersburg',
+            '124': '124. City of Portsmouth', '125': '125. City of Radford',
+            '126': '126. City of Radford', '127': '127. City of Richmond',
+            '128': '128. City of Roanoke', '129': '129. City of Salem',
+            '130': '130. Town of South Boston', '131': '131. City of Chesapeake',
+            '132': '132. City of Staunton', '133': '133. City of Suffolk',
+            '134': '134. City of Virginia Beach', '135': '135. City of Waynesboro',
+            '136': '136. City of Waynesboro', '137': '137. City of Williamsburg',
+            '138': '138. City of Winchester', '139': '139. Town of Wytheville',
+            '140': '140. Town of Abingdon', '141': '141. Town of Altavista',
+            '142': '142. Town of Amherst', '143': '143. Town of Berryville',
+            '144': '144. Town of Farmville', '145': '145. City of Franklin',
+            '146': '146. Town of Gretna', '147': '147. City of Poquoson',
+            '148': '148. Town of Richlands', '149': '149. Town of Bedford',
+            '150': '150. Town of Blacksburg', '151': '151. City of Fairfax',
+            '152': '152. City of Manassas Park', '153': '153. Town of Vienna',
+            '154': '154. Town of Christiansburg', '155': '155. City of Manassas',
+            '156': '156. Town of Warrenton', '157': '157. Town of Rocky Mount',
+            '158': '158. Town of Tazewell', '159': '159. Town of Woodstock',
+            '160': '160. Town of Bridgewater', '161': '161. Town of Luray',
+            '162': '162. Town of Narrows', '163': '163. Town of Pearisburg',
+            '164': '164. Town of Broadway', '165': '165. Town of Vinton',
+            '166': '166. Town of Ashland', '167': '167. Town of Belle Haven',
+            '192': '192. Town of Clarksville', '196': '196. Town of Clintwood',
+            '202': '202. Town of Craigsville', '203': '203. Town of Crewe',
+            '204': '204. Town of Culpeper', '212': '212. Town of Dumfries',
+            '219': '219. Town of Floyd', '221': '221. Town of Gate City',
+            '229': '229. Town of Grundy', '233': '233. Town of Haymarket',
+            '235': '235. Town of Herndon', '237': '237. Town of Hillsville',
+            '245': '245. Town of Jonesville', '253': '253. Town of Leesburg',
+            '267': '267. Town of Nassawadox', '275': '275. Town of Orange',
+            '286': '286. Town of Purcellville', '292': '292. Town of Rural Retreat',
+            '300': '300. Town of Smithfield', '301': '301. Town of South Hill',
+            '303': '303. Town of Stanley', '306': '306. Town of Strasburg',
         }
-        raw = df['Facility Type'].astype(str).str.strip()
-        if raw.isin(facility_map.keys()).any() and not raw.str.contains('Way', na=False).any():
-            df['Facility Type'] = raw.map(facility_map).fillna(df['Facility Type'])
+        raw = df['Physical Juris Name'].astype(str).str.strip()
+        if raw.isin(juris_map.keys()).any() and not raw.str.contains('County|City|Town', na=False, regex=True).any():
+            df['Physical Juris Name'] = raw.map(juris_map).fillna(df['Physical Juris Name'])
+
+    # ── Planning District ──
+    if 'Planning District' in df.columns:
+        plan_map = {
+            '1': 'Lenowisco', '2': 'Cumberland Plateau',
+            '3': 'Mount Rogers', '4': 'New River Valley',
+            '5': 'Roanoke Valley-Alleghany', '6': 'Central Shenandoah',
+            '7': 'Northern Shenandoah Valley', '8': 'Northern Virginia',
+            '9': 'Rappahannock - Rapidan', '10': 'Thomas Jefferson',
+            '11': 'Region 2000', '12': 'West Piedmont',
+            '13': 'Southside', '14': 'Commonwealth Regional',
+            '15': 'Richmond Regional', '16': 'George Washington Regional',
+            '17': 'Northern Neck', '18': 'Middle Peninsula',
+            '19': 'Crater', '20': 'Piedmont',
+            '21': 'Rappahannock Area', '22': 'Accomack-Northampton',
+            '23': 'Hampton Roads',
+            # Combo districts
+            '5,12': 'Roanoke Valley-Alleghany, West Piedmont',
+            '15,19': 'Richmond Regional, Crater',
+            '18,23': 'Middle Peninsula, Hampton Roads',
+            '19,23': 'Crater, Hampton Roads',
+        }
+        raw = df['Planning District'].astype(str).str.strip()
+        if raw.isin(plan_map.keys()).any() and not raw.str.contains('[a-zA-Z]', na=False, regex=True).any():
+            df['Planning District'] = raw.map(plan_map).fillna(df['Planning District'])
+
+    # ── Boolean fields: 0/1 → Yes/No ──
+    bool_yes_no_fields = [
+        'Alcohol?', 'Bike?', 'Pedestrian?', 'Speed?', 'Distracted?',
+        'Drowsy?', 'Drug Related?', 'Guardrail Related?', 'Hitrun?',
+        'Lgtruck?', 'Motorcycle?', 'Animal Related?', 'Senior?',
+        'Young?', 'Mainline?', 'Night?',
+    ]
+    for col in bool_yes_no_fields:
+        if col in df.columns:
+            raw = df[col].astype(str).str.strip()
+            if raw.isin({'0', '1'}).any() and not raw.str.contains('Yes|No', na=False, regex=True).any():
+                df[col] = raw.map({'0': 'No', '1': 'Yes'}).fillna(df[col])
+
+    # ── Unrestrained? (special: 0→Belted, 1→Unbelted) ──
+    if 'Unrestrained?' in df.columns:
+        raw = df['Unrestrained?'].astype(str).str.strip()
+        if raw.isin({'0', '1'}).any() and not raw.str.contains('Belted|Unbelted', na=False, regex=True).any():
+            df['Unrestrained?'] = raw.map({'0': 'Belted', '1': 'Unbelted'}).fillna(df['Unrestrained?'])
+
+    # ── RoadDeparture Type ──
+    _decode_column('RoadDeparture Type', {
+        '0': 'NOT_RD',
+        '1': 'RD_LEFT',
+        '2': 'RD_RIGHT',
+        '3': 'RD_UNKNOWN',
+    }, skip_if_contains='NOT_RD')
+
+    # ── Intersection Analysis ──
+    _decode_column('Intersection Analysis', {
+        '0': 'Not Intersection',
+        '1': 'VDOT Intersection',
+        '2': 'Urban Intersection',
+    }, skip_if_contains='Intersection')
+
+    # ── Work Zone Location ──
+    _decode_column('Work Zone Location', {
+        '0': '',
+        '1': '1. Advance Warning Area',
+        '2': '2. Transition Area',
+        '3': '3. Activity Area',
+        '4': '4. Termination Area',
+        '99': '',
+    }, skip_if_contains='Warning')
+
+    # ── Work Zone Type ──
+    _decode_column('Work Zone Type', {
+        '0': '',
+        '1': '1. Lane Closure',
+        '2': '2. Lane Shift/Crossover',
+        '3': '3. Work on Shoulder or Median',
+        '4': '4. Intermittent or Moving Work',
+        '5': '5. Other',
+        '99': '',
+    }, skip_if_contains='Lane Closure')
 
     return df
 

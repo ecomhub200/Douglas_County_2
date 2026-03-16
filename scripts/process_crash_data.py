@@ -977,7 +977,7 @@ def stage_split(validated_path: str, config: PipelineConfig, stats: PipelineStat
             no_interstate = [r for r in all_rows
                              if r.get('_co_system_code', '').strip() != 'Interstate Highway']
         else:
-            no_interstate = [r for r in all_rows if r.get('SYSTEM', '').strip() != 'Interstate']
+            no_interstate = [r for r in all_rows if r.get('SYSTEM', '').strip() not in ('Interstate', 'VDOT Interstate')]
 
     no_int_path = str(config.output_dir / f"{jurisdiction}_no_interstate.csv")
     _write_split_csv(no_int_path, headers, no_interstate,

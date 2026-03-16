@@ -64,16 +64,15 @@ VALUE_DECODE_MAP = {
         '2': '2. County Hwy Agency',
         '3': '3. City or Town Hwy Agency',
         '4': '4. Federal Roads',
-        '5': '5. State Toll Authority',
-        '6': '6. Other',
+        '5': '5. Toll Roads Maintained by Others',
+        '6': '6. Private/Unknown Roads',
     },
     'SYSTEM': {
-        '1': 'Interstate',
-        '2': 'Primary',
-        '3': 'Secondary',
-        '4': 'NonVDOT primary',
-        '5': 'NonVDOT secondary',
-        '6': 'Non-VDOT',
+        '1': 'NonVDOT primary',
+        '2': 'NonVDOT secondary',
+        '3': 'VDOT Interstate',
+        '4': 'VDOT Primary',
+        '5': 'VDOT Secondary',
     },
     'Functional Class': {
         'INT': '1-Interstate (A,1)',
@@ -273,7 +272,7 @@ def filter_no_interstate(rows, headers, split_config):
 
     elif method == 'system_column':
         col = _resolve_column(col_idx, interstate_config, 'SYSTEM')
-        exclude_values = interstate_config.get('excludeValues', ['Interstate'])
+        exclude_values = interstate_config.get('excludeValues', ['Interstate', 'VDOT Interstate'])
         if col is None:
             logger.warning(f"  Column not found for interstate exclusion")
             return rows
@@ -370,7 +369,7 @@ def main():
             'interstateExclusion': {
                 'method': 'system_column',
                 'column': 'SYSTEM',
-                'excludeValues': ['Interstate']
+                'excludeValues': ['Interstate', 'VDOT Interstate']
             }
         }
 

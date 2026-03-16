@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-CRASH LENS — Virginia Crash Data Downloader (v7)
+CRASH LENS — Virginia Crash Data Downloader (v8)
 
 Downloads CrashData_Basic from virginiaroads.org via ArcGIS FeatureServer.
-ALL API calls are routed through Playwright's browser context to bypass
-VDOT's bot detection (Python requests gets connection-reset).
+
+Two download methods (tried in order):
+  1. DIRECT REST API — Plain HTTP requests to ArcGIS FeatureServer (fast, no browser)
+  2. PLAYWRIGHT FALLBACK — Browser-routed requests if direct API is blocked by bot detection
 
 Supports INCREMENTAL downloads using OBJECTID high-water mark:
   - Tracks max OBJECTID from previous download in a manifest file
@@ -14,8 +16,8 @@ Supports INCREMENTAL downloads using OBJECTID high-water mark:
   - Quarterly full refresh recommended to catch edits/deletions
 
 Strategy:
-  1. Open browser, navigate to Hub page (establishes session/cookies)
-  2. Discover live FeatureServer URL from network traffic
+  1. Try direct REST API (requests library) — fastest, no dependencies
+  2. If blocked/fails, fall back to Playwright browser session
   3. Check manifest for last OBJECTID (incremental) or paginate all (full)
   4. Stream results to CSV on disk
   5. Merge delta into existing CSV if incremental
@@ -29,6 +31,9 @@ Usage:
 
     # Force full re-download:
     python download_virginia_crash_data.py --data-dir data --force --jurisdiction henrico
+
+    # Force Playwright method (skip REST API attempt):
+    python download_virginia_crash_data.py --data-dir data --playwright-only --jurisdiction henrico
 """
 
 import argparse
@@ -43,6 +48,9 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
+
+import requests
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('virginia-download')
@@ -138,7 +146,298 @@ def save_cached_url(url):
 
 
 # ============================================================================
-# Browser-context API helper
+# Direct REST API download (primary method — no browser needed)
+# ============================================================================
+
+REST_API_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+    'Referer': 'https://www.virginiaroads.org/',
+    'Origin': 'https://www.virginiaroads.org',
+}
+
+# Default REST API endpoint (Full_Crash service)
+REST_API_BASE = 'https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/Full_Crash/FeatureServer/0'
+
+
+def rest_fetch_json(url, retries=5, timeout=60):
+    """Fetch JSON from ArcGIS REST API using plain HTTP requests.
+
+    Returns parsed JSON dict, or None on failure.
+    """
+    for attempt in range(retries):
+        try:
+            resp = requests.get(url, headers=REST_API_HEADERS, timeout=timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                if 'error' not in data:
+                    return data
+                err = data.get('error', {})
+                logger.warning(f"  API error: {err.get('message', err)}")
+            else:
+                logger.warning(f"  HTTP {resp.status_code} from REST API")
+        except requests.exceptions.ConnectionError as e:
+            logger.warning(f"  Connection error: {e}")
+        except requests.exceptions.Timeout:
+            logger.warning(f"  Request timed out ({timeout}s)")
+        except Exception as e:
+            logger.warning(f"  REST fetch error: {e}")
+
+        if attempt < retries - 1:
+            wait = min(15, 2 ** attempt)
+            logger.info(f"    Retry {attempt+1} in {wait}s...")
+            time.sleep(wait)
+
+    return None
+
+
+def _find_working_rest_service():
+    """Try known FeatureServer URLs via direct REST API.
+
+    Returns (service_url, total_count) or (None, 0).
+    """
+    # Try REST_API_BASE first, then the rest of KNOWN_FEATURE_SERVERS
+    urls_to_try = [REST_API_BASE] + [u for u in KNOWN_FEATURE_SERVERS if u != REST_API_BASE]
+
+    for url in urls_to_try:
+        svc_name = url.split('/')[-3]
+        count_url = f'{url}/query?where=1%3D1&returnCountOnly=true&f=json'
+        data = rest_fetch_json(count_url, retries=2, timeout=30)
+        if data and 'count' in data:
+            count = data['count']
+            logger.info(f"  REST API {svc_name}: {count:,} records")
+            if count > 100000:
+                return url, count
+        else:
+            logger.info(f"  REST API {svc_name}: failed or blocked")
+
+    return None, 0
+
+
+def download_with_rest_api(output_path, batch_size=5000,
+                           where_clause=None, append_mode=False):
+    """Download crash data using direct REST API requests (no browser).
+
+    This is the primary/fast download method. Falls back to Playwright
+    if the API returns connection errors or bot detection blocks.
+
+    Args:
+        output_path: Path to write the CSV file.
+        batch_size: Records per paginated request.
+        where_clause: ArcGIS WHERE filter (e.g. 'OBJECTID > 500000').
+                      None means '1=1' (all records).
+        append_mode: If True, writes CSV without header (for merging later).
+
+    Returns:
+        dict with {success, total_written, max_objectid, total_server_count, service_url}
+        or False on failure.
+    """
+    logger.info("Attempting direct REST API download...")
+
+    # Step 1: Find a working FeatureServer endpoint
+    service_url, total_count = _find_working_rest_service()
+    if not service_url:
+        logger.warning("  Direct REST API not available — will fall back to Playwright")
+        return False
+
+    save_cached_url(service_url)
+    logger.info(f"  Using: {service_url}")
+    logger.info(f"  Total records on server: {total_count:,}")
+
+    # Step 2: Get field schema
+    logger.info("  Fetching field schema...")
+    schema_url = f'{service_url}?f=json'
+    schema = rest_fetch_json(schema_url, retries=3, timeout=30)
+
+    if not schema or 'fields' not in schema:
+        logger.warning("  Could not get field schema via REST — falling back")
+        return False
+
+    fields = schema['fields']
+    has_geometry = 'Point' in schema.get('geometryType', '')
+    fieldnames = [f['name'] for f in fields]
+    if has_geometry:
+        fieldnames.extend(['x', 'y'])
+
+    logger.info(f"  {len(fields)} fields, geometry={has_geometry}")
+    logger.info(f"  Fields: {', '.join(fieldnames[:10])}...")
+
+    # Step 3: Determine download query
+    effective_where = where_clause or '1=1'
+    encoded_where = quote(effective_where)
+
+    if effective_where != '1=1':
+        delta_count_url = f'{service_url}/query?where={encoded_where}&returnCountOnly=true&f=json'
+        delta_data = rest_fetch_json(delta_count_url, retries=3, timeout=30)
+        download_count = delta_data.get('count', total_count) if delta_data else total_count
+        logger.info(f"  Incremental query: {effective_where}")
+        logger.info(f"  Delta records to download: {download_count:,}")
+    else:
+        download_count = total_count
+        logger.info(f"  Full download: {download_count:,} records")
+
+    # Step 4: Paginate records via REST API
+    logger.info(f"  Downloading {download_count:,} records ({batch_size}/batch) via REST API...")
+
+    temp_path = output_path + '.partial'
+    offset = 0
+    total_written = 0
+    max_objectid_seen = 0
+    start_time = time.time()
+    consecutive_errors = 0
+    max_consecutive_errors = 10
+
+    query_base = f'{service_url}/query'
+
+    with open(temp_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
+        if not append_mode:
+            writer.writeheader()
+
+        while offset < download_count:
+            # Progress logging
+            pct = min(100, int(offset / max(download_count, 1) * 100))
+            elapsed = time.time() - start_time
+            rate = total_written / max(elapsed, 0.1)
+            remaining = download_count - total_written
+            eta = remaining / max(rate, 0.1)
+
+            if offset % (batch_size * 5) == 0 or offset == 0:
+                logger.info(
+                    f"  {total_written:,} / {download_count:,} ({pct}%) "
+                    f"| {rate:.0f} rec/s | ETA {eta/60:.1f} min"
+                )
+
+            # Build query URL
+            params = (
+                f'?where={encoded_where}'
+                f'&outFields=*'
+                f'&resultOffset={offset}'
+                f'&resultRecordCount={batch_size}'
+                f'&orderByFields=OBJECTID+ASC'
+                f'&f=json'
+            )
+            if has_geometry:
+                params += '&outSR=4326'
+
+            fetch_url = query_base + params
+
+            # Fetch via direct REST API
+            data = rest_fetch_json(fetch_url, retries=5, timeout=120)
+
+            if data is None:
+                consecutive_errors += 1
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.error(f"  {max_consecutive_errors} consecutive REST errors")
+                    # If we got at least some data, don't discard it — but signal failure
+                    # so main() can decide whether to fall back
+                    if total_written > 0:
+                        logger.warning(f"  Partial download: {total_written:,} records before failure")
+                    # Clean up partial file
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                    return False
+                continue
+
+            if 'error' in data:
+                err = data['error']
+                logger.warning(f"  API error at offset {offset}: {err}")
+                consecutive_errors += 1
+                if consecutive_errors >= max_consecutive_errors:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                    return False
+                time.sleep(2)
+                continue
+
+            features = data.get('features', [])
+            if not features:
+                break
+
+            consecutive_errors = 0
+
+            # Write batch to CSV and track max OBJECTID
+            for feat in features:
+                row = feat.get('attributes', {})
+                geom = feat.get('geometry')
+                if geom and has_geometry:
+                    row['x'] = geom.get('x', '')
+                    row['y'] = geom.get('y', '')
+                writer.writerow(row)
+                total_written += 1
+                # Track highest OBJECTID seen
+                oid = row.get('OBJECTID') or row.get('objectid') or row.get('FID')
+                if oid is not None:
+                    try:
+                        max_objectid_seen = max(max_objectid_seen, int(oid))
+                    except (ValueError, TypeError):
+                        pass
+
+            offset += len(features)
+            if len(features) < batch_size:
+                break
+
+    elapsed = time.time() - start_time
+    logger.info(f"  REST API downloaded {total_written:,} records in {elapsed/60:.1f} min")
+    logger.info(f"  Average: {total_written/max(elapsed,1):.0f} rec/s")
+    logger.info(f"  Max OBJECTID seen: {max_objectid_seen:,}")
+
+    if total_written == 0:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return {
+            'success': True,
+            'total_written': 0,
+            'max_objectid': max_objectid_seen,
+            'total_server_count': total_count,
+            'service_url': service_url,
+        }
+
+    if effective_where == '1=1' and total_written < total_count * 0.95:
+        logger.warning(
+            f"  Got {total_written:,} of {total_count:,} "
+            f"({total_written/total_count*100:.1f}%)"
+        )
+
+    # Replace old file with new one
+    if os.path.exists(output_path):
+        for attempt in range(5):
+            try:
+                os.remove(output_path)
+                break
+            except PermissionError:
+                if attempt < 4:
+                    logger.info(f"  File locked, retrying in {attempt+1}s...")
+                    time.sleep(attempt + 1)
+                else:
+                    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    alt_path = output_path.replace('.csv', f'_{ts}.csv')
+                    shutil.move(temp_path, alt_path)
+                    size = os.path.getsize(alt_path)
+                    logger.warning(f"  Old file locked — saved as: {alt_path} ({size/(1024*1024):.1f} MB)")
+                    return {
+                        'success': True,
+                        'total_written': total_written,
+                        'max_objectid': max_objectid_seen,
+                        'total_server_count': total_count,
+                        'service_url': service_url,
+                    }
+
+    shutil.move(temp_path, output_path)
+    size = os.path.getsize(output_path)
+    logger.info(f"  Saved: {output_path} ({size/(1024*1024):.1f} MB)")
+
+    return {
+        'success': True,
+        'total_written': total_written,
+        'max_objectid': max_objectid_seen,
+        'total_server_count': total_count,
+        'service_url': service_url,
+    }
+
+
+# ============================================================================
+# Browser-context API helper (Playwright fallback)
 # ============================================================================
 
 def browser_fetch_json(page, url, retries=5):
@@ -391,7 +690,6 @@ def download_with_browser(output_path, headless=True, batch_size=5000,
             # ============================================================
             # Step 4: Determine download query (full vs incremental)
             # ============================================================
-            from urllib.parse import quote
             effective_where = where_clause or '1=1'
             encoded_where = quote(effective_where)
 
@@ -802,6 +1100,10 @@ Examples:
     parser.add_argument('--gzip', action='store_true')
     parser.add_argument('--headful', action='store_true', help='Show browser window')
     parser.add_argument('--batch-size', type=int, default=5000, help='Records per request')
+    parser.add_argument('--playwright-only', action='store_true',
+                        help='Skip REST API and use only Playwright browser method')
+    parser.add_argument('--rest-only', action='store_true',
+                        help='Use only REST API (no Playwright fallback)')
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir)
@@ -825,10 +1127,19 @@ Examples:
         elif not do_full and not manifest:
             logger.info("No manifest found — starting with full download")
 
+    use_playwright_only = args.playwright_only
+    use_rest_only = args.rest_only
+
+    method_label = 'REST API → Playwright fallback'
+    if use_playwright_only:
+        method_label = 'Playwright browser only'
+    elif use_rest_only:
+        method_label = 'REST API only (no fallback)'
+
     logger.info("=" * 60)
-    logger.info("  CRASH LENS — Virginia Crash Data Download (v7)")
+    logger.info("  CRASH LENS — Virginia Crash Data Download (v8)")
     logger.info(f"  Mode: {download_mode.upper()}")
-    logger.info(f"  Method: Browser-routed FeatureServer pagination")
+    logger.info(f"  Method: {method_label}")
     logger.info(f"  Output: {data_dir}")
     logger.info(f"  Jurisdiction: {jurisdiction}")
     logger.info(f"  Batch size: {args.batch_size:,}")
@@ -840,6 +1151,38 @@ Examples:
 
     csv_path = None
 
+    def _try_download(out_path, where=None, append=False):
+        """Try REST API first, fall back to Playwright. Returns result dict or False."""
+        result = False
+
+        # Attempt 1: Direct REST API (unless --playwright-only)
+        if not use_playwright_only:
+            logger.info("=" * 40)
+            logger.info("  ATTEMPT 1: Direct REST API")
+            logger.info("=" * 40)
+            result = download_with_rest_api(
+                out_path, batch_size=args.batch_size,
+                where_clause=where, append_mode=append
+            )
+            if result is not False:
+                return result
+            logger.warning("  REST API download failed")
+
+        # Attempt 2: Playwright browser (unless --rest-only)
+        if not use_rest_only:
+            logger.info("=" * 40)
+            logger.info("  ATTEMPT 2: Playwright browser fallback")
+            logger.info("=" * 40)
+            result = download_with_browser(
+                out_path, headless=headless, batch_size=args.batch_size,
+                where_clause=where, append_mode=append
+            )
+            if result is not False:
+                return result
+            logger.error("  Playwright download also failed")
+
+        return False
+
     if download_mode == 'incremental':
         # ── Incremental: download only new records ──
         last_max = manifest['max_objectid']
@@ -847,10 +1190,7 @@ Examples:
         where_clause = f'OBJECTID > {last_max}'
         delta_path = str(data_dir / 'virginia_delta.csv')
 
-        result = download_with_browser(
-            delta_path, headless=headless, batch_size=args.batch_size,
-            where_clause=where_clause
-        )
+        result = _try_download(delta_path, where=where_clause)
 
         if result is False:
             logger.error("Incremental download failed — falling back to full download")
@@ -924,9 +1264,7 @@ Examples:
                 csv_path = output_path
 
         if csv_path is None:
-            result = download_with_browser(
-                output_path, headless=headless, batch_size=args.batch_size
-            )
+            result = _try_download(output_path)
             if result is False or (isinstance(result, dict) and not result.get('success')):
                 logger.error("Download failed")
                 sys.exit(1)
