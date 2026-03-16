@@ -1,16 +1,18 @@
 # ==============================================================================
-# Virginia State Download Workflow (Playwright-Based)
+# Virginia State Download Workflow (v9 — Hub CSV Export + FeatureServer Fallback)
 # ==============================================================================
-# Downloads crash data from Virginia Roads using Playwright to bypass
-# bot-detection on CSV downloads, then triggers pipeline.yml for processing.
+# Downloads crash data from Virginia Roads Open Data Hub.
 #
-# Why Playwright?
-#   virginiaroads.org blocks programmatic CSV downloads (403 Forbidden) from
-#   server IPs but serves the page fine in a browser. Playwright simulates a
-#   real Chromium browser session. Same approach as download-cdot-crash-data.yml.
+# Download strategy (tried in order):
+#   1. Hub CSV Export — Playwright clicks "Download CSV" on the Hub page (primary)
+#   2. Direct REST API — Plain HTTP to ArcGIS FeatureServer (may need auth token)
+#   3. Playwright FeatureServer — Browser-routed FeatureServer queries (legacy)
+#
+# As of March 2026, VDOT's FeatureServer endpoints require authentication tokens,
+# so the Hub CSV export via Playwright is the primary download method.
 #
 # Flow:
-#   Playwright download → Filter jurisdiction → Split road types → Upload R2 → Pipeline
+#   Hub CSV download → Filter jurisdiction → Split road types → Upload R2 → Pipeline
 #
 # Scope options:
 #   - jurisdiction: Download statewide, filter + split single county
@@ -336,12 +338,13 @@ jobs:
             echo "| Selection | ${SELECTION:-statewide} |"
             echo "| Records | ${RECORDS} |"
             echo "| Mode | ${{ steps.download.outputs.download_mode || 'incremental' }} |"
-            echo '| Method | Playwright (browser-based) |'
+            echo '| Method | Hub CSV Export → REST API → Playwright FeatureServer |'
             echo "| Output | ${CSV_PATH:-N/A} |"
             echo "| Run time | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |"
             echo ''
-            echo '**Download method:** Playwright Chromium browser simulates real user to bypass'
-            echo 'virginiaroads.org bot-detection (403 Forbidden on programmatic CSV requests).'
+            echo '**Download method (v9):** Primary: Playwright clicks CSV download button on'
+            echo 'Virginia Roads Hub page. Fallback: REST API or Playwright-routed FeatureServer'
+            echo 'queries. Hub export bypasses FeatureServer auth token requirements.'
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Trigger unified pipeline

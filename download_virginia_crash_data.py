@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """
-CRASH LENS — Virginia Crash Data Downloader (v8)
+CRASH LENS — Virginia Crash Data Downloader (v9)
 
-Downloads CrashData_Basic from virginiaroads.org via ArcGIS FeatureServer.
+Downloads crash data from virginiaroads.org (Virginia Roads Open Data Hub).
 
-Two download methods (tried in order):
-  1. DIRECT REST API — Plain HTTP requests to ArcGIS FeatureServer (fast, no browser)
-  2. PLAYWRIGHT FALLBACK — Browser-routed requests if direct API is blocked by bot detection
+Three download methods (tried in order):
+  1. HUB CSV EXPORT — Playwright clicks "Download CSV" on the Hub page (primary)
+  2. DIRECT REST API — Plain HTTP requests to ArcGIS FeatureServer (fast, no browser)
+  3. PLAYWRIGHT FEATURESERVER — Browser-routed FeatureServer queries (legacy fallback)
+
+As of March 2026, VDOT's FeatureServer endpoints require authentication tokens,
+so the Hub CSV export via Playwright is now the primary download method.
 
 Supports INCREMENTAL downloads using OBJECTID high-water mark:
   - Tracks max OBJECTID from previous download in a manifest file
@@ -16,11 +20,12 @@ Supports INCREMENTAL downloads using OBJECTID high-water mark:
   - Quarterly full refresh recommended to catch edits/deletions
 
 Strategy:
-  1. Try direct REST API (requests library) — fastest, no dependencies
-  2. If blocked/fails, fall back to Playwright browser session
-  3. Check manifest for last OBJECTID (incremental) or paginate all (full)
-  4. Stream results to CSV on disk
-  5. Merge delta into existing CSV if incremental
+  1. Try Hub CSV export (Playwright clicks download button on Hub page)
+  2. If Hub fails, try direct REST API (requests library)
+  3. If REST fails, fall back to Playwright browser-routed FeatureServer queries
+  4. Check manifest for last OBJECTID (incremental) or paginate all (full)
+  5. Stream results to CSV on disk
+  6. Merge delta into existing CSV if incremental
 
 Usage:
     # Incremental (default — fast, only new records):
@@ -32,8 +37,11 @@ Usage:
     # Force full re-download:
     python download_virginia_crash_data.py --data-dir data --force --jurisdiction henrico
 
-    # Force Playwright method (skip REST API attempt):
+    # Force Playwright Hub download only:
     python download_virginia_crash_data.py --data-dir data --playwright-only --jurisdiction henrico
+
+    # Skip Hub export, use only FeatureServer methods:
+    python download_virginia_crash_data.py --data-dir data --rest-only --jurisdiction henrico
 """
 
 import argparse
@@ -60,12 +68,23 @@ CONFIG_PATH = SCRIPT_DIR / 'config.json'
 
 HUB_URL = 'https://www.virginiaroads.org/datasets/VDOT::full-crash-1/explore?layer=0'
 
-# Known FeatureServer URLs (discovered 2026-03-15)
+# Hub dataset pages (for CSV export via Playwright download button)
+HUB_DATASET_PAGES = [
+    'https://www.virginiaroads.org/datasets/VDOT::full-crash-1/about',
+    'https://www.virginiaroads.org/datasets/VDOT::crashdata-basic-1/about',
+    'https://virginiaroads-vdot.opendata.arcgis.com/datasets/VDOT::full-crash-1/about',
+    'https://virginiaroads-vdot.opendata.arcgis.com/datasets/VDOT::crashdata-basic-1/about',
+]
+
+# Known FeatureServer URLs (may require auth tokens as of March 2026)
 KNOWN_FEATURE_SERVERS = [
     'https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/Full_Crash/FeatureServer/0',
     'https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_Basic/FeatureServer/0',
     'https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/CrashData_Basic_Updated/FeatureServer/0',
 ]
+
+# Minimum acceptable record count for a valid statewide download
+MIN_STATEWIDE_RECORDS = 50000
 
 CACHE_PATH = SCRIPT_DIR / '.virginia_featureserver_cache.json'
 MANIFEST_FILENAME = 'virginia_download_manifest.json'
@@ -146,7 +165,459 @@ def save_cached_url(url):
 
 
 # ============================================================================
-# Direct REST API download (primary method — no browser needed)
+# Hub CSV Export download (PRIMARY method — Playwright clicks download button)
+# ============================================================================
+
+def download_via_hub_export(output_path, headless=True, timeout_minutes=30):
+    """
+    Download crash data CSV from Virginia Roads Open Data Hub using Playwright.
+
+    Navigates to the Hub dataset page and clicks the CSV download button.
+    This bypasses FeatureServer token requirements because the Hub generates
+    its own CSV export from cached/replicated data.
+
+    The ArcGIS Hub "Download" button triggers a server-side CSV generation
+    that is served as a file download — completely separate from the
+    FeatureServer query API.
+
+    Returns:
+        dict with {success, total_written, max_objectid, total_server_count, service_url}
+        or False on failure.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        logger.error("Playwright not installed. Run: pip install playwright && playwright install chromium")
+        return False
+
+    import tempfile
+
+    logger.info("=" * 50)
+    logger.info("  HUB CSV EXPORT via Playwright")
+    logger.info("=" * 50)
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=headless,
+                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            )
+            # Use a temp directory for Playwright downloads
+            download_dir = tempfile.mkdtemp(prefix='va_hub_dl_')
+            context = browser.new_context(
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                           '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                viewport={'width': 1920, 'height': 1080},
+                accept_downloads=True,
+            )
+            page = context.new_page()
+
+            downloaded_path = None
+
+            for hub_url in HUB_DATASET_PAGES:
+                logger.info(f"  Trying Hub page: {hub_url}")
+                try:
+                    page.goto(hub_url, wait_until='networkidle', timeout=60000)
+                    page.wait_for_timeout(3000)
+                    title = page.title()
+                    logger.info(f"  Page loaded: {title}")
+
+                    # Check if page loaded successfully (not 404 or error)
+                    if '404' in title.lower() or 'not found' in title.lower():
+                        logger.info(f"  Page not found, trying next...")
+                        continue
+
+                    # Strategy 1: Look for the Hub "Download" action/button
+                    downloaded_path = _try_hub_download_button(page, download_dir, timeout_minutes)
+                    if downloaded_path:
+                        break
+
+                    # Strategy 2: Try the "I want to use this" / API download panel
+                    downloaded_path = _try_hub_api_download(page, download_dir, timeout_minutes)
+                    if downloaded_path:
+                        break
+
+                except Exception as e:
+                    logger.warning(f"  Hub page failed: {e}")
+                    continue
+
+            browser.close()
+
+            if not downloaded_path or not os.path.exists(downloaded_path):
+                logger.error("  Hub CSV export failed — no file downloaded")
+                # Clean up temp dir
+                try:
+                    shutil.rmtree(download_dir, ignore_errors=True)
+                except Exception:
+                    pass
+                return False
+
+            # Validate the downloaded file
+            file_size = os.path.getsize(downloaded_path)
+            logger.info(f"  Downloaded file: {downloaded_path} ({file_size / (1024*1024):.1f} MB)")
+
+            if file_size < 1000:
+                logger.error(f"  Downloaded file too small ({file_size} bytes)")
+                shutil.rmtree(download_dir, ignore_errors=True)
+                return False
+
+            # Check if it's a valid CSV (not HTML error page)
+            with open(downloaded_path, 'r', encoding='utf-8-sig', errors='replace') as f:
+                first_line = f.readline(2000)
+            if '<html' in first_line.lower() or '<HTML' in first_line:
+                logger.error("  Downloaded file is HTML (error page), not CSV")
+                shutil.rmtree(download_dir, ignore_errors=True)
+                return False
+
+            # Handle GeoJSON download — convert to CSV if needed
+            if downloaded_path.endswith('.geojson') or first_line.strip().startswith('{'):
+                logger.info("  Downloaded GeoJSON — converting to CSV...")
+                csv_from_geojson = _geojson_to_csv(downloaded_path, output_path)
+                shutil.rmtree(download_dir, ignore_errors=True)
+                if csv_from_geojson:
+                    return csv_from_geojson
+                return False
+
+            # Move CSV to target location
+            shutil.move(downloaded_path, output_path)
+            shutil.rmtree(download_dir, ignore_errors=True)
+
+            # Count records and find max OBJECTID
+            total_written = 0
+            max_objectid = 0
+            with open(output_path, 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    total_written += 1
+                    oid = row.get('OBJECTID') or row.get('objectid') or row.get('FID') or ''
+                    try:
+                        oid_int = int(oid)
+                        if oid_int > max_objectid:
+                            max_objectid = oid_int
+                    except (ValueError, TypeError):
+                        pass
+
+            logger.info(f"  Hub CSV export success: {total_written:,} records")
+            logger.info(f"  Max OBJECTID: {max_objectid:,}")
+
+            if total_written < MIN_STATEWIDE_RECORDS:
+                logger.warning(f"  Only {total_written:,} records (expected {MIN_STATEWIDE_RECORDS:,}+)")
+
+            return {
+                'success': True,
+                'total_written': total_written,
+                'max_objectid': max_objectid,
+                'total_server_count': total_written,
+                'service_url': 'hub_csv_export',
+            }
+
+    except Exception as e:
+        logger.error(f"  Hub export fatal error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def _try_hub_download_button(page, download_dir, timeout_minutes):
+    """
+    Try to find and click the download button on the ArcGIS Hub dataset page.
+    Hub pages have various download button patterns depending on the page type.
+
+    Returns: path to downloaded file, or None.
+    """
+    logger.info("  Strategy 1: Looking for Download button...")
+
+    # ArcGIS Hub dataset "about" pages have a Download button
+    # that opens a dropdown with format options (CSV, KML, Shapefile, GeoJSON)
+    download_selectors = [
+        # Hub v2+ (calcite-based)
+        'calcite-button:has-text("Download")',
+        'calcite-dropdown-item:has-text("Download")',
+        # Hub classic and generic
+        'button:has-text("Download")',
+        'a:has-text("Download")',
+        # Hub "I want to use this" section
+        'a[href*="download"]',
+        'button[data-testid="download-button"]',
+        # Hub action bar
+        'calcite-action:has-text("Download")',
+    ]
+
+    # First, find and click the main download trigger
+    download_clicked = False
+    for selector in download_selectors:
+        try:
+            elements = page.locator(selector).all()
+            for el in elements:
+                try:
+                    if not el.is_visible(timeout=2000):
+                        continue
+                    text = el.inner_text().strip()
+                    # Skip "Recent Downloads" or navigation links
+                    if any(skip in text for skip in ['Recent', 'Sign', 'Log']):
+                        continue
+                    bbox = el.bounding_box()
+                    # Skip header/nav elements
+                    if bbox and bbox['y'] < 100:
+                        continue
+                    logger.info(f"    Found download button: '{text}' at y={bbox['y'] if bbox else '?'}")
+                    el.click()
+                    page.wait_for_timeout(2000)
+                    download_clicked = True
+                    break
+                except Exception:
+                    continue
+            if download_clicked:
+                break
+        except Exception:
+            continue
+
+    if not download_clicked:
+        logger.info("    No download button found")
+        return None
+
+    # Now look for CSV format option in the dropdown/modal
+    csv_path = _select_csv_format_and_download(page, download_dir, timeout_minutes)
+    return csv_path
+
+
+def _try_hub_api_download(page, download_dir, timeout_minutes):
+    """
+    Try the Hub API download panel — some Hub pages have a direct
+    "Download CSV" link or an API/download section.
+
+    Returns: path to downloaded file, or None.
+    """
+    logger.info("  Strategy 2: Looking for direct download links...")
+
+    # Look for direct CSV download links
+    csv_link_selectors = [
+        'a[href*=".csv"]',
+        'a[href*="format=csv"]',
+        'a[href*="download"][href*="csv"]',
+        'a:has-text("CSV")',
+        'a:has-text("Spreadsheet")',
+        'calcite-dropdown-item:has-text("CSV")',
+        'calcite-dropdown-item:has-text("Spreadsheet")',
+    ]
+
+    for selector in csv_link_selectors:
+        try:
+            elements = page.locator(selector).all()
+            for el in elements:
+                try:
+                    if not el.is_visible(timeout=2000):
+                        continue
+                    text = el.inner_text().strip()
+                    href = el.get_attribute('href') or ''
+                    logger.info(f"    Found link: '{text}' → {href[:100]}")
+
+                    # Click and wait for download
+                    with page.expect_download(timeout=timeout_minutes * 60 * 1000) as dl_info:
+                        el.click()
+
+                    download = dl_info.value
+                    filename = download.suggested_filename
+                    save_path = os.path.join(download_dir, filename)
+                    download.save_as(save_path)
+                    logger.info(f"    Downloaded: {filename}")
+                    return save_path
+                except Exception as e:
+                    logger.info(f"    Link failed: {e}")
+                    continue
+        except Exception:
+            continue
+
+    # Also try extracting download URL from page and fetching directly
+    try:
+        download_url = page.evaluate("""
+            () => {
+                // Look for download links in the page
+                const links = document.querySelectorAll('a[href]');
+                for (const link of links) {
+                    const href = link.href;
+                    if (href.includes('download') && (href.includes('csv') || href.includes('spreadsheet'))) {
+                        return href;
+                    }
+                }
+                // Check for Hub API download pattern in meta/data attributes
+                const meta = document.querySelector('meta[name="dc.identifier"]');
+                if (meta) {
+                    const itemId = meta.content;
+                    return `https://hub.arcgis.com/api/v3/datasets/${itemId}/downloads/data?format=csv&spatialRefId=4326`;
+                }
+                return null;
+            }
+        """)
+        if download_url:
+            logger.info(f"    Found download URL: {download_url[:100]}")
+            with page.expect_download(timeout=timeout_minutes * 60 * 1000) as dl_info:
+                page.goto(download_url)
+            download = dl_info.value
+            save_path = os.path.join(download_dir, download.suggested_filename)
+            download.save_as(save_path)
+            logger.info(f"    Downloaded: {download.suggested_filename}")
+            return save_path
+    except Exception as e:
+        logger.info(f"    URL extraction failed: {e}")
+
+    return None
+
+
+def _select_csv_format_and_download(page, download_dir, timeout_minutes):
+    """
+    After clicking the main download button, select CSV format and
+    wait for the file to download.
+
+    Returns: path to downloaded file, or None.
+    """
+    logger.info("    Selecting CSV format...")
+
+    # Look for format options (CSV, Spreadsheet, GeoJSON, etc.)
+    format_selectors = [
+        # Calcite dropdown items
+        'calcite-dropdown-item:has-text("CSV")',
+        'calcite-dropdown-item:has-text("Spreadsheet")',
+        'calcite-dropdown-item:has-text("csv")',
+        # Regular links/buttons
+        'a:has-text("CSV")',
+        'a:has-text("Spreadsheet")',
+        'button:has-text("CSV")',
+        'button:has-text("Spreadsheet")',
+        # List items
+        'li:has-text("CSV")',
+        'li:has-text("Spreadsheet")',
+        # Hub download panel options
+        '[data-format="csv"]',
+        '[data-value="csv"]',
+    ]
+
+    for selector in format_selectors:
+        try:
+            elements = page.locator(selector).all()
+            for el in elements:
+                try:
+                    if not el.is_visible(timeout=2000):
+                        continue
+                    text = el.inner_text().strip()
+                    logger.info(f"    Found format option: '{text}'")
+
+                    # Click the CSV option and capture the download
+                    try:
+                        with page.expect_download(timeout=timeout_minutes * 60 * 1000) as dl_info:
+                            el.click()
+
+                        download = dl_info.value
+                        filename = download.suggested_filename
+                        save_path = os.path.join(download_dir, filename)
+                        download.save_as(save_path)
+                        logger.info(f"    Downloaded: {filename} ({os.path.getsize(save_path) / (1024*1024):.1f} MB)")
+                        return save_path
+                    except Exception as e:
+                        logger.info(f"    Download capture failed: {e}")
+                        # The click may have triggered a redirect instead of download
+                        # Check if a file appeared in the download directory
+                        page.wait_for_timeout(5000)
+                        for f in os.listdir(download_dir):
+                            fpath = os.path.join(download_dir, f)
+                            if os.path.isfile(fpath) and os.path.getsize(fpath) > 1000:
+                                logger.info(f"    Found file in download dir: {f}")
+                                return fpath
+                        continue
+                except Exception:
+                    continue
+        except Exception:
+            continue
+
+    # If no format dropdown found, the download button may have directly
+    # triggered a CSV download — check download directory
+    logger.info("    No format dropdown found — checking for direct download...")
+    page.wait_for_timeout(10000)
+    for f in os.listdir(download_dir):
+        fpath = os.path.join(download_dir, f)
+        if os.path.isfile(fpath) and os.path.getsize(fpath) > 1000:
+            logger.info(f"    Found downloaded file: {f}")
+            return fpath
+
+    # Last resort: try to intercept a download URL from network traffic
+    # and use page.expect_download with a longer timeout
+    logger.info("    Waiting longer for Hub to generate export file...")
+    try:
+        with page.expect_download(timeout=min(timeout_minutes, 10) * 60 * 1000) as dl_info:
+            # Some Hub pages auto-start download after clicking
+            pass
+        download = dl_info.value
+        save_path = os.path.join(download_dir, download.suggested_filename)
+        download.save_as(save_path)
+        return save_path
+    except Exception:
+        pass
+
+    return None
+
+
+def _geojson_to_csv(geojson_path, csv_path):
+    """Convert a GeoJSON file to CSV. Returns result dict or False."""
+    try:
+        with open(geojson_path, 'r', encoding='utf-8-sig') as f:
+            data = json.load(f)
+
+        features = data.get('features', [])
+        if not features:
+            logger.error("  GeoJSON has no features")
+            return False
+
+        # Extract fieldnames from first feature
+        first_props = features[0].get('properties', {})
+        fieldnames = list(first_props.keys())
+
+        # Check for geometry — add x/y columns if point geometry
+        has_geometry = features[0].get('geometry', {}).get('type') == 'Point'
+        if has_geometry:
+            fieldnames.extend(['x', 'y'])
+
+        total_written = 0
+        max_objectid = 0
+
+        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
+            writer.writeheader()
+
+            for feat in features:
+                row = feat.get('properties', {})
+                if has_geometry:
+                    geom = feat.get('geometry', {})
+                    coords = geom.get('coordinates', [])
+                    if len(coords) >= 2:
+                        row['x'] = coords[0]
+                        row['y'] = coords[1]
+                writer.writerow(row)
+                total_written += 1
+
+                oid = row.get('OBJECTID') or row.get('objectid') or row.get('FID') or ''
+                try:
+                    oid_int = int(oid)
+                    if oid_int > max_objectid:
+                        max_objectid = oid_int
+                except (ValueError, TypeError):
+                    pass
+
+        logger.info(f"  Converted GeoJSON to CSV: {total_written:,} records")
+        return {
+            'success': True,
+            'total_written': total_written,
+            'max_objectid': max_objectid,
+            'total_server_count': total_written,
+            'service_url': 'hub_geojson_export',
+        }
+
+    except Exception as e:
+        logger.error(f"  GeoJSON conversion failed: {e}")
+        return False
+
+
+# ============================================================================
+# Direct REST API download (fallback — may require auth tokens)
 # ============================================================================
 
 REST_API_HEADERS = {
@@ -173,7 +644,13 @@ def rest_fetch_json(url, retries=5, timeout=60):
                 if 'error' not in data:
                     return data
                 err = data.get('error', {})
-                logger.warning(f"  API error: {err.get('message', err)}")
+                err_code = err.get('code', '')
+                err_msg = err.get('message', str(err))
+                # Token required (499) — don't retry, service is auth-restricted
+                if err_code == 499 or 'token' in err_msg.lower():
+                    logger.warning(f"  Token required (code {err_code}): {err_msg}")
+                    return data  # Return the error response so caller can check
+                logger.warning(f"  API error: {err_msg}")
             else:
                 logger.warning(f"  HTTP {resp.status_code} from REST API")
         except requests.exceptions.ConnectionError as e:
@@ -211,12 +688,19 @@ def _find_working_rest_service():
             logger.info(f"  REST API {svc_name}: {count:,} records")
             if count > best_count:
                 best_url, best_count = url, count
+        elif data and 'error' in data:
+            err = data.get('error', {})
+            code = err.get('code', '')
+            msg = err.get('message', '')
+            logger.info(f"  REST API {svc_name}: error {code} — {msg}")
+            if code == 499 or 'token' in str(msg).lower():
+                logger.info(f"    (Token required — FeatureServer is auth-restricted)")
         else:
             logger.info(f"  REST API {svc_name}: failed or blocked")
 
     if best_url and best_count >= MIN_RECORDS:
-        if best_count < 100000:
-            logger.warning(f"  Best endpoint has only {best_count:,} records (expected 100K+ for statewide)")
+        if best_count < MIN_STATEWIDE_RECORDS:
+            logger.warning(f"  Best endpoint has only {best_count:,} records (expected {MIN_STATEWIDE_RECORDS:,}+ for statewide)")
         return best_url, best_count
 
     return None, 0
@@ -1165,14 +1649,14 @@ Examples:
     use_playwright_only = args.playwright_only
     use_rest_only = args.rest_only
 
-    method_label = 'REST API → Playwright fallback'
+    method_label = 'Hub CSV Export → REST API → Playwright FeatureServer'
     if use_playwright_only:
-        method_label = 'Playwright browser only'
+        method_label = 'Playwright only (Hub export + FeatureServer)'
     elif use_rest_only:
-        method_label = 'REST API only (no fallback)'
+        method_label = 'REST API only (no Playwright/Hub)'
 
     logger.info("=" * 60)
-    logger.info("  CRASH LENS — Virginia Crash Data Download (v8)")
+    logger.info("  CRASH LENS — Virginia Crash Data Download (v9)")
     logger.info(f"  Mode: {download_mode.upper()}")
     logger.info(f"  Method: {method_label}")
     logger.info(f"  Output: {data_dir}")
@@ -1187,13 +1671,28 @@ Examples:
     csv_path = None
 
     def _try_download(out_path, where=None, append=False):
-        """Try REST API first, fall back to Playwright. Returns result dict or False."""
+        """Try Hub export first, then REST API, then Playwright FeatureServer.
+        Returns result dict or False."""
         result = False
 
-        # Attempt 1: Direct REST API (unless --playwright-only)
+        # Attempt 1: Hub CSV Export via Playwright (primary — works even when
+        # FeatureServer requires auth tokens, as Hub serves its own cached export)
+        # Only for full downloads (incremental uses FeatureServer with WHERE clause)
+        if not use_rest_only and where is None:
+            logger.info("=" * 40)
+            logger.info("  ATTEMPT 1: Hub CSV Export (Playwright)")
+            logger.info("=" * 40)
+            result = download_via_hub_export(
+                out_path, headless=headless
+            )
+            if result is not False:
+                return result
+            logger.warning("  Hub CSV export failed — trying FeatureServer methods")
+
+        # Attempt 2: Direct REST API (fast, no browser — may fail if token required)
         if not use_playwright_only:
             logger.info("=" * 40)
-            logger.info("  ATTEMPT 1: Direct REST API")
+            logger.info("  ATTEMPT 2: Direct REST API")
             logger.info("=" * 40)
             result = download_with_rest_api(
                 out_path, batch_size=args.batch_size,
@@ -1203,10 +1702,10 @@ Examples:
                 return result
             logger.warning("  REST API download failed")
 
-        # Attempt 2: Playwright browser (unless --rest-only)
+        # Attempt 3: Playwright browser-routed FeatureServer queries
         if not use_rest_only:
             logger.info("=" * 40)
-            logger.info("  ATTEMPT 2: Playwright browser fallback")
+            logger.info("  ATTEMPT 3: Playwright FeatureServer fallback")
             logger.info("=" * 40)
             result = download_with_browser(
                 out_path, headless=headless, batch_size=args.batch_size,
@@ -1214,7 +1713,7 @@ Examples:
             )
             if result is not False:
                 return result
-            logger.error("  Playwright download also failed")
+            logger.error("  All download methods failed")
 
         return False
 
