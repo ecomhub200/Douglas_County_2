@@ -50,7 +50,13 @@ def load_hierarchy(state):
         return json.load(f)
 
 
-def load_config_fips_map():
+def load_config_fips_map(state_abbrev=None):
+    """Build FIPS → config.json jurisdiction key mapping, filtered by state.
+
+    Args:
+        state_abbrev: State abbreviation (e.g., 'VA', 'CO') to filter
+            jurisdictions. Prevents FIPS collisions across states.
+    """
     config_path = PROJECT_ROOT / 'config.json'
     if not config_path.exists():
         return {}
@@ -59,12 +65,15 @@ def load_config_fips_map():
     fips_to_key = {}
     for jid, jinfo in config.get('jurisdictions', {}).items():
         if isinstance(jinfo, dict) and 'fips' in jinfo:
+            if state_abbrev and jinfo.get('state', '').upper() != state_abbrev.upper():
+                continue
             fips_to_key[jinfo['fips']] = jid
     return fips_to_key
 
 
 def build_fips_to_key_map(hierarchy):
-    config_fips_map = load_config_fips_map()
+    state_abbrev = hierarchy.get('state', {}).get('abbreviation')
+    config_fips_map = load_config_fips_map(state_abbrev)
     all_counties = hierarchy.get('allCounties', {})
     fips_to_key = {}
     for fips, name in all_counties.items():
