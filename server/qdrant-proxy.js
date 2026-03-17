@@ -2712,6 +2712,10 @@ async function fetchCrashCSV(r2Path) {
             if (res.statusCode === 301 || res.statusCode === 302) {
                 // Follow redirect
                 https.get(res.headers.location, (res2) => {
+                    if (res2.statusCode !== 200) {
+                        reject(new Error(`HTTP ${res2.statusCode} after redirect to ${res.headers.location}`));
+                        return;
+                    }
                     collectHttpResponse(res2).then(data => {
                         const rows = parseCSV(data);
                         csvCache.set(r2Path, { rows, loadedAt: Date.now() });
@@ -2755,10 +2759,13 @@ function parseCSV(text) {
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
         const values = splitCSVLine(lines[i]);
-        if (values.length !== headers.length) continue;
+        // Accept rows with >= headers (trailing commas) or fewer (missing fields, padded with '')
+        if (values.length < headers.length) {
+            while (values.length < headers.length) values.push('');
+        }
         const obj = {};
         for (let j = 0; j < headers.length; j++) {
-            obj[headers[j]] = values[j];
+            obj[headers[j]] = values[j] != null ? values[j] : '';
         }
         rows.push(obj);
     }
@@ -2810,8 +2817,8 @@ function evaluateServerAlertConditions(alert, crashes) {
 
     // 1. Crash Count Threshold
     if (thresholds.crashCountEnabled) {
-        const windowMonths = thresholds.crashCountWindowMonths || 6;
-        const threshold = thresholds.crashCountThreshold || 5;
+        const windowMonths = thresholds.crashCountWindowMonths ?? 6;
+        const threshold = thresholds.crashCountThreshold ?? 5;
         const cutoff = new Date(now);
         cutoff.setMonth(cutoff.getMonth() - windowMonths);
 
@@ -2835,7 +2842,7 @@ function evaluateServerAlertConditions(alert, crashes) {
 
     // 2. Severity Alert
     if (thresholds.severityEnabled) {
-        const level = thresholds.severityLevel || 'KA';
+        const level = thresholds.severityLevel ?? 'KA';
         const targetSevs = level === 'K' ? ['K'] : level === 'KA' ? ['K', 'A'] : ['K', 'A', 'B'];
         const last90Days = new Date(now);
         last90Days.setDate(last90Days.getDate() - 90);
@@ -2863,8 +2870,8 @@ function evaluateServerAlertConditions(alert, crashes) {
 
     // 3. Trend Detection (compare recent window to prior window)
     if (thresholds.trendEnabled) {
-        const increaseThreshold = thresholds.trendIncreasePercent || 25;
-        const windowMonths = thresholds.trendWindowMonths || 12;
+        const increaseThreshold = thresholds.trendIncreasePercent ?? 25;
+        const windowMonths = thresholds.trendWindowMonths ?? 12;
         const dateCol = alert.dateColumn || 'Crash Date';
 
         const recentStart = new Date(now);
@@ -2901,10 +2908,17 @@ function evaluateServerAlertConditions(alert, crashes) {
 }
 
 /**
+ * Escape HTML special characters to prevent XSS in email content.
+ */
+function escapeHtml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
  * Build HTML email for server-side crash alert notifications.
  */
 function buildServerAlertEmailHtml(conditions, alert) {
-    const locationName = alert.locationName || alert.locationValue || 'Unknown Location';
+    const locationName = escapeHtml(alert.locationName || alert.locationValue || 'Unknown Location');
     const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const appUrl = APP_URL || 'https://crashlens.aicreatesai.com';
 
@@ -2916,9 +2930,9 @@ function buildServerAlertEmailHtml(conditions, alert) {
             <div style="background:${bgColor};border:1.5px solid ${borderColor};border-radius:8px;padding:14px 16px;margin-bottom:10px">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                     <span style="color:${iconColor};font-size:16px">&#9888;</span>
-                    <strong style="color:${iconColor};font-size:14px">${c.title}</strong>
+                    <strong style="color:${iconColor};font-size:14px">${escapeHtml(c.title)}</strong>
                 </div>
-                <p style="margin:0;color:#334155;font-size:13px;line-height:1.5">${c.message}</p>
+                <p style="margin:0;color:#334155;font-size:13px;line-height:1.5">${escapeHtml(c.message)}</p>
             </div>`;
     }).join('');
 
@@ -2986,7 +3000,13 @@ async function processCrashAlerts() {
         for (const alert of dueAlerts) {
             const r2Path = alert.r2Path;
             if (!r2Path) {
-                console.warn(`[CrashAlerts] Alert ${alert.id} has no r2Path, skipping`);
+                console.warn(`[CrashAlerts] Alert ${alert.id} has no r2Path, rescheduling`);
+                // Still update nextCheckAt so this alert isn't re-queried every tick
+                try {
+                    await db.collection('users').doc(alert.uid)
+                        .collection('crashAlerts').doc(alert.id)
+                        .update({ nextCheckAt: calculateNextAlertCheck(alert), lastCheckedAt: new Date().toISOString() });
+                } catch (e) { /* ignore update failure */ }
                 continue;
             }
             if (!alertsByPath.has(r2Path)) alertsByPath.set(r2Path, []);
@@ -3067,4 +3087,17 @@ async function processCrashAlerts() {
     } catch (err) {
         console.error(`[CrashAlerts] Error in processCrashAlerts: ${err.message}`);
     }
+}
+
+// Export pure functions for testing (only when required as module, not when run directly)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        parseCSV,
+        splitCSVLine,
+        evaluateServerAlertConditions,
+        calculateNextRunAt,
+        calculateNextAlertCheck,
+        buildServerAlertEmailHtml,
+        escapeHtml
+    };
 }
