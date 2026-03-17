@@ -513,11 +513,14 @@ def filter_by_jurisdiction(df, jurisdiction, jconfig):
 
     if juris_code:
         for cl, ca in cols_lower.items():
-            if 'juris' in cl and 'code' in cl:
-                mask |= df[ca].astype(str).str.strip() == juris_code
+            if 'juris' in cl and ('code' in cl or 'name' in cl):
+                col_val = df[ca].astype(str).str.strip()
+                mask |= col_val == juris_code
                 if juris_code.isdigit():
-                    mask |= df[ca].astype(str).str.strip() == str(int(juris_code))
-                break
+                    mask |= col_val == str(int(juris_code))
+                    mask |= col_val == juris_code.zfill(3)
+                if mask.sum() > 0:
+                    break
 
     if fips and mask.sum() == 0:
         for cl, ca in cols_lower.items():
