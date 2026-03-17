@@ -181,10 +181,598 @@ class BaseNormalizer(ABC):
 
 
 class VirginiaNormalizer(BaseNormalizer):
-    """Virginia TREDS data - already in standard format, passthrough."""
+    """Virginia TREDS data normalizer.
+
+    Handles two data formats:
+    - OLD format (text labels): passes through unchanged
+    - NEW format (numeric codes): decodes back to text labels the frontend expects
+
+    Idempotent: detects format and only normalizes if needed.
+    """
+
+    # Column renames: VDOT website renamed some columns
+    COLUMN_RENAMES = {
+        'Senior Driver?': 'Senior?',
+        'Young Driver?': 'Young?',
+        'Hit & Run?': 'Hitrun?',
+        'Large Vehicle?': 'Lgtruck?',
+        'UnBelted?': 'Unrestrained?',
+        # ArcGIS ALL_CAPS format
+        'DOCUMENT_NBR': 'Document Nbr', 'Document_Nbr': 'Document Nbr',
+        'CRASH_YEAR': 'Crash Year', 'Crash_Year': 'Crash Year',
+        'CRASH_DT': 'Crash Date', 'Crash_Date': 'Crash Date',
+        'CRASH_MILITARY_TM': 'Crash Military Time', 'Crash_Military_Time': 'Crash Military Time',
+        'CRASH_SEVERITY': 'Crash Severity', 'Crash_Severity': 'Crash Severity',
+        'K_PEOPLE': 'K_People', 'A_PEOPLE': 'A_People',
+        'B_PEOPLE': 'B_People', 'C_PEOPLE': 'C_People',
+        'PERSONS_INJURED': 'Persons Injured', 'Persons_Injured': 'Persons Injured',
+        'PEDESTRIANS_KILLED': 'Pedestrians Killed', 'Pedestrians_Killed': 'Pedestrians Killed',
+        'PEDESTRIANS_INJURED': 'Pedestrians Injured', 'Pedestrians_Injured': 'Pedestrians Injured',
+        'VEH_COUNT': 'Vehicle Count', 'Vehicle_Count': 'Vehicle Count',
+        'COLLISION_TYPE': 'Collision Type', 'Collision_Type': 'Collision Type',
+        'WEATHER_CONDITION': 'Weather Condition', 'Weather_Condition': 'Weather Condition',
+        'LIGHT_CONDITION': 'Light Condition', 'Light_Condition': 'Light Condition',
+        'ROADWAY_SURFACE_COND': 'Roadway Surface Condition', 'Roadway_Surface_Condition': 'Roadway Surface Condition',
+        'RELATION_TO_ROADWAY': 'Relation To Roadway', 'Relation_To_Roadway': 'Relation To Roadway',
+        'ROADWAY_ALIGNMENT': 'Roadway Alignment', 'Roadway_Alignment': 'Roadway Alignment',
+        'ROADWAY_SURFACE_TYPE': 'Roadway Surface Type', 'Roadway_Surface_Type': 'Roadway Surface Type',
+        'ROADWAY_DEFECT': 'Roadway Defect', 'Roadway_Defect': 'Roadway Defect',
+        'ROADWAY_DESCRIPTION': 'Roadway Description', 'Roadway_Description': 'Roadway Description',
+        'INTERSECTION_TYPE': 'Intersection Type', 'Intersection_Type': 'Intersection Type',
+        'TRAFFIC_CONTROL_TYPE': 'Traffic Control Type', 'Traffic_Control_Type': 'Traffic Control Type',
+        'TRFC_CTRL_STATUS_TYPE': 'Traffic Control Status', 'Traffic_Control_Status': 'Traffic Control Status',
+        'WORK_ZONE_RELATED': 'Work Zone Related', 'Work_Zone_Related': 'Work Zone Related',
+        'WORK_ZONE_LOCATION': 'Work Zone Location', 'Work_Zone_Location': 'Work Zone Location',
+        'WORK_ZONE_TYPE': 'Work Zone Type', 'Work_Zone_Type': 'Work Zone Type',
+        'SCHOOL_ZONE': 'School Zone', 'School_Zone': 'School Zone',
+        'FIRST_HARMFUL_EVENT': 'First Harmful Event', 'First_Harmful_Event': 'First Harmful Event',
+        'FIRST_HARMFUL_EVENT_LOC': 'First Harmful Event Loc', 'First_Harmful_Event_Loc': 'First Harmful Event Loc',
+        'JURIS_CODE': 'Juris Code', 'Juris_Code': 'Juris Code',
+        'PHYSICAL_JURIS': 'Physical Juris Name', 'Physical_Juris_Name': 'Physical Juris Name',
+        'FUN': 'Functional Class', 'Functional_Class': 'Functional Class',
+        'FAC': 'Facility Type', 'Facility_Type': 'Facility Type',
+        'AREA_TYPE': 'Area Type', 'Area_Type': 'Area Type',
+        'OWNERSHIP': 'Ownership',
+        'PLAN_DISTRICT': 'Planning District', 'Planning_District': 'Planning District',
+        'MPO_NAME': 'MPO Name', 'MPO_Name': 'MPO Name',
+        'VDOT_DISTRICT': 'VDOT District', 'VDOT_District': 'VDOT District',
+        'RTE_NM': 'RTE Name', 'RTE_NAME': 'RTE Name', 'RTE_Name': 'RTE Name',
+        'NODE': 'Node', 'OFFSET': 'Node Offset (ft)', 'Node_Offset': 'Node Offset (ft)',
+        'ALCOHOL_NOTALCOHOL': 'Alcohol?', 'BIKE_NONBIKE': 'Bike?',
+        'PED_NONPED': 'Pedestrian?', 'SPEED_NOTSPEED': 'Speed?',
+        'DISTRACTED_NOTDISTRACTED': 'Distracted?', 'DROWSY_NOTDROWSY': 'Drowsy?',
+        'HITRUN_NOT_HITRUN': 'Hitrun?', 'SENIOR_NOTSENIOR': 'Senior?',
+        'YOUNG_NOTYOUNG': 'Young?', 'NIGHT': 'Night?',
+        'BELTED_UNBELTED': 'Unrestrained?', 'MOTOR_NONMOTOR': 'Motorcycle?',
+        'DRUG_NODRUG': 'Drug Related?', 'GR_NOGR': 'Guardrail Related?',
+        'LGTRUCK_NONLGTRUCK': 'Lgtruck?', 'MAINLINE_YN': 'Mainline?',
+        'SPEED_DIFF_MAX': 'Max Speed Diff', 'RD_TYPE': 'RoadDeparture Type',
+        'LOCAL_CASE_CD': 'Local Case CD', 'ROUTE_OR_STREET_NM': 'Route or Street Name',
+        'INTERSECTION_ANALYSIS': 'Intersection Analysis', 'ANIMAL': 'Animal Related?',
+    }
+
+    # Coded value decode maps: column → {code → label}
+    DECODE_MAPS = {
+        'Collision Type': {
+            '0': 'Not Applicable', '1': '1. Rear End', '2': '2. Angle',
+            '3': '3. Head On', '4': '4. Sideswipe - Same Direction',
+            '5': '5. Sideswipe - Opposite Direction', '6': '6. Fixed Object in Road',
+            '7': '7. Train', '8': '8. Non-Collision', '9': '9. Fixed Object - Off Road',
+            '10': '10. Deer', '11': '11. Other Animal', '12': '12. Ped',
+            '13': '13. Bicyclist', '14': '14. Motorcyclist', '15': '15. Backed Into',
+            '16': '16. Other', '99': 'Not Provided',
+        },
+        'Weather Condition': {
+            '1': '1. No Adverse Condition (Clear/Cloudy)', '3': '3. Fog',
+            '4': '4. Mist', '5': '5. Rain', '6': '6. Snow', '7': '7. Sleet/Hail',
+            '8': '8. Smoke/Dust', '9': '9. Other',
+            '10': '10. Blowing Sand, Soil, Dirt, or Snow', '11': '11. Severe Crosswinds',
+            '99': 'Not Applicable',
+        },
+        'Light Condition': {
+            '1': '1. Dawn', '2': '2. Daylight', '3': '3. Dusk',
+            '4': '4. Darkness - Road Lighted', '5': '5. Darkness - Road Not Lighted',
+            '6': '6. Darkness - Unknown Road Lighting', '7': '7. Unknown',
+            '99': 'Not Applicable',
+        },
+        'Roadway Surface Condition': {
+            '0': 'Not Applicable', '1': '1. Dry', '2': '2. Wet', '3': '3. Snowy',
+            '4': '4. Icy', '5': '5. Muddy', '6': '6. Oil/Other Fluids', '7': '7. Other',
+            '8': '8. Natural Debris', '9': '9. Water (Standing, Moving)',
+            '10': '10. Slush', '11': '11. Sand, Dirt, Gravel', '99': 'Not Provided',
+        },
+        'Relation To Roadway': {
+            '0': 'Not Applicable', '1': '1. Main-Line Roadway',
+            '2': '2. Acceleration/Deceleration Lanes',
+            '3': '3. Gore Area (b/w Ramp and Highway Edgelines)',
+            '4': '4. Collector/Distributor Road', '5': '5. On Entrance/Exit Ramp',
+            '6': '6. Intersection at end of Ramp',
+            '7': '7. Other location not listed above within an interchange area (median, shoulder , roadside)',
+            '8': '8. Non-Intersection', '9': '9. Within Intersection',
+            '10': '10. Intersection Related - Within 150 Feet',
+            '11': '11. Intersection Related - Outside 150 Feet',
+            '12': '12. Crossover Related', '13': '13. Driveway, Alley-Access - Related',
+            '14': '14. Railway Grade Crossing',
+            '15': '15. Other Crossing (Crossing for Bikes, School, etc.)',
+            '99': 'Not Provided',
+        },
+        'Roadway Alignment': {
+            '1': '1. Straight - Level', '2': '2. Curve - Level',
+            '3': '3. Grade - Straight', '4': '4. Grade - Curve',
+            '5': '5. Hillcrest - Straight', '6': '6. Hillcrest - Curve',
+            '7': '7. Dip - Straight', '8': '8. Dip - Curve', '9': '9. Other',
+            '10': '10. On/Off Ramp', '99': 'Not Applicable',
+        },
+        'Roadway Surface Type': {
+            '1': '1. Concrete', '2': '2. Blacktop, Asphalt, Bituminous',
+            '3': '3. Brick or Block', '4': '4. Slag, Gravel, Stone',
+            '5': '5. Dirt', '6': '6. Other', '99': 'Not Applicable',
+        },
+        'Roadway Defect': {
+            '0': 'Not Applicable', '1': '1. No Defects', '2': '2. Holes, Ruts, Bumps',
+            '3': '3. Soft or Low Shoulder', '4': '4. Under Repair',
+            '5': '5. Loose Material', '6': '6. Restricted Width',
+            '7': '7. Slick Pavement', '8': '8. Roadway Obstructed', '9': '9. Other',
+            '10': '10. Edge Pavement Drop Off', '99': 'Not Provided',
+        },
+        'Roadway Description': {
+            '0': 'Not Applicable', '1': '1. Two-Way, Not Divided',
+            '2': '2. Two-Way, Divided, Unprotected Median',
+            '3': '3. Two-Way, Divided, Positive Median Barrier',
+            '4': '4. One-Way, Not Divided', '5': '5. Unknown', '99': 'Not Provided',
+        },
+        'Intersection Type': {
+            '0': 'Not Applicable', '1': '1. Not at Intersection',
+            '2': '2. Two Approaches', '3': '3. Three Approaches',
+            '4': '4. Four Approaches', '5': '5. Five-Point, or More',
+            '6': '6. Roundabout', '99': 'Not Provided',
+        },
+        'Traffic Control Type': {
+            '1': '1. No Traffic Control', '2': '2. Officer or Flagger',
+            '3': '3. Traffic Signal', '4': '4. Stop Sign',
+            '5': '5. Slow or Warning Sign', '6': '6. Traffic Lanes Marked',
+            '7': '7. No Passing Lines', '8': '8. Yield Sign',
+            '9': '9. One Way Road or Street',
+            '10': '10. Railroad Crossing With Markings and Signs',
+            '11': '11. Railroad Crossing With Signals',
+            '12': '12. Railroad Crossing With Gate and Signals',
+            '13': '13. Other', '14': '14. Ped Crosswalk',
+            '15': '15. Reduced Speed - School Zone',
+            '16': '16. Reduced Speed - Work Zone',
+            '17': '17. Highway Safety Corridor', '99': 'Not Applicable',
+        },
+        'Traffic Control Status': {
+            '0': 'Not Applicable', '1': '1. Yes - Working',
+            '2': '2. Yes - Working and Obscured', '3': '3. Yes - Not Working',
+            '4': '4. Yes - Not Working and Obscured', '5': '5. Yes - Missing',
+            '6': '6. No Traffic Control Device Present', '99': 'Not Provided',
+        },
+        'Work Zone Related': {
+            '0': 'Not Applicable', '1': '1. Yes', '2': '2. No', '99': 'Not Provided',
+        },
+        'Work Zone Location': {
+            '0': '', '1': '1. Advance Warning Area', '2': '2. Transition Area',
+            '3': '3. Activity Area', '4': '4. Termination Area', '99': '',
+        },
+        'Work Zone Type': {
+            '0': '', '1': '1. Lane Closure', '2': '2. Lane Shift/Crossover',
+            '3': '3. Work on Shoulder or Median', '4': '4. Intermittent or Moving Work',
+            '5': '5. Other', '99': '',
+        },
+        'School Zone': {
+            '0': 'Not Applicable', '1': '1. Yes', '2': '2. Yes - With School Activity',
+            '3': '3. No', '99': 'Not Provided',
+        },
+        'First Harmful Event': {
+            '1': '1. Bank Or Ledge', '2': '2. Trees', '3': '3. Utility Pole',
+            '4': '4. Fence Or Post', '5': '5. Guard Rail', '6': '6. Parked Vehicle',
+            '7': '7. Tunnel, Bridge, Underpass, Culvert, etc.',
+            '8': '8. Sign, Traffic Signal', '9': '9. Impact Cushioning Device',
+            '10': '10. Other', '11': '11. Jersey Wall', '12': '12. Building/Structure',
+            '13': '13. Curb', '14': '14. Ditch', '15': '15. Other Fixed Object',
+            '16': '16. Other Traffic Barrier', '17': '17. Traffic Sign Support',
+            '18': '18. Mailbox', '19': '19. Ped', '20': '20. Motor Vehicle In Transport',
+            '21': '21. Train', '22': '22. Bicycle', '23': '23. Animal',
+            '24': '24. Work Zone Maintenance Equipment', '25': '25. Other Movable Object',
+            '26': '26. Unknown Movable Object', '27': '27. Other',
+            '28': '28. Ran Off Road', '29': '29. Jack Knife',
+            '30': '30. Overturn (Rollover)', '31': '31. Downhill Runaway',
+            '32': '32. Cargo Loss or Shift', '33': '33. Explosion or Fire',
+            '34': '34. Separation of Units', '35': '35. Cross Median',
+            '36': '36. Cross Centerline', '37': '37. Equipment Failure (Tire, etc)',
+            '38': '38. Immersion', '39': '39. Fell/Jumped From Vehicle',
+            '40': '40. Thrown or Falling Object', '41': '41. Non-Collision Unknown',
+            '42': '42. Other Non-Collision',
+        },
+        'First Harmful Event Loc': {
+            '0': 'Not Applicable', '1': '1. On Roadway', '2': '2. Shoulder',
+            '3': '3. Median', '4': '4. Roadside', '5': '5. Gore',
+            '6': '6. Separator', '7': '7. In Parking Lane or Zone',
+            '8': '8. Off Roadway, Location Unknown', '9': '9. Outside Right-of-Way',
+            '99': 'Not Provided',
+        },
+        'VDOT District': {
+            '1': '1. Bristol', '2': '2. Salem', '3': '3. Lynchburg',
+            '4': '4. Richmond', '5': '5. Hampton Roads', '6': '6. Fredericksburg',
+            '7': '7. Culpeper', '8': '8. Staunton', '9': '9. Northern Virginia',
+        },
+        'Ownership': {
+            '1': '1. State Hwy Agency', '2': '2. County Hwy Agency',
+            '3': '3. City or Town Hwy Agency', '4': '4. Federal Roads',
+            '5': '5. Toll Roads Maintained by Others', '6': '6. Private/Unknown Roads',
+        },
+        'SYSTEM': {
+            '1': 'NonVDOT primary', '2': 'NonVDOT secondary',
+            '3': 'VDOT Interstate', '4': 'VDOT Primary', '5': 'VDOT Secondary',
+        },
+        'Functional Class': {
+            'INT': '1-Interstate (A,1)',
+            'OFE': '2-Principal Arterial - Other Freeways and Expressways (B)',
+            'OPA': '3-Principal Arterial - Other (E,2)',
+            'MIA': '4-Minor Arterial (H,3)', 'MAC': '5-Major Collector (I,4)',
+            'MIC': '6-Minor Collector (5)', 'LOC': '7-Local (J,6)',
+        },
+        'Facility Type': {
+            'OUD': '1-One-Way Undivided', 'OWD': '2-One-Way Divided',
+            'TUD': '3-Two-Way Undivided', 'TWD': '4-Two-Way Divided',
+            'REX': '5-Reversible Exclusively (e.g. 395R)',
+        },
+        'Area Type': {
+            '0': 'Rural', '1': 'Urban',
+        },
+        'RoadDeparture Type': {
+            '0': 'NOT_RD', '1': 'RD_LEFT', '2': 'RD_RIGHT', '3': 'RD_UNKNOWN',
+        },
+        'Intersection Analysis': {
+            '0': 'Not Intersection', '1': 'VDOT Intersection', '2': 'Urban Intersection',
+        },
+    }
+
+    # Planning District decode map
+    PLANNING_DISTRICT_MAP = {
+        '1': 'Lenowisco', '2': 'Cumberland Plateau',
+        '3': 'Mount Rogers', '4': 'New River Valley',
+        '5': 'Roanoke Valley-Alleghany', '6': 'Central Shenandoah',
+        '7': 'Northern Shenandoah Valley', '8': 'Northern Virginia',
+        '9': 'Rappahannock - Rapidan', '10': 'Thomas Jefferson',
+        '11': 'Region 2000', '12': 'West Piedmont',
+        '13': 'Southside', '14': 'Commonwealth Regional',
+        '15': 'Richmond Regional', '16': 'George Washington Regional',
+        '17': 'Northern Neck', '18': 'Middle Peninsula',
+        '19': 'Crater', '20': 'Piedmont',
+        '21': 'Rappahannock Area', '22': 'Accomack-Northampton',
+        '23': 'Hampton Roads',
+        '5,12': 'Roanoke Valley-Alleghany, West Piedmont',
+        '15,19': 'Richmond Regional, Crater',
+        '18,23': 'Middle Peninsula, Hampton Roads',
+        '19,23': 'Crater, Hampton Roads',
+    }
+
+    # Complete VDOT jurisdiction table (324 entries)
+    JURIS_MAP = {
+        '0': '000. Arlington County', '1': '001. Accomack County',
+        '2': '002. Albemarle County', '3': '003. Alleghany County',
+        '4': '004. Amelia County', '5': '005. Amherst County',
+        '6': '006. Appomattox County', '7': '007. Augusta County',
+        '8': '008. Bath County', '9': '009. Bedford County',
+        '10': '010. Bland County', '11': '011. Botetourt County',
+        '12': '012. Brunswick County', '13': '013. Buchanan County',
+        '14': '014. Buckingham County', '15': '015. Campbell County',
+        '16': '016. Caroline County', '17': '017. Carroll County',
+        '18': '018. Charles City County', '19': '019. Charlotte County',
+        '20': '020. Chesterfield County', '21': '021. Clarke County',
+        '22': '022. Craig County', '23': '023. Culpeper County',
+        '24': '024. Cumberland County', '25': '025. Dickenson County',
+        '26': '026. Dinwiddie County',
+        '28': '028. Essex County', '29': '029. Fairfax County',
+        '30': '030. Fauquier County', '31': '031. Floyd County',
+        '32': '032. Fluvanna County', '33': '033. Franklin County',
+        '34': '034. Frederick County', '35': '035. Giles County',
+        '36': '036. Gloucester County', '37': '037. Goochland County',
+        '38': '038. Grayson County', '39': '039. Greene County',
+        '40': '040. Greensville County', '41': '041. Halifax County',
+        '42': '042. Hanover County', '43': '043. Henrico County',
+        '44': '044. Henry County', '45': '045. Highland County',
+        '46': '046. Isle of Wight County', '47': '047. James City County',
+        '48': '048. King George County', '49': '049. King & Queen County',
+        '50': '050. King William County', '51': '051. Lancaster County',
+        '52': '052. Lee County', '53': '053. Loudoun County',
+        '54': '054. Louisa County', '55': '055. Lunenburg County',
+        '56': '056. Madison County', '57': '057. Mathews County',
+        '58': '058. Mecklenburg County', '59': '059. Middlesex County',
+        '60': '060. Montgomery County',
+        '62': '062. Nelson County', '63': '063. New Kent County',
+        '65': '065. Northampton County',
+        '66': '066. Northumberland County', '67': '067. Nottoway County',
+        '68': '068. Orange County', '69': '069. Page County',
+        '70': '070. Patrick County', '71': '071. Pittsylvania County',
+        '72': '072. Powhatan County', '73': '073. Prince Edward County',
+        '74': '074. Prince George County',
+        '76': '076. Prince William County', '77': '077. Pulaski County',
+        '78': '078. Rappahannock County', '79': '079. Richmond County',
+        '80': '080. Roanoke County', '81': '081. Rockbridge County',
+        '82': '082. Rockingham County', '83': '083. Russell County',
+        '84': '084. Scott County', '85': '085. Shenandoah County',
+        '86': '086. Smyth County', '87': '087. Southampton County',
+        '88': '088. Spotsylvania County', '89': '089. Stafford County',
+        '90': '090. Surry County', '91': '091. Sussex County',
+        '92': '092. Tazewell County', '93': '093. Warren County',
+        '95': '095. Washington County',
+        '96': '096. Westmoreland County', '97': '097. Wise County',
+        '98': '098. Wythe County', '99': '099. York County',
+        '100': '100. City of Alexandria', '101': '101. Town of Big Stone Gap',
+        '102': '102. City of Bristol', '103': '103. City of Buena Vista',
+        '104': '104. City of Charlottesville', '105': '105. Town of Clifton Forge',
+        '106': '106. City of Colonial Heights', '107': '107. City of Covington',
+        '108': '108. City of Danville', '109': '109. City of Emporia',
+        '110': '110. City of Falls Church', '111': '111. City of Fredericksburg',
+        '112': '112. Town of Front Royal', '113': '113. City of Galax',
+        '114': '114. City of Hampton', '115': '115. City of Harrisonburg',
+        '116': '116. City of Hopewell', '117': '117. City of Lexington',
+        '118': '118. City of Lynchburg', '119': '119. Town of Marion',
+        '120': '120. City of Martinsville', '121': '121. City of Newport News',
+        '122': '122. City of Norfolk', '123': '123. City of Petersburg',
+        '124': '124. City of Portsmouth', '125': '125. Town of Pulaski',
+        '126': '126. City of Radford', '127': '127. City of Richmond',
+        '128': '128. City of Roanoke', '129': '129. City of Salem',
+        '130': '130. Town of South Boston', '131': '131. City of Chesapeake',
+        '132': '132. City of Staunton', '133': '133. City of Suffolk',
+        '134': '134. City of Virginia Beach',
+        '136': '136. City of Waynesboro', '137': '137. City of Williamsburg',
+        '138': '138. City of Winchester', '139': '139. Town of Wytheville',
+        '140': '140. Town of Abingdon', '141': '141. Town of Bedford',
+        '142': '142. Town of Blackstone', '143': '143. Town of Bluefield',
+        '144': '144. Town of Farmville', '145': '145. City of Franklin',
+        '146': '146. City of Norton', '147': '147. City of Poquoson',
+        '148': '148. Town of Richlands', '149': '149. Town of Vinton',
+        '150': '150. Town of Blacksburg', '151': '151. City of Fairfax',
+        '152': '152. City of Manassas Park', '153': '153. Town of Vienna',
+        '154': '154. Town of Christiansburg', '155': '155. City of Manassas',
+        '156': '156. Town of Warrenton', '157': '157. Town of Rocky Mount',
+        '158': '158. Town of Tazewell', '159': '159. Town of Luray',
+        '160': '160. Town of Accomac', '161': '161. Town of Alberta',
+        '162': '162. Town of Altavista', '163': '163. Town of Amherst',
+        '164': '164. Town of Appalachia', '165': '165. Town of Appomattox',
+        '166': '166. Town of Ashland', '167': '167. Town of Belle Haven',
+        '168': '168. Town of Berryville', '169': '169. Town of Bloxom',
+        '170': '170. Town of Boones Mill', '171': '171. Town of Bowling Green',
+        '172': '172. Town of Boyce', '173': '173. Town of Boydton',
+        '174': '174. Town of Boykins', '175': '175. Town of Branchville',
+        '176': '176. Town of Bridgewater', '177': '177. Town of Broadway',
+        '178': '178. Town of Brodnax', '179': '179. Town of Brookneal',
+        '180': '180. Town of Buchanan', '181': '181. Town of Burkeville',
+        '182': '182. Town of Cape Charles', '183': '183. Town of Capron',
+        '184': '184. Town of Cedar Bluff', '185': '185. Town of Charlotte C.H.',
+        '186': '186. Town of Chase City', '187': '187. Town of Chatham',
+        '188': '188. Town of Cheriton', '189': '189. Town of Chilhowie',
+        '190': '190. Town of Chincoteague', '191': '191. Town of Claremont',
+        '192': '192. Town of Clarksville', '193': '193. Town of Cleveland',
+        '194': '194. Town of Clifton', '195': '195. Town of Clinchport',
+        '196': '196. Town of Clintwood',
+        '198': '198. Town of Coeburn', '199': '199. Town of Colonial Beach',
+        '200': '200. Town of Columbia', '201': '201. Town of Courtland',
+        '202': '202. Town of Craigsville', '203': '203. Town of Crewe',
+        '204': '204. Town of Culpeper', '205': '205. Town of Damascus',
+        '206': '206. Town of Dayton', '207': '207. Town of Dendron',
+        '208': '208. Town of Dillwyn', '209': '209. Town of Drakes Branch',
+        '210': '210. Town of Dublin', '211': '211. Town of Duffield',
+        '212': '212. Town of Dumfries', '213': '213. Town of Dungannon',
+        '214': '214. Town of Eastville', '215': '215. Town of Edinburg',
+        '216': '216. Town of Elkton', '217': '217. Town of Exmore',
+        '218': '218. Town of Fincastle', '219': '219. Town of Floyd',
+        '220': '220. Town of Fries', '221': '221. Town of Gate City',
+        '222': '222. Town of Glade Spring', '223': '223. Town of Glasgow',
+        '224': '224. Town of Glen Lyn', '225': '225. Town of Gordonsville',
+        '226': '226. Town of Goshen', '227': '227. Town of Gretna',
+        '228': '228. Town of Grottoes', '229': '229. Town of Grundy',
+        '230': '230. Town of Halifax', '231': '231. Town of Hallwood',
+        '232': '232. Town of Hamilton', '233': '233. Town of Haymarket',
+        '234': '234. Town of Haysi', '235': '235. Town of Herndon',
+        '236': '236. Town of Hillsboro', '237': '237. Town of Hillsville',
+        '239': '239. Town of Honaker', '240': '240. Town of Independence',
+        '241': '241. Town of Iron Gate', '242': '242. Town of Irvington',
+        '243': '243. Town of Ivor', '244': '244. Town of Jarratt',
+        '245': '245. Town of Jonesville', '246': '246. Town of Keller',
+        '247': '247. Town of Kenbridge', '248': '248. Town of Keysville',
+        '249': '249. Town of Kilmarnock', '250': '250. Town of LaCrosse',
+        '251': '251. Town of Lawrenceville', '252': '252. Town of Lebanon',
+        '253': '253. Town of Leesburg', '254': '254. Town of Louisa',
+        '255': '255. Town of Lovettsville', '256': '256. Town of Madison',
+        '257': '257. Town of McKenney', '258': '258. Town of Melfa',
+        '259': '259. Town of Middleburg', '260': '260. Town of Middletown',
+        '261': '261. Town of Mineral', '262': '262. Town of Monterey',
+        '263': '263. Town of Montross', '264': '264. Town of Mount Crawford',
+        '265': '265. Town of Mount Jackson', '266': '266. Town of Narrows',
+        '267': '267. Town of Nassawadox', '268': '268. Town of New Castle',
+        '269': '269. Town of New Market', '270': '270. Town of Newsoms',
+        '271': '271. Town of Nickelsville', '272': '272. Town of Occoquan',
+        '273': '273. Town of Onancock', '274': '274. Town of Onley',
+        '275': '275. Town of Orange', '276': '276. Town of Painter',
+        '277': '277. Town of Pamplin City', '278': '278. Town of Parksley',
+        '279': '279. Town of Pearisburg', '280': '280. Town of Pembroke',
+        '281': '281. Town of Pennington Gap', '282': '282. Town of Phenix',
+        '283': '283. Town of Pocahontas', '284': '284. Town of Port Royal',
+        '285': '285. Town of Pound', '286': '286. Town of Purcellville',
+        '287': '287. Town of Quantico', '288': '288. Town of Remington',
+        '289': '289. Town of Rich Creek', '290': '290. Town of Ridgeway',
+        '291': '291. Town of Round Hill', '292': '292. Town of Rural Retreat',
+        '293': '293. Town of St. Charles', '294': '294. Town of Saint Paul',
+        '295': '295. Town of Saltville', '296': '296. Town of Saxis',
+        '297': '297. Town of Scottsburg', '298': '298. Town of Scottsville',
+        '299': '299. Town of Shenandoah', '300': '300. Town of Smithfield',
+        '301': '301. Town of South Hill', '302': '302. Town of Stanardsville',
+        '303': '303. Town of Stanley', '304': '304. Town of Stephens City',
+        '305': '305. Town of Stony Creek', '306': '306. Town of Strasburg',
+        '307': '307. Town of Stuart', '308': '308. Town of Surry',
+        '309': '309. Town of Tangier', '310': '310. Town of Tappahannock',
+        '311': '311. Town of The Plains', '312': '312. Town of Timberville',
+        '313': '313. Town of Toms Brook', '314': '314. Town of Troutdale',
+        '315': '315. Town of Troutville', '316': '316. Town of Urbanna',
+        '317': '317. Town of Victoria', '318': '318. Town of Virgilina',
+        '319': '319. Town of Wachapreague', '320': '320. Town of Wakefield',
+        '321': '321. Town of Warsaw', '322': '322. Town of Washington',
+        '323': '323. Town of Waverly', '324': '324. Town of Weber City',
+        '325': '325. Town of West Point', '327': '327. Town of White Stone',
+        '328': '328. Town of Windsor', '329': '329. Town of Wise',
+        '330': '330. Town of Woodstock', '331': '331. Town of Hurt',
+        '339': '339. Town of Clinchco',
+    }
+
+    # Boolean Yes/No fields
+    BOOL_YES_NO_FIELDS = [
+        'Alcohol?', 'Bike?', 'Pedestrian?', 'Speed?', 'Distracted?',
+        'Drowsy?', 'Drug Related?', 'Guardrail Related?', 'Hitrun?',
+        'Lgtruck?', 'Motorcycle?', 'Animal Related?', 'Senior?',
+        'Young?', 'Mainline?', 'Night?',
+    ]
+
+    # Idempotency markers: if a column value contains this string, it's already decoded
+    _SKIP_MARKERS = {
+        'Collision Type': 'Rear End',
+        'Weather Condition': 'Adverse',
+        'Light Condition': 'Dawn',
+        'Roadway Surface Condition': 'Dry',
+        'Relation To Roadway': 'Main-Line',
+        'Roadway Alignment': 'Straight',
+        'Roadway Surface Type': 'Concrete',
+        'Roadway Defect': 'No Defects',
+        'Roadway Description': 'Two-Way',
+        'Intersection Type': 'Not at Intersection',
+        'Traffic Control Type': 'No Traffic Control',
+        'Traffic Control Status': 'Working',
+        'Work Zone Related': 'Yes',
+        'Work Zone Location': 'Warning',
+        'Work Zone Type': 'Lane Closure',
+        'School Zone': 'Yes',
+        'First Harmful Event': 'Bank Or Ledge',
+        'First Harmful Event Loc': 'On Roadway',
+        'VDOT District': 'Bristol',
+        'Ownership': 'Hwy Agency',
+        'SYSTEM': 'VDOT',
+        'Functional Class': 'Interstate',
+        'Facility Type': 'Way',
+        'Area Type': 'Rural',
+        'RoadDeparture Type': 'NOT_RD',
+        'Intersection Analysis': 'Intersection',
+    }
+
+    def __init__(self, state_key: str, config_path: Optional[str] = None):
+        super().__init__(state_key, config_path)
+        # Track format detection per column to avoid re-checking every row
+        self._format_detected = False
+        self._needs_decode = {}  # col → bool
+
+    def _detect_format(self, row: Dict[str, str]) -> None:
+        """Detect whether this data uses old (text) or new (numeric) format."""
+        self._format_detected = True
+
+        # Check each decode-map column
+        for col, code_map in self.DECODE_MAPS.items():
+            val = row.get(col, '').strip()
+            if not val:
+                self._needs_decode[col] = False
+                continue
+            skip_marker = self._SKIP_MARKERS.get(col)
+            if skip_marker and skip_marker in val:
+                self._needs_decode[col] = False  # already decoded
+            elif val in code_map:
+                self._needs_decode[col] = True  # numeric code found
+            else:
+                self._needs_decode[col] = False
+
+        # Check Planning District
+        pd_val = row.get('Planning District', '').strip()
+        if pd_val and pd_val in self.PLANNING_DISTRICT_MAP and not re.search(r'[a-zA-Z]', pd_val):
+            self._needs_decode['Planning District'] = True
+        else:
+            self._needs_decode['Planning District'] = False
+
+        # Check Physical Juris Name
+        pjn_val = row.get('Physical Juris Name', '').strip()
+        if pjn_val and pjn_val in self.JURIS_MAP and not re.search(r'County|City|Town', pjn_val):
+            self._needs_decode['Physical Juris Name'] = True
+        else:
+            self._needs_decode['Physical Juris Name'] = False
+
+        # Check boolean fields
+        # Sample one boolean field to decide
+        for bf in self.BOOL_YES_NO_FIELDS:
+            bv = row.get(bf, '').strip()
+            if bv in ('0', '1'):
+                self._needs_decode['_booleans'] = True
+                break
+            elif bv in ('Yes', 'No', ''):
+                self._needs_decode['_booleans'] = False
+                break
+        else:
+            self._needs_decode['_booleans'] = False
+
+        # Check Unrestrained?
+        uv = row.get('Unrestrained?', '').strip()
+        if uv in ('0', '1'):
+            self._needs_decode['Unrestrained?'] = True
+        else:
+            self._needs_decode['Unrestrained?'] = False
 
     def normalize_row(self, row: Dict[str, str]) -> Dict[str, str]:
         normalized = dict(row)
+
+        # Step 1: Apply column renames
+        for old_name, new_name in self.COLUMN_RENAMES.items():
+            if old_name in normalized and old_name != new_name:
+                normalized[new_name] = normalized.pop(old_name)
+
+        # Step 2: Detect format on first row
+        if not self._format_detected:
+            self._detect_format(normalized)
+
+        # Step 3: Decode coded columns
+        for col, code_map in self.DECODE_MAPS.items():
+            if self._needs_decode.get(col):
+                val = normalized.get(col, '').strip()
+                if val in code_map:
+                    normalized[col] = code_map[val]
+
+        # Step 4: Decode Planning District
+        if self._needs_decode.get('Planning District'):
+            val = normalized.get('Planning District', '').strip()
+            if val in self.PLANNING_DISTRICT_MAP:
+                normalized['Planning District'] = self.PLANNING_DISTRICT_MAP[val]
+
+        # Step 5: Decode Physical Juris Name
+        if self._needs_decode.get('Physical Juris Name'):
+            val = normalized.get('Physical Juris Name', '').strip()
+            if val in self.JURIS_MAP:
+                normalized['Physical Juris Name'] = self.JURIS_MAP[val]
+
+        # Step 6: Boolean 0/1 → Yes/No
+        if self._needs_decode.get('_booleans'):
+            for col in self.BOOL_YES_NO_FIELDS:
+                val = normalized.get(col, '').strip()
+                if val == '1':
+                    normalized[col] = 'Yes'
+                elif val == '0':
+                    normalized[col] = 'No'
+
+        # Step 7: Unrestrained? special case (0→Belted, 1→Unbelted)
+        if self._needs_decode.get('Unrestrained?'):
+            val = normalized.get('Unrestrained?', '').strip()
+            if val == '1':
+                normalized['Unrestrained?'] = 'Unbelted'
+            elif val == '0':
+                normalized['Unrestrained?'] = 'Belted'
+
+        # Step 8: Epoch date conversion
+        crash_date = normalized.get('Crash Date', '').strip()
+        if crash_date and re.match(r'^\d{10,}$', crash_date):
+            try:
+                from datetime import datetime, timezone
+                ts = int(float(crash_date)) / 1000
+                dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+                normalized['Crash Date'] = dt.strftime('%-m/%-d/%Y %-I:%M:%S %p')
+            except (ValueError, TypeError, OSError):
+                pass
+
         normalized['_source_state'] = 'virginia'
         return normalized
 
