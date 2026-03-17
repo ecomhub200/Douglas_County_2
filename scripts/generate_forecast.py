@@ -91,7 +91,14 @@ EPDO_WEIGHTS = {"K": 883, "A": 94, "B": 21, "C": 11, "O": 1}  # Default (FHWA 20
 
 
 def download_from_r2(state, jurisdiction, data_dir):
-    """Download validated road-type CSVs from R2 CDN into data_dir."""
+    """Download validated road-type CSVs from R2 CDN into data_dir.
+
+    R2 objects are stored with Content-Encoding: gzip for storage savings.
+    This function handles transparent decompression for gzipped responses
+    (urllib does not auto-decompress Content-Encoding: gzip like browsers do).
+    """
+    import gzip as gz
+    import io
     import urllib.request
     CDN_BASE = "https://data.aicreatesai.com"
     os.makedirs(data_dir, exist_ok=True)
@@ -101,9 +108,17 @@ def download_from_r2(state, jurisdiction, data_dir):
         local_path = os.path.join(data_dir, f"{jurisdiction}_{rt}.csv")
         print(f"  Downloading {url} → {local_path}")
         try:
-            urllib.request.urlretrieve(url, local_path)
+            req = urllib.request.Request(url)
+            req.add_header("Accept-Encoding", "gzip, identity")
+            with urllib.request.urlopen(req) as resp:
+                encoding = resp.headers.get("Content-Encoding", "")
+                raw = resp.read()
+                if encoding == "gzip":
+                    raw = gz.decompress(raw)
+                with open(local_path, "wb") as f:
+                    f.write(raw)
             size = os.path.getsize(local_path)
-            print(f"    OK ({size:,} bytes)")
+            print(f"    OK ({size:,} bytes, encoding={encoding or 'identity'})")
         except Exception as e:
             print(f"    SKIP: {e}")
 
