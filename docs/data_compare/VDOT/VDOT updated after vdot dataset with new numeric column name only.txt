@@ -1,0 +1,75 @@
+Total columns: 73
+
+1. OBJECTID
+2. Document Nbr
+3. Local Case CD
+4. Crash Year
+5. Crash Date
+6. Crash Military Time
+7. Crash Severity
+8. K_People
+9. A_People
+10. B_People
+11. C_People
+12. Persons Injured
+13. Pedestrians Killed
+14. Pedestrians Injured
+15. Vehicle Count
+16. Collision Type
+17. Weather Condition
+18. Light Condition
+19. Roadway Surface Condition
+20. Relation To Roadway
+21. Roadway Alignment
+22. Roadway Surface Type
+23. Roadway Defect
+24. Roadway Description
+25. Intersection Type
+26. Traffic Control Type
+27. Traffic Control Status
+28. Work Zone Related
+29. Work Zone Location
+30. Work Zone Type
+31. School Zone
+32. First Harmful Event
+33. First Harmful Event Loc
+34. Route or Street Name
+35. Alcohol?
+36. UnBelted?
+37. Bike?
+38. Distracted?
+39. Animal Related?
+40. Drowsy?
+41. Drug Related?
+42. Guardrail Related?
+43. Hit & Run?
+44. Large Vehicle?
+45. Motorcycle?
+46. Pedestrian?
+47. Max Speed Diff
+48. Speed?
+49. RoadDeparture Type
+50. Intersection Analysis
+51. Senior Driver?
+52. Young Driver?
+53. Mainline?
+54. Night?
+55. VDOT District
+56. Juris Code
+57. Physical Juris Name
+58. Functional Class
+59. Facility Type
+60. Area Type
+61. SYSTEM
+62. VSP
+63. Ownership
+64. Planning District
+65. MPO Name
+66. RTE Name
+67. RNS MP
+68. Node
+69. Node Offset (ft)
+70. LAT
+71. LON
+72. x
+73. y

@@ -1,0 +1,1222 @@
+
+===== Crash Severity =====
+A
+B
+C
+K
+O
+... (5 unique values)
+
+===== K_People =====
+0
+1
+2
+3
+4
+... (5 unique values)
+
+===== A_People =====
+0
+1
+10
+11
+18
+2
+3
+4
+5
+54
+6
+7
+8
+9
+... (14 unique values)
+
+===== B_People =====
+0
+1
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+2
+3
+33
+36
+4
+5
+6
+7
+8
+9
+... (22 unique values)
+
+===== C_People =====
+0
+1
+10
+11
+12
+14
+15
+16
+17
+2
+21
+23
+24
+27
+3
+30
+32
+38
+4
+5
+6
+7
+8
+9
+... (24 unique values)
+
+===== Persons Injured =====
+0
+1
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+2
+20
+21
+23
+24
+27
+3
+30
+32
+33
+38
+4
+46
+5
+54
+6
+7
+8
+9
+... (31 unique values)
+
+===== Pedestrians Killed =====
+0
+1
+2
+3
+... (4 unique values)
+
+===== Pedestrians Injured =====
+0
+1
+2
+3
+4
+5
+6
+7
+... (8 unique values)
+
+===== Vehicle Count =====
+1
+10
+11
+12
+13
+14
+16
+17
+18
+2
+22
+3
+4
+5
+6
+7
+75
+8
+9
+... (19 unique values)
+
+===== Collision Type =====
+1. Rear End
+10. Deer
+11. Other Animal
+12. Ped
+13. Bicyclist
+14. Motorcyclist
+15. Backed Into
+16. Other
+2. Angle
+3. Head On
+4. Sideswipe - Same Direction
+5. Sideswipe - Opposite Direction
+6. Fixed Object in Road
+7. Train
+8. Non-Collision
+9. Fixed Object - Off Road
+Not Applicable
+Not Provided
+... (18 unique values)
+
+===== Weather Condition =====
+1. No Adverse Condition (Clear/Cloudy)
+10. Blowing Sand, Soil, Dirt, or Snow
+11. Severe Crosswinds
+3. Fog
+4. Mist
+5. Rain
+6. Snow
+7. Sleet/Hail
+8. Smoke/Dust
+9. Other
+Not Applicable
+... (11 unique values)
+
+===== Light Condition =====
+1. Dawn
+2. Daylight
+3. Dusk
+4. Darkness - Road Lighted
+5. Darkness - Road Not Lighted
+6. Darkness - Unknown Road Lighting
+7. Unknown
+Not Applicable
+... (8 unique values)
+
+===== Roadway Surface Condition =====
+1. Dry
+10. Slush
+11. Sand, Dirt, Gravel
+2. Wet
+3. Snowy
+4. Icy
+5. Muddy
+6. Oil/Other Fluids
+7. Other
+8. Natural Debris
+9. Water (Standing, Moving)
+Not Applicable
+... (12 unique values)
+
+===== Relation To Roadway =====
+1. Main-Line Roadway
+10. Intersection Related - Within 150 Feet
+11. Intersection Related - Outside 150 Feet
+12. Crossover Related
+13. Driveway, Alley-Access - Related
+14. Railway Grade Crossing
+15. Other Crossing (Crossing for Bikes, School, etc.)
+2. Acceleration/Deceleration Lanes
+3. Gore Area (b/w Ramp and Highway Edgelines)
+4. Collector/Distributor Road
+5. On Entrance/Exit Ramp
+6. Intersection at end of Ramp
+7. Other location not listed above within an interchange area (median, shoulder , roadside)
+8. Non-Intersection
+9. Within Intersection
+Not Applicable
+Not Provided
+... (17 unique values)
+
+===== Roadway Alignment =====
+1. Straight - Level
+10. On/Off Ramp
+2. Curve - Level
+3. Grade - Straight
+4. Grade - Curve
+5. Hillcrest - Straight
+6. Hillcrest - Curve
+7. Dip - Straight
+8. Dip - Curve
+9. Other
+... (10 unique values)
+
+===== Roadway Surface Type =====
+1. Concrete
+2. Blacktop, Asphalt, Bituminous
+3. Brick or Block
+4. Slag, Gravel, Stone
+5. Dirt
+6. Other
+Not Applicable
+... (7 unique values)
+
+===== Roadway Defect =====
+1. No Defects
+10. Edge Pavement Drop Off
+2. Holes, Ruts, Bumps
+3. Soft or Low Shoulder
+4. Under Repair
+5. Loose Material
+6. Restricted Width
+7. Slick Pavement
+8. Roadway Obstructed
+9. Other
+Not Applicable
+Not Provided
+... (12 unique values)
+
+===== Roadway Description =====
+1. Two-Way, Not Divided
+2. Two-Way, Divided, Unprotected Median
+3. Two-Way, Divided, Positive Median Barrier
+4. One-Way, Not Divided
+5. Unknown
+Not Applicable
+Not Provided
+... (7 unique values)
+
+===== Intersection Type =====
+1. Not at Intersection
+2. Two Approaches
+3. Three Approaches
+4. Four Approaches
+5. Five-Point, or More
+6. Roundabout
+Not Applicable
+... (7 unique values)
+
+===== Traffic Control Type =====
+1. No Traffic Control
+10. Railroad Crossing With Markings and Signs
+11. Railroad Crossing With Signals
+12. Railroad Crossing With Gate and Signals
+13. Other
+14. Ped Crosswalk
+15. Reduced Speed - School Zone
+16. Reduced Speed - Work Zone
+17. Highway Safety Corridor
+2. Officer or Flagger
+3. Traffic Signal
+4. Stop Sign
+5. Slow or Warning Sign
+6. Traffic Lanes Marked
+7. No Passing Lines
+8. Yield Sign
+9. One Way Road or Street
+Not Applicable
+... (18 unique values)
+
+===== Traffic Control Status =====
+1. Yes - Working
+2. Yes - Working and Obscured
+3. Yes - Not Working
+4. Yes - Not Working and Obscured
+5. Yes - Missing
+6. No Traffic Control Device Present
+Not Applicable
+... (7 unique values)
+
+===== Work Zone Related =====
+1. Yes
+2. No
+Not Applicable
+Not Provided
+... (4 unique values)
+
+===== Work Zone Location =====
+1. Advance Warning Area
+2. Transition Area
+3. Activity Area
+4. Termination Area
+... (4 unique values)
+
+===== Work Zone Type =====
+1. Lane Closure
+2. Lane Shift/Crossover
+3. Work on Shoulder or Median
+4. Intermittent or Moving Work
+5. Other
+... (5 unique values)
+
+===== School Zone =====
+1. Yes
+2. Yes - With School Activity
+3. No
+Not Applicable
+Not Provided
+... (5 unique values)
+
+===== First Harmful Event Loc =====
+1. On Roadway
+2. Shoulder
+3. Median
+4. Roadside
+5. Gore
+6. Separator
+7. In Parking Lane or Zone
+8. Off Roadway, Location Unknown
+9. Outside Right-of-Way
+Not Applicable
+... (10 unique values)
+
+===== Alcohol? =====
+No
+Yes
+... (2 unique values)
+
+===== Animal Related? =====
+No
+Yes
+... (2 unique values)
+
+===== Unrestrained? =====
+Belted
+Unbelted
+... (2 unique values)
+
+===== Bike? =====
+No
+Yes
+... (2 unique values)
+
+===== Distracted? =====
+No
+Yes
+... (2 unique values)
+
+===== Drowsy? =====
+No
+Yes
+... (2 unique values)
+
+===== Drug Related? =====
+No
+Yes
+... (2 unique values)
+
+===== Guardrail Related? =====
+No
+Yes
+... (2 unique values)
+
+===== Hitrun? =====
+No
+Yes
+... (2 unique values)
+
+===== Lgtruck? =====
+No
+Yes
+... (2 unique values)
+
+===== Motorcycle? =====
+No
+Yes
+... (2 unique values)
+
+===== Pedestrian? =====
+No
+Yes
+... (2 unique values)
+
+===== Speed? =====
+No
+Yes
+... (2 unique values)
+
+===== RoadDeparture Type =====
+NOT_RD
+RD_LEFT
+RD_RIGHT
+RD_UNKNOWN
+... (4 unique values)
+
+===== Intersection Analysis =====
+Not Intersection
+Urban Intersection
+VDOT Intersection
+... (3 unique values)
+
+===== Senior? =====
+No
+Yes
+... (2 unique values)
+
+===== Young? =====
+No
+Yes
+... (2 unique values)
+
+===== Mainline? =====
+No
+Yes
+... (2 unique values)
+
+===== Night? =====
+No
+Yes
+... (2 unique values)
+
+===== VDOT District =====
+1. Bristol
+2. Salem
+3. Lynchburg
+4. Richmond
+5. Hampton Roads
+6. Fredericksburg
+7. Culpeper
+8. Staunton
+9. Northern Virginia
+... (9 unique values)
+
+===== Juris Code =====
+0
+1
+10
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+11
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+12
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+13
+130
+131
+132
+133
+134
+136
+137
+138
+139
+14
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+15
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+16
+160
+161
+162
+163
+164
+165
+166
+167
+168
+169
+17
+170
+171
+172
+173
+174
+175
+176
+177
+178
+179
+18
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189
+19
+190
+191
+192
+193
+194
+195
+196
+198
+199
+2
+20
+200
+201
+202
+203
+204
+205
+206
+207
+208
+209
+21
+210
+211
+212
+213
+214
+215
+216
+217
+218
+219
+22
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+23
+230
+231
+232
+233
+234
+235
+236
+237
+239
+24
+240
+241
+242
+243
+244
+245
+246
+247
+248
+249
+25
+250
+251
+252
+253
+254
+255
+256
+257
+258
+259
+26
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+28
+280
+281
+282
+283
+284
+285
+286
+287
+288
+289
+29
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+3
+30
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+31
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+32
+320
+321
+322
+323
+324
+325
+327
+328
+329
+33
+330
+331
+339
+34
+35
+36
+37
+38
+39
+4
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+5
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+6
+60
+62
+63
+65
+66
+67
+68
+69
+7
+70
+71
+72
+73
+74
+76
+77
+78
+79
+8
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+9
+90
+91
+92
+93
+95
+96
+97
+98
+99
+... (324 unique values)
+
+===== Physical Juris Name =====
+000. Arlington County
+001. Accomack County
+002. Albemarle County
+003. Alleghany County
+004. Amelia County
+005. Amherst County
+006. Appomattox County
+007. Augusta County
+008. Bath County
+009. Bedford County
+010. Bland County
+011. Botetourt County
+012. Brunswick County
+013. Buchanan County
+014. Buckingham County
+015. Campbell County
+016. Caroline County
+017. Carroll County
+018. Charles City County
+019. Charlotte County
+020. Chesterfield County
+021. Clarke County
+022. Craig County
+023. Culpeper County
+024. Cumberland County
+025. Dickenson County
+026. Dinwiddie County
+028. Essex County
+029. Fairfax County
+030. Fauquier County
+031. Floyd County
+032. Fluvanna County
+033. Franklin County
+034. Frederick County
+035. Giles County
+036. Gloucester County
+037. Goochland County
+038. Grayson County
+039. Greene County
+040. Greensville County
+041. Halifax County
+042. Hanover County
+043. Henrico County
+044. Henry County
+045. Highland County
+046. Isle of Wight County
+047. James City County
+048. King George County
+049. King & Queen County
+050. King William County
+051. Lancaster County
+052. Lee County
+053. Loudoun County
+054. Louisa County
+055. Lunenburg County
+056. Madison County
+057. Mathews County
+058. Mecklenburg County
+059. Middlesex County
+060. Montgomery County
+062. Nelson County
+063. New Kent County
+065. Northampton County
+066. Northumberland County
+067. Nottoway County
+068. Orange County
+069. Page County
+070. Patrick County
+071. Pittsylvania County
+072. Powhatan County
+073. Prince Edward County
+074. Prince George County
+076. Prince William County
+077. Pulaski County
+078. Rappahannock County
+079. Richmond County
+080. Roanoke County
+081. Rockbridge County
+082. Rockingham County
+083. Russell County
+084. Scott County
+085. Shenandoah County
+086. Smyth County
+087. Southampton County
+088. Spotsylvania County
+089. Stafford County
+090. Surry County
+091. Sussex County
+092. Tazewell County
+093. Warren County
+095. Washington County
+096. Westmoreland County
+097. Wise County
+098. Wythe County
+099. York County
+100. City of Alexandria
+101. Town of Big Stone Gap
+102. City of Bristol
+103. City of Buena Vista
+104. City of Charlottesville
+105. Town of Clifton Forge
+106. City of Colonial Heights
+107. City of Covington
+108. City of Danville
+109. City of Emporia
+110. City of Falls Church
+111. City of Fredericksburg
+112. Town of Front Royal
+113. City of Galax
+114. City of Hampton
+115. City of Harrisonburg
+116. City of Hopewell
+117. City of Lexington
+118. City of Lynchburg
+119. Town of Marion
+120. City of Martinsville
+121. City of Newport News
+122. City of Norfolk
+123. City of Petersburg
+124. City of Portsmouth
+125. Town of Pulaski
+126. City of Radford
+127. City of Richmond
+128. City of Roanoke
+129. City of Salem
+130. Town of South Boston
+131. City of Chesapeake
+132. City of Staunton
+133. City of Suffolk
+134. City of Virginia Beach
+136. City of Waynesboro
+137. City of Williamsburg
+138. City of Winchester
+139. Town of Wytheville
+140. Town of Abingdon
+141. Town of Bedford
+142. Town of Blackstone
+143. Town of Bluefield
+144. Town of Farmville
+145. City of Franklin
+146. City of Norton
+147. City of Poquoson
+148. Town of Richlands
+149. Town of Vinton
+150. Town of Blacksburg
+151. City of Fairfax
+152. City of Manassas Park
+153. Town of Vienna
+154. Town of Christiansburg
+155. City of Manassas
+156. Town of Warrenton
+157. Town of Rocky Mount
+158. Town of Tazewell
+159. Town of Luray
+160. Town of Accomac
+161. Town of Alberta
+162. Town of Altavista
+163. Town of Amherst
+164. Town of Appalachia
+165. Town of Appomattox
+166. Town of Ashland
+167. Town of Belle Haven
+168. Town of Berryville
+169. Town of Bloxom
+170. Town of Boones Mill
+171. Town of Bowling Green
+172. Town of Boyce
+173. Town of Boydton
+174. Town of Boykins
+175. Town of Branchville
+176. Town of Bridgewater
+177. Town of Broadway
+178. Town of Brodnax
+179. Town of Brookneal
+180. Town of Buchanan
+181. Town of Burkeville
+182. Town of Cape Charles
+183. Town of Capron
+184. Town of Cedar Bluff
+185. Town of Charlotte C.H.
+186. Town of Chase City
+187. Town of Chatham
+188. Town of Cheriton
+189. Town of Chilhowie
+190. Town of Chincoteague
+191. Town of Claremont
+192. Town of Clarksville
+193. Town of Cleveland
+194. Town of Clifton
+195. Town of Clinchport
+196. Town of Clintwood
+198. Town of Coeburn
+199. Town of Colonial Beach
+200. Town of Columbia
+201. Town of Courtland
+202. Town of Craigsville
+203. Town of Crewe
+204. Town of Culpeper
+205. Town of Damascus
+206. Town of Dayton
+207. Town of Dendron
+208. Town of Dillwyn
+209. Town of Drakes Branch
+210. Town of Dublin
+211. Town of Duffield
+212. Town of Dumfries
+213. Town of Dungannon
+214. Town of Eastville
+215. Town of Edinburg
+216. Town of Elkton
+217. Town of Exmore
+218. Town of Fincastle
+219. Town of Floyd
+220. Town of Fries
+221. Town of Gate City
+222. Town of Glade Spring
+223. Town of Glasgow
+224. Town of Glen Lyn
+225. Town of Gordonsville
+226. Town of Goshen
+227. Town of Gretna
+228. Town of Grottoes
+229. Town of Grundy
+230. Town of Halifax
+231. Town of Hallwood
+232. Town of Hamilton
+233. Town of Haymarket
+234. Town of Haysi
+235. Town of Herndon
+236. Town of Hillsboro
+237. Town of Hillsville
+239. Town of Honaker
+240. Town of Independence
+241. Town of Iron Gate
+242. Town of Irvington
+243. Town of Ivor
+244. Town of Jarratt
+245. Town of Jonesville
+246. Town of Keller
+247. Town of Kenbridge
+248. Town of Keysville
+249. Town of Kilmarnock
+250. Town of LaCrosse
+251. Town of Lawrenceville
+252. Town of Lebanon
+253. Town of Leesburg
+254. Town of Louisa
+255. Town of Lovettsville
+256. Town of Madison
+257. Town of McKenney
+258. Town of Melfa
+259. Town of Middleburg
+260. Town of Middletown
+261. Town of Mineral
+262. Town of Monterey
+263. Town of Montross
+264. Town of Mount Crawford
+265. Town of Mount Jackson
+266. Town of Narrows
+267. Town of Nassawadox
+268. Town of New Castle
+269. Town of New Market
+270. Town of Newsoms
+271. Town of Nickelsville
+272. Town of Occoquan
+273. Town of Onancock
+274. Town of Onley
+275. Town of Orange
+276. Town of Painter
+277. Town of Pamplin City
+278. Town of Parksley
+279. Town of Pearisburg
+280. Town of Pembroke
+281. Town of Pennington Gap
+282. Town of Phenix
+283. Town of Pocahontas
+284. Town of Port Royal
+285. Town of Pound
+286. Town of Purcellville
+287. Town of Quantico
+288. Town of Remington
+289. Town of Rich Creek
+290. Town of Ridgeway
+291. Town of Round Hill
+292. Town of Rural Retreat
+293. Town of St. Charles
+294. Town of Saint Paul
+295. Town of Saltville
+296. Town of Saxis
+297. Town of Scottsburg
+298. Town of Scottsville
+299. Town of Shenandoah
+300. Town of Smithfield
+301. Town of South Hill
+302. Town of Stanardsville
+303. Town of Stanley
+304. Town of Stephens City
+305. Town of Stony Creek
+306. Town of Strasburg
+307. Town of Stuart
+308. Town of Surry
+309. Town of Tangier
+310. Town of Tappahannock
+311. Town of The Plains
+312. Town of Timberville
+313. Town of Toms Brook
+314. Town of Troutdale
+315. Town of Troutville
+316. Town of Urbanna
+317. Town of Victoria
+318. Town of Virgilina
+319. Town of Wachapreague
+320. Town of Wakefield
+321. Town of Warsaw
+322. Town of Washington
+323. Town of Waverly
+324. Town of Weber City
+325. Town of West Point
+327. Town of White Stone
+328. Town of Windsor
+329. Town of Wise
+330. Town of Woodstock
+331. Town of Hurt
+339. Town of Clinchco
+... (324 unique values)
+
+===== Functional Class =====
+1-Interstate (A,1)
+2-Principal Arterial - Other Freeways and Expressways (B)
+3-Principal Arterial - Other (E,2)
+4-Minor Arterial (H,3)
+5-Major Collector (I,4)
+6-Minor Collector (5)
+7-Local (J,6)
+... (7 unique values)
+
+===== Facility Type =====
+1-One-Way Undivided
+2-One-Way Divided
+3-Two-Way Undivided
+4-Two-Way Divided
+5-Reversible Exclusively (e.g. 395R)
+... (5 unique values)
+
+===== Area Type =====
+Rural
+Urban
+... (2 unique values)
+
+===== SYSTEM =====
+NonVDOT primary
+NonVDOT secondary
+VDOT Interstate
+VDOT Primary
+VDOT Secondary
+... (5 unique values)
+
+===== Ownership =====
+1. State Hwy Agency
+2. County Hwy Agency
+3. City or Town Hwy Agency
+4. Federal Roads
+5. Toll Roads Maintained by Others
+6. Private/Unknown Roads
+... (6 unique values)
+
+===== Planning District =====
+Accomack-Northampton
+Central Shenandoah
+Commonwealth Regional
+Crater
+Crater, Hampton Roads
+Cumberland Plateau
+George Washington Regional
+Hampton Roads
+Lenowisco
+Middle Peninsula
+Middle Peninsula, Hampton Roads
+Mount Rogers
+New River Valley
+Northern Neck
+Northern Shenandoah Valley
+Northern Virginia
+Rappahannock - Rapidan
+Region 2000
+Richmond Regional
+Richmond Regional, Crater
+Roanoke Valley-Alleghany
+Roanoke Valley-Alleghany, West Piedmont
+Southside
+Thomas Jefferson
+West Piedmont
+... (25 unique values)
+
+===== MPO Name =====
+BRIS
+CVIL
+DAN
+FRED
+HAMP
+HAR
+KING
+LYN
+NOVA
+NRV
+RICH
+ROAN
+SAW
+TCAT
+WINC
+... (15 unique values)
