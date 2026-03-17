@@ -29,42 +29,40 @@ This document is the **single source of truth** for Claude Code when working wit
 
 ### API Behavior
 - **Pagination**: `$limit`/`$offset` (max 50,000 per request)
-- **Filtering**: SoQL `$where` clause (e.g., `county_name='Sussex'`)
-- **JSON API**: Returns lowercase field names with underscores (`crash_datetime`)
-- **CSV/Excel Export**: Returns UPPERCASE field names with spaces (`CRASH DATETIME`)
-- **Auto-discovery**: Download script detects field names dynamically from first record
+- **Filtering**: SoQL `$where` clause (e.g., `county_desc='Sussex'`)
+- **Download method**: CSV export (`rows.csv?accessType=DOWNLOAD`) — preferred because it includes ALL fields
+- **CSV Export**: Returns UPPERCASE field names with spaces (e.g., `CRASH DATETIME`, `COUNTY NAME`)
+- **JSON API**: Returns **abbreviated** lowercase field names (e.g., `crash_class_desc`, `county_desc`)
+- **IMPORTANT**: The JSON API is **missing** `crash_datetime` and `year` fields — always use CSV export
 
-### Raw Field Names (from Socrata JSON API)
+### Field Names — Three Formats
 
-| API Field Name | Description | Example Value |
-|---------------|-------------|---------------|
-| `crash_datetime` | ISO 8601 datetime | `2023-06-15T14:30:00.000` |
-| `crash_classification_code` | Numeric severity code | `2` |
-| `crash_classification_description` | Text severity | `Property Damage Only` |
-| `manner_of_impact_code` | Numeric collision type | `1` |
-| `manner_of_impact_description` | Text collision type | `Front to rear` |
-| `weather_1_description` | Weather condition | `Clear` |
-| `lighting_condition_description` | Lighting | `Daylight` |
-| `road_surface_description` | Road surface | `Dry` |
-| `latitude` | GPS latitude | `39.1059209` |
-| `longitude` | GPS longitude | `-75.5409314` |
-| `county_name` | County | `Kent` |
-| `county_code` | County code | `K` |
-| `pedestrian_involved` | Boolean | `N` |
-| `bicycled_involved` | Boolean (note typo in source) | `N` |
-| `alcohol_involved` | Boolean | `N` |
-| `drug_involved` | Boolean | `N` |
-| `motorcycle_involved` | Boolean | `N` |
-| `seatbelt_used` | Boolean | `Y` |
-| `work_zone` | Boolean | `N` |
-| `primary_contributing_circumstance_code` | Contributing factor | `NA` |
-| `school_bus_involved_code` | School bus flag | `0` |
-| `year` | Crash year | `2023` |
-| `day_of_week_description` | Day of week | `Tuesday` |
+The dataset has undergone a schema change. The normalizer supports all three field name formats:
 
-### UPPERCASE Field Names (from CSV/Excel Export)
-
-Same fields but in format: `CRASH DATETIME`, `CRASH CLASSIFICATION DESCRIPTION`, `ALCOHOL INVOLVED`, etc. The normalizer handles both formats via `_FIELD_ALIASES`.
+| CSV Export (UPPERCASE) | JSON API (Abbreviated) | Original Canonical Name |
+|---|---|---|
+| `CRASH DATETIME` | *(missing from API)* | `crash_datetime` |
+| `YEAR` | *(missing from API)* | `year` |
+| `CRASH CLASSIFICATION CODE` | `crash_class` | `crash_classification_code` |
+| `CRASH CLASSIFICATION DESCRIPTION` | `crash_class_desc` | `crash_classification_description` |
+| `MANNER OF IMPACT DESCRIPTION` | `impact_desc` | `manner_of_impact_description` |
+| `WEATHER 1 DESCRIPTION` | `weather_1_desc` | `weather_1_description` |
+| `LIGHTING CONDITION DESCRIPTION` | `light_cond_desc` | `lighting_condition_description` |
+| `ROAD SURFACE DESCRIPTION` | `road_surface_desc` | `road_surface_description` |
+| `LATITUDE` | `latitude` | `latitude` |
+| `LONGITUDE` | `longitude` | `longitude` |
+| `COUNTY NAME` | `county_desc` | `county_name` |
+| `COUNTY CODE` | `county` | `county_code` |
+| `PEDESTRIAN INVOLVED` | `ped_involved` | `pedestrian_involved` |
+| `BICYCLED INVOLVED` | `bike_involved` | `bicycled_involved` |
+| `ALCOHOL INVOLVED` | `alcohol_involved` | `alcohol_involved` |
+| `DRUG INVOLVED` | `drug_involved` | `drug_involved` |
+| `MOTORCYCLE INVOLVED` | `mc_involved` | `motorcycle_involved` |
+| `SEATBELT USED` | `seatbelt_used` | `seatbelt_used` |
+| `WORK ZONE` | `work_zone` | `work_zone` |
+| `PRIMARY CONTRIBUTING CIRCUMSTANCE CODE` | `pri_contrib_circum` | `primary_contributing_circumstance_code` |
+| `SCHOOL BUS INVOLVED CODE` | `school_bus_involved` | `school_bus_involved_code` |
+| `DAY OF WEEK DESCRIPTION` | `day_of_week_desc` | `day_of_week_description` |
 
 ---
 

@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 """
-Delaware Crash Data — Socrata SODA API Downloader
+Delaware Crash Data — Socrata CSV Export Downloader
 
-Downloads crash data from Delaware Department of Transportation via Socrata SODA API.
-Supports jurisdiction filtering, date range queries, gzip compression for R2 storage.
+Downloads crash data from Delaware Department of Safety & Homeland Security
+via Socrata's CSV export endpoint, which includes ALL fields (including
+CRASH DATETIME and YEAR that are missing from the JSON API).
 
 Data Source: https://data.delaware.gov
-API: https://data.delaware.gov/resource/827n-m6xc.json
+Dataset: https://data.delaware.gov/Transportation/Public-Crash-Data/827n-m6xc
+
+NOTE: The JSON API (resource/827n-m6xc.json) uses abbreviated field names
+and is missing crash_datetime and year. The CSV export endpoint returns
+UPPERCASE column names including CRASH DATETIME and YEAR.
 
 Usage:
-    python download_delaware_crash_data.py --jurisdiction <county> --years 2023 2024
+    python download_delaware_crash_data.py --jurisdiction sussex
+    python download_delaware_crash_data.py --jurisdiction new_castle --years 2023 2024
     python download_delaware_crash_data.py --gzip
     python download_delaware_crash_data.py --health-check
 """
@@ -17,6 +23,7 @@ Usage:
 import argparse
 import csv
 import gzip
+import io
 import json
 import logging
 import os
@@ -35,19 +42,31 @@ except ImportError:
 # Constants
 # =============================================================================
 
-SOCRATA_BASE_URL = "https://data.delaware.gov/resource/827n-m6xc.json"
-SOCRATA_METADATA_URL = "https://data.delaware.gov/api/views/827n-m6xc.json"
+# CSV export has ALL fields including CRASH DATETIME and YEAR
+SOCRATA_CSV_EXPORT_URL = "https://data.delaware.gov/api/views/827n-m6xc/rows.csv?accessType=DOWNLOAD"
+# JSON API (used only for health check — missing datetime fields)
+SOCRATA_JSON_URL = "https://data.delaware.gov/resource/827n-m6xc.json"
 
-PAGE_SIZE = 50000
 MAX_RETRIES = 4
 RETRY_BACKOFF = [2, 4, 8, 16]
 
-# Delaware jurisdictions: slug → county_name value in Socrata dataset
+# Delaware jurisdictions: slug → COUNTY NAME value in CSV export
 JURISDICTIONS = {
     "kent":       {"county_name": "Kent",       "fips": "10001"},
     "new_castle": {"county_name": "New Castle",  "fips": "10003"},
     "sussex":     {"county_name": "Sussex",      "fips": "10005"},
 }
+
+# CSV export uses UPPERCASE column names — these are the county column candidates
+COUNTY_COLUMN_CANDIDATES = [
+    "COUNTY NAME", "COUNTY_NAME", "county_name",
+    "COUNTY DESC", "COUNTY_DESC", "county_desc",
+]
+
+# Year column candidates
+YEAR_COLUMN_CANDIDATES = [
+    "YEAR", "year", "CRASH YEAR", "crash_year",
+]
 
 # Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
@@ -58,18 +77,11 @@ log = logging.getLogger("delaware_downloader")
 # Helper Functions
 # =============================================================================
 
-def retry_request(url, params=None, max_retries=MAX_RETRIES):
+def retry_request(url, params=None, max_retries=MAX_RETRIES, stream=False):
     """Make HTTP GET with exponential backoff retry."""
     for attempt in range(max_retries):
         try:
-            resp = requests.get(url, params=params, timeout=120)
-            if resp.status_code == 400:
-                # Log the Socrata error body for debugging
-                try:
-                    err_body = resp.json()
-                    log.error(f"  Socrata 400 error: {json.dumps(err_body, indent=2)}")
-                except Exception:
-                    log.error(f"  Socrata 400 body: {resp.text[:500]}")
+            resp = requests.get(url, params=params, timeout=300, stream=stream)
             resp.raise_for_status()
             return resp
         except requests.exceptions.RequestException as e:
@@ -82,162 +94,103 @@ def retry_request(url, params=None, max_retries=MAX_RETRIES):
 
 
 def health_check():
-    """Test API connectivity."""
+    """Test API connectivity using JSON endpoint."""
     log.info("=" * 60)
     log.info("Delaware Socrata API — Health Check")
     log.info("=" * 60)
     try:
-        resp = retry_request(SOCRATA_BASE_URL, params={"$limit": 1})
+        resp = retry_request(SOCRATA_JSON_URL, params={"$limit": 1})
         data = resp.json()
         if data:
-            log.info(f"  Sample record keys: {list(data[0].keys())[:10]}...")
-            log.info("  ✓ API is healthy")
-            return True
-        log.warning("  Empty response")
-        return False
+            log.info(f"  JSON API fields: {list(data[0].keys())[:10]}...")
+            log.info("  JSON API is healthy")
+        # Also check CSV export
+        resp2 = retry_request(SOCRATA_CSV_EXPORT_URL, stream=True)
+        first_line = resp2.iter_lines(decode_unicode=True).__next__()
+        resp2.close()
+        cols = first_line.split(",")[:10]
+        log.info(f"  CSV export columns: {cols}...")
+        log.info("  CSV export is healthy")
+        return True
     except Exception as e:
         log.error(f"  FAILED: {e}")
         return False
 
 
-def discover_fields(base_url):
-    """Fetch 1 record to discover actual API field names."""
-    log.info("  Discovering API field names...")
-    resp = retry_request(base_url, params={"$limit": 1})
-    data = resp.json()
-    if data and len(data) > 0:
-        fields = list(data[0].keys())
-        log.info(f"  Discovered {len(fields)} fields: {fields}")
-        return fields, data[0]
-    return [], {}
+def find_column(headers, candidates):
+    """Find the first matching column name from candidates."""
+    header_set = set(headers)
+    for c in candidates:
+        if c in header_set:
+            return c
+    return None
 
 
-def resolve_county_field(sample_record):
-    """Detect the correct county field name from a sample record.
+def download_csv_export():
+    """Download the full CSV export from Socrata.
 
-    Socrata field names vary by dataset — could be county_name, county_desc,
-    county, etc. This checks the sample record for likely county fields.
+    The CSV export endpoint returns ALL fields with UPPERCASE column names,
+    including CRASH DATETIME and YEAR which are missing from the JSON API.
     """
-    # Candidate field names in order of preference
-    candidates = [
-        "county_name", "county_desc", "county", "county_description",
-        "cnty_name", "cnty_desc", "jurisdiction",
-    ]
-    for candidate in candidates:
-        if candidate in sample_record:
-            log.info(f"  County field detected: '{candidate}' = '{sample_record[candidate]}'")
-            return candidate
+    log.info("  Downloading full CSV export from Socrata...")
+    log.info(f"  URL: {SOCRATA_CSV_EXPORT_URL}")
 
-    # Fallback: search for any field containing 'county' in name
-    for field, value in sample_record.items():
-        if "county" in field.lower() and isinstance(value, str) and value:
-            log.info(f"  County field found by search: '{field}' = '{value}'")
-            return field
+    resp = retry_request(SOCRATA_CSV_EXPORT_URL, stream=True)
+    content_length = resp.headers.get('Content-Length')
+    if content_length:
+        log.info(f"  Content-Length: {int(content_length):,} bytes")
 
-    log.warning("  No county field detected in sample record!")
-    return None
+    # Read the full response
+    log.info("  Streaming response...")
+    raw_text = resp.text
+    log.info(f"  Downloaded {len(raw_text):,} bytes")
 
+    # Parse CSV
+    reader = csv.DictReader(io.StringIO(raw_text))
+    records = list(reader)
+    log.info(f"  Parsed {len(records):,} records with {len(reader.fieldnames)} columns")
+    log.info(f"  Columns: {reader.fieldnames}")
 
-def resolve_datetime_field(sample_record):
-    """Detect the correct datetime field name from a sample record."""
-    candidates = [
-        "crash_datetime", "crash_date", "acc_date", "date", "datetime",
-        "crash_date_time", "incident_date",
-    ]
-    for candidate in candidates:
-        if candidate in sample_record:
-            log.info(f"  Datetime field detected: '{candidate}' = '{sample_record[candidate]}'")
-            return candidate
-
-    for field, value in sample_record.items():
-        if ("date" in field.lower() or "time" in field.lower()) and isinstance(value, str) and "T" in str(value):
-            log.info(f"  Datetime field found by search: '{field}' = '{value}'")
-            return field
-
-    log.warning("  No datetime field detected in sample record!")
-    return None
+    return records, reader.fieldnames
 
 
-def build_where_clause(jurisdiction_key, years, county_field, datetime_field):
-    """Build SoQL $where clause for filtering."""
-    clauses = []
+def filter_records(records, headers, jurisdiction_key, years):
+    """Filter records by jurisdiction and/or year range locally."""
+    if not jurisdiction_key and not years:
+        return records
 
-    # Jurisdiction filter
-    if jurisdiction_key and jurisdiction_key in JURISDICTIONS and county_field:
-        county_value = JURISDICTIONS[jurisdiction_key]["county_name"]
-        clauses.append(f"{county_field}='{county_value}'")
+    county_col = find_column(headers, COUNTY_COLUMN_CANDIDATES)
+    year_col = find_column(headers, YEAR_COLUMN_CANDIDATES)
 
-    # Year filter
-    if years and datetime_field:
-        year_clauses = []
-        for year in years:
-            start = f"{year}-01-01T00:00:00.000"
-            end = f"{year}-12-31T23:59:59.999"
-            year_clauses.append(f"({datetime_field}>='{start}' AND {datetime_field}<='{end}')")
-        if len(year_clauses) == 1:
-            clauses.append(year_clauses[0])
-        else:
-            clauses.append(f"({' OR '.join(year_clauses)})")
+    filtered = records
+    before = len(filtered)
 
-    return " AND ".join(clauses) if clauses else None
-
-
-def download_data(jurisdiction_key, years):
-    """Download crash data from Socrata API with pagination."""
-    # Step 1: Discover actual field names from a sample record
-    fields, sample = discover_fields(SOCRATA_BASE_URL)
-    if not fields:
-        log.error("Could not discover fields — API returned no records")
-        return []
-
-    county_field = resolve_county_field(sample)
-    datetime_field = resolve_datetime_field(sample)
-
-    where_clause = build_where_clause(jurisdiction_key, years, county_field, datetime_field)
-
-    log.info(f"Downloading Delaware crash data...")
+    # Filter by jurisdiction
     if jurisdiction_key and jurisdiction_key in JURISDICTIONS:
-        county_info = JURISDICTIONS[jurisdiction_key]
-        log.info(f"  Jurisdiction: {county_info['county_name']} County (FIPS {county_info['fips']})")
-    else:
-        log.info(f"  Jurisdiction: statewide (all counties)")
-    if years:
-        log.info(f"  Years: {', '.join(str(y) for y in years)}")
-    if where_clause:
-        log.info(f"  SoQL filter: $where={where_clause}")
-    else:
-        log.info(f"  No SoQL filter (downloading all records)")
+        target_county = JURISDICTIONS[jurisdiction_key]["county_name"]
+        if county_col:
+            filtered = [r for r in filtered if r.get(county_col, '').strip() == target_county]
+            log.info(f"  Filtered by {county_col}='{target_county}': {before:,} -> {len(filtered):,}")
+        else:
+            log.warning(f"  County column not found in headers! Tried: {COUNTY_COLUMN_CANDIDATES}")
+            log.warning(f"  Available headers: {headers}")
 
-    all_records = []
-    offset = 0
-    page = 1
-    while True:
-        params = {"$limit": PAGE_SIZE, "$offset": offset, "$order": ":id"}
-        if where_clause:
-            params["$where"] = where_clause
-        log.info(f"  Page {page}: offset={offset}, limit={PAGE_SIZE}")
-        resp = retry_request(SOCRATA_BASE_URL, params=params)
-        records = resp.json()
-        if not records:
-            log.info(f"  No more records at offset {offset}")
-            break
-        all_records.extend(records)
-        log.info(f"  Received {len(records)} records (total: {len(all_records)})")
-        if len(records) < PAGE_SIZE:
-            break
-        offset += PAGE_SIZE
-        page += 1
-        time.sleep(0.5)
+    # Filter by year
+    if years and year_col:
+        before = len(filtered)
+        year_strs = {str(y) for y in years}
+        filtered = [r for r in filtered if r.get(year_col, '').strip() in year_strs]
+        log.info(f"  Filtered by {year_col} in {sorted(years)}: {before:,} -> {len(filtered):,}")
+    elif years:
+        log.warning(f"  Year column not found! Tried: {YEAR_COLUMN_CANDIDATES}")
 
-    log.info(f"  Total records downloaded: {len(all_records)}")
-    return all_records
+    return filtered
 
 
-def save_csv(records, output_path, gzip_output=False):
+def save_csv(records, fieldnames, output_path, gzip_output=False):
     """Save records as CSV."""
     if not records:
         return None
-    fieldnames = list(dict.fromkeys(k for r in records for k in r.keys()))
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     if gzip_output:
         gz_path = str(output_path) + ".gz"
@@ -258,14 +211,14 @@ def save_csv(records, output_path, gzip_output=False):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Download Delaware crash data from Socrata SODA API",
+        description="Download Delaware crash data from Socrata CSV export",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --jurisdiction sussex --years 2023 2024
-  %(prog)s --jurisdiction new_castle --gzip
+  %(prog)s --jurisdiction sussex
+  %(prog)s --jurisdiction new_castle --years 2023 2024
+  %(prog)s --jurisdiction kent --gzip
   %(prog)s --health-check
-  %(prog)s --gzip  # Download all statewide data, gzip compressed
 
 Available jurisdictions:
   """ + ", ".join(sorted(JURISDICTIONS.keys())),
@@ -308,20 +261,36 @@ Available jurisdictions:
         sys.exit(0)
 
     log.info("=" * 60)
-    log.info(f"Delaware Crash Data Downloader")
+    log.info("Delaware Crash Data Downloader (CSV Export)")
     log.info(f"Started at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
     log.info("=" * 60)
 
+    if args.jurisdiction and args.jurisdiction in JURISDICTIONS:
+        county_info = JURISDICTIONS[args.jurisdiction]
+        log.info(f"  Jurisdiction: {county_info['county_name']} County (FIPS {county_info['fips']})")
+    else:
+        log.info("  Jurisdiction: statewide (all counties)")
+    if args.years:
+        log.info(f"  Years: {', '.join(str(y) for y in args.years)}")
+
     start = time.time()
-    records = download_data(args.jurisdiction, args.years)
+
+    # Download full CSV export (includes CRASH DATETIME and YEAR)
+    records, fieldnames = download_csv_export()
     if not records:
         log.warning("No records downloaded. Exiting.")
         sys.exit(1)
 
-    saved = save_csv(records, output_path, gzip_output=args.gzip)
+    # Filter locally by jurisdiction and/or year
+    records = filter_records(records, fieldnames, args.jurisdiction, args.years)
+    if not records:
+        log.warning("No records after filtering. Exiting.")
+        sys.exit(1)
+
+    saved = save_csv(records, fieldnames, output_path, gzip_output=args.gzip)
     elapsed = time.time() - start
     log.info("=" * 60)
-    log.info(f"Download complete!")
+    log.info("Download complete!")
     log.info(f"  Records: {len(records):,}")
     log.info(f"  Output: {saved}")
     log.info(f"  Elapsed: {elapsed:.1f}s")
