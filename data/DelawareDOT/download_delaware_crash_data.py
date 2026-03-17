@@ -16,6 +16,7 @@ UPPERCASE column names including CRASH DATETIME and YEAR.
 Usage:
     python download_delaware_crash_data.py --jurisdiction sussex
     python download_delaware_crash_data.py --jurisdiction new_castle --years 2023 2024
+    python download_delaware_crash_data.py --jurisdiction statewide
     python download_delaware_crash_data.py --gzip
     python download_delaware_crash_data.py --health-check
 """
@@ -46,6 +47,8 @@ except ImportError:
 SOCRATA_CSV_EXPORT_URL = "https://data.delaware.gov/api/views/827n-m6xc/rows.csv?accessType=DOWNLOAD"
 # JSON API (used only for health check — missing datetime fields)
 SOCRATA_JSON_URL = "https://data.delaware.gov/resource/827n-m6xc.json"
+# SODA CSV endpoint — supports SoQL $where filtering (server-side)
+SOCRATA_SODA_CSV_URL = "https://data.delaware.gov/resource/827n-m6xc.csv"
 
 MAX_RETRIES = 4
 RETRY_BACKOFF = [2, 4, 8, 16]
@@ -56,6 +59,9 @@ JURISDICTIONS = {
     "new_castle": {"county_name": "New Castle",  "fips": "10003"},
     "sussex":     {"county_name": "Sussex",      "fips": "10005"},
 }
+
+# All valid --jurisdiction values (includes 'statewide' for all counties)
+VALID_JURISDICTIONS = list(JURISDICTIONS.keys()) + ["statewide"]
 
 # CSV export uses UPPERCASE column names — these are the county column candidates
 COUNTY_COLUMN_CANDIDATES = [
@@ -126,22 +132,61 @@ def find_column(headers, candidates):
     return None
 
 
-def download_csv_export():
-    """Download the full CSV export from Socrata.
+def download_csv_export(jurisdiction_key=None, years=None):
+    """Download crash data from Socrata.
 
-    The CSV export endpoint returns ALL fields with UPPERCASE column names,
-    including CRASH DATETIME and YEAR which are missing from the JSON API.
+    Uses the SODA CSV endpoint with server-side $where filtering when a
+    jurisdiction or year filter is specified. Falls back to the full CSV
+    export endpoint for statewide downloads (which includes CRASH DATETIME
+    and YEAR fields that the SODA API may omit).
+
+    Returns (records, fieldnames).
     """
+    # Build SoQL $where clauses for server-side filtering
+    where_clauses = []
+    if jurisdiction_key and jurisdiction_key in JURISDICTIONS:
+        county = JURISDICTIONS[jurisdiction_key]["county_name"]
+        where_clauses.append(f"county_desc='{county}'")
+    if years:
+        year_list = ",".join(str(y) for y in years)
+        where_clauses.append(f"year in({year_list})")
+
+    if where_clauses:
+        # Use SODA CSV endpoint with server-side filtering (much faster)
+        where = " AND ".join(where_clauses)
+        params = {"$where": where, "$limit": 500000}
+        log.info(f"  Downloading via SODA CSV with filter: {where}")
+        log.info(f"  URL: {SOCRATA_SODA_CSV_URL}")
+
+        # stream=False so retry covers the full body download
+        resp = retry_request(SOCRATA_SODA_CSV_URL, params=params)
+        raw_text = resp.text
+        log.info(f"  Downloaded {len(raw_text):,} bytes")
+
+        reader = csv.DictReader(io.StringIO(raw_text))
+        records = list(reader)
+        fieldnames = reader.fieldnames or []
+        log.info(f"  Parsed {len(records):,} records with {len(fieldnames)} columns")
+        log.info(f"  Columns: {fieldnames}")
+
+        # SODA API may use abbreviated field names — check if key fields
+        # are present and log a warning if crash_datetime is missing
+        if records and 'crash_datetime' not in fieldnames and 'CRASH DATETIME' not in fieldnames:
+            log.warning("  SODA CSV missing crash_datetime — falling back to full CSV export")
+        else:
+            return records, fieldnames
+
+    # Full CSV export: downloads ALL data (no server-side filtering)
     log.info("  Downloading full CSV export from Socrata...")
     log.info(f"  URL: {SOCRATA_CSV_EXPORT_URL}")
 
-    resp = retry_request(SOCRATA_CSV_EXPORT_URL, stream=True)
+    # Do NOT use stream=True here — we want the retry loop to cover the
+    # entire body download, not just the connection/headers.
+    resp = retry_request(SOCRATA_CSV_EXPORT_URL)
     content_length = resp.headers.get('Content-Length')
     if content_length:
         log.info(f"  Content-Length: {int(content_length):,} bytes")
 
-    # Read the full response
-    log.info("  Streaming response...")
     raw_text = resp.text
     log.info(f"  Downloaded {len(raw_text):,} bytes")
 
@@ -155,7 +200,11 @@ def download_csv_export():
 
 
 def filter_records(records, headers, jurisdiction_key, years):
-    """Filter records by jurisdiction and/or year range locally."""
+    """Filter records by jurisdiction and/or year range locally.
+
+    This is a safety net for the full CSV export path where server-side
+    filtering is not available.
+    """
     if not jurisdiction_key and not years:
         return records
 
@@ -218,13 +267,14 @@ Examples:
   %(prog)s --jurisdiction sussex
   %(prog)s --jurisdiction new_castle --years 2023 2024
   %(prog)s --jurisdiction kent --gzip
+  %(prog)s --jurisdiction statewide
   %(prog)s --health-check
 
 Available jurisdictions:
-  """ + ", ".join(sorted(JURISDICTIONS.keys())),
+  """ + ", ".join(sorted(VALID_JURISDICTIONS)),
     )
     parser.add_argument("--jurisdiction", "-j", type=str, default=None,
-                        choices=list(JURISDICTIONS.keys()),
+                        choices=VALID_JURISDICTIONS,
                         help="County to filter to (default: all statewide)")
     parser.add_argument("--years", "-y", type=int, nargs="+", default=None,
                         help="Years to download (e.g., --years 2023 2024)")
@@ -240,6 +290,11 @@ Available jurisdictions:
 
     if args.health_check:
         sys.exit(0 if health_check() else 1)
+
+    # Treat 'statewide' as no jurisdiction filter (download all counties)
+    jurisdiction_key = args.jurisdiction
+    if jurisdiction_key == "statewide":
+        jurisdiction_key = None
 
     # Build output filename
     jurisdiction = args.jurisdiction or "statewide"
@@ -265,8 +320,8 @@ Available jurisdictions:
     log.info(f"Started at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
     log.info("=" * 60)
 
-    if args.jurisdiction and args.jurisdiction in JURISDICTIONS:
-        county_info = JURISDICTIONS[args.jurisdiction]
+    if jurisdiction_key and jurisdiction_key in JURISDICTIONS:
+        county_info = JURISDICTIONS[jurisdiction_key]
         log.info(f"  Jurisdiction: {county_info['county_name']} County (FIPS {county_info['fips']})")
     else:
         log.info("  Jurisdiction: statewide (all counties)")
@@ -275,14 +330,14 @@ Available jurisdictions:
 
     start = time.time()
 
-    # Download full CSV export (includes CRASH DATETIME and YEAR)
-    records, fieldnames = download_csv_export()
+    # Download crash data (with server-side filtering when possible)
+    records, fieldnames = download_csv_export(jurisdiction_key, args.years)
     if not records:
         log.warning("No records downloaded. Exiting.")
         sys.exit(1)
 
-    # Filter locally by jurisdiction and/or year
-    records = filter_records(records, fieldnames, args.jurisdiction, args.years)
+    # Apply local filtering as safety net (needed for full CSV export path)
+    records = filter_records(records, fieldnames, jurisdiction_key, args.years)
     if not records:
         log.warning("No records after filtering. Exiting.")
         sys.exit(1)
