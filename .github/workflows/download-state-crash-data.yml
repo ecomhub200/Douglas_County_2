@@ -510,19 +510,28 @@ jobs:
             exit 1
           fi
 
-          # Upload with retry (exponential backoff)
+          # Gzip the CSV for storage savings
+          GZ_PATH="${CSV_PATH}.gz"
+          gzip -cn "$CSV_PATH" > "$GZ_PATH"
+          GZ_SIZE=$(stat -c%s "$GZ_PATH" 2>/dev/null || stat -f%z "$GZ_PATH")
+          ORIG_SIZE=$(stat -c%s "$CSV_PATH" 2>/dev/null || stat -f%z "$CSV_PATH")
+          echo "  Gzip: ${ORIG_SIZE} -> ${GZ_SIZE} bytes (saved $((ORIG_SIZE - GZ_SIZE)) bytes)"
+
+          # Upload gzipped with Content-Encoding: gzip (retry with exponential backoff)
           for i in 1 2 3 4; do
-            if aws s3 cp "$CSV_PATH" "s3://$R2_BUCKET/$R2_KEY" \
+            if aws s3 cp "$GZ_PATH" "s3://$R2_BUCKET/$R2_KEY" \
               --endpoint-url "$R2_ENDPOINT" \
               --content-type "text/csv" \
+              --content-encoding "gzip" \
               --only-show-errors; then
-              echo "Upload succeeded"
+              echo "Upload succeeded (gzip-compressed)"
               break
             fi
             DELAY=$((2 ** i))
             echo "Upload failed (attempt $i/4), retrying in ${DELAY}s..."
             sleep $DELAY
           done
+          rm -f "$GZ_PATH"
 
           # Verify upload
           SIZE=$(aws s3api head-object \
@@ -537,7 +546,7 @@ jobs:
           fi
 
           SIZE_MB=$((SIZE / 1048576))
-          echo "Verified: $R2_KEY (${SIZE_MB}MB on R2)"
+          echo "Verified: $R2_KEY (${SIZE_MB}MB gzipped on R2)"
           echo "r2_data_key=$R2_KEY" >> $GITHUB_OUTPUT
 
       # ── Step 9: Job summary ──
