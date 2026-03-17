@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRASH LENS Data Mapping Tool — Delaware</title>
+<style>
+:root {
+  --primary: #1a365d;
+  --primary-light: #2c5282;
+  --accent: #3182ce;
+  --green: #38a169;
+  --green-bg: #c6f6d5;
+  --red: #e53e3e;
+  --red-bg: #fed7d7;
+  --yellow: #d69e2e;
+  --yellow-bg: #fefcbf;
+  --gray-50: #f7fafc;
+  --gray-100: #edf2f7;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e0;
+  --gray-600: #718096;
+  --gray-700: #4a5568;
+  --gray-800: #2d3748;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-50); color: var(--gray-800); font-size: 13px; }
+
+/* HEADER */
+.header { background: var(--primary); color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; position: sticky; top: 0; z-index: 100; }
+.header h1 { font-size: 18px; font-weight: 700; }
+.header .subtitle { font-size: 12px; opacity: 0.8; }
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.header-actions button { padding: 6px 14px; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; background: rgba(255,255,255,0.1); color: white; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.15s; }
+.header-actions button:hover { background: rgba(255,255,255,0.25); }
+.header-actions button.primary-btn { background: var(--accent); border-color: var(--accent); }
+
+/* STATS BAR */
+.stats-bar { background: white; border-bottom: 2px solid var(--gray-200); padding: 14px 24px; display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+.stat-card { text-align: center; min-width: 100px; }
+.stat-card .number { font-size: 22px; font-weight: 700; }
+.stat-card .label { font-size: 11px; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card.green .number { color: var(--green); }
+.stat-card.red .number { color: var(--red); }
+.stat-card.yellow .number { color: var(--yellow); }
+.mandatory-status { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.mandatory-badge { padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+.mandatory-badge.ok { background: var(--green-bg); color: #276749; }
+.mandatory-badge.missing { background: var(--red-bg); color: #9b2c2c; }
+
+/* FILTER BAR */
+.filter-bar { padding: 10px 24px; background: var(--gray-100); border-bottom: 1px solid var(--gray-200); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.filter-bar label { font-size: 12px; font-weight: 600; color: var(--gray-600); }
+.filter-bar select, .filter-bar input { padding: 4px 8px; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 12px; }
+.filter-bar input { width: 200px; }
+
+/* WARNING BANNER */
+.warning-banner { background: #fffbeb; border-left: 4px solid var(--yellow); padding: 10px 24px; font-size: 12px; color: #92400e; }
+
+/* MAIN TABLE */
+.table-container { padding: 0 24px 24px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+thead th { background: var(--primary); color: white; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 70px; z-index: 50; }
+tbody td { padding: 6px 10px; border-bottom: 1px solid var(--gray-200); vertical-align: top; font-size: 12px; }
+tbody tr:hover { background: #ebf8ff; }
+tbody tr.status-mapped { border-left: 3px solid var(--green); }
+tbody tr.status-gap { border-left: 3px solid var(--red); }
+tbody tr.status-extra { border-left: 3px solid var(--yellow); }
+.status-icon { font-weight: 700; font-size: 11px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+.status-icon.mapped { background: var(--green-bg); color: #276749; }
+.status-icon.gap { background: var(--red-bg); color: #9b2c2c; }
+.status-icon.extra { background: var(--yellow-bg); color: #92400e; }
+
+/* EXPANDABLE VALUE MAPPING */
+.expand-btn { background: none; border: 1px solid var(--gray-300); border-radius: 3px; cursor: pointer; font-size: 11px; padding: 2px 8px; color: var(--accent); }
+.expand-btn:hover { background: var(--gray-100); }
+.value-map-panel { display: none; margin-top: 8px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 4px; padding: 8px; }
+.value-map-panel.open { display: block; }
+.value-map-panel table { margin-top: 4px; }
+.value-map-panel th { background: var(--primary-light); font-size: 10px; padding: 4px 6px; position: static; }
+.value-map-panel td { font-size: 11px; padding: 3px 6px; }
+.value-map-panel td select { font-size: 11px; padding: 2px 4px; width: 100%; }
+.override-input { width: 100%; font-size: 11px; padding: 2px 4px; border: 1px solid var(--gray-300); border-radius: 3px; }
+
+/* DROPDOWN overrides */
+.col-select { font-size: 11px; padding: 2px 4px; border: 1px solid var(--gray-300); border-radius: 3px; max-width: 200px; }
+
+/* PRINT */
+@media print {
+  .header-actions, .filter-bar, .expand-btn, .col-select, .override-input, button { display: none !important; }
+  .header { position: static; }
+  thead th { position: static; }
+  .value-map-panel { display: block !important; }
+  body { font-size: 10px; }
+  .stats-bar { page-break-after: auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>CRASH LENS Data Mapping Tool — Delaware</h1>
+    <div class="subtitle">Source: data.delaware.gov/827n-m6xc | Generated: March 2026</div>
+  </div>
+  <div class="header-actions">
+    <button onclick="saveMappings()">Save</button>
+    <button onclick="loadMappings()">Load</button>
+    <button onclick="resetMappings()">Reset</button>
+    <button class="primary-btn" onclick="window.print()">Export PDF</button>
+  </div>
+</div>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="warning-banner">
+  <strong>DATA QUALITY WARNING:</strong> Delaware does NOT distinguish injury severity levels (A/B/C). All "Personal Injury Crash" records are mapped to severity <strong>B</strong>. EPDO calculations will undercount severity. Functional Class and Ownership are NOT in the public dataset — these are CRITICAL gaps that will break Road Type filters until filled.
+</div>
+
+<div class="filter-bar">
+  <label>Filter:</label>
+  <select id="statusFilter" onchange="filterRows()">
+    <option value="all">All Columns</option>
+    <option value="mapped">Mapped Only</option>
+    <option value="gap">Gaps Only</option>
+    <option value="extra">Extra Only</option>
+  </select>
+  <input type="text" id="searchInput" placeholder="Search column names..." oninput="filterRows()">
+</div>
+
+<div class="table-container">
+  <table id="mappingTable">
+    <thead>
+      <tr>
+        <th style="width:30px">#</th>
+        <th style="width:170px">Frontend Expected Column</th>
+        <th style="width:210px">New State Column</th>
+        <th style="width:80px">Action</th>
+        <th>Value Mapping / Notes</th>
+        <th style="width:70px">Status</th>
+      </tr>
+    </thead>
+    <tbody id="mappingBody"></tbody>
+  </table>
+</div>
+
+<script>
+// ============================================================
+// COMPLETE MAPPING DATA
+// ============================================================
+const DE_COLUMNS = [
+  "CRASH DATETIME","DAY OF WEEK CODE","DAY OF WEEK DESCRIPTION","CRASH CLASSIFICATION CODE",
+  "CRASH CLASSIFICATION DESCRIPTION","COLLISION ON PRIVATE PROPERTY","PEDESTRIAN INVOLVED",
+  "MANNER OF IMPACT CODE","MANNER OF IMPACT DESCRIPTION","ALCOHOL INVOLVED","DRUG INVOLVED",
+  "ROAD SURFACE CODE","ROAD SURFACE DESCRIPTION","LIGHTING CONDITION CODE",
+  "LIGHTING CONDITION DESCRIPTION","WEATHER 1 CODE","WEATHER 1 DESCRIPTION","WEATHER 2 CODE",
+  "WEATHER 2 DESCRIPTION","SEATBELT USED","MOTORCYCLE INVOLVED","MOTORCYCLE HELMET USED",
+  "BICYCLED INVOLVED","BICYCLE HELMET USED","LATITUDE","LONGITUDE",
+  "PRIMARY CONTRIBUTING CIRCUMSTANCE CODE","PRIMARY CONTRIBUTING CIRCUMSTANCE DESCRIPTION",
+  "SCHOOL BUS INVOLVED CODE","SCHOOL BUS INVOLVED DESCRIPTION","WORK ZONE",
+  "WORK ZONE LOCATION CODE","WORK ZONE LOCATION DESCRIPTION","WORK ZONE TYPE CODE",
+  "WORK ZONE TYPE DESCRIPTION","WORKERS PRESENT","the_geom","COUNTY CODE","COUNTY NAME","YEAR"
+];
+
+const MAPPINGS = [
+  // MANDATORY
+  {num:"1", fe:"Crash Severity", ns:"CRASH CLASSIFICATION DESCRIPTION", action:"VALUE_MAP", status:"mapped",
+   values:[
+     ["Fatality Crash","K"],["Personal Injury Crash","B"],["Property Damage Only","O"],["Non-Reportable","O"]
+   ], note:"DE has no A/B/C injury split. All injuries → B."},
+  {num:"2", fe:"Physical Juris Name", ns:"COUNTY NAME", action:"VALUE_MAP", status:"mapped",
+   values:[["Kent","001. Kent County"],["New Castle","003. New Castle County"],["Sussex","005. Sussex County"]]},
+  {num:"3", fe:"Functional Class", ns:"(none)", action:"MISSING", status:"gap",
+   note:"CRITICAL: Not in DE public data. Needed for 'No Interstate' filter."},
+  {num:"4", fe:"Ownership", ns:"(none)", action:"MISSING", status:"gap",
+   note:"CRITICAL: Not in DE public data. Needed for County/City Roads filters."},
+  {num:"5", fe:"x", ns:"LONGITUDE", action:"RENAME", status:"mapped"},
+  {num:"6", fe:"y", ns:"LATITUDE", action:"RENAME", status:"mapped"},
+
+  // OTHER MAPPED
+  {num:"7", fe:"Crash Year", ns:"YEAR", action:"RENAME", status:"mapped"},
+  {num:"8", fe:"Crash Date", ns:"CRASH DATETIME", action:"DERIVE", status:"mapped", note:"Parse date from datetime string"},
+  {num:"9", fe:"Crash Military Time", ns:"CRASH DATETIME", action:"DERIVE", status:"mapped", note:"Parse HHMM from datetime string"},
+  {num:"10", fe:"Collision Type", ns:"MANNER OF IMPACT DESCRIPTION", action:"VALUE_MAP", status:"mapped",
+   values:[
+     ["Front to rear","1. Rear End"],["Angle","2. Angle"],["Front to front","3. Head On"],
+     ["Sideswipe, same direction","4. Sideswipe - Same Direction"],
+     ["Sideswipe, opposite direction","5. Sideswipe - Opposite Direction"],
+     ["Not a collision between two vehicles","8. Non-Collision"],
+     ["Rear to rear","16. Other"],["Rear to side","16. Other"],["Other","16. Other"],["Unknown","Not Provided"]
+   ]},
+  {num:"11", fe:"Weather Condition", ns:"WEATHER 1 DESCRIPTION", action:"VALUE_MAP", status:"mapped",
+   values:[
+     ["Clear","1. No Adverse Condition (Clear/Cloudy)"],["Cloudy","1. No Adverse Condition (Clear/Cloudy)"],
+     ["Fog, Smog, Smoke","3. Fog"],["Rain","5. Rain"],["Snow","6. Snow"],
+     ["Sleet, Hail (freezing rain or drizzle)","7. Sleet/Hail"],
+     ["Blowing Sand, Soil, Dirt","10. Blowing Sand, Soil, Dirt, or Snow"],
+     ["Blowing Snow","10. Blowing Sand, Soil, Dirt, or Snow"],
+     ["Severe Crosswinds","11. Severe Crosswinds"],["Other","9. Other"],["Unknown","9. Other"]
+   ]},
+  {num:"12", fe:"Light Condition", ns:"LIGHTING CONDITION DESCRIPTION", action:"VALUE_MAP", status:"mapped",
+   values:[
+     ["Dawn","1. Dawn"],["Daylight","2. Daylight"],["Dusk","3. Dusk"],
+     ["Dark-Lighted","4. Darkness - Road Lighted"],["Dark-Not Lighted","5. Darkness - Road Not Lighted"],
+     ["Dark-Unknown Lighting","6. Darkness - Unknown Road Lighting"],["Other","7. Unknown"],["Unknown","7. Unknown"]
+   ]},
+  {num:"13", fe:"Roadway Surface Condition", ns:"ROAD SURFACE DESCRIPTION", action:"VALUE_MAP", status:"mapped",
+   values:[
+     ["Dry","1. Dry"],["Wet","2. Wet"],["Snow","3. Snowy"],["Ice/Frost","4. Icy"],
+     ["Oil","6. Oil/Other Fluids"],["Other","7. Other"],
+     ["Water (standing, moving)","9. Water (Standing, Moving)"],["Slush","10. Slush"],
+     ["Mud, Dirt, Gravel","11. Sand, Dirt, Gravel"],["Sand","11. Sand, Dirt, Gravel"],["Unknown","7. Other"]
+   ]},
+  {num:"14", fe:"Alcohol?", ns:"ALCOHOL INVOLVED", action:"VALUE_MAP", status:"mapped",
+   values:[["Y","Yes"],["N","No"]]},
+  {num:"15", fe:"Drug Related?", ns:"DRUG INVOLVED", action:"VALUE_MAP", status:"mapped",
+   values:[["Y","Yes"],["N","No"]]},
+  {num:"16", fe:"Bike?", ns:"BICYCLED INVOLVED", action:"VALUE_MAP", status:"mapped",
+   values:[["Y","Yes"],["N","No"]]},
+  {num:"17", fe:"Motorcycle?", ns:"MOTORCYCLE INVOLVED", action:"VALUE_MAP", status:"mapped",
+   values:[["Y","Yes"],["N","No"]]},
+  {num:"18", fe:"Pedestrian?", ns:"PEDESTRIAN INVOLVED", action:"VALUE_MAP", status:"mapped",
+   values:[["Y","Yes"],["N","No"]]},
+  {num:"19", fe:"Unrestrained?", ns:"SEATBELT USED", action:"VALUE_MAP", status:"mapped",
+   values:[["Y","Belted"],["N","Unbelted"]], note:"Y=belt used=Belted"},
+  {num:"20", fe:"Work Zone Related", ns:"WORK ZONE", action:"VALUE_MAP", status:"mapped",
+   values:[["Y","1. Yes"],["N","2. No"]]},
+  {num:"21", fe:"Work Zone Location", ns:"WORK ZONE LOCATION DESCRIPTION", action:"VALUE_MAP", status:"mapped",
+   values:[
+     ["Advance Warning Area","1. Advance Warning Area"],["Transition Area","2. Transition Area"],
+     ["Activity Area","3. Activity Area"],["Termination Area","4. Termination Area"],
+     ["Before the First Work Zone Warning Sign","1. Advance Warning Area"]
+   ]},
+  {num:"22", fe:"Work Zone Type", ns:"WORK ZONE TYPE DESCRIPTION", action:"VALUE_MAP", status:"mapped",
+   values:[
+     ["Lane Closure","1. Lane Closure"],["Lane Shift/Crossover","2. Lane Shift/Crossover"],
+     ["Work on Shoulder or Median","3. Work on Shoulder or Median"],
+     ["Intermittent or Moving Work","4. Intermittent or Moving Work"],["Other","5. Other"]
+   ]},
+  {num:"23", fe:"Night?", ns:"LIGHTING CONDITION DESCRIPTION", action:"DERIVE", status:"mapped",
+   values:[
+     ["Dark-Lighted","Yes"],["Dark-Not Lighted","Yes"],["Dark-Unknown Lighting","Yes"],
+     ["Dawn","No"],["Daylight","No"],["Dusk","No"],["Other","No"],["Unknown","No"]
+   ]},
+  {num:"24", fe:"Juris Code", ns:"COUNTY CODE", action:"VALUE_MAP", status:"mapped",
+   values:[["K","001"],["N","003"],["S","005"]]},
+
+  // GAPS — missing columns
+  {num:"25", fe:"OBJECTID", ns:"(none)", action:"GENERATE", status:"gap", note:"Auto-increment integer"},
+  {num:"26", fe:"Document Nbr", ns:"(none)", action:"GENERATE", status:"gap", note:"DE-{YEAR}-{SEQ:06d}"},
+  {num:"27", fe:"K_People", ns:"(none)", action:"DERIVE", status:"gap", note:"If Severity=K → 1, else 0"},
+  {num:"28", fe:"A_People", ns:"(none)", action:"SET", status:"gap", note:"Set to 0 (DE has no A-level)"},
+  {num:"29", fe:"B_People", ns:"(none)", action:"DERIVE", status:"gap", note:"If Severity=B → 1, else 0"},
+  {num:"30", fe:"C_People", ns:"(none)", action:"SET", status:"gap", note:"Set to 0 (DE has no C-level)"},
+  {num:"31", fe:"Persons Injured", ns:"(none)", action:"DERIVE", status:"gap", note:"If Severity=B → 1, else 0"},
+  {num:"32", fe:"Pedestrians Killed", ns:"(none)", action:"DERIVE", status:"gap", note:"If K AND Ped?=Yes → 1"},
+  {num:"33", fe:"Pedestrians Injured", ns:"(none)", action:"DERIVE", status:"gap", note:"If B AND Ped?=Yes → 1"},
+  {num:"34", fe:"Vehicle Count", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"35", fe:"Relation To Roadway", ns:"(none)", action:"SET", status:"gap", note:"Not Provided"},
+  {num:"36", fe:"Roadway Alignment", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"37", fe:"Roadway Surface Type", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"38", fe:"Roadway Defect", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"39", fe:"Roadway Description", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"40", fe:"Intersection Type", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"41", fe:"Traffic Control Type", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"42", fe:"Traffic Control Status", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"43", fe:"School Zone", ns:"(none)", action:"SET", status:"gap", note:"Not Provided"},
+  {num:"44", fe:"First Harmful Event", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"45", fe:"First Harmful Event Loc", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"46", fe:"Animal Related?", ns:"(none)", action:"SET", status:"gap", note:"No"},
+  {num:"47", fe:"Distracted?", ns:"(none)", action:"SET", status:"gap", note:"No"},
+  {num:"48", fe:"Drowsy?", ns:"(none)", action:"SET", status:"gap", note:"No"},
+  {num:"49", fe:"Guardrail Related?", ns:"(none)", action:"SET", status:"gap", note:"No"},
+  {num:"50", fe:"Hitrun?", ns:"(none)", action:"SET", status:"gap", note:"No"},
+  {num:"51", fe:"Lgtruck?", ns:"(none)", action:"SET", status:"gap", note:"No"},
+  {num:"52", fe:"Speed?", ns:"(none)", action:"SET", status:"gap", note:"No"},
+  {num:"53", fe:"Max Speed Diff", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"54", fe:"RoadDeparture Type", ns:"(none)", action:"SET", status:"gap", note:"NOT_RD"},
+  {num:"55", fe:"Intersection Analysis", ns:"(none)", action:"SET", status:"gap", note:"Not Intersection"},
+  {num:"56", fe:"Senior?", ns:"(none)", action:"SET", status:"gap", note:"No"},
+  {num:"57", fe:"Young?", ns:"(none)", action:"SET", status:"gap", note:"No"},
+  {num:"58", fe:"Mainline?", ns:"(none)", action:"SET", status:"gap", note:"No"},
+  {num:"59", fe:"VDOT District", ns:"(none)", action:"N/A", status:"gap", note:"VA-specific, null"},
+  {num:"60", fe:"Facility Type", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"61", fe:"Area Type", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"62", fe:"SYSTEM", ns:"(none)", action:"SET", status:"gap", note:"null"},
+  {num:"63", fe:"VSP", ns:"(none)", action:"N/A", status:"gap", note:"VA-specific, null"},
+  {num:"64", fe:"Planning District", ns:"(none)", action:"N/A", status:"gap", note:"VA-specific, null"},
+  {num:"65", fe:"MPO Name", ns:"(none)", action:"SET", status:"gap", note:"Could map DE MPOs"},
+  {num:"66", fe:"RTE Name", ns:"(none)", action:"GEOCODE", status:"gap", note:"OSM reverse geocode from x,y"},
+  {num:"67", fe:"RNS MP", ns:"(none)", action:"N/A", status:"gap", note:"VA LRS, null"},
+  {num:"68", fe:"Node", ns:"(none)", action:"GEOCODE", status:"gap", note:"OSM Overpass API from x,y"},
+  {num:"69", fe:"Node Offset (ft)", ns:"(none)", action:"SET", status:"gap", note:"null"},
+
+  // EXTRA COLUMNS (passthrough)
+  {num:"E1", fe:"-- EXTRA --", ns:"DAY OF WEEK CODE", action:"EXTRA (kept)", status:"extra"},
+  {num:"E2", fe:"-- EXTRA --", ns:"DAY OF WEEK DESCRIPTION", action:"EXTRA (kept)", status:"extra"},
+  {num:"E3", fe:"-- EXTRA --", ns:"CRASH CLASSIFICATION CODE", action:"EXTRA (kept)", status:"extra"},
+  {num:"E4", fe:"-- EXTRA --", ns:"CRASH CLASSIFICATION DESCRIPTION", action:"EXTRA (kept)", status:"extra"},
+  {num:"E5", fe:"-- EXTRA --", ns:"COLLISION ON PRIVATE PROPERTY", action:"EXTRA (kept)", status:"extra"},
+  {num:"E6", fe:"-- EXTRA --", ns:"WEATHER 2 CODE", action:"EXTRA (kept)", status:"extra"},
+  {num:"E7", fe:"-- EXTRA --", ns:"WEATHER 2 DESCRIPTION", action:"EXTRA (kept)", status:"extra"},
+  {num:"E8", fe:"-- EXTRA --", ns:"MOTORCYCLE HELMET USED", action:"EXTRA (kept)", status:"extra"},
+  {num:"E9", fe:"-- EXTRA --", ns:"BICYCLE HELMET USED", action:"EXTRA (kept)", status:"extra"},
+  {num:"E10", fe:"-- EXTRA --", ns:"PRIMARY CONTRIBUTING CIRCUMSTANCE CODE", action:"EXTRA (kept)", status:"extra"},
+  {num:"E11", fe:"-- EXTRA --", ns:"PRIMARY CONTRIBUTING CIRCUMSTANCE DESCRIPTION", action:"EXTRA (kept)", status:"extra"},
+  {num:"E12", fe:"-- EXTRA --", ns:"SCHOOL BUS INVOLVED CODE", action:"EXTRA (kept)", status:"extra"},
+  {num:"E13", fe:"-- EXTRA --", ns:"SCHOOL BUS INVOLVED DESCRIPTION", action:"EXTRA (kept)", status:"extra"},
+  {num:"E14", fe:"-- EXTRA --", ns:"WORKERS PRESENT", action:"EXTRA (kept)", status:"extra"},
+];
+
+const MANDATORY = ["Crash Severity","Physical Juris Name","Functional Class","Ownership","x","y"];
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderStats() {
+  const mapped = MAPPINGS.filter(m => m.status === 'mapped').length;
+  const gaps = MAPPINGS.filter(m => m.status === 'gap').length;
+  const extras = MAPPINGS.filter(m => m.status === 'extra').length;
+  const mandatoryMapped = MANDATORY.filter(col => {
+    const m = MAPPINGS.find(x => x.fe === col);
+    return m && m.status === 'mapped';
+  });
+
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat-card green"><div class="number">${mapped}</div><div class="label">Mapped</div></div>
+    <div class="stat-card red"><div class="number">${gaps}</div><div class="label">Gaps</div></div>
+    <div class="stat-card yellow"><div class="number">${extras}</div><div class="label">Extra</div></div>
+    <div class="stat-card"><div class="number">${mapped}/${mapped+gaps}</div><div class="label">Coverage</div></div>
+    <div style="border-left:1px solid var(--gray-300);height:40px"></div>
+    <div>
+      <div style="font-size:11px;font-weight:700;margin-bottom:4px;text-transform:uppercase;color:var(--gray-600)">Mandatory Columns</div>
+      <div class="mandatory-status">
+        ${MANDATORY.map(col => {
+          const m = MAPPINGS.find(x => x.fe === col);
+          const ok = m && m.status === 'mapped';
+          return `<span class="mandatory-badge ${ok?'ok':'missing'}">${ok?'✓':'✗'} ${col}</span>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderTable() {
+  const body = document.getElementById('mappingBody');
+  body.innerHTML = '';
+
+  MAPPINGS.forEach((m, idx) => {
+    const tr = document.createElement('tr');
+    tr.className = `status-${m.status}`;
+    tr.dataset.status = m.status;
+    tr.dataset.search = `${m.fe} ${m.ns}`.toLowerCase();
+
+    const statusLabel = {mapped:'✓ MAPPED', gap:'✗ GAP', extra:'~ EXTRA'}[m.status];
+    const statusClass = m.status;
+
+    let valueCell = m.note || '';
+    if (m.values && m.values.length > 0) {
+      const panelId = `panel-${idx}`;
+      valueCell = `
+        <button class="expand-btn" onclick="togglePanel('${panelId}')">▶ Show ${m.values.length} mappings</button>
+        ${m.note ? `<div style="font-size:11px;color:var(--gray-600);margin-top:3px">${m.note}</div>` : ''}
+        <div class="value-map-panel" id="${panelId}">
+          <table>
+            <thead><tr><th>New State Value</th><th>Frontend Expected Value</th><th>Override</th></tr></thead>
+            <tbody>
+              ${m.values.map(([src, dst], vi) => `
+                <tr>
+                  <td>${src}</td>
+                  <td>${dst}</td>
+                  <td><input class="override-input" data-map="${idx}" data-val="${vi}" value="${dst}" onchange="overrideValue(${idx},${vi},this.value)"></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // New State Column dropdown for mapped rows
+    let nsCell = m.ns;
+    if (m.status === 'mapped' || m.status === 'gap') {
+      nsCell = `
+        <select class="col-select" data-idx="${idx}" onchange="changeSourceCol(${idx},this.value)">
+          <option value="(none)">(none)</option>
+          ${DE_COLUMNS.map(c => `<option value="${c}" ${c===m.ns?'selected':''}>${c}</option>`).join('')}
+        </select>
+      `;
+    }
+
+    tr.innerHTML = `
+      <td>${m.num}</td>
+      <td><strong>${m.fe}</strong></td>
+      <td>${nsCell}</td>
+      <td>${m.action}</td>
+      <td>${valueCell}</td>
+      <td><span class="status-icon ${statusClass}">${statusLabel}</span></td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+function togglePanel(id) {
+  const panel = document.getElementById(id);
+  const btn = panel.previousElementSibling?.previousElementSibling || panel.parentElement.querySelector('.expand-btn');
+  if (panel.classList.contains('open')) {
+    panel.classList.remove('open');
+    if (btn) btn.textContent = btn.textContent.replace('▼','▶');
+  } else {
+    panel.classList.add('open');
+    if (btn) btn.textContent = btn.textContent.replace('▶','▼');
+  }
+}
+
+function filterRows() {
+  const status = document.getElementById('statusFilter').value;
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('#mappingBody tr').forEach(tr => {
+    const matchStatus = status === 'all' || tr.dataset.status === status;
+    const matchSearch = !search || tr.dataset.search.includes(search);
+    tr.style.display = (matchStatus && matchSearch) ? '' : 'none';
+  });
+}
+
+function changeSourceCol(idx, val) {
+  MAPPINGS[idx].ns = val;
+  if (val === '(none)') {
+    MAPPINGS[idx].status = 'gap';
+  } else {
+    MAPPINGS[idx].status = 'mapped';
+  }
+  renderStats();
+  renderTable();
+}
+
+function overrideValue(mapIdx, valIdx, newVal) {
+  MAPPINGS[mapIdx].values[valIdx][1] = newVal;
+}
+
+// ============================================================
+// SAVE / LOAD / RESET
+// ============================================================
+function saveMappings() {
+  const data = JSON.stringify(MAPPINGS);
+  localStorage.setItem('crashlens_de_mappings', data);
+  alert('Mappings saved to browser storage.');
+}
+
+function loadMappings() {
+  const data = localStorage.getItem('crashlens_de_mappings');
+  if (data) {
+    const loaded = JSON.parse(data);
+    loaded.forEach((m, i) => {
+      if (MAPPINGS[i]) Object.assign(MAPPINGS[i], m);
+    });
+    renderStats();
+    renderTable();
+    alert('Mappings loaded.');
+  } else {
+    alert('No saved mappings found.');
+  }
+}
+
+function resetMappings() {
+  if (confirm('Reset all mappings to defaults? This cannot be undone.')) {
+    localStorage.removeItem('crashlens_de_mappings');
+    location.reload();
+  }
+}
+
+// INIT
+renderStats();
+renderTable();
+</script>
+</body>
+</html>

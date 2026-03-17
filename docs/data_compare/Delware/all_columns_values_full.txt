@@ -1,0 +1,260 @@
+
+===== DAY OF WEEK CODE (7 unique values) =====
+1
+2
+3
+4
+5
+6
+7
+
+===== DAY OF WEEK DESCRIPTION (7 unique values) =====
+Friday
+Monday
+Saturday
+Sunday
+Thursday
+Tuesday
+Wednesday
+
+===== CRASH CLASSIFICATION CODE (15 unique values) =====
+'1
+.1
+.2
+.3
+00
+01
+02
+03
+04
+1
+2
+3
+31
+32
+33
+
+===== CRASH CLASSIFICATION DESCRIPTION (4 unique values) =====
+Fatality Crash
+Non-Reportable
+Personal Injury Crash
+Property Damage Only
+
+===== COLLISION ON PRIVATE PROPERTY (2 unique values) =====
+N
+Y
+
+===== PEDESTRIAN INVOLVED (2 unique values) =====
+N
+Y
+
+===== MANNER OF IMPACT CODE (13 unique values) =====
+0
+00
+01
+02
+03
+04
+05
+06
+07
+3.
+30
+88
+99
+
+===== MANNER OF IMPACT DESCRIPTION (10 unique values) =====
+Angle
+Front to front
+Front to rear
+Not a collision between two vehicles
+Other
+Rear to rear
+Rear to side
+Sideswipe, opposite direction
+Sideswipe, same direction
+Unknown
+
+===== ALCOHOL INVOLVED (2 unique values) =====
+N
+Y
+
+===== DRUG INVOLVED (2 unique values) =====
+N
+Y
+
+===== ROAD SURFACE CODE (11 unique values) =====
+01
+02
+03
+04
+05
+06
+07
+08
+09
+88
+99
+
+===== ROAD SURFACE DESCRIPTION (11 unique values) =====
+Dry
+Ice/Frost
+Mud, Dirt, Gravel
+Oil
+Other
+Sand
+Slush
+Snow
+Unknown
+Water (standing, moving)
+Wet
+
+===== LIGHTING CONDITION CODE (8 unique values) =====
+01
+02
+03
+04
+05
+06
+88
+99
+
+===== LIGHTING CONDITION DESCRIPTION (8 unique values) =====
+Dark-Lighted
+Dark-Not Lighted
+Dark-Unknown Lighting
+Dawn
+Daylight
+Dusk
+Other
+Unknown
+
+===== WEATHER 1 CODE (11 unique values) =====
+01
+02
+03
+04
+05
+06
+07
+08
+09
+88
+99
+
+===== WEATHER 1 DESCRIPTION (11 unique values) =====
+Blowing Sand, Soil, Dirt
+Blowing Snow
+Clear
+Cloudy
+Fog, Smog, Smoke
+Other
+Rain
+Severe Crosswinds
+Sleet, Hail (freezing rain or drizzle)
+Snow
+Unknown
+
+===== WEATHER 2 CODE (11 unique values) =====
+01
+02
+03
+04
+05
+06
+07
+08
+09
+88
+99
+
+===== WEATHER 2 DESCRIPTION (11 unique values) =====
+Blowing Sand, Soil, Dirt
+Blowing Snow
+Clear
+Cloudy
+Fog, Smog, Smoke
+Other
+Rain
+Severe Crosswinds
+Sleet, Hail (freezing rain or drizzle)
+Snow
+Unknown
+
+===== SEATBELT USED (2 unique values) =====
+N
+Y
+
+===== MOTORCYCLE INVOLVED (2 unique values) =====
+N
+Y
+
+===== MOTORCYCLE HELMET USED (2 unique values) =====
+N
+Y
+
+===== BICYCLED INVOLVED (2 unique values) =====
+N
+Y
+
+===== BICYCLE HELMET USED (2 unique values) =====
+N
+Y
+
+===== SCHOOL BUS INVOLVED CODE (3 unique values) =====
+00
+01
+02
+
+===== SCHOOL BUS INVOLVED DESCRIPTION (3 unique values) =====
+No
+Yes, Directly Involved
+Yes, Indirectly Involved
+
+===== WORK ZONE (2 unique values) =====
+N
+Y
+
+===== WORK ZONE LOCATION CODE (5 unique values) =====
+01
+02
+03
+04
+05
+
+===== WORK ZONE LOCATION DESCRIPTION (5 unique values) =====
+Activity Area
+Advance Warning Area
+Before the First Work Zone Warning Sign
+Termination Area
+Transition Area
+
+===== WORK ZONE TYPE CODE (5 unique values) =====
+01
+02
+03
+04
+88
+
+===== WORK ZONE TYPE DESCRIPTION (5 unique values) =====
+Intermittent or Moving Work
+Lane Closure
+Lane Shift/Crossover
+Other
+Work on Shoulder or Median
+
+===== WORKERS PRESENT (4 unique values) =====
+1
+2
+9
+N
+
+===== COUNTY CODE (3 unique values) =====
+K
+N
+S
+
+===== COUNTY NAME (3 unique values) =====
+Kent
+New Castle
+Sussex
