@@ -10,7 +10,8 @@
 #   - pipeline.yml remains untouched for single-jurisdiction workflows
 #
 # Stage order: Download from R2 → Init Cache → Split Jurisdiction →
-#              Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest
+#              Split Road Type → Aggregate (CSV) → Upload → Predict →
+#              Aggregate Forecasts (Region/MPO) → Manifest
 #
 # NOTE: Validation and Geocoding are handled separately on Cloudflare.
 # ==============================================================================
@@ -180,7 +181,8 @@ jobs:
             exit 1
           fi
 
-          # Decompress if downloaded file is gzip (Content-Encoding: gzip on R2)
+          # Decompress if R2 object was stored with Content-Encoding: gzip
+          # (aws s3 cp downloads raw gzipped bytes when Content-Encoding: gzip is set)
           if file "$LOCAL_CSV" | grep -q gzip; then
             echo "Detected gzip content — decompressing..."
             mv "$LOCAL_CSV" "${LOCAL_CSV}.gz"
@@ -263,7 +265,7 @@ jobs:
             done
           fi
 
-          # Decompress if downloaded file is gzip
+          # Decompress if R2 object was stored with Content-Encoding: gzip
           if [ -f "$LOCAL_CSV" ] && file "$LOCAL_CSV" | grep -q gzip; then
             echo "Detected gzip content — decompressing..."
             mv "$LOCAL_CSV" "${LOCAL_CSV}.gz"
@@ -574,6 +576,62 @@ jobs:
           print(f'  Gzip savings: {saved_bytes / 1024 / 1024:.1f} MB saved')
           "
 
+      # ── Stage 5c: Aggregate Forecasts (Region + MPO) ──
+      - name: "Stage 5c: Aggregate forecasts (region + MPO)"
+        if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+
+          echo "=========================================="
+          echo "Stage 5c: Aggregate jurisdiction forecasts into region/MPO forecasts"
+          echo "=========================================="
+
+          python scripts/aggregate_forecasts.py \
+            --state "$STATE" \
+            --scope statewide \
+            --data-dir "$DATA_DIR" \
+            --output-dir "$DATA_DIR" || {
+            echo "WARNING: Forecast aggregation had issues (non-fatal)"
+          }
+
+      # ── Stage 5d: Upload aggregated forecast JSONs to R2 ──
+      - name: "Stage 5d: Upload region/MPO forecast JSONs to R2"
+        if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+
+          echo "=========================================="
+          echo "Stage 5d: Upload region/MPO forecast JSONs to R2"
+          echo "=========================================="
+
+          UPLOADED=0
+          # Find all forecast JSONs in _region/ and _mpo/ directories
+          find "$DATA_DIR" \( -path "*/_region/*" -o -path "*/_mpo/*" \) -name "forecasts_*.json" 2>/dev/null | while read f; do
+            REL="${f#$DATA_DIR/}"
+            R2_KEY="$R2_PREFIX/$REL"
+            SIZE=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo "?")
+            if aws s3 cp "$f" "s3://$R2_BUCKET/$R2_KEY" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type "application/json" \
+              --only-show-errors; then
+              echo "  Uploaded: $R2_KEY ($SIZE bytes)"
+              UPLOADED=$((UPLOADED + 1))
+            else
+              echo "  WARN: failed to upload $R2_KEY"
+            fi
+          done
+
+          echo "Region/MPO forecast upload complete"
+
       # ── Stage 6: Commit ──
       - name: "Stage 6: Commit manifest and metadata"
         if: github.event.inputs.dry_run != 'true'
@@ -621,4 +679,4 @@ jobs:
           echo "| Jurisdictions | ${{ needs.prepare.outputs.jurisdiction_count }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Data Source | R2: ${{ github.event.inputs.r2_data_key }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Stages | R2 Download → Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stages | R2 Download → Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Aggregate Forecasts → Manifest |" >> $GITHUB_STEP_SUMMARY

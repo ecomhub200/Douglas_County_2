@@ -19,6 +19,18 @@ service cloud.firestore {
 
       // Never allow delete of user documents from client
       allow delete: if false;
+
+      // Email schedules subcollection: user can manage their own schedules
+      match /emailSchedules/{scheduleId} {
+        allow read, create, update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Crash alert monitoring subcollection: user can manage their own alerts
+      match /crashAlerts/{alertId} {
+        allow read, create, update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     // Deny all other collections by default

@@ -57,12 +57,17 @@ def county_name_to_key(name):
     return key.strip('_')
 
 
-def load_config_fips_map():
+def load_config_fips_map(state_abbrev=None):
     """Build FIPS → config.json jurisdiction key mapping.
 
     config.json jurisdiction keys are the source of truth for filenames
     (e.g., "alexandria" not "alexandria_city"), so we prefer these over
     hierarchy-derived keys when available.
+
+    Args:
+        state_abbrev: State abbreviation (e.g., 'VA', 'CO') to filter
+            jurisdictions. Required to avoid FIPS collisions across states
+            (e.g., FIPS 027 = Buchanan in VA, Custer in CO).
     """
     config_path = PROJECT_ROOT / 'config.json'
     if not config_path.exists():
@@ -72,6 +77,8 @@ def load_config_fips_map():
     fips_to_config_key = {}
     for jid, jinfo in config.get('jurisdictions', {}).items():
         if isinstance(jinfo, dict) and 'fips' in jinfo:
+            if state_abbrev and jinfo.get('state', '').upper() != state_abbrev.upper():
+                continue
             fips_to_config_key[jinfo['fips']] = jid
     return fips_to_config_key
 
@@ -83,8 +90,11 @@ def build_fips_to_key_map(hierarchy):
     hierarchy-derived keys. Falls back to hierarchy names for FIPS codes
     not in config.json.
     """
+    # Extract state abbreviation from hierarchy to filter config.json entries
+    state_abbrev = hierarchy.get('state', {}).get('abbreviation')
+
     # Prefer config.json keys — they match Stage 1 output filenames
-    config_fips_map = load_config_fips_map()
+    config_fips_map = load_config_fips_map(state_abbrev)
 
     all_counties = hierarchy.get('allCounties', {})
     fips_to_key = {}
@@ -187,15 +197,21 @@ def concat_county_csvs(member_counties, road_type, data_dir, output_path):
 
 
 def generate_group_csvs(group_type, group_id, member_counties, data_dir, output_dir):
-    """Generate 3 road-type CSVs for a region or MPO."""
+    """Generate road-type CSVs for a region or MPO.
+
+    Output filenames use just {road_type}.csv (no group_id prefix) to match
+    the R2 key convention expected by the frontend:
+        _region/{id}/{road_type}.csv
+        _mpo/{id}/{road_type}.csv
+    """
     logger.info(f"  Aggregating {group_type}/{group_id} ({len(member_counties)} counties)")
 
     for road_type in ROAD_TYPES:
-        output_path = Path(output_dir) / f"_{group_type}" / group_id / f"{group_id}_{road_type}.csv"
+        output_path = Path(output_dir) / f"_{group_type}" / group_id / f"{road_type}.csv"
         row_count = concat_county_csvs(member_counties, road_type, data_dir, output_path)
         if row_count > 0:
             size_mb = os.path.getsize(output_path) / (1024 * 1024)
-            logger.info(f"    {group_id}_{road_type}.csv: {row_count:,} rows ({size_mb:.1f} MB)")
+            logger.info(f"    {road_type}.csv: {row_count:,} rows ({size_mb:.1f} MB)")
 
 
 def main():

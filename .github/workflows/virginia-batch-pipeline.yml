@@ -175,7 +175,7 @@ jobs:
             exit 1
           fi
 
-          # Decompress if downloaded file is gzip
+          # Decompress if R2 object was stored with Content-Encoding: gzip
           if file "$LOCAL_CSV" | grep -q gzip; then
             echo "Detected gzip content — decompressing..."
             mv "$LOCAL_CSV" "${LOCAL_CSV}.gz"
@@ -258,7 +258,7 @@ jobs:
             done
           fi
 
-          # Decompress if downloaded file is gzip
+          # Decompress if R2 object was stored with Content-Encoding: gzip
           if [ -f "$LOCAL_CSV" ] && file "$LOCAL_CSV" | grep -q gzip; then
             echo "Detected gzip content — decompressing..."
             mv "$LOCAL_CSV" "${LOCAL_CSV}.gz"
