@@ -822,11 +822,11 @@ def standardize_columns(df):
 
     # ── SYSTEM ──
     _decode_column('SYSTEM', {
-        '1': 'NonVDOT primary',
-        '2': 'NonVDOT secondary',
-        '3': 'VDOT Interstate',
-        '4': 'VDOT Primary',
-        '5': 'VDOT Secondary',
+        '1': 'VDOT Interstate',
+        '2': 'VDOT Primary',
+        '3': 'VDOT Secondary',
+        '4': 'NonVDOT primary',
+        '5': 'NonVDOT secondary',
     }, skip_if_contains='VDOT')
 
     # ── Functional Class ──
@@ -900,7 +900,6 @@ def standardize_columns(df):
 
     # ── Roadway Surface Condition ──
     _decode_column('Roadway Surface Condition', {
-        '0': 'Not Applicable',
         '1': '1. Dry',
         '2': '2. Wet',
         '3': '3. Snowy',
@@ -912,7 +911,7 @@ def standardize_columns(df):
         '9': '9. Water (Standing, Moving)',
         '10': '10. Slush',
         '11': '11. Sand, Dirt, Gravel',
-        '99': 'Not Provided',
+        '99': 'Not Applicable',
     }, skip_if_contains='Dry')
 
     # ── Relation To Roadway ──
@@ -991,14 +990,13 @@ def standardize_columns(df):
 
     # ── Intersection Type ──
     _decode_column('Intersection Type', {
-        '0': 'Not Applicable',
         '1': '1. Not at Intersection',
         '2': '2. Two Approaches',
         '3': '3. Three Approaches',
         '4': '4. Four Approaches',
         '5': '5. Five-Point, or More',
         '6': '6. Roundabout',
-        '99': 'Not Provided',
+        '99': 'Not Applicable',
     }, skip_if_contains='Not at Intersection')
 
     # ── Traffic Control Type ──
@@ -1025,14 +1023,13 @@ def standardize_columns(df):
 
     # ── Traffic Control Status ──
     _decode_column('Traffic Control Status', {
-        '0': 'Not Applicable',
         '1': '1. Yes - Working',
         '2': '2. Yes - Working and Obscured',
         '3': '3. Yes - Not Working',
         '4': '4. Yes - Not Working and Obscured',
         '5': '5. Yes - Missing',
         '6': '6. No Traffic Control Device Present',
-        '99': 'Not Provided',
+        '99': 'Not Applicable',
     }, skip_if_contains='Working')
 
     # ── Work Zone Related ──
@@ -1100,7 +1097,6 @@ def standardize_columns(df):
 
     # ── First Harmful Event Location ──
     _decode_column('First Harmful Event Loc', {
-        '0': 'Not Applicable',
         '1': '1. On Roadway',
         '2': '2. Shoulder',
         '3': '3. Median',
@@ -1110,7 +1106,7 @@ def standardize_columns(df):
         '7': '7. In Parking Lane or Zone',
         '8': '8. Off Roadway, Location Unknown',
         '9': '9. Outside Right-of-Way',
-        '99': 'Not Provided',
+        '99': 'Not Applicable',
     }, skip_if_contains='On Roadway')
 
     # ── VDOT District ──
@@ -1364,8 +1360,8 @@ def standardize_columns(df):
     # ── Intersection Analysis ──
     _decode_column('Intersection Analysis', {
         '0': 'Not Intersection',
-        '1': 'VDOT Intersection',
-        '2': 'Urban Intersection',
+        '1': 'Urban Intersection',
+        '2': 'VDOT Intersection',
     }, skip_if_contains='Intersection')
 
     # ── Work Zone Location ──

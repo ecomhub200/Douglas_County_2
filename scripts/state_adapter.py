@@ -276,10 +276,10 @@ class VirginiaNormalizer(BaseNormalizer):
             '99': 'Not Applicable',
         },
         'Roadway Surface Condition': {
-            '0': 'Not Applicable', '1': '1. Dry', '2': '2. Wet', '3': '3. Snowy',
+            '1': '1. Dry', '2': '2. Wet', '3': '3. Snowy',
             '4': '4. Icy', '5': '5. Muddy', '6': '6. Oil/Other Fluids', '7': '7. Other',
             '8': '8. Natural Debris', '9': '9. Water (Standing, Moving)',
-            '10': '10. Slush', '11': '11. Sand, Dirt, Gravel', '99': 'Not Provided',
+            '10': '10. Slush', '11': '11. Sand, Dirt, Gravel', '99': 'Not Applicable',
         },
         'Relation To Roadway': {
             '0': 'Not Applicable', '1': '1. Main-Line Roadway',
@@ -322,10 +322,10 @@ class VirginiaNormalizer(BaseNormalizer):
             '4': '4. One-Way, Not Divided', '5': '5. Unknown', '99': 'Not Provided',
         },
         'Intersection Type': {
-            '0': 'Not Applicable', '1': '1. Not at Intersection',
+            '1': '1. Not at Intersection',
             '2': '2. Two Approaches', '3': '3. Three Approaches',
             '4': '4. Four Approaches', '5': '5. Five-Point, or More',
-            '6': '6. Roundabout', '99': 'Not Provided',
+            '6': '6. Roundabout', '99': 'Not Applicable',
         },
         'Traffic Control Type': {
             '1': '1. No Traffic Control', '2': '2. Officer or Flagger',
@@ -342,10 +342,10 @@ class VirginiaNormalizer(BaseNormalizer):
             '17': '17. Highway Safety Corridor', '99': 'Not Applicable',
         },
         'Traffic Control Status': {
-            '0': 'Not Applicable', '1': '1. Yes - Working',
+            '1': '1. Yes - Working',
             '2': '2. Yes - Working and Obscured', '3': '3. Yes - Not Working',
             '4': '4. Yes - Not Working and Obscured', '5': '5. Yes - Missing',
-            '6': '6. No Traffic Control Device Present', '99': 'Not Provided',
+            '6': '6. No Traffic Control Device Present', '99': 'Not Applicable',
         },
         'Work Zone Related': {
             '0': 'Not Applicable', '1': '1. Yes', '2': '2. No', '99': 'Not Provided',
@@ -385,11 +385,11 @@ class VirginiaNormalizer(BaseNormalizer):
             '42': '42. Other Non-Collision',
         },
         'First Harmful Event Loc': {
-            '0': 'Not Applicable', '1': '1. On Roadway', '2': '2. Shoulder',
+            '1': '1. On Roadway', '2': '2. Shoulder',
             '3': '3. Median', '4': '4. Roadside', '5': '5. Gore',
             '6': '6. Separator', '7': '7. In Parking Lane or Zone',
             '8': '8. Off Roadway, Location Unknown', '9': '9. Outside Right-of-Way',
-            '99': 'Not Provided',
+            '99': 'Not Applicable',
         },
         'VDOT District': {
             '1': '1. Bristol', '2': '2. Salem', '3': '3. Lynchburg',
@@ -402,8 +402,8 @@ class VirginiaNormalizer(BaseNormalizer):
             '5': '5. Toll Roads Maintained by Others', '6': '6. Private/Unknown Roads',
         },
         'SYSTEM': {
-            '1': 'NonVDOT primary', '2': 'NonVDOT secondary',
-            '3': 'VDOT Interstate', '4': 'VDOT Primary', '5': 'VDOT Secondary',
+            '1': 'VDOT Interstate', '2': 'VDOT Primary', '3': 'VDOT Secondary',
+            '4': 'NonVDOT primary', '5': 'NonVDOT secondary',
         },
         'Functional Class': {
             'INT': '1-Interstate (A,1)',
@@ -424,7 +424,7 @@ class VirginiaNormalizer(BaseNormalizer):
             '0': 'NOT_RD', '1': 'RD_LEFT', '2': 'RD_RIGHT', '3': 'RD_UNKNOWN',
         },
         'Intersection Analysis': {
-            '0': 'Not Intersection', '1': 'VDOT Intersection', '2': 'Urban Intersection',
+            '0': 'Not Intersection', '1': 'Urban Intersection', '2': 'VDOT Intersection',
         },
     }
 
