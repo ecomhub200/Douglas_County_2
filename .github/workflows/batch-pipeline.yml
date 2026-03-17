@@ -131,9 +131,13 @@ jobs:
           R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
           R2_BUCKET="crash-lens-data"
 
+          # Canonical path: _state/statewide_all_roads.csv.gz
+          PRIMARY_KEY="${R2_PREFIX}/_state/statewide_all_roads.csv.gz"
+
           echo "=========================================="
           echo "Downloading statewide CSV from R2"
-          echo "  R2 key: $R2_KEY"
+          echo "  Primary: $PRIMARY_KEY"
+          echo "  Fallback: $R2_KEY"
           echo "=========================================="
 
           mkdir -p "$DATA_DIR"
@@ -141,39 +145,38 @@ jobs:
           LOCAL_CSV="$DATA_DIR/${STATE}_statewide_all_roads.csv"
           DOWNLOADED=false
 
-          # Try primary key with retry
-          for i in 1 2 3; do
-            if aws s3 cp "s3://$R2_BUCKET/$R2_KEY" "$LOCAL_CSV" \
+          # Try canonical _state/ gzip path first
+          for i in 1 2 3 4; do
+            if aws s3 cp "s3://$R2_BUCKET/$PRIMARY_KEY" "${LOCAL_CSV}.gz" \
               --endpoint-url "$R2_ENDPOINT" \
               --only-show-errors; then
-              echo "Download succeeded from primary key"
+              echo "Download succeeded from _state/"
+              gunzip -f "${LOCAL_CSV}.gz"
               DOWNLOADED=true
               break
             fi
-            echo "Download failed (attempt $i/3), retrying in $((2 ** i))s..."
+            echo "Download failed (attempt $i/4), retrying in $((2 ** i))s..."
             sleep $((2 ** i))
           done
 
-          # Fallback: try _state/ gzip path (used by download-*-crash-data.yml workflows)
-          if [ "$DOWNLOADED" = "false" ]; then
-            FALLBACK_KEY="${R2_PREFIX}/_state/statewide_all_roads.csv.gz"
-            echo "Primary key failed — trying fallback: $FALLBACK_KEY"
-            for i in 1 2 3 4; do
-              if aws s3 cp "s3://$R2_BUCKET/$FALLBACK_KEY" "${LOCAL_CSV}.gz" \
+          # Fallback: try the r2_data_key input (legacy statewide/ path)
+          if [ "$DOWNLOADED" = "false" ] && [ -n "$R2_KEY" ]; then
+            echo "Primary key failed — trying fallback: $R2_KEY"
+            for i in 1 2 3; do
+              if aws s3 cp "s3://$R2_BUCKET/$R2_KEY" "$LOCAL_CSV" \
                 --endpoint-url "$R2_ENDPOINT" \
                 --only-show-errors; then
                 echo "Fallback download succeeded"
-                gunzip -f "${LOCAL_CSV}.gz"
                 DOWNLOADED=true
                 break
               fi
-              echo "Fallback failed (attempt $i/4), retrying in $((2 ** i))s..."
+              echo "Fallback failed (attempt $i/3), retrying in $((2 ** i))s..."
               sleep $((2 ** i))
             done
           fi
 
           if [ "$DOWNLOADED" = "false" ] || [ ! -f "$LOCAL_CSV" ]; then
-            echo "::error::Failed to download statewide CSV from R2 (tried $R2_KEY and ${R2_PREFIX}/_state/statewide_all_roads.csv.gz)"
+            echo "::error::Failed to download statewide CSV from R2 (tried $PRIMARY_KEY and $R2_KEY)"
             exit 1
           fi
 
@@ -223,37 +226,39 @@ jobs:
           R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
           R2_BUCKET="crash-lens-data"
 
+          # Canonical path: _state/statewide_all_roads.csv.gz
+          PRIMARY_KEY="${R2_PREFIX}/_state/statewide_all_roads.csv.gz"
+
           mkdir -p "$DATA_DIR"
           LOCAL_CSV="$DATA_DIR/${STATE}_statewide_all_roads.csv"
           DOWNLOADED=false
 
           echo "Downloading statewide CSV from R2..."
-          for i in 1 2 3; do
-            if aws s3 cp "s3://$R2_BUCKET/$R2_KEY" "$LOCAL_CSV" \
+          for i in 1 2 3 4; do
+            if aws s3 cp "s3://$R2_BUCKET/$PRIMARY_KEY" "${LOCAL_CSV}.gz" \
               --endpoint-url "$R2_ENDPOINT" \
               --only-show-errors; then
-              echo "Download succeeded: $LOCAL_CSV"
+              echo "Download succeeded from _state/"
+              gunzip -f "${LOCAL_CSV}.gz"
               DOWNLOADED=true
               break
             fi
-            echo "Retry $i/3..."
+            echo "Retry $i/4..."
             sleep $((2 ** i))
           done
 
-          # Fallback: try _state/ gzip path
-          if [ "$DOWNLOADED" = "false" ]; then
-            FALLBACK_KEY="${R2_PREFIX}/_state/statewide_all_roads.csv.gz"
-            echo "Primary key failed — trying fallback: $FALLBACK_KEY"
-            for i in 1 2 3 4; do
-              if aws s3 cp "s3://$R2_BUCKET/$FALLBACK_KEY" "${LOCAL_CSV}.gz" \
+          # Fallback: try the r2_data_key input (legacy statewide/ path)
+          if [ "$DOWNLOADED" = "false" ] && [ -n "$R2_KEY" ]; then
+            echo "Primary failed — trying fallback: $R2_KEY"
+            for i in 1 2 3; do
+              if aws s3 cp "s3://$R2_BUCKET/$R2_KEY" "$LOCAL_CSV" \
                 --endpoint-url "$R2_ENDPOINT" \
                 --only-show-errors; then
                 echo "Fallback download succeeded"
-                gunzip -f "${LOCAL_CSV}.gz"
                 DOWNLOADED=true
                 break
               fi
-              echo "Fallback retry $i/4..."
+              echo "Fallback retry $i/3..."
               sleep $((2 ** i))
             done
           fi
