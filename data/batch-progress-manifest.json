@@ -75,6 +75,21 @@
         }
       ],
       "last_updated": "2026-03-17T04:44:00.908112+00:00"
+    },
+    "delaware": {
+      "runs": [
+        {
+          "timestamp": "2026-03-17T17:01:54.510560+00:00",
+          "scope": "statewide",
+          "selection": "all",
+          "total_records": 566762,
+          "jurisdiction_count": 3,
+          "r2_key": "delaware/statewide/delaware_statewide_all_roads.csv",
+          "data_changed": true,
+          "workflow_run": "23206087745"
+        }
+      ],
+      "last_updated": "2026-03-17T17:01:54.510550+00:00"
     }
   }
 }
