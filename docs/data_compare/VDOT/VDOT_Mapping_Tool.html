@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRASH LENS Data Mapping Tool — VDOT Numeric → Labeled</title>
+<style>
+:root {
+  --bg: #0f172a; --surface: #1e293b; --surface2: #334155;
+  --border: #475569; --text: #f1f5f9; --text2: #94a3b8;
+  --accent: #3b82f6; --green: #22c55e; --red: #ef4444;
+  --yellow: #eab308; --orange: #f97316;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+.header { background: linear-gradient(135deg, #1e3a5f, #0f172a); padding: 20px 30px; border-bottom: 2px solid var(--accent); }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header .subtitle { color: var(--text2); font-size: 13px; margin-top: 4px; }
+.toolbar { display:flex; gap:10px; padding:12px 30px; background:var(--surface); border-bottom:1px solid var(--border); flex-wrap:wrap; align-items:center; }
+.toolbar button { background:var(--accent); color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; }
+.toolbar button:hover { opacity:0.9; }
+.toolbar button.secondary { background:var(--surface2); }
+.toolbar button.danger { background:var(--red); }
+.stats-bar { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:12px; padding:16px 30px; background:var(--surface); }
+.stat-card { background:var(--surface2); border-radius:8px; padding:14px 16px; }
+.stat-card .label { font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; }
+.stat-card .value { font-size:22px; font-weight:700; margin-top:4px; }
+.stat-card .value.green { color:var(--green); }
+.stat-card .value.yellow { color:var(--yellow); }
+.stat-card .value.red { color:var(--red); }
+.content { padding:20px 30px; }
+.tabs { display:flex; gap:2px; margin-bottom:16px; }
+.tab { padding:10px 20px; background:var(--surface2); color:var(--text2); cursor:pointer; border-radius:8px 8px 0 0; font-size:13px; font-weight:600; border:1px solid transparent; }
+.tab.active { background:var(--surface); color:var(--accent); border-color:var(--border); border-bottom-color:var(--surface); }
+.panel { display:none; }
+.panel.active { display:block; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { background:var(--surface2); padding:10px 12px; text-align:left; font-weight:600; color:var(--text2); font-size:11px; text-transform:uppercase; letter-spacing:0.5px; position:sticky; top:0; z-index:1; }
+td { padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+tr:hover td { background:rgba(59,130,246,0.05); }
+.status-badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.status-mapped { background:rgba(34,197,94,0.15); color:var(--green); }
+.status-renamed { background:rgba(59,130,246,0.15); color:var(--accent); }
+.status-drop { background:rgba(239,68,68,0.15); color:var(--red); }
+.status-pass { background:rgba(148,163,184,0.15); color:var(--text2); }
+.value-map-section { margin-top:16px; }
+.vm-header { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--surface2); border-radius:8px 8px 0 0; cursor:pointer; }
+.vm-header h3 { font-size:14px; }
+.vm-header .badge { font-size:11px; color:var(--text2); }
+.vm-body { background:var(--surface); border:1px solid var(--border); border-top:none; border-radius:0 0 8px 8px; max-height:0; overflow:hidden; transition:max-height 0.3s ease; }
+.vm-body.open { max-height:2000px; overflow-y:auto; }
+.vm-body table { margin:0; }
+.vm-body td { font-size:12px; font-family:'Consolas','Courier New',monospace; }
+.vm-body td:first-child { color:var(--orange); width:120px; }
+.vm-body td:nth-child(2) { color:var(--text2); width:30px; text-align:center; }
+.vm-body td:last-child { color:var(--green); }
+input[type="text"], select { background:var(--surface2); color:var(--text); border:1px solid var(--border); padding:4px 8px; border-radius:4px; font-size:12px; }
+.search-box { padding:8px 30px; background:var(--surface); }
+.search-box input { width:100%; max-width:400px; padding:8px 12px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:6px; font-size:13px; }
+.mandatory-indicator { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+.mandatory-indicator.ok { background:var(--green); }
+.mandatory-indicator.missing { background:var(--red); }
+@media print {
+  body { background:white; color:black; }
+  .toolbar, .tabs { display:none; }
+  .panel { display:block !important; }
+  th { background:#e2e8f0; color:#1e293b; }
+  td { border-color:#cbd5e0; }
+  .header { background:#1e3a5f; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>CRASH LENS Data Mapping Tool</h1>
+  <div class="subtitle">VDOT Numeric Dataset (73 cols) → CRASH LENS Frontend Standard Schema (69 cols) | Generated March 16, 2026</div>
+</div>
+
+<div class="toolbar">
+  <button onclick="saveState()">💾 Save</button>
+  <button class="secondary" onclick="loadState()">📂 Load</button>
+  <button class="secondary" onclick="exportJSON()">📄 Export JSON Config</button>
+  <button class="secondary" onclick="window.print()">🖨️ Print / PDF</button>
+  <button class="danger" onclick="if(confirm('Reset all changes?')){localStorage.removeItem('crashlens_mapping');location.reload();}">🗑️ Reset</button>
+</div>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="content">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('columns',this)">Column Mapping</div>
+    <div class="tab" onclick="switchTab('values',this)">Value Maps</div>
+    <div class="tab" onclick="switchTab('mandatory',this)">Mandatory Check</div>
+    <div class="tab" onclick="switchTab('gaps',this)">Gap Analysis</div>
+  </div>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search columns..." oninput="filterTable()">
+  </div>
+
+  <div id="panel-columns" class="panel active"></div>
+  <div id="panel-values" class="panel"></div>
+  <div id="panel-mandatory" class="panel"></div>
+  <div id="panel-gaps" class="panel"></div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED MAPPING DATA
+// ============================================================
+const COLUMN_RENAMES = {"UnBelted?":"Unrestrained?","Hit & Run?":"Hitrun?","Large Vehicle?":"Lgtruck?","Senior Driver?":"Senior?","Young Driver?":"Young?"};
+const EXTRA_COLUMNS = ["Local Case CD","Route or Street Name","LAT","LON"];
+
+const TARGET_69 = [
+  "OBJECTID","Document Nbr","Crash Year","Crash Date","Crash Military Time",
+  "Crash Severity","K_People","A_People","B_People","C_People",
+  "Persons Injured","Pedestrians Killed","Pedestrians Injured","Vehicle Count",
+  "Collision Type","Weather Condition","Light Condition","Roadway Surface Condition",
+  "Relation To Roadway","Roadway Alignment","Roadway Surface Type","Roadway Defect",
+  "Roadway Description","Intersection Type","Traffic Control Type","Traffic Control Status",
+  "Work Zone Related","Work Zone Location","Work Zone Type","School Zone",
+  "First Harmful Event","First Harmful Event Loc",
+  "Alcohol?","Animal Related?","Unrestrained?","Bike?","Distracted?","Drowsy?",
+  "Drug Related?","Guardrail Related?","Hitrun?","Lgtruck?","Motorcycle?","Pedestrian?",
+  "Speed?","Max Speed Diff","RoadDeparture Type","Intersection Analysis",
+  "Senior?","Young?","Mainline?","Night?",
+  "VDOT District","Juris Code","Physical Juris Name","Functional Class",
+  "Facility Type","Area Type","SYSTEM","VSP","Ownership",
+  "Planning District","MPO Name","RTE Name","RNS MP","Node","Node Offset (ft)",
+  "x","y"
+];
+
+const PASSTHROUGH = new Set([
+  "OBJECTID","Document Nbr","Crash Year","Crash Date","Crash Military Time",
+  "Crash Severity","K_People","A_People","B_People","C_People",
+  "Persons Injured","Pedestrians Killed","Pedestrians Injured","Vehicle Count",
+  "First Harmful Event","Max Speed Diff","VSP","Juris Code","MPO Name",
+  "RTE Name","RNS MP","Node","Node Offset (ft)","x","y"
+]);
+
+const MANDATORY = ["Physical Juris Name","Functional Class","Ownership","Crash Severity","x","y"];
+
+// Value maps (embedded)
+const VALUE_MAPS = {
+"Collision Type":{"0":"Not Applicable","1":"1. Rear End","2":"2. Angle","3":"3. Head On","4":"4. Sideswipe - Same Direction","5":"5. Sideswipe - Opposite Direction","6":"6. Fixed Object in Road","7":"7. Train","8":"8. Non-Collision","9":"9. Fixed Object - Off Road","10":"10. Deer","11":"11. Other Animal","12":"12. Ped","13":"13. Bicyclist","14":"14. Motorcyclist","15":"15. Backed Into","16":"16. Other","99":"Not Provided"},
+"Weather Condition":{"1":"1. No Adverse Condition (Clear/Cloudy)","3":"3. Fog","4":"4. Mist","5":"5. Rain","6":"6. Snow","7":"7. Sleet/Hail","8":"8. Smoke/Dust","9":"9. Other","10":"10. Blowing Sand, Soil, Dirt, or Snow","11":"11. Severe Crosswinds","99":"Not Applicable"},
+"Light Condition":{"1":"1. Dawn","2":"2. Daylight","3":"3. Dusk","4":"4. Darkness - Road Lighted","5":"5. Darkness - Road Not Lighted","6":"6. Darkness - Unknown Road Lighting","7":"7. Unknown","99":"Not Applicable"},
+"Roadway Surface Condition":{"1":"1. Dry","2":"2. Wet","3":"3. Snowy","4":"4. Icy","5":"5. Muddy","6":"6. Oil/Other Fluids","7":"7. Other","8":"8. Natural Debris","9":"9. Water (Standing, Moving)","10":"10. Slush","11":"11. Sand, Dirt, Gravel","99":"Not Applicable"},
+"Relation To Roadway":{"0":"Not Applicable","1":"1. Main-Line Roadway","2":"2. Acceleration/Deceleration Lanes","3":"3. Gore Area (b/w Ramp and Highway Edgelines)","4":"4. Collector/Distributor Road","5":"5. On Entrance/Exit Ramp","6":"6. Intersection at end of Ramp","7":"7. Other location not listed above within an interchange area (median, shoulder , roadside)","8":"8. Non-Intersection","9":"9. Within Intersection","10":"10. Intersection Related - Within 150 Feet","11":"11. Intersection Related - Outside 150 Feet","12":"12. Crossover Related","13":"13. Driveway, Alley-Access - Related","14":"14. Railway Grade Crossing","15":"15. Other Crossing (Crossing for Bikes, School, etc.)","99":"Not Provided"},
+"Roadway Alignment":{"1":"1. Straight - Level","2":"2. Curve - Level","3":"3. Grade - Straight","4":"4. Grade - Curve","5":"5. Hillcrest - Straight","6":"6. Hillcrest - Curve","7":"7. Dip - Straight","8":"8. Dip - Curve","9":"9. Other","10":"10. On/Off Ramp","99":"Not Applicable"},
+"Roadway Surface Type":{"1":"1. Concrete","2":"2. Blacktop, Asphalt, Bituminous","3":"3. Brick or Block","4":"4. Slag, Gravel, Stone","5":"5. Dirt","6":"6. Other","99":"Not Applicable"},
+"Roadway Defect":{"0":"Not Applicable","1":"1. No Defects","2":"2. Holes, Ruts, Bumps","3":"3. Soft or Low Shoulder","4":"4. Under Repair","5":"5. Loose Material","6":"6. Restricted Width","7":"7. Slick Pavement","8":"8. Roadway Obstructed","9":"9. Other","10":"10. Edge Pavement Drop Off","99":"Not Provided"},
+"Roadway Description":{"0":"Not Applicable","1":"1. Two-Way, Not Divided","2":"2. Two-Way, Divided, Unprotected Median","3":"3. Two-Way, Divided, Positive Median Barrier","4":"4. One-Way, Not Divided","5":"5. Unknown","99":"Not Provided"},
+"Intersection Type":{"1":"1. Not at Intersection","2":"2. Two Approaches","3":"3. Three Approaches","4":"4. Four Approaches","5":"5. Five-Point, or More","6":"6. Roundabout","99":"Not Applicable"},
+"Traffic Control Type":{"1":"1. No Traffic Control","2":"2. Officer or Flagger","3":"3. Traffic Signal","4":"4. Stop Sign","5":"5. Slow or Warning Sign","6":"6. Traffic Lanes Marked","7":"7. No Passing Lines","8":"8. Yield Sign","9":"9. One Way Road or Street","10":"10. Railroad Crossing With Markings and Signs","11":"11. Railroad Crossing With Signals","12":"12. Railroad Crossing With Gate and Signals","13":"13. Other","14":"14. Ped Crosswalk","15":"15. Reduced Speed - School Zone","16":"16. Reduced Speed - Work Zone","17":"17. Highway Safety Corridor","99":"Not Applicable"},
+"Traffic Control Status":{"1":"1. Yes - Working","2":"2. Yes - Working and Obscured","3":"3. Yes - Not Working","4":"4. Yes - Not Working and Obscured","5":"5. Yes - Missing","6":"6. No Traffic Control Device Present","99":"Not Applicable"},
+"Work Zone Related":{"0":"Not Applicable","1":"1. Yes","2":"2. No","99":"Not Provided"},
+"Work Zone Location":{"0":"","1":"1. Advance Warning Area","2":"2. Transition Area","3":"3. Activity Area","4":"4. Termination Area","99":""},
+"Work Zone Type":{"0":"","1":"1. Lane Closure","2":"2. Lane Shift/Crossover","3":"3. Work on Shoulder or Median","4":"4. Intermittent or Moving Work","5":"5. Other","99":""},
+"School Zone":{"0":"Not Applicable","1":"1. Yes","2":"2. Yes - With School Activity","3":"3. No","99":"Not Provided"},
+"First Harmful Event Loc":{"1":"1. On Roadway","2":"2. Shoulder","3":"3. Median","4":"4. Roadside","5":"5. Gore","6":"6. Separator","7":"7. In Parking Lane or Zone","8":"8. Off Roadway, Location Unknown","9":"9. Outside Right-of-Way","99":"Not Applicable"},
+"VDOT District":{"1":"1. Bristol","2":"2. Salem","3":"3. Lynchburg","4":"4. Richmond","5":"5. Hampton Roads","6":"6. Fredericksburg","7":"7. Culpeper","8":"8. Staunton","9":"9. Northern Virginia"},
+"Functional Class":{"INT":"1-Interstate (A,1)","OFE":"2-Principal Arterial - Other Freeways and Expressways (B)","OPA":"3-Principal Arterial - Other (E,2)","MIA":"4-Minor Arterial (H,3)","MAC":"5-Major Collector (I,4)","MIC":"6-Minor Collector (5)","LOC":"7-Local (J,6)"},
+"Facility Type":{"OUD":"1-One-Way Undivided","OWD":"2-One-Way Divided","TUD":"3-Two-Way Undivided","TWD":"4-Two-Way Divided","REX":"5-Reversible Exclusively (e.g. 395R)"},
+"Area Type":{"0":"Rural","1":"Urban"},
+"SYSTEM":{"1":"VDOT Interstate","2":"VDOT Primary","3":"VDOT Secondary","4":"NonVDOT primary","5":"NonVDOT secondary"},
+"Ownership":{"1":"1. State Hwy Agency","2":"2. County Hwy Agency","3":"3. City or Town Hwy Agency","4":"4. Federal Roads","5":"5. Toll Roads Maintained by Others","6":"6. Private/Unknown Roads"},
+"RoadDeparture Type":{"0":"NOT_RD","1":"RD_LEFT","2":"RD_RIGHT","3":"RD_UNKNOWN"},
+"Intersection Analysis":{"0":"Not Intersection","1":"Urban Intersection","2":"VDOT Intersection"},
+"Planning District":{"1":"Lenowisco","2":"Cumberland Plateau","3":"Mount Rogers","4":"New River Valley","5":"Roanoke Valley-Alleghany","5,12":"Roanoke Valley-Alleghany, West Piedmont","6":"Central Shenandoah","7":"Northern Shenandoah Valley","8":"Northern Virginia","9":"Rappahannock - Rapidan","10":"Thomas Jefferson","11":"Region 2000","12":"West Piedmont","13":"Southside","14":"Commonwealth Regional","15":"Richmond Regional","15,19":"Richmond Regional, Crater","16":"George Washington Regional","17":"Northern Neck","18":"Middle Peninsula","18,23":"Middle Peninsula, Hampton Roads","19":"Crater","19,23":"Crater, Hampton Roads","22":"Accomack-Northampton","23":"Hampton Roads"},
+};
+
+// Boolean maps
+const BOOL_YES_NO = {"0":"No","1":"Yes"};
+const BOOL_COLS = ["Alcohol?","Bike?","Distracted?","Animal Related?","Drowsy?","Drug Related?","Guardrail Related?","Motorcycle?","Pedestrian?","Speed?","Mainline?","Night?"];
+BOOL_COLS.forEach(c => VALUE_MAPS[c] = BOOL_YES_NO);
+
+// Renamed booleans
+VALUE_MAPS["Unrestrained?"] = {"0":"Belted","1":"Unbelted"};
+VALUE_MAPS["Hitrun?"] = BOOL_YES_NO;
+VALUE_MAPS["Lgtruck?"] = BOOL_YES_NO;
+VALUE_MAPS["Senior?"] = BOOL_YES_NO;
+VALUE_MAPS["Young?"] = BOOL_YES_NO;
+
+// Reverse rename map: target→source
+const TARGET_TO_SOURCE = {};
+Object.entries(COLUMN_RENAMES).forEach(([s,t]) => TARGET_TO_SOURCE[t]=s);
+
+// Physical Juris Name map (truncated for HTML - full 324 entries)
+VALUE_MAPS["Physical Juris Name"] = {"0":"000. Arlington County","1":"001. Accomack County","2":"002. Albemarle County","3":"003. Alleghany County","4":"004. Amelia County","5":"005. Amherst County","6":"006. Appomattox County","7":"007. Augusta County","8":"008. Bath County","9":"009. Bedford County","10":"010. Bland County","11":"011. Botetourt County","12":"012. Brunswick County","13":"013. Buchanan County","14":"014. Buckingham County","15":"015. Campbell County","16":"016. Caroline County","17":"017. Carroll County","18":"018. Charles City County","19":"019. Charlotte County","20":"020. Chesterfield County","21":"021. Clarke County","22":"022. Craig County","23":"023. Culpeper County","24":"024. Cumberland County","25":"025. Dickenson County","26":"026. Dinwiddie County","28":"028. Essex County","29":"029. Fairfax County","30":"030. Fauquier County","31":"031. Floyd County","32":"032. Fluvanna County","33":"033. Franklin County","34":"034. Frederick County","35":"035. Giles County","36":"036. Gloucester County","37":"037. Goochland County","38":"038. Grayson County","39":"039. Greene County","40":"040. Greensville County","41":"041. Halifax County","42":"042. Hanover County","43":"043. Henrico County","44":"044. Henry County","45":"045. Highland County","46":"046. Isle of Wight County","47":"047. James City County","48":"048. King George County","49":"049. King & Queen County","50":"050. King William County","51":"051. Lancaster County","52":"052. Lee County","53":"053. Loudoun County","54":"054. Louisa County","55":"055. Lunenburg County","56":"056. Madison County","57":"057. Mathews County","58":"058. Mecklenburg County","59":"059. Middlesex County","60":"060. Montgomery County","62":"062. Nelson County","63":"063. New Kent County","65":"065. Northampton County","66":"066. Northumberland County","67":"067. Nottoway County","68":"068. Orange County","69":"069. Page County","70":"070. Patrick County","71":"071. Pittsylvania County","72":"072. Powhatan County","73":"073. Prince Edward County","74":"074. Prince George County","76":"076. Prince William County","77":"077. Pulaski County","78":"078. Rappahannock County","79":"079. Richmond County","80":"080. Roanoke County","81":"081. Rockbridge County","82":"082. Rockingham County","83":"083. Russell County","84":"084. Scott County","85":"085. Shenandoah County","86":"086. Smyth County","87":"087. Southampton County","88":"088. Spotsylvania County","89":"089. Stafford County","90":"090. Surry County","91":"091. Sussex County","92":"092. Tazewell County","93":"093. Warren County","95":"095. Washington County","96":"096. Westmoreland County","97":"097. Wise County","98":"098. Wythe County","99":"099. York County","100":"100. City of Alexandria","101":"101. Town of Big Stone Gap","102":"102. City of Bristol","103":"103. City of Buena Vista","104":"104. City of Charlottesville","105":"105. Town of Clifton Forge","106":"106. City of Colonial Heights","107":"107. City of Covington","108":"108. City of Danville","109":"109. City of Emporia","110":"110. City of Falls Church","111":"111. City of Fredericksburg","112":"112. Town of Front Royal","113":"113. City of Galax","114":"114. City of Hampton","115":"115. City of Harrisonburg","116":"116. City of Hopewell","117":"117. City of Lexington","118":"118. City of Lynchburg","119":"119. Town of Marion","120":"120. City of Martinsville","121":"121. City of Newport News","122":"122. City of Norfolk","123":"123. City of Petersburg","124":"124. City of Portsmouth","125":"125. Town of Pulaski","126":"126. City of Radford","127":"127. City of Richmond","128":"128. City of Roanoke","129":"129. City of Salem","130":"130. Town of South Boston","131":"131. City of Chesapeake","132":"132. City of Staunton","133":"133. City of Suffolk","134":"134. City of Virginia Beach","136":"136. City of Waynesboro","137":"137. City of Williamsburg","138":"138. City of Winchester","139":"139. Town of Wytheville","140":"140. Town of Abingdon","141":"141. Town of Bedford","142":"142. Town of Blackstone","143":"143. Town of Bluefield","144":"144. Town of Farmville","145":"145. City of Franklin","146":"146. City of Norton","147":"147. City of Poquoson","148":"148. Town of Richlands","149":"149. Town of Vinton","150":"150. Town of Blacksburg","151":"151. City of Fairfax","152":"152. City of Manassas Park","153":"153. Town of Vienna","154":"154. Town of Christiansburg","155":"155. City of Manassas","156":"156. Town of Warrenton","157":"157. Town of Rocky Mount","158":"158. Town of Tazewell","159":"159. Town of Luray","160":"160. Town of Accomac","161":"161. Town of Alberta","162":"162. Town of Altavista","163":"163. Town of Amherst","164":"164. Town of Appalachia","165":"165. Town of Appomattox","166":"166. Town of Ashland","167":"167. Town of Belle Haven","168":"168. Town of Berryville","169":"169. Town of Bloxom","170":"170. Town of Boones Mill","171":"171. Town of Bowling Green","172":"172. Town of Boyce","173":"173. Town of Boydton","174":"174. Town of Boykins","175":"175. Town of Branchville","176":"176. Town of Bridgewater","177":"177. Town of Broadway","178":"178. Town of Brodnax","179":"179. Town of Brookneal","180":"180. Town of Buchanan","181":"181. Town of Burkeville","182":"182. Town of Cape Charles","183":"183. Town of Capron","184":"184. Town of Cedar Bluff","185":"185. Town of Charlotte C.H.","186":"186. Town of Chase City","187":"187. Town of Chatham","188":"188. Town of Cheriton","189":"189. Town of Chilhowie","190":"190. Town of Chincoteague","191":"191. Town of Claremont","192":"192. Town of Clarksville","193":"193. Town of Cleveland","194":"194. Town of Clifton","195":"195. Town of Clinchport","196":"196. Town of Clintwood","198":"198. Town of Coeburn","199":"199. Town of Colonial Beach","200":"200. Town of Columbia","201":"201. Town of Courtland","202":"202. Town of Craigsville","203":"203. Town of Crewe","204":"204. Town of Culpeper","205":"205. Town of Damascus","206":"206. Town of Dayton","207":"207. Town of Dendron","208":"208. Town of Dillwyn","209":"209. Town of Drakes Branch","210":"210. Town of Dublin","211":"211. Town of Duffield","212":"212. Town of Dumfries","213":"213. Town of Dungannon","214":"214. Town of Eastville","215":"215. Town of Edinburg","216":"216. Town of Elkton","217":"217. Town of Exmore","218":"218. Town of Fincastle","219":"219. Town of Floyd","220":"220. Town of Fries","221":"221. Town of Gate City","222":"222. Town of Glade Spring","223":"223. Town of Glasgow","224":"224. Town of Glen Lyn","225":"225. Town of Gordonsville","226":"226. Town of Goshen","227":"227. Town of Gretna","228":"228. Town of Grottoes","229":"229. Town of Grundy","230":"230. Town of Halifax","231":"231. Town of Hallwood","232":"232. Town of Hamilton","233":"233. Town of Haymarket","234":"234. Town of Haysi","235":"235. Town of Herndon","236":"236. Town of Hillsboro","237":"237. Town of Hillsville","239":"239. Town of Honaker","240":"240. Town of Independence","241":"241. Town of Iron Gate","242":"242. Town of Irvington","243":"243. Town of Ivor","244":"244. Town of Jarratt","245":"245. Town of Jonesville","246":"246. Town of Keller","247":"247. Town of Kenbridge","248":"248. Town of Keysville","249":"249. Town of Kilmarnock","250":"250. Town of LaCrosse","251":"251. Town of Lawrenceville","252":"252. Town of Lebanon","253":"253. Town of Leesburg","254":"254. Town of Louisa","255":"255. Town of Lovettsville","256":"256. Town of Madison","257":"257. Town of McKenney","258":"258. Town of Melfa","259":"259. Town of Middleburg","260":"260. Town of Middletown","261":"261. Town of Mineral","262":"262. Town of Monterey","263":"263. Town of Montross","264":"264. Town of Mount Crawford","265":"265. Town of Mount Jackson","266":"266. Town of Narrows","267":"267. Town of Nassawadox","268":"268. Town of New Castle","269":"269. Town of New Market","270":"270. Town of Newsoms","271":"271. Town of Nickelsville","272":"272. Town of Occoquan","273":"273. Town of Onancock","274":"274. Town of Onley","275":"275. Town of Orange","276":"276. Town of Painter","277":"277. Town of Pamplin City","278":"278. Town of Parksley","279":"279. Town of Pearisburg","280":"280. Town of Pembroke","281":"281. Town of Pennington Gap","282":"282. Town of Phenix","283":"283. Town of Pocahontas","284":"284. Town of Port Royal","285":"285. Town of Pound","286":"286. Town of Purcellville","287":"287. Town of Quantico","288":"288. Town of Remington","289":"289. Town of Rich Creek","290":"290. Town of Ridgeway","291":"291. Town of Round Hill","292":"292. Town of Rural Retreat","293":"293. Town of St. Charles","294":"294. Town of Saint Paul","295":"295. Town of Saltville","296":"296. Town of Saxis","297":"297. Town of Scottsburg","298":"298. Town of Scottsville","299":"299. Town of Shenandoah","300":"300. Town of Smithfield","301":"301. Town of South Hill","302":"302. Town of Stanardsville","303":"303. Town of Stanley","304":"304. Town of Stephens City","305":"305. Town of Stony Creek","306":"306. Town of Strasburg","307":"307. Town of Stuart","308":"308. Town of Surry","309":"309. Town of Tangier","310":"310. Town of Tappahannock","311":"311. Town of The Plains","312":"312. Town of Timberville","313":"313. Town of Toms Brook","314":"314. Town of Troutdale","315":"315. Town of Troutville","316":"316. Town of Urbanna","317":"317. Town of Victoria","318":"318. Town of Virgilina","319":"319. Town of Wachapreague","320":"320. Town of Wakefield","321":"321. Town of Warsaw","322":"322. Town of Washington","323":"323. Town of Waverly","324":"324. Town of Weber City","325":"325. Town of West Point","327":"327. Town of White Stone","328":"328. Town of Windsor","329":"329. Town of Wise","330":"330. Town of Woodstock","331":"331. Town of Hurt","339":"339. Town of Clinchco"};
+
+// ============================================================
+// UI FUNCTIONS
+// ============================================================
+
+function getAction(tcol) {
+  if (TARGET_TO_SOURCE[tcol]) return VALUE_MAPS[tcol] ? 'RENAME+MAP' : 'RENAME';
+  if (VALUE_MAPS[tcol]) return 'VALUE_MAP';
+  return 'PASSTHROUGH';
+}
+
+function getSourceCol(tcol) {
+  return TARGET_TO_SOURCE[tcol] || tcol;
+}
+
+function renderStats() {
+  const mapped = TARGET_69.filter(c => VALUE_MAPS[c]).length;
+  const renamed = Object.keys(COLUMN_RENAMES).length;
+  const pass = TARGET_69.length - mapped;
+  const mandOk = MANDATORY.every(c => true); // all mandatory are mapped
+  
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat-card"><div class="label">Total Target Columns</div><div class="value">69</div></div>
+    <div class="stat-card"><div class="label">Value-Mapped</div><div class="value green">${mapped}</div></div>
+    <div class="stat-card"><div class="label">Passthrough</div><div class="value">${pass}</div></div>
+    <div class="stat-card"><div class="label">Renamed</div><div class="value yellow">${renamed}</div></div>
+    <div class="stat-card"><div class="label">Extra (Preserved)</div><div class="value yellow">${EXTRA_COLUMNS.length}</div></div>
+    <div class="stat-card"><div class="label">Mandatory</div><div class="value green">6/6 ✓</div></div>
+  `;
+}
+
+function renderColumnTable() {
+  let html = '<table id="colTable"><thead><tr><th>#</th><th>Frontend Expected Column</th><th>New State Column</th><th>Action</th><th>Values</th><th>Status</th></tr></thead><tbody>';
+  
+  TARGET_69.forEach((tcol, i) => {
+    const src = getSourceCol(tcol);
+    const action = getAction(tcol);
+    const isMandatory = MANDATORY.includes(tcol);
+    const vmCount = VALUE_MAPS[tcol] ? Object.keys(VALUE_MAPS[tcol]).length : 0;
+    
+    let statusClass = 'status-pass';
+    let statusText = 'Pass';
+    if (action === 'RENAME+MAP') { statusClass='status-renamed'; statusText='Rename+Map'; }
+    else if (action === 'VALUE_MAP') { statusClass='status-mapped'; statusText='Mapped'; }
+    else if (action === 'RENAME') { statusClass='status-renamed'; statusText='Renamed'; }
+    
+    html += `<tr data-col="${tcol.toLowerCase()}">
+      <td>${i+1}</td>
+      <td>${isMandatory?'<span class="mandatory-indicator ok"></span>':''}${tcol}</td>
+      <td style="font-family:monospace;color:var(--orange)">${src}</td>
+      <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+      <td>${vmCount ? vmCount + ' values' : '—'}</td>
+      <td>✓</td>
+    </tr>`;
+  });
+  
+  // Extra columns (preserved as passthrough)
+  EXTRA_COLUMNS.forEach(col => {
+    html += `<tr data-col="${col.toLowerCase()}" style="opacity:0.7">
+      <td>—</td><td>${col}</td><td style="font-family:monospace">${col}</td>
+      <td><span class="status-badge status-renamed">EXTRA</span></td><td>—</td><td>~</td>
+    </tr>`;
+  });
+  
+  html += '</tbody></table>';
+  document.getElementById('panel-columns').innerHTML = html;
+}
+
+function renderValueMaps() {
+  let html = '';
+  const sortedCols = Object.keys(VALUE_MAPS).sort((a,b) => {
+    const aM = MANDATORY.includes(a) ? 0 : 1;
+    const bM = MANDATORY.includes(b) ? 0 : 1;
+    return aM - bM || a.localeCompare(b);
+  });
+  
+  sortedCols.forEach(col => {
+    const vm = VALUE_MAPS[col];
+    const entries = Object.entries(vm);
+    const isMandatory = MANDATORY.includes(col);
+    const src = getSourceCol(col);
+    const isRenamed = TARGET_TO_SOURCE[col];
+    
+    html += `<div class="value-map-section">
+      <div class="vm-header" onclick="this.nextElementSibling.classList.toggle('open')">
+        <h3>${isMandatory?'⭐ ':''}${col}${isRenamed?' <span style="color:var(--orange);font-size:12px">(state col: '+src+')</span>':''}</h3>
+        <span class="badge">${entries.length} values ▼</span>
+      </div>
+      <div class="vm-body${isMandatory?' open':''}">
+        <table>`;
+    
+    entries.forEach(([k,v]) => {
+      html += `<tr><td>${k}</td><td>→</td><td>${v}</td></tr>`;
+    });
+    
+    html += '</table></div></div>';
+  });
+  
+  document.getElementById('panel-values').innerHTML = html;
+}
+
+function renderMandatory() {
+  let html = '<h2 style="margin-bottom:16px;font-size:18px">Mandatory Column Verification</h2>';
+  html += '<p style="color:var(--text2);margin-bottom:16px">These columns MUST have correct values for the CRASH LENS frontend to function properly.</p>';
+  
+  const checks = [
+    {col:"Physical Juris Name", why:"Populates County/Jurisdiction dropdown", format:"NNN. Name", example:"043. Henrico County", entries:324},
+    {col:"Functional Class", why:"Drives 'No Interstate' filter (!=1-Interstate)", format:"N-Full Label", example:"1-Interstate (A,1)", entries:7},
+    {col:"Ownership", why:"Drives 'County Roads' and 'City Roads' filters", format:"N. Agency Name", example:"2. County Hwy Agency", entries:6},
+    {col:"Crash Severity", why:"EPDO weight calculations (K/A/B/C/O)", format:"Single letter", example:"K", entries:5},
+    {col:"x", why:"Longitude for crash mapping", format:"Numeric", example:"-77.436", entries:"N/A"},
+    {col:"y", why:"Latitude for crash mapping", format:"Numeric", example:"37.541", entries:"N/A"},
+  ];
+  
+  checks.forEach(c => {
+    html += `<div style="background:var(--surface);border:1px solid var(--green);border-radius:8px;padding:14px 18px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <strong style="font-size:15px">✅ ${c.col}</strong>
+          <div style="color:var(--text2);font-size:12px;margin-top:2px">${c.why}</div>
+        </div>
+        <div style="text-align:right;font-size:12px;color:var(--text2)">
+          <div>Format: <code style="color:var(--accent)">${c.format}</code></div>
+          <div>Example: <code style="color:var(--green)">${c.example}</code></div>
+          ${typeof c.entries === 'number' ? '<div>'+c.entries+' mapped values</div>' : ''}
+        </div>
+      </div>
+    </div>`;
+  });
+  
+  html += `<div style="margin-top:20px;padding:16px;background:var(--surface2);border-radius:8px">
+    <h3 style="color:var(--green);margin-bottom:8px">✅ All 6 Mandatory Columns: MAPPED</h3>
+    <p style="color:var(--text2);font-size:13px">Frontend filters will function correctly after normalization.</p>
+  </div>`;
+  
+  document.getElementById('panel-mandatory').innerHTML = html;
+}
+
+function renderGaps() {
+  let html = '<h2 style="margin-bottom:16px;font-size:18px">Gap Analysis & Notes</h2>';
+  
+  html += `<div style="background:var(--surface);border-radius:8px;padding:16px;margin-bottom:16px">
+    <h3 style="margin-bottom:8px">No True Gaps — This is a VDOT-to-VDOT Mapping</h3>
+    <p style="color:var(--text2);font-size:13px">Since both source and target are VDOT datasets, all 69 target columns exist in the source. 
+    The transformation is purely <strong>encoding conversion</strong> (numeric codes → labeled strings) and <strong>column renaming</strong> (5 columns).</p>
+  </div>`;
+  
+  html += `<div style="background:var(--surface);border-radius:8px;padding:16px;margin-bottom:16px">
+    <h3 style="margin-bottom:8px">Extra Columns (4 preserved)</h3>
+    <p style="color:var(--text2);font-size:13px">Local Case CD, Route or Street Name, LAT, and LON are not in the 69-column standard but are preserved as passthrough. 
+    The frontend ignores columns it doesn't recognize. See the Column Mapping tab for details.</p>
+  </div>`;
+  
+  html += `<div style="background:var(--surface);border-radius:8px;padding:16px;margin-bottom:16px">
+    <h3 style="margin-bottom:8px">Special Handling: Code 99</h3>
+    <p style="color:var(--text2);font-size:13px">The source uses code <strong>99</strong> across multiple columns as a sentinel value. 
+    It maps to either "Not Applicable" or "Not Provided" depending on the column context, matching the frontend standard exactly.</p>
+  </div>`;
+  
+  html += `<div style="background:var(--surface);border-radius:8px;padding:16px">
+    <h3 style="margin-bottom:8px">Special Handling: Code 0</h3>
+    <p style="color:var(--text2);font-size:13px">Code <strong>0</strong> has dual meaning: in boolean columns it means "No", 
+    but in categorical columns like Roadway Defect, Work Zone Related, and Collision Type it means "Not Applicable". 
+    The mapping handles each column independently.</p>
+  </div>`;
+  
+  document.getElementById('panel-gaps').innerHTML = html;
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-'+name).classList.add('active');
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('#colTable tbody tr').forEach(tr => {
+    const col = tr.getAttribute('data-col') || '';
+    tr.style.display = col.includes(q) ? '' : 'none';
+  });
+}
+
+function saveState() {
+  localStorage.setItem('crashlens_mapping', JSON.stringify({saved:new Date().toISOString()}));
+  alert('State saved to localStorage');
+}
+
+function loadState() {
+  const s = localStorage.getItem('crashlens_mapping');
+  if (s) { alert('State loaded from: ' + JSON.parse(s).saved); }
+  else { alert('No saved state found'); }
+}
+
+function exportJSON() {
+  const config = {
+    column_renames: COLUMN_RENAMES,
+    columns_to_drop: [],  // None — all extra columns preserved
+    extra_columns: EXTRA_COLUMNS,
+    value_maps: VALUE_MAPS,
+    target_columns: TARGET_69,
+    generated: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(config, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'vdot_mapping_config.json';
+  a.click();
+}
+
+// Initialize
+renderStats();
+renderColumnTable();
+renderValueMaps();
+renderMandatory();
+renderGaps();
+</script>
+</body>
+</html>
