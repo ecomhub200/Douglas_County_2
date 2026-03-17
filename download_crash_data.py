@@ -822,11 +822,11 @@ def standardize_columns(df):
 
     # ── SYSTEM ──
     _decode_column('SYSTEM', {
-        '1': 'NonVDOT primary',
-        '2': 'NonVDOT secondary',
-        '3': 'VDOT Interstate',
-        '4': 'VDOT Primary',
-        '5': 'VDOT Secondary',
+        '1': 'VDOT Interstate',
+        '2': 'VDOT Primary',
+        '3': 'VDOT Secondary',
+        '4': 'NonVDOT primary',
+        '5': 'NonVDOT secondary',
     }, skip_if_contains='VDOT')
 
     # ── Functional Class ──
@@ -900,7 +900,6 @@ def standardize_columns(df):
 
     # ── Roadway Surface Condition ──
     _decode_column('Roadway Surface Condition', {
-        '0': 'Not Applicable',
         '1': '1. Dry',
         '2': '2. Wet',
         '3': '3. Snowy',
@@ -912,7 +911,7 @@ def standardize_columns(df):
         '9': '9. Water (Standing, Moving)',
         '10': '10. Slush',
         '11': '11. Sand, Dirt, Gravel',
-        '99': 'Not Provided',
+        '99': 'Not Applicable',
     }, skip_if_contains='Dry')
 
     # ── Relation To Roadway ──
@@ -991,14 +990,13 @@ def standardize_columns(df):
 
     # ── Intersection Type ──
     _decode_column('Intersection Type', {
-        '0': 'Not Applicable',
         '1': '1. Not at Intersection',
         '2': '2. Two Approaches',
         '3': '3. Three Approaches',
         '4': '4. Four Approaches',
         '5': '5. Five-Point, or More',
         '6': '6. Roundabout',
-        '99': 'Not Provided',
+        '99': 'Not Applicable',
     }, skip_if_contains='Not at Intersection')
 
     # ── Traffic Control Type ──
@@ -1025,14 +1023,13 @@ def standardize_columns(df):
 
     # ── Traffic Control Status ──
     _decode_column('Traffic Control Status', {
-        '0': 'Not Applicable',
         '1': '1. Yes - Working',
         '2': '2. Yes - Working and Obscured',
         '3': '3. Yes - Not Working',
         '4': '4. Yes - Not Working and Obscured',
         '5': '5. Yes - Missing',
         '6': '6. No Traffic Control Device Present',
-        '99': 'Not Provided',
+        '99': 'Not Applicable',
     }, skip_if_contains='Working')
 
     # ── Work Zone Related ──
@@ -1100,7 +1097,6 @@ def standardize_columns(df):
 
     # ── First Harmful Event Location ──
     _decode_column('First Harmful Event Loc', {
-        '0': 'Not Applicable',
         '1': '1. On Roadway',
         '2': '2. Shoulder',
         '3': '3. Median',
@@ -1110,7 +1106,7 @@ def standardize_columns(df):
         '7': '7. In Parking Lane or Zone',
         '8': '8. Off Roadway, Location Unknown',
         '9': '9. Outside Right-of-Way',
-        '99': 'Not Provided',
+        '99': 'Not Applicable',
     }, skip_if_contains='On Roadway')
 
     # ── VDOT District ──
@@ -1133,6 +1129,7 @@ def standardize_columns(df):
     }, skip_if_contains='Rural')
 
     # ── Physical Juris Name (jurisdiction code → name) ──
+    # Complete VDOT jurisdiction table (324 entries) from authoritative dataset
     if 'Physical Juris Name' in df.columns:
         juris_map = {
             '0': '000. Arlington County', '1': '001. Accomack County',
@@ -1148,7 +1145,7 @@ def standardize_columns(df):
             '20': '020. Chesterfield County', '21': '021. Clarke County',
             '22': '022. Craig County', '23': '023. Culpeper County',
             '24': '024. Cumberland County', '25': '025. Dickenson County',
-            '26': '026. Dinwiddie County', '27': '027. Emporia',
+            '26': '026. Dinwiddie County',
             '28': '028. Essex County', '29': '029. Fairfax County',
             '30': '030. Fauquier County', '31': '031. Floyd County',
             '32': '032. Fluvanna County', '33': '033. Franklin County',
@@ -1165,14 +1162,14 @@ def standardize_columns(df):
             '54': '054. Louisa County', '55': '055. Lunenburg County',
             '56': '056. Madison County', '57': '057. Mathews County',
             '58': '058. Mecklenburg County', '59': '059. Middlesex County',
-            '60': '060. Montgomery County', '61': '061. Nansemond County',
+            '60': '060. Montgomery County',
             '62': '062. Nelson County', '63': '063. New Kent County',
-            '64': '064. Norfolk County', '65': '065. Northampton County',
+            '65': '065. Northampton County',
             '66': '066. Northumberland County', '67': '067. Nottoway County',
             '68': '068. Orange County', '69': '069. Page County',
             '70': '070. Patrick County', '71': '071. Pittsylvania County',
             '72': '072. Powhatan County', '73': '073. Prince Edward County',
-            '74': '074. Prince George County', '75': '075. Princess Anne County',
+            '74': '074. Prince George County',
             '76': '076. Prince William County', '77': '077. Pulaski County',
             '78': '078. Rappahannock County', '79': '079. Richmond County',
             '80': '080. Roanoke County', '81': '081. Rockbridge County',
@@ -1182,14 +1179,15 @@ def standardize_columns(df):
             '88': '088. Spotsylvania County', '89': '089. Stafford County',
             '90': '090. Surry County', '91': '091. Sussex County',
             '92': '092. Tazewell County', '93': '093. Warren County',
-            '94': '094. Warwick County', '95': '095. Washington County',
+            '95': '095. Washington County',
             '96': '096. Westmoreland County', '97': '097. Wise County',
             '98': '098. Wythe County', '99': '099. York County',
+            # Independent cities
             '100': '100. City of Alexandria', '101': '101. Town of Big Stone Gap',
             '102': '102. City of Bristol', '103': '103. City of Buena Vista',
             '104': '104. City of Charlottesville', '105': '105. Town of Clifton Forge',
             '106': '106. City of Colonial Heights', '107': '107. City of Covington',
-            '108': '108. City of Danville', '109': '109. Town of Elkton',
+            '108': '108. City of Danville', '109': '109. City of Emporia',
             '110': '110. City of Falls Church', '111': '111. City of Fredericksburg',
             '112': '112. Town of Front Royal', '113': '113. City of Galax',
             '114': '114. City of Hampton', '115': '115. City of Harrisonburg',
@@ -1197,39 +1195,111 @@ def standardize_columns(df):
             '118': '118. City of Lynchburg', '119': '119. Town of Marion',
             '120': '120. City of Martinsville', '121': '121. City of Newport News',
             '122': '122. City of Norfolk', '123': '123. City of Petersburg',
-            '124': '124. City of Portsmouth', '125': '125. City of Radford',
+            '124': '124. City of Portsmouth', '125': '125. Town of Pulaski',
             '126': '126. City of Radford', '127': '127. City of Richmond',
             '128': '128. City of Roanoke', '129': '129. City of Salem',
             '130': '130. Town of South Boston', '131': '131. City of Chesapeake',
             '132': '132. City of Staunton', '133': '133. City of Suffolk',
-            '134': '134. City of Virginia Beach', '135': '135. City of Waynesboro',
+            '134': '134. City of Virginia Beach',
             '136': '136. City of Waynesboro', '137': '137. City of Williamsburg',
             '138': '138. City of Winchester', '139': '139. Town of Wytheville',
-            '140': '140. Town of Abingdon', '141': '141. Town of Altavista',
-            '142': '142. Town of Amherst', '143': '143. Town of Berryville',
+            # Towns
+            '140': '140. Town of Abingdon', '141': '141. Town of Bedford',
+            '142': '142. Town of Blackstone', '143': '143. Town of Bluefield',
             '144': '144. Town of Farmville', '145': '145. City of Franklin',
-            '146': '146. Town of Gretna', '147': '147. City of Poquoson',
-            '148': '148. Town of Richlands', '149': '149. Town of Bedford',
+            '146': '146. City of Norton', '147': '147. City of Poquoson',
+            '148': '148. Town of Richlands', '149': '149. Town of Vinton',
             '150': '150. Town of Blacksburg', '151': '151. City of Fairfax',
             '152': '152. City of Manassas Park', '153': '153. Town of Vienna',
             '154': '154. Town of Christiansburg', '155': '155. City of Manassas',
             '156': '156. Town of Warrenton', '157': '157. Town of Rocky Mount',
-            '158': '158. Town of Tazewell', '159': '159. Town of Woodstock',
-            '160': '160. Town of Bridgewater', '161': '161. Town of Luray',
-            '162': '162. Town of Narrows', '163': '163. Town of Pearisburg',
-            '164': '164. Town of Broadway', '165': '165. Town of Vinton',
+            '158': '158. Town of Tazewell', '159': '159. Town of Luray',
+            '160': '160. Town of Accomac', '161': '161. Town of Alberta',
+            '162': '162. Town of Altavista', '163': '163. Town of Amherst',
+            '164': '164. Town of Appalachia', '165': '165. Town of Appomattox',
             '166': '166. Town of Ashland', '167': '167. Town of Belle Haven',
-            '192': '192. Town of Clarksville', '196': '196. Town of Clintwood',
+            '168': '168. Town of Berryville', '169': '169. Town of Bloxom',
+            '170': '170. Town of Boones Mill', '171': '171. Town of Bowling Green',
+            '172': '172. Town of Boyce', '173': '173. Town of Boydton',
+            '174': '174. Town of Boykins', '175': '175. Town of Branchville',
+            '176': '176. Town of Bridgewater', '177': '177. Town of Broadway',
+            '178': '178. Town of Brodnax', '179': '179. Town of Brookneal',
+            '180': '180. Town of Buchanan', '181': '181. Town of Burkeville',
+            '182': '182. Town of Cape Charles', '183': '183. Town of Capron',
+            '184': '184. Town of Cedar Bluff', '185': '185. Town of Charlotte C.H.',
+            '186': '186. Town of Chase City', '187': '187. Town of Chatham',
+            '188': '188. Town of Cheriton', '189': '189. Town of Chilhowie',
+            '190': '190. Town of Chincoteague', '191': '191. Town of Claremont',
+            '192': '192. Town of Clarksville', '193': '193. Town of Cleveland',
+            '194': '194. Town of Clifton', '195': '195. Town of Clinchport',
+            '196': '196. Town of Clintwood',
+            '198': '198. Town of Coeburn', '199': '199. Town of Colonial Beach',
+            '200': '200. Town of Columbia', '201': '201. Town of Courtland',
             '202': '202. Town of Craigsville', '203': '203. Town of Crewe',
-            '204': '204. Town of Culpeper', '212': '212. Town of Dumfries',
-            '219': '219. Town of Floyd', '221': '221. Town of Gate City',
-            '229': '229. Town of Grundy', '233': '233. Town of Haymarket',
-            '235': '235. Town of Herndon', '237': '237. Town of Hillsville',
-            '245': '245. Town of Jonesville', '253': '253. Town of Leesburg',
-            '267': '267. Town of Nassawadox', '275': '275. Town of Orange',
-            '286': '286. Town of Purcellville', '292': '292. Town of Rural Retreat',
-            '300': '300. Town of Smithfield', '301': '301. Town of South Hill',
-            '303': '303. Town of Stanley', '306': '306. Town of Strasburg',
+            '204': '204. Town of Culpeper', '205': '205. Town of Damascus',
+            '206': '206. Town of Dayton', '207': '207. Town of Dendron',
+            '208': '208. Town of Dillwyn', '209': '209. Town of Drakes Branch',
+            '210': '210. Town of Dublin', '211': '211. Town of Duffield',
+            '212': '212. Town of Dumfries', '213': '213. Town of Dungannon',
+            '214': '214. Town of Eastville', '215': '215. Town of Edinburg',
+            '216': '216. Town of Elkton', '217': '217. Town of Exmore',
+            '218': '218. Town of Fincastle', '219': '219. Town of Floyd',
+            '220': '220. Town of Fries', '221': '221. Town of Gate City',
+            '222': '222. Town of Glade Spring', '223': '223. Town of Glasgow',
+            '224': '224. Town of Glen Lyn', '225': '225. Town of Gordonsville',
+            '226': '226. Town of Goshen', '227': '227. Town of Gretna',
+            '228': '228. Town of Grottoes', '229': '229. Town of Grundy',
+            '230': '230. Town of Halifax', '231': '231. Town of Hallwood',
+            '232': '232. Town of Hamilton', '233': '233. Town of Haymarket',
+            '234': '234. Town of Haysi', '235': '235. Town of Herndon',
+            '236': '236. Town of Hillsboro', '237': '237. Town of Hillsville',
+            '239': '239. Town of Honaker', '240': '240. Town of Independence',
+            '241': '241. Town of Iron Gate', '242': '242. Town of Irvington',
+            '243': '243. Town of Ivor', '244': '244. Town of Jarratt',
+            '245': '245. Town of Jonesville', '246': '246. Town of Keller',
+            '247': '247. Town of Kenbridge', '248': '248. Town of Keysville',
+            '249': '249. Town of Kilmarnock', '250': '250. Town of LaCrosse',
+            '251': '251. Town of Lawrenceville', '252': '252. Town of Lebanon',
+            '253': '253. Town of Leesburg', '254': '254. Town of Louisa',
+            '255': '255. Town of Lovettsville', '256': '256. Town of Madison',
+            '257': '257. Town of McKenney', '258': '258. Town of Melfa',
+            '259': '259. Town of Middleburg', '260': '260. Town of Middletown',
+            '261': '261. Town of Mineral', '262': '262. Town of Monterey',
+            '263': '263. Town of Montross', '264': '264. Town of Mount Crawford',
+            '265': '265. Town of Mount Jackson', '266': '266. Town of Narrows',
+            '267': '267. Town of Nassawadox', '268': '268. Town of New Castle',
+            '269': '269. Town of New Market', '270': '270. Town of Newsoms',
+            '271': '271. Town of Nickelsville', '272': '272. Town of Occoquan',
+            '273': '273. Town of Onancock', '274': '274. Town of Onley',
+            '275': '275. Town of Orange', '276': '276. Town of Painter',
+            '277': '277. Town of Pamplin City', '278': '278. Town of Parksley',
+            '279': '279. Town of Pearisburg', '280': '280. Town of Pembroke',
+            '281': '281. Town of Pennington Gap', '282': '282. Town of Phenix',
+            '283': '283. Town of Pocahontas', '284': '284. Town of Port Royal',
+            '285': '285. Town of Pound', '286': '286. Town of Purcellville',
+            '287': '287. Town of Quantico', '288': '288. Town of Remington',
+            '289': '289. Town of Rich Creek', '290': '290. Town of Ridgeway',
+            '291': '291. Town of Round Hill', '292': '292. Town of Rural Retreat',
+            '293': '293. Town of St. Charles', '294': '294. Town of Saint Paul',
+            '295': '295. Town of Saltville', '296': '296. Town of Saxis',
+            '297': '297. Town of Scottsburg', '298': '298. Town of Scottsville',
+            '299': '299. Town of Shenandoah', '300': '300. Town of Smithfield',
+            '301': '301. Town of South Hill', '302': '302. Town of Stanardsville',
+            '303': '303. Town of Stanley', '304': '304. Town of Stephens City',
+            '305': '305. Town of Stony Creek', '306': '306. Town of Strasburg',
+            '307': '307. Town of Stuart', '308': '308. Town of Surry',
+            '309': '309. Town of Tangier', '310': '310. Town of Tappahannock',
+            '311': '311. Town of The Plains', '312': '312. Town of Timberville',
+            '313': '313. Town of Toms Brook', '314': '314. Town of Troutdale',
+            '315': '315. Town of Troutville', '316': '316. Town of Urbanna',
+            '317': '317. Town of Victoria', '318': '318. Town of Virgilina',
+            '319': '319. Town of Wachapreague', '320': '320. Town of Wakefield',
+            '321': '321. Town of Warsaw', '322': '322. Town of Washington',
+            '323': '323. Town of Waverly', '324': '324. Town of Weber City',
+            '325': '325. Town of West Point', '327': '327. Town of White Stone',
+            '328': '328. Town of Windsor', '329': '329. Town of Wise',
+            '330': '330. Town of Woodstock', '331': '331. Town of Hurt',
+            '339': '339. Town of Clinchco',
         }
         raw = df['Physical Juris Name'].astype(str).str.strip()
         if raw.isin(juris_map.keys()).any() and not raw.str.contains('County|City|Town', na=False, regex=True).any():
@@ -1290,8 +1360,8 @@ def standardize_columns(df):
     # ── Intersection Analysis ──
     _decode_column('Intersection Analysis', {
         '0': 'Not Intersection',
-        '1': 'VDOT Intersection',
-        '2': 'Urban Intersection',
+        '1': 'Urban Intersection',
+        '2': 'VDOT Intersection',
     }, skip_if_contains='Intersection')
 
     # ── Work Zone Location ──

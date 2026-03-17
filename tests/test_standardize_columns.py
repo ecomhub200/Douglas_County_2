@@ -282,25 +282,25 @@ class TestUnrestrainedDecode(unittest.TestCase):
 
 class TestSystemDecode(unittest.TestCase):
 
-    def test_nonvdot_primary(self):
-        df = standardize_columns(_make_df({'SYSTEM': '1'}))
-        self.assertEqual(df['SYSTEM'].iloc[0], 'NonVDOT primary')
-
-    def test_nonvdot_secondary(self):
-        df = standardize_columns(_make_df({'SYSTEM': '2'}))
-        self.assertEqual(df['SYSTEM'].iloc[0], 'NonVDOT secondary')
-
     def test_vdot_interstate(self):
-        df = standardize_columns(_make_df({'SYSTEM': '3'}))
+        df = standardize_columns(_make_df({'SYSTEM': '1'}))
         self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Interstate')
 
     def test_vdot_primary(self):
-        df = standardize_columns(_make_df({'SYSTEM': '4'}))
+        df = standardize_columns(_make_df({'SYSTEM': '2'}))
         self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Primary')
 
     def test_vdot_secondary(self):
-        df = standardize_columns(_make_df({'SYSTEM': '5'}))
+        df = standardize_columns(_make_df({'SYSTEM': '3'}))
         self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Secondary')
+
+    def test_nonvdot_primary(self):
+        df = standardize_columns(_make_df({'SYSTEM': '4'}))
+        self.assertEqual(df['SYSTEM'].iloc[0], 'NonVDOT primary')
+
+    def test_nonvdot_secondary(self):
+        df = standardize_columns(_make_df({'SYSTEM': '5'}))
+        self.assertEqual(df['SYSTEM'].iloc[0], 'NonVDOT secondary')
 
 
 class TestOwnershipDecode(unittest.TestCase):
@@ -426,13 +426,13 @@ class TestIntersectionAnalysisDecode(unittest.TestCase):
         df = standardize_columns(_make_df({'INTERSECTION_ANALYSIS': '0'}))
         self.assertEqual(df['Intersection Analysis'].iloc[0], 'Not Intersection')
 
-    def test_vdot_intersection(self):
-        df = standardize_columns(_make_df({'INTERSECTION_ANALYSIS': '1'}))
-        self.assertEqual(df['Intersection Analysis'].iloc[0], 'VDOT Intersection')
-
     def test_urban_intersection(self):
-        df = standardize_columns(_make_df({'INTERSECTION_ANALYSIS': '2'}))
+        df = standardize_columns(_make_df({'INTERSECTION_ANALYSIS': '1'}))
         self.assertEqual(df['Intersection Analysis'].iloc[0], 'Urban Intersection')
+
+    def test_vdot_intersection(self):
+        df = standardize_columns(_make_df({'INTERSECTION_ANALYSIS': '2'}))
+        self.assertEqual(df['Intersection Analysis'].iloc[0], 'VDOT Intersection')
 
 
 class TestRoadDepartureTypeDecode(unittest.TestCase):
@@ -584,13 +584,13 @@ class TestSentinelValues(unittest.TestCase):
         df = standardize_columns(_make_df({'LIGHT_CONDITION': '99'}))
         self.assertEqual(df['Light Condition'].iloc[0], 'Not Applicable')
 
-    def test_surface_cond_not_applicable(self):
+    def test_surface_cond_zero_passthrough(self):
         df = standardize_columns(_make_df({'ROADWAY_SURFACE_COND': '0'}))
-        self.assertEqual(df['Roadway Surface Condition'].iloc[0], 'Not Applicable')
+        self.assertEqual(df['Roadway Surface Condition'].iloc[0], '0')
 
-    def test_surface_cond_not_provided(self):
+    def test_surface_cond_not_applicable(self):
         df = standardize_columns(_make_df({'ROADWAY_SURFACE_COND': '99'}))
-        self.assertEqual(df['Roadway Surface Condition'].iloc[0], 'Not Provided')
+        self.assertEqual(df['Roadway Surface Condition'].iloc[0], 'Not Applicable')
 
     def test_relation_roadway_not_applicable(self):
         df = standardize_columns(_make_df({'RELATION_TO_ROADWAY': '0'}))
@@ -624,25 +624,25 @@ class TestSentinelValues(unittest.TestCase):
         df = standardize_columns(_make_df({'ROADWAY_DESCRIPTION': '99'}))
         self.assertEqual(df['Roadway Description'].iloc[0], 'Not Provided')
 
-    def test_intersection_type_not_applicable(self):
+    def test_intersection_type_zero_passthrough(self):
         df = standardize_columns(_make_df({'INTERSECTION_TYPE': '0'}))
-        self.assertEqual(df['Intersection Type'].iloc[0], 'Not Applicable')
+        self.assertEqual(df['Intersection Type'].iloc[0], '0')
 
-    def test_intersection_type_not_provided(self):
+    def test_intersection_type_not_applicable(self):
         df = standardize_columns(_make_df({'INTERSECTION_TYPE': '99'}))
-        self.assertEqual(df['Intersection Type'].iloc[0], 'Not Provided')
+        self.assertEqual(df['Intersection Type'].iloc[0], 'Not Applicable')
 
     def test_traffic_control_not_applicable(self):
         df = standardize_columns(_make_df({'TRAFFIC_CONTROL_TYPE': '99'}))
         self.assertEqual(df['Traffic Control Type'].iloc[0], 'Not Applicable')
 
-    def test_traffic_ctrl_status_not_applicable(self):
+    def test_traffic_ctrl_status_zero_passthrough(self):
         df = standardize_columns(_make_df({'TRFC_CTRL_STATUS_TYPE': '0'}))
-        self.assertEqual(df['Traffic Control Status'].iloc[0], 'Not Applicable')
+        self.assertEqual(df['Traffic Control Status'].iloc[0], '0')
 
-    def test_traffic_ctrl_status_not_provided(self):
+    def test_traffic_ctrl_status_not_applicable(self):
         df = standardize_columns(_make_df({'TRFC_CTRL_STATUS_TYPE': '99'}))
-        self.assertEqual(df['Traffic Control Status'].iloc[0], 'Not Provided')
+        self.assertEqual(df['Traffic Control Status'].iloc[0], 'Not Applicable')
 
     def test_work_zone_related_not_applicable(self):
         df = standardize_columns(_make_df({'WORK_ZONE_RELATED': '0'}))
@@ -652,13 +652,13 @@ class TestSentinelValues(unittest.TestCase):
         df = standardize_columns(_make_df({'SCHOOL_ZONE': '0'}))
         self.assertEqual(df['School Zone'].iloc[0], 'Not Applicable')
 
-    def test_first_harmful_loc_not_applicable(self):
+    def test_first_harmful_loc_zero_passthrough(self):
         df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT_LOC': '0'}))
-        self.assertEqual(df['First Harmful Event Loc'].iloc[0], 'Not Applicable')
+        self.assertEqual(df['First Harmful Event Loc'].iloc[0], '0')
 
-    def test_first_harmful_loc_not_provided(self):
+    def test_first_harmful_loc_not_applicable(self):
         df = standardize_columns(_make_df({'FIRST_HARMFUL_EVENT_LOC': '99'}))
-        self.assertEqual(df['First Harmful Event Loc'].iloc[0], 'Not Provided')
+        self.assertEqual(df['First Harmful Event Loc'].iloc[0], 'Not Applicable')
 
 
 class TestCorrectedLabels(unittest.TestCase):
@@ -782,7 +782,7 @@ class TestIdempotency(unittest.TestCase):
             'Crash Severity': 'O',
             'Collision Type': '4. Sideswipe - Same Direction',
             'Weather Condition': '1. No Adverse Condition (Clear/Cloudy)',
-            'SYSTEM': 'VDOT Secondary',
+            'SYSTEM': 'NonVDOT secondary',
             'Ownership': '3. City or Town Hwy Agency',
             'Functional Class': '7-Local (J,6)',
             'Facility Type': '3-Two-Way Undivided',
@@ -792,7 +792,7 @@ class TestIdempotency(unittest.TestCase):
             'Area Type': 'Urban',
             'Physical Juris Name': '121. City of Newport News',
             'Planning District': 'Hampton Roads',
-            'Intersection Analysis': 'Urban Intersection',
+            'Intersection Analysis': 'VDOT Intersection',
             'RoadDeparture Type': 'NOT_RD',
         }
         df = pd.DataFrame([decoded])
@@ -849,7 +849,7 @@ class TestFullRowIntegration(unittest.TestCase):
             'Pedestrian?': 'No',
             'Speed?': 'No',
             'RoadDeparture Type': 'NOT_RD',
-            'Intersection Analysis': 'Urban Intersection',
+            'Intersection Analysis': 'VDOT Intersection',
             'Senior?': 'Yes',
             'Young?': 'No',
             'Mainline?': 'Yes',
@@ -860,7 +860,7 @@ class TestFullRowIntegration(unittest.TestCase):
             'Functional Class': '7-Local (J,6)',
             'Facility Type': '3-Two-Way Undivided',
             'Area Type': 'Urban',
-            'SYSTEM': 'VDOT Secondary',
+            'SYSTEM': 'NonVDOT secondary',
             'Ownership': '3. City or Town Hwy Agency',
             'Planning District': 'Hampton Roads',
             'MPO Name': 'HAMP',
