@@ -15,6 +15,7 @@ const https = require('https');
 const url = require('url');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const { S3Client, PutObjectCommand, HeadObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
 
@@ -1633,9 +1634,13 @@ const server = http.createServer((req, res) => {
         console.log(`[Forecasts] Fetching from R2: ${r2Key}`);
 
         https.get(r2PublicUrl, (r2Res) => {
+            // Handle Content-Encoding: gzip (R2 stores compressed objects)
+            const encoding = r2Res.headers['content-encoding'];
+            const stream = (encoding === 'gzip') ? r2Res.pipe(zlib.createGunzip()) : r2Res;
+
             let data = '';
-            r2Res.on('data', chunk => { data += chunk; });
-            r2Res.on('end', () => {
+            stream.on('data', chunk => { data += chunk; });
+            stream.on('end', () => {
                 if (r2Res.statusCode === 200) {
                     // Cache the response
                     forecastCache.set(cacheKey, { data, timestamp: Date.now() });
@@ -1654,6 +1659,11 @@ const server = http.createServer((req, res) => {
                     res.writeHead(502, corsHeaders);
                     res.end(JSON.stringify({ error: `R2 returned HTTP ${r2Res.statusCode}` }));
                 }
+            });
+            stream.on('error', (err) => {
+                console.error(`[Forecasts] Decompression error: ${err.message}`);
+                res.writeHead(502, corsHeaders);
+                res.end(JSON.stringify({ error: 'Failed to decompress forecast data', message: err.message }));
             });
         }).on('error', (err) => {
             console.error(`[Forecasts] R2 fetch error: ${err.message}`);

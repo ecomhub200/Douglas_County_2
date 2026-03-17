@@ -94,19 +94,27 @@ jobs:
             echo "  $LOCAL_PATH ($SIZE) -> $R2_KEY"
 
             if [ "$DRY_RUN" = "true" ]; then
-              echo "    [DRY-RUN] Would upload"
+              echo "    [DRY-RUN] Would upload (gzip-compressed)"
               return
             fi
 
-            aws s3 cp "$LOCAL_PATH" "s3://${R2_BUCKET}/${R2_KEY}" \
+            # Gzip the JSON before uploading for storage savings
+            GZ_FILE="${LOCAL_PATH}.gz"
+            gzip -c "$LOCAL_PATH" > "$GZ_FILE"
+            GZ_SIZE=$(ls -lh "$GZ_FILE" | awk '{print $5}')
+            echo "    Compressed: $SIZE -> $GZ_SIZE"
+
+            aws s3 cp "$GZ_FILE" "s3://${R2_BUCKET}/${R2_KEY}" \
               --endpoint-url "$ENDPOINT" \
-              --content-type "application/json" && {
-                echo "    Uploaded successfully"
+              --content-type "application/json" \
+              --content-encoding "gzip" && {
+                echo "    Uploaded successfully (gzip)"
                 UPLOADED=$((UPLOADED + 1))
               } || {
                 echo "    [ERROR] Upload failed"
                 FAILED=$((FAILED + 1))
               }
+            rm -f "$GZ_FILE"
           }
 
           upload_jurisdiction() {

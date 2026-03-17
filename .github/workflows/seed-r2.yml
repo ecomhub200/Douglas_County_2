@@ -85,27 +85,37 @@ jobs:
             R2_PREFIX="${STATE}/${JURISDICTION}"
           fi
 
-          # Build JSON array of files to upload
+          # Build JSON array of files to upload (gzip-compressed)
+          # Gzip each file first; the upload-r2 action detects .gz extensions
+          # and sets Content-Encoding: gzip automatically.
           FILES="["
           FIRST=true
 
-          # Processed pipeline outputs
+          # Processed pipeline outputs — gzip before upload
           for suffix in standardized all_roads county_roads city_roads no_interstate; do
             FILE="${DATA_DIR}/${JURISDICTION}_${suffix}.csv"
             if [ -f "$FILE" ]; then
+              GZ_FILE="${FILE}.gz"
+              gzip -c "$FILE" > "$GZ_FILE"
+              ORIG_SIZE=$(stat -c%s "$FILE" 2>/dev/null || stat -f%z "$FILE")
+              GZ_SIZE=$(stat -c%s "$GZ_FILE" 2>/dev/null || stat -f%z "$GZ_FILE")
               if [ "$FIRST" = true ]; then FIRST=false; else FILES="$FILES,"; fi
-              FILES="$FILES{\"local_path\":\"$FILE\",\"r2_key\":\"${R2_PREFIX}/${suffix}.csv\"}"
-              echo "  Found: $FILE -> ${R2_PREFIX}/${suffix}.csv"
+              FILES="$FILES{\"local_path\":\"$GZ_FILE\",\"r2_key\":\"${R2_PREFIX}/${suffix}.csv\",\"uncompressed_size\":$ORIG_SIZE}"
+              echo "  Found: $FILE -> ${R2_PREFIX}/${suffix}.csv (${ORIG_SIZE} -> ${GZ_SIZE} bytes)"
             fi
           done
 
-          # Forecast JSON files
+          # Forecast JSON files — gzip before upload
           for rt in county_roads city_roads no_interstate all_roads; do
             FFILE="${DATA_DIR}/forecasts_${rt}.json"
             if [ -f "$FFILE" ]; then
+              GZ_FILE="${FFILE}.gz"
+              gzip -c "$FFILE" > "$GZ_FILE"
+              ORIG_SIZE=$(stat -c%s "$FFILE" 2>/dev/null || stat -f%z "$FFILE")
+              GZ_SIZE=$(stat -c%s "$GZ_FILE" 2>/dev/null || stat -f%z "$GZ_FILE")
               if [ "$FIRST" = true ]; then FIRST=false; else FILES="$FILES,"; fi
-              FILES="$FILES{\"local_path\":\"$FFILE\",\"r2_key\":\"${R2_PREFIX}/forecasts_${rt}.json\"}"
-              echo "  Found: $FFILE -> ${R2_PREFIX}/forecasts_${rt}.json"
+              FILES="$FILES{\"local_path\":\"$GZ_FILE\",\"r2_key\":\"${R2_PREFIX}/forecasts_${rt}.json\",\"uncompressed_size\":$ORIG_SIZE}"
+              echo "  Found: $FFILE -> ${R2_PREFIX}/forecasts_${rt}.json (${ORIG_SIZE} -> ${GZ_SIZE} bytes)"
             fi
           done
 
@@ -141,7 +151,7 @@ jobs:
           DATA_DIR="${{ steps.files.outputs.data_dir }}"
           R2_PREFIX="${{ steps.files.outputs.r2_prefix }}"
 
-          echo "Uploading raw annual CSVs..."
+          echo "Uploading raw annual CSVs (gzip-compressed)..."
           echo "Endpoint: $R2_ENDPOINT"
           UPLOADED=0
           for f in "${DATA_DIR}"/20*.csv; do
@@ -150,10 +160,13 @@ jobs:
             YEAR=$(echo "$BASENAME" | grep -oP '^\d{4}')
             if [ -n "$YEAR" ]; then
               R2_KEY="${R2_PREFIX}/raw/${YEAR}.csv"
-              echo "  Uploading: $f -> s3://crash-lens-data/${R2_KEY}"
-              OUTPUT=$(aws s3 cp "$f" "s3://crash-lens-data/${R2_KEY}" \
+              GZ_FILE="${f}.gz"
+              gzip -c "$f" > "$GZ_FILE"
+              echo "  Uploading: $f -> s3://crash-lens-data/${R2_KEY} (gzip)"
+              OUTPUT=$(aws s3 cp "$GZ_FILE" "s3://crash-lens-data/${R2_KEY}" \
                 --endpoint-url "$R2_ENDPOINT" \
-                --content-type "text/csv" 2>&1)
+                --content-type "text/csv" \
+                --content-encoding "gzip" 2>&1)
               EXIT_CODE=$?
               echo "    exit_code=$EXIT_CODE output=$OUTPUT"
               if [ $EXIT_CODE -eq 0 ]; then
@@ -162,6 +175,7 @@ jobs:
               else
                 echo "  FAIL: $f"
               fi
+              rm -f "$GZ_FILE"
             fi
           done
           echo "Uploaded $UPLOADED raw annual CSVs"
