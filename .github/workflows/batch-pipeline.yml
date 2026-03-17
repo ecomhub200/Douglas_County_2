@@ -157,6 +157,14 @@ jobs:
             exit 1
           fi
 
+          # Decompress if R2 object was stored with Content-Encoding: gzip
+          # (aws s3 cp downloads raw gzipped bytes when Content-Encoding: gzip is set)
+          if file "$LOCAL_CSV" | grep -q gzip; then
+            echo "Detected gzip content — decompressing..."
+            mv "$LOCAL_CSV" "${LOCAL_CSV}.gz"
+            gunzip -f "${LOCAL_CSV}.gz"
+          fi
+
           TOTAL=$(wc -l < "$LOCAL_CSV" | tr -d ' ')
           SIZE=$(ls -lh "$LOCAL_CSV" | awk '{print $5}')
           echo "Downloaded: $LOCAL_CSV ($((TOTAL - 1)) records, $SIZE)"
@@ -209,6 +217,13 @@ jobs:
             echo "Retry $i/4..."
             sleep $((2 ** i))
           done
+
+          # Decompress if R2 object was stored with Content-Encoding: gzip
+          if file "$LOCAL_CSV" | grep -q gzip; then
+            echo "Detected gzip content — decompressing..."
+            mv "$LOCAL_CSV" "${LOCAL_CSV}.gz"
+            gunzip -f "${LOCAL_CSV}.gz"
+          fi
 
           TOTAL=$(wc -l < "$LOCAL_CSV" | tr -d ' ')
           echo "Ready: $LOCAL_CSV ($((TOTAL - 1)) records)"

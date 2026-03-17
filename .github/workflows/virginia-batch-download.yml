@@ -432,6 +432,14 @@ jobs:
             exit 1
           fi
 
+          # Gzip the CSV for storage savings (keep original for local use)
+          GZ_PATH="${CSV_PATH}.gz"
+          gzip -cn "$CSV_PATH" > "$GZ_PATH"
+          GZ_SIZE=$(stat -c%s "$GZ_PATH" 2>/dev/null || stat -f%z "$GZ_PATH")
+          ORIG_SIZE=$(stat -c%s "$CSV_PATH" 2>/dev/null || stat -f%z "$CSV_PATH")
+          GZ_MD5=$(md5sum "$GZ_PATH" | awk '{print $1}')
+          echo "  Gzip: ${ORIG_SIZE} -> ${GZ_SIZE} bytes (saved $((ORIG_SIZE - GZ_SIZE)) bytes)"
+
           DATA_CHANGED="true"
 
           # ── Incremental check: compare with existing R2 object ──
@@ -446,30 +454,33 @@ jobs:
             # R2 ETag for single-part uploads is the MD5 in quotes
             R2_MD5=$(echo "$R2_ETAG" | tr -d '"')
 
-            if [ "$R2_MD5" = "$LOCAL_MD5" ]; then
-              echo "Data unchanged (MD5 match: $LOCAL_MD5) — skipping upload and pipeline"
+            if [ "$R2_MD5" = "$GZ_MD5" ]; then
+              echo "Data unchanged (gzip MD5 match: $GZ_MD5) — skipping upload and pipeline"
               DATA_CHANGED="false"
               echo "r2_data_key=$R2_KEY" >> $GITHUB_OUTPUT
               echo "data_changed=false" >> $GITHUB_OUTPUT
+              rm -f "$GZ_PATH"
               exit 0
             else
-              echo "Data changed (local=$LOCAL_MD5, R2=$R2_MD5) — uploading"
+              echo "Data changed (local_gz=$GZ_MD5, R2=$R2_MD5) — uploading"
             fi
           fi
 
-          # Upload with retry (exponential backoff)
+          # Upload gzipped with Content-Encoding: gzip (browsers auto-decompress)
           for i in 1 2 3 4; do
-            if aws s3 cp "$CSV_PATH" "s3://$R2_BUCKET/$R2_KEY" \
+            if aws s3 cp "$GZ_PATH" "s3://$R2_BUCKET/$R2_KEY" \
               --endpoint-url "$R2_ENDPOINT" \
               --content-type "text/csv" \
+              --content-encoding "gzip" \
               --only-show-errors; then
-              echo "Upload succeeded"
+              echo "Upload succeeded (gzip-compressed)"
               break
             fi
             DELAY=$((2 ** i))
             echo "Upload failed (attempt $i/4), retrying in ${DELAY}s..."
             sleep $DELAY
           done
+          rm -f "$GZ_PATH"
 
           # Verify upload
           SIZE=$(aws s3api head-object \
