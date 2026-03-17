@@ -325,16 +325,17 @@ jobs:
           echo "Stage 4: Upload to R2 (all CSVs)"
           echo "=========================================="
 
-          # 4a: Upload jurisdiction CSVs (county-level road-type splits)
+          # 4a: Upload jurisdiction CSVs (county-level road-type splits) — gzip-compressed
           MANIFEST=$(python scripts/split_jurisdictions.py \
             --state "$STATE" --r2-manifest --r2-prefix "$R2_PREFIX" --output-dir "$DATA_DIR")
 
           echo "$MANIFEST" | python3 -c "
-          import json, sys, subprocess, os
+          import json, sys, subprocess, os, gzip as gz, shutil
           files = json.load(sys.stdin)
           endpoint = '$R2_ENDPOINT'
           bucket = '$R2_BUCKET'
           success = failed = skipped = 0
+          saved_bytes = 0
           for i, entry in enumerate(files):
               local = entry['local_path']
               r2_key = entry['r2_key']
@@ -342,39 +343,60 @@ jobs:
                   skipped += 1
                   continue
               try:
+                  # Gzip the CSV before uploading
+                  gz_path = local + '.gz'
+                  orig_size = os.path.getsize(local)
+                  with open(local, 'rb') as f_in:
+                      with gz.open(gz_path, 'wb', compresslevel=6) as f_out:
+                          shutil.copyfileobj(f_in, f_out)
+                  gz_size = os.path.getsize(gz_path)
+                  saved_bytes += (orig_size - gz_size)
                   subprocess.run([
-                      'aws', 's3', 'cp', local, f's3://{bucket}/{r2_key}',
+                      'aws', 's3', 'cp', gz_path, f's3://{bucket}/{r2_key}',
                       '--endpoint-url', endpoint,
                       '--content-type', 'text/csv',
+                      '--content-encoding', 'gzip',
                       '--only-show-errors'
                   ], check=True, capture_output=True, timeout=120)
+                  os.remove(gz_path)
                   success += 1
               except Exception as e:
                   print(f'  FAIL: {r2_key}: {e}')
                   failed += 1
+                  if os.path.exists(local + '.gz'):
+                      os.remove(local + '.gz')
               if (i + 1) % 50 == 0 or (i + 1) == len(files):
                   print(f'  Progress: {i+1}/{len(files)} ({success} ok, {failed} fail, {skipped} skip)')
           print(f'County CSV upload: {success} ok, {failed} fail, {skipped} skip')
+          print(f'  Gzip savings: {saved_bytes / 1024 / 1024:.1f} MB saved')
           "
 
-          # 4b: Upload region/MPO aggregate CSVs
+          # 4b: Upload region/MPO aggregate CSVs (gzip-compressed)
           find "$DATA_DIR" -path "*/_region/*" -name "*.csv" -o -path "*/_mpo/*" -name "*.csv" 2>/dev/null | while read f; do
             REL="${f#$DATA_DIR/}"
             R2_KEY="$R2_PREFIX/$REL"
-            aws s3 cp "$f" "s3://$R2_BUCKET/$R2_KEY" \
+            GZ_FILE="${f}.gz"
+            gzip -c "$f" > "$GZ_FILE"
+            aws s3 cp "$GZ_FILE" "s3://$R2_BUCKET/$R2_KEY" \
               --endpoint-url "$R2_ENDPOINT" \
               --content-type "text/csv" \
+              --content-encoding "gzip" \
               --only-show-errors || echo "  WARN: failed to upload $R2_KEY"
+            rm -f "$GZ_FILE"
           done
 
-          # 4c: Upload federal aggregate CSVs (statewide scope only)
+          # 4c: Upload federal aggregate CSVs (statewide scope only, gzip-compressed)
           if [ "$SCOPE" = "statewide" ]; then
             find "data/_federal" -name "*.csv" 2>/dev/null | while read f; do
               R2_KEY="_federal/${f#data/_federal/}"
-              aws s3 cp "$f" "s3://$R2_BUCKET/$R2_KEY" \
+              GZ_FILE="${f}.gz"
+              gzip -c "$f" > "$GZ_FILE"
+              aws s3 cp "$GZ_FILE" "s3://$R2_BUCKET/$R2_KEY" \
                 --endpoint-url "$R2_ENDPOINT" \
                 --content-type "text/csv" \
+                --content-encoding "gzip" \
                 --only-show-errors || true
+              rm -f "$GZ_FILE"
             done
           fi
 
@@ -433,7 +455,7 @@ jobs:
           echo "=========================================="
 
           echo "$JURISDICTIONS" | python3 -c "
-          import json, sys, subprocess, os
+          import json, sys, subprocess, os, gzip as gz, shutil
 
           jurisdictions = json.load(sys.stdin)
           data_dir = '$DATA_DIR'
@@ -442,6 +464,7 @@ jobs:
           bucket = '$R2_BUCKET'
           uploaded = 0
           skipped = 0
+          saved_bytes = 0
 
           for j in jurisdictions:
               for rt in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
@@ -455,19 +478,31 @@ jobs:
 
                   r2_key = f'{r2_prefix}/{j}/forecasts_{rt}.json'
                   try:
+                      # Gzip the JSON before uploading
+                      gz_path = local_path + '.gz'
+                      orig_size = os.path.getsize(local_path)
+                      with open(local_path, 'rb') as f_in:
+                          with gz.open(gz_path, 'wb', compresslevel=6) as f_out:
+                              shutil.copyfileobj(f_in, f_out)
+                      gz_size = os.path.getsize(gz_path)
+                      saved_bytes += (orig_size - gz_size)
                       subprocess.run([
-                          'aws', 's3', 'cp', local_path, f's3://{bucket}/{r2_key}',
+                          'aws', 's3', 'cp', gz_path, f's3://{bucket}/{r2_key}',
                           '--endpoint-url', endpoint,
                           '--content-type', 'application/json',
+                          '--content-encoding', 'gzip',
                           '--only-show-errors'
                       ], check=True, capture_output=True, timeout=120)
-                      size = os.path.getsize(local_path)
-                      print(f'  Uploaded: {r2_key} ({size:,} bytes)')
+                      os.remove(gz_path)
+                      print(f'  Uploaded: {r2_key} ({orig_size:,} -> {gz_size:,} bytes)')
                       uploaded += 1
                   except Exception as e:
                       print(f'  FAIL: {r2_key}: {e}')
+                      if os.path.exists(local_path + '.gz'):
+                          os.remove(local_path + '.gz')
 
           print(f'Forecast upload: {uploaded} uploaded, {skipped} skipped')
+          print(f'  Gzip savings: {saved_bytes / 1024 / 1024:.1f} MB saved')
           "
 
       # ── Stage 6: Commit ──
