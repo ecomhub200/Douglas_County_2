@@ -236,10 +236,10 @@
       "name": "Arlington County",
       "type": "county",
       "fips": "013",
-      "jurisCode": "7",
+      "jurisCode": "0",
       "namePatterns": [
         "ARLINGTON",
-        "007. Arlington County"
+        "000. Arlington County"
       ],
       "mapCenter": [
         38.88,
@@ -263,10 +263,10 @@
       "name": "Augusta County",
       "type": "county",
       "fips": "015",
-      "jurisCode": "8",
+      "jurisCode": "7",
       "namePatterns": [
         "AUGUSTA",
-        "008. Augusta County"
+        "007. Augusta County"
       ],
       "mapCenter": [
         38.16,
@@ -290,10 +290,10 @@
       "name": "Bath County",
       "type": "county",
       "fips": "017",
-      "jurisCode": "9",
+      "jurisCode": "8",
       "namePatterns": [
         "BATH",
-        "009. Bath County"
+        "008. Bath County"
       ],
       "mapCenter": [
         38.07,
@@ -313,10 +313,10 @@
       "name": "Bedford County",
       "type": "county",
       "fips": "019",
-      "jurisCode": "10",
+      "jurisCode": "9",
       "namePatterns": [
         "BEDFORD",
-        "010. Bedford County"
+        "009. Bedford County"
       ],
       "mapCenter": [
         37.31,
@@ -340,10 +340,10 @@
       "name": "Bland County",
       "type": "county",
       "fips": "021",
-      "jurisCode": "11",
+      "jurisCode": "10",
       "namePatterns": [
         "BLAND",
-        "011. Bland County"
+        "010. Bland County"
       ],
       "mapCenter": [
         37.1,
@@ -363,10 +363,10 @@
       "name": "Botetourt County",
       "type": "county",
       "fips": "023",
-      "jurisCode": "12",
+      "jurisCode": "11",
       "namePatterns": [
         "BOTETOURT",
-        "012. Botetourt County"
+        "011. Botetourt County"
       ],
       "mapCenter": [
         37.55,
@@ -386,10 +386,10 @@
       "name": "Brunswick County",
       "type": "county",
       "fips": "025",
-      "jurisCode": "13",
+      "jurisCode": "12",
       "namePatterns": [
         "BRUNSWICK",
-        "013. Brunswick County"
+        "012. Brunswick County"
       ],
       "mapCenter": [
         36.76,
@@ -409,10 +409,10 @@
       "name": "Buchanan County",
       "type": "county",
       "fips": "027",
-      "jurisCode": "14",
+      "jurisCode": "13",
       "namePatterns": [
         "BUCHANAN",
-        "014. Buchanan County"
+        "013. Buchanan County"
       ],
       "mapCenter": [
         37.27,
@@ -432,10 +432,10 @@
       "name": "Buckingham County",
       "type": "county",
       "fips": "029",
-      "jurisCode": "15",
+      "jurisCode": "14",
       "namePatterns": [
         "BUCKINGHAM",
-        "015. Buckingham County"
+        "014. Buckingham County"
       ],
       "mapCenter": [
         37.55,
@@ -455,10 +455,10 @@
       "name": "Campbell County",
       "type": "county",
       "fips": "031",
-      "jurisCode": "16",
+      "jurisCode": "15",
       "namePatterns": [
         "CAMPBELL",
-        "016. Campbell County"
+        "015. Campbell County"
       ],
       "mapCenter": [
         37.2,
@@ -478,10 +478,10 @@
       "name": "Caroline County",
       "type": "county",
       "fips": "033",
-      "jurisCode": "17",
+      "jurisCode": "16",
       "namePatterns": [
         "CAROLINE",
-        "017. Caroline County"
+        "016. Caroline County"
       ],
       "mapCenter": [
         38.03,
@@ -505,10 +505,10 @@
       "name": "Carroll County",
       "type": "county",
       "fips": "035",
-      "jurisCode": "18",
+      "jurisCode": "17",
       "namePatterns": [
         "CARROLL",
-        "018. Carroll County"
+        "017. Carroll County"
       ],
       "mapCenter": [
         36.73,
@@ -528,10 +528,10 @@
       "name": "Charles City County",
       "type": "county",
       "fips": "036",
-      "jurisCode": "19",
+      "jurisCode": "18",
       "namePatterns": [
         "CHARLES CITY",
-        "019. Charles City County"
+        "018. Charles City County"
       ],
       "mapCenter": [
         37.36,
@@ -555,10 +555,10 @@
       "name": "Charlotte County",
       "type": "county",
       "fips": "037",
-      "jurisCode": "20",
+      "jurisCode": "19",
       "namePatterns": [
         "CHARLOTTE",
-        "020. Charlotte County"
+        "019. Charlotte County"
       ],
       "mapCenter": [
         37.01,
@@ -582,10 +582,10 @@
       "name": "Chesterfield County",
       "type": "county",
       "fips": "041",
-      "jurisCode": "21",
+      "jurisCode": "20",
       "namePatterns": [
         "CHESTERFIELD",
-        "021. Chesterfield County"
+        "020. Chesterfield County"
       ],
       "mapCenter": [
         37.38,
@@ -609,10 +609,10 @@
       "name": "Clarke County",
       "type": "county",
       "fips": "043",
-      "jurisCode": "22",
+      "jurisCode": "21",
       "namePatterns": [
         "CLARKE",
-        "022. Clarke County"
+        "021. Clarke County"
       ],
       "mapCenter": [
         39.11,
@@ -632,10 +632,10 @@
       "name": "Craig County",
       "type": "county",
       "fips": "045",
-      "jurisCode": "23",
+      "jurisCode": "22",
       "namePatterns": [
         "CRAIG",
-        "023. Craig County"
+        "022. Craig County"
       ],
       "mapCenter": [
         37.47,
@@ -655,10 +655,10 @@
       "name": "Culpeper County",
       "type": "county",
       "fips": "047",
-      "jurisCode": "24",
+      "jurisCode": "23",
       "namePatterns": [
         "CULPEPER",
-        "024. Culpeper County"
+        "023. Culpeper County"
       ],
       "mapCenter": [
         38.49,
@@ -682,10 +682,10 @@
       "name": "Cumberland County",
       "type": "county",
       "fips": "049",
-      "jurisCode": "25",
+      "jurisCode": "24",
       "namePatterns": [
         "CUMBERLAND",
-        "025. Cumberland County"
+        "024. Cumberland County"
       ],
       "mapCenter": [
         37.51,
@@ -705,10 +705,10 @@
       "name": "Dickenson County",
       "type": "county",
       "fips": "051",
-      "jurisCode": "26",
+      "jurisCode": "25",
       "namePatterns": [
         "DICKENSON",
-        "026. Dickenson County"
+        "025. Dickenson County"
       ],
       "mapCenter": [
         37.12,
@@ -728,10 +728,10 @@
       "name": "Dinwiddie County",
       "type": "county",
       "fips": "053",
-      "jurisCode": "27",
+      "jurisCode": "26",
       "namePatterns": [
         "DINWIDDIE",
-        "027. Dinwiddie County"
+        "026. Dinwiddie County"
       ],
       "mapCenter": [
         37.08,
@@ -1275,10 +1275,10 @@
       "name": "King and Queen County",
       "type": "county",
       "fips": "097",
-      "jurisCode": "48",
+      "jurisCode": "49",
       "namePatterns": [
         "KING AND QUEEN",
-        "048. King and Queen County"
+        "049. King & Queen County"
       ],
       "mapCenter": [
         37.72,
@@ -1302,10 +1302,10 @@
       "name": "King George County",
       "type": "county",
       "fips": "099",
-      "jurisCode": "49",
+      "jurisCode": "48",
       "namePatterns": [
         "KING GEORGE",
-        "049. King George County"
+        "048. King George County"
       ],
       "mapCenter": [
         38.27,
@@ -1626,10 +1626,10 @@
       "name": "Nelson County",
       "type": "county",
       "fips": "125",
-      "jurisCode": "61",
+      "jurisCode": "62",
       "namePatterns": [
         "NELSON",
-        "061. Nelson County"
+        "062. Nelson County"
       ],
       "mapCenter": [
         37.79,
@@ -1653,10 +1653,10 @@
       "name": "New Kent County",
       "type": "county",
       "fips": "127",
-      "jurisCode": "62",
+      "jurisCode": "63",
       "namePatterns": [
         "NEW KENT",
-        "062. New Kent County"
+        "063. New Kent County"
       ],
       "mapCenter": [
         37.52,
@@ -1676,10 +1676,10 @@
       "name": "Northampton County",
       "type": "county",
       "fips": "131",
-      "jurisCode": "63",
+      "jurisCode": "65",
       "namePatterns": [
         "NORTHAMPTON",
-        "063. Northampton County"
+        "065. Northampton County"
       ],
       "mapCenter": [
         37.3,
@@ -1699,10 +1699,10 @@
       "name": "Northumberland County",
       "type": "county",
       "fips": "133",
-      "jurisCode": "64",
+      "jurisCode": "66",
       "namePatterns": [
         "NORTHUMBERLAND",
-        "064. Northumberland County"
+        "066. Northumberland County"
       ],
       "mapCenter": [
         37.87,
@@ -1722,10 +1722,10 @@
       "name": "Nottoway County",
       "type": "county",
       "fips": "135",
-      "jurisCode": "65",
+      "jurisCode": "67",
       "namePatterns": [
         "NOTTOWAY",
-        "065. Nottoway County"
+        "067. Nottoway County"
       ],
       "mapCenter": [
         37.14,
@@ -1745,10 +1745,10 @@
       "name": "Orange County",
       "type": "county",
       "fips": "137",
-      "jurisCode": "66",
+      "jurisCode": "68",
       "namePatterns": [
         "ORANGE",
-        "066. Orange County"
+        "068. Orange County"
       ],
       "mapCenter": [
         38.24,
@@ -1768,10 +1768,10 @@
       "name": "Page County",
       "type": "county",
       "fips": "139",
-      "jurisCode": "67",
+      "jurisCode": "69",
       "namePatterns": [
         "PAGE",
-        "067. Page County"
+        "069. Page County"
       ],
       "mapCenter": [
         38.62,
@@ -1791,10 +1791,10 @@
       "name": "Patrick County",
       "type": "county",
       "fips": "141",
-      "jurisCode": "68",
+      "jurisCode": "70",
       "namePatterns": [
         "PATRICK",
-        "068. Patrick County"
+        "070. Patrick County"
       ],
       "mapCenter": [
         36.68,
@@ -1814,10 +1814,10 @@
       "name": "Pittsylvania County",
       "type": "county",
       "fips": "143",
-      "jurisCode": "69",
+      "jurisCode": "71",
       "namePatterns": [
         "PITTSYLVANIA",
-        "069. Pittsylvania County"
+        "071. Pittsylvania County"
       ],
       "mapCenter": [
         36.82,
@@ -1837,10 +1837,10 @@
       "name": "Powhatan County",
       "type": "county",
       "fips": "145",
-      "jurisCode": "70",
+      "jurisCode": "72",
       "namePatterns": [
         "POWHATAN",
-        "070. Powhatan County"
+        "072. Powhatan County"
       ],
       "mapCenter": [
         37.55,
@@ -1860,10 +1860,10 @@
       "name": "Prince Edward County",
       "type": "county",
       "fips": "147",
-      "jurisCode": "71",
+      "jurisCode": "73",
       "namePatterns": [
         "PRINCE EDWARD",
-        "071. Prince Edward County"
+        "073. Prince Edward County"
       ],
       "mapCenter": [
         37.23,
@@ -1883,10 +1883,10 @@
       "name": "Prince George County",
       "type": "county",
       "fips": "149",
-      "jurisCode": "72",
+      "jurisCode": "74",
       "namePatterns": [
         "PRINCE GEORGE",
-        "072. Prince George County"
+        "074. Prince George County"
       ],
       "mapCenter": [
         37.19,
@@ -1906,10 +1906,10 @@
       "name": "Prince William County",
       "type": "county",
       "fips": "153",
-      "jurisCode": "73",
+      "jurisCode": "76",
       "namePatterns": [
         "PRINCE WILLIAM",
-        "073. Prince William County"
+        "076. Prince William County"
       ],
       "mapCenter": [
         38.7,
@@ -1933,10 +1933,10 @@
       "name": "Pulaski County",
       "type": "county",
       "fips": "155",
-      "jurisCode": "74",
+      "jurisCode": "77",
       "namePatterns": [
         "PULASKI",
-        "074. Pulaski County"
+        "077. Pulaski County"
       ],
       "mapCenter": [
         37.06,
@@ -1956,10 +1956,10 @@
       "name": "Rappahannock County",
       "type": "county",
       "fips": "157",
-      "jurisCode": "75",
+      "jurisCode": "78",
       "namePatterns": [
         "RAPPAHANNOCK",
-        "075. Rappahannock County"
+        "078. Rappahannock County"
       ],
       "mapCenter": [
         38.68,
@@ -1979,10 +1979,10 @@
       "name": "Richmond County",
       "type": "county",
       "fips": "159",
-      "jurisCode": "76",
+      "jurisCode": "79",
       "namePatterns": [
         "RICHMOND COUNTY",
-        "076. Richmond County"
+        "079. Richmond County"
       ],
       "mapCenter": [
         37.94,
@@ -2002,10 +2002,10 @@
       "name": "Roanoke County",
       "type": "county",
       "fips": "161",
-      "jurisCode": "77",
+      "jurisCode": "80",
       "namePatterns": [
         "ROANOKE COUNTY",
-        "077. Roanoke County"
+        "080. Roanoke County"
       ],
       "mapCenter": [
         37.28,
@@ -2025,10 +2025,10 @@
       "name": "Rockbridge County",
       "type": "county",
       "fips": "163",
-      "jurisCode": "78",
+      "jurisCode": "81",
       "namePatterns": [
         "ROCKBRIDGE",
-        "078. Rockbridge County"
+        "081. Rockbridge County"
       ],
       "mapCenter": [
         37.81,
@@ -2048,10 +2048,10 @@
       "name": "Rockingham County",
       "type": "county",
       "fips": "165",
-      "jurisCode": "79",
+      "jurisCode": "82",
       "namePatterns": [
         "ROCKINGHAM",
-        "079. Rockingham County"
+        "082. Rockingham County"
       ],
       "mapCenter": [
         38.52,
@@ -2075,10 +2075,10 @@
       "name": "Russell County",
       "type": "county",
       "fips": "167",
-      "jurisCode": "80",
+      "jurisCode": "83",
       "namePatterns": [
         "RUSSELL",
-        "080. Russell County"
+        "083. Russell County"
       ],
       "mapCenter": [
         36.93,
@@ -2098,10 +2098,10 @@
       "name": "Scott County",
       "type": "county",
       "fips": "169",
-      "jurisCode": "81",
+      "jurisCode": "84",
       "namePatterns": [
         "SCOTT",
-        "081. Scott County"
+        "084. Scott County"
       ],
       "mapCenter": [
         36.71,
@@ -2121,10 +2121,10 @@
       "name": "Shenandoah County",
       "type": "county",
       "fips": "171",
-      "jurisCode": "82",
+      "jurisCode": "85",
       "namePatterns": [
         "SHENANDOAH",
-        "082. Shenandoah County"
+        "085. Shenandoah County"
       ],
       "mapCenter": [
         38.86,
@@ -2144,10 +2144,10 @@
       "name": "Smyth County",
       "type": "county",
       "fips": "173",
-      "jurisCode": "83",
+      "jurisCode": "86",
       "namePatterns": [
         "SMYTH",
-        "083. Smyth County"
+        "086. Smyth County"
       ],
       "mapCenter": [
         36.85,
@@ -2167,10 +2167,10 @@
       "name": "Southampton County",
       "type": "county",
       "fips": "175",
-      "jurisCode": "84",
+      "jurisCode": "87",
       "namePatterns": [
         "SOUTHAMPTON",
-        "084. Southampton County"
+        "087. Southampton County"
       ],
       "mapCenter": [
         36.72,
@@ -2190,10 +2190,10 @@
       "name": "Spotsylvania County",
       "type": "county",
       "fips": "177",
-      "jurisCode": "85",
+      "jurisCode": "88",
       "namePatterns": [
         "SPOTSYLVANIA",
-        "085. Spotsylvania County"
+        "088. Spotsylvania County"
       ],
       "mapCenter": [
         38.18,
@@ -2213,10 +2213,10 @@
       "name": "Stafford County",
       "type": "county",
       "fips": "179",
-      "jurisCode": "86",
+      "jurisCode": "89",
       "namePatterns": [
         "STAFFORD",
-        "086. Stafford County"
+        "089. Stafford County"
       ],
       "mapCenter": [
         38.42,
@@ -2236,10 +2236,10 @@
       "name": "Surry County",
       "type": "county",
       "fips": "181",
-      "jurisCode": "87",
+      "jurisCode": "90",
       "namePatterns": [
         "SURRY",
-        "087. Surry County"
+        "090. Surry County"
       ],
       "mapCenter": [
         37.12,
@@ -2259,10 +2259,10 @@
       "name": "Sussex County",
       "type": "county",
       "fips": "183",
-      "jurisCode": "88",
+      "jurisCode": "91",
       "namePatterns": [
         "SUSSEX",
-        "088. Sussex County"
+        "091. Sussex County"
       ],
       "mapCenter": [
         36.92,
@@ -2282,10 +2282,10 @@
       "name": "Tazewell County",
       "type": "county",
       "fips": "185",
-      "jurisCode": "89",
+      "jurisCode": "92",
       "namePatterns": [
         "TAZEWELL",
-        "089. Tazewell County"
+        "092. Tazewell County"
       ],
       "mapCenter": [
         37.12,
@@ -2305,10 +2305,10 @@
       "name": "Warren County",
       "type": "county",
       "fips": "187",
-      "jurisCode": "90",
+      "jurisCode": "93",
       "namePatterns": [
         "WARREN",
-        "090. Warren County"
+        "093. Warren County"
       ],
       "mapCenter": [
         38.91,
@@ -2328,10 +2328,10 @@
       "name": "Washington County",
       "type": "county",
       "fips": "191",
-      "jurisCode": "91",
+      "jurisCode": "95",
       "namePatterns": [
         "WASHINGTON",
-        "091. Washington County"
+        "095. Washington County"
       ],
       "mapCenter": [
         36.75,
@@ -2351,10 +2351,10 @@
       "name": "Westmoreland County",
       "type": "county",
       "fips": "193",
-      "jurisCode": "92",
+      "jurisCode": "96",
       "namePatterns": [
         "WESTMORELAND",
-        "092. Westmoreland County"
+        "096. Westmoreland County"
       ],
       "mapCenter": [
         38.11,
@@ -2374,10 +2374,10 @@
       "name": "Wise County",
       "type": "county",
       "fips": "195",
-      "jurisCode": "93",
+      "jurisCode": "97",
       "namePatterns": [
         "WISE",
-        "093. Wise County"
+        "097. Wise County"
       ],
       "mapCenter": [
         36.97,
@@ -2397,10 +2397,10 @@
       "name": "Wythe County",
       "type": "county",
       "fips": "197",
-      "jurisCode": "94",
+      "jurisCode": "98",
       "namePatterns": [
         "WYTHE",
-        "094. Wythe County"
+        "098. Wythe County"
       ],
       "mapCenter": [
         36.92,
@@ -2420,10 +2420,10 @@
       "name": "York County",
       "type": "county",
       "fips": "199",
-      "jurisCode": "95",
+      "jurisCode": "99",
       "namePatterns": [
         "YORK",
-        "095. York County"
+        "099. York County"
       ],
       "mapCenter": [
         37.22,
@@ -2443,10 +2443,10 @@
       "name": "Alexandria City",
       "type": "city",
       "fips": "510",
-      "jurisCode": "96",
+      "jurisCode": "100",
       "namePatterns": [
         "ALEXANDRIA",
-        "096. Alexandria City"
+        "100. City of Alexandria"
       ],
       "mapCenter": [
         38.82,
@@ -2470,10 +2470,10 @@
       "name": "Bristol City",
       "type": "city",
       "fips": "520",
-      "jurisCode": "97",
+      "jurisCode": "102",
       "namePatterns": [
         "BRISTOL",
-        "097. Bristol City"
+        "102. City of Bristol"
       ],
       "mapCenter": [
         36.6,
@@ -2493,10 +2493,10 @@
       "name": "Buena Vista City",
       "type": "city",
       "fips": "530",
-      "jurisCode": "98",
+      "jurisCode": "103",
       "namePatterns": [
         "BUENA VISTA",
-        "098. Buena Vista City"
+        "103. City of Buena Vista"
       ],
       "mapCenter": [
         37.73,
@@ -2520,10 +2520,10 @@
       "name": "Charlottesville City",
       "type": "city",
       "fips": "540",
-      "jurisCode": "99",
+      "jurisCode": "104",
       "namePatterns": [
         "CHARLOTTESVILLE",
-        "099. Charlottesville City"
+        "104. City of Charlottesville"
       ],
       "mapCenter": [
         38.03,
@@ -2543,10 +2543,10 @@
       "name": "Chesapeake City",
       "type": "city",
       "fips": "550",
-      "jurisCode": "100",
+      "jurisCode": "131",
       "namePatterns": [
         "CHESAPEAKE",
-        "100. Chesapeake City"
+        "131. City of Chesapeake"
       ],
       "mapCenter": [
         36.77,
@@ -2570,10 +2570,10 @@
       "name": "Colonial Heights City",
       "type": "city",
       "fips": "570",
-      "jurisCode": "101",
+      "jurisCode": "106",
       "namePatterns": [
         "COLONIAL HEIGHTS",
-        "101. Colonial Heights City"
+        "106. City of Colonial Heights"
       ],
       "mapCenter": [
         37.26,
@@ -2597,10 +2597,10 @@
       "name": "Covington City",
       "type": "city",
       "fips": "580",
-      "jurisCode": "102",
+      "jurisCode": "107",
       "namePatterns": [
         "COVINGTON",
-        "102. Covington City"
+        "107. City of Covington"
       ],
       "mapCenter": [
         37.79,
@@ -2674,10 +2674,10 @@
       "name": "Danville City",
       "type": "city",
       "fips": "590",
-      "jurisCode": "103",
+      "jurisCode": "108",
       "namePatterns": [
         "DANVILLE",
-        "103. Danville City"
+        "108. City of Danville"
       ],
       "mapCenter": [
         36.59,
@@ -2701,10 +2701,10 @@
       "name": "Emporia City",
       "type": "city",
       "fips": "595",
-      "jurisCode": "104",
+      "jurisCode": "109",
       "namePatterns": [
         "EMPORIA",
-        "104. Emporia City"
+        "109. City of Emporia"
       ],
       "mapCenter": [
         36.69,
@@ -2724,10 +2724,11 @@
       "name": "Fairfax City",
       "type": "city",
       "fips": "600",
-      "jurisCode": "105",
+      "jurisCode": "151",
       "namePatterns": [
+        "CITY OF FAIRFAX",
         "FAIRFAX CITY",
-        "105. Fairfax City"
+        "151. City of Fairfax"
       ],
       "mapCenter": [
         38.85,
@@ -2751,10 +2752,10 @@
       "name": "Falls Church City",
       "type": "city",
       "fips": "610",
-      "jurisCode": "106",
+      "jurisCode": "110",
       "namePatterns": [
         "FALLS CHURCH",
-        "106. Falls Church City"
+        "110. City of Falls Church"
       ],
       "mapCenter": [
         38.88,
@@ -2774,10 +2775,11 @@
       "name": "Franklin City",
       "type": "city",
       "fips": "620",
-      "jurisCode": "107",
+      "jurisCode": "145",
       "namePatterns": [
+        "CITY OF FRANKLIN",
         "FRANKLIN CITY",
-        "107. Franklin City"
+        "145. City of Franklin"
       ],
       "mapCenter": [
         36.68,
@@ -2801,10 +2803,10 @@
       "name": "Fredericksburg City",
       "type": "city",
       "fips": "630",
-      "jurisCode": "108",
+      "jurisCode": "111",
       "namePatterns": [
         "FREDERICKSBURG",
-        "108. Fredericksburg City"
+        "111. City of Fredericksburg"
       ],
       "mapCenter": [
         38.3,
@@ -2828,10 +2830,10 @@
       "name": "Galax City",
       "type": "city",
       "fips": "640",
-      "jurisCode": "109",
+      "jurisCode": "113",
       "namePatterns": [
         "GALAX",
-        "109. Galax City"
+        "113. City of Galax"
       ],
       "mapCenter": [
         36.66,
@@ -2851,10 +2853,10 @@
       "name": "Hampton City",
       "type": "city",
       "fips": "650",
-      "jurisCode": "110",
+      "jurisCode": "114",
       "namePatterns": [
         "HAMPTON",
-        "110. Hampton City"
+        "114. City of Hampton"
       ],
       "mapCenter": [
         37.03,
@@ -2878,10 +2880,10 @@
       "name": "Harrisonburg City",
       "type": "city",
       "fips": "660",
-      "jurisCode": "111",
+      "jurisCode": "115",
       "namePatterns": [
         "HARRISONBURG",
-        "111. Harrisonburg City"
+        "115. City of Harrisonburg"
       ],
       "mapCenter": [
         38.45,
@@ -2901,10 +2903,10 @@
       "name": "Hopewell City",
       "type": "city",
       "fips": "670",
-      "jurisCode": "112",
+      "jurisCode": "116",
       "namePatterns": [
         "HOPEWELL",
-        "112. Hopewell City"
+        "116. City of Hopewell"
       ],
       "mapCenter": [
         37.3,
@@ -2924,10 +2926,10 @@
       "name": "Lexington City",
       "type": "city",
       "fips": "678",
-      "jurisCode": "113",
+      "jurisCode": "117",
       "namePatterns": [
         "LEXINGTON",
-        "113. Lexington City"
+        "117. City of Lexington"
       ],
       "mapCenter": [
         37.78,
@@ -2947,10 +2949,10 @@
       "name": "Lynchburg City",
       "type": "city",
       "fips": "680",
-      "jurisCode": "114",
+      "jurisCode": "118",
       "namePatterns": [
         "LYNCHBURG",
-        "114. Lynchburg City"
+        "118. City of Lynchburg"
       ],
       "mapCenter": [
         37.41,
@@ -2974,10 +2976,10 @@
       "name": "Manassas City",
       "type": "city",
       "fips": "683",
-      "jurisCode": "115",
+      "jurisCode": "155",
       "namePatterns": [
         "MANASSAS",
-        "115. Manassas City"
+        "155. City of Manassas"
       ],
       "mapCenter": [
         38.75,
@@ -2997,10 +2999,10 @@
       "name": "Manassas Park City",
       "type": "city",
       "fips": "685",
-      "jurisCode": "116",
+      "jurisCode": "152",
       "namePatterns": [
         "MANASSAS PARK",
-        "116. Manassas Park City"
+        "152. City of Manassas Park"
       ],
       "mapCenter": [
         38.77,
@@ -3020,10 +3022,10 @@
       "name": "Martinsville City",
       "type": "city",
       "fips": "690",
-      "jurisCode": "117",
+      "jurisCode": "120",
       "namePatterns": [
         "MARTINSVILLE",
-        "117. Martinsville City"
+        "120. City of Martinsville"
       ],
       "mapCenter": [
         36.69,
@@ -3043,10 +3045,10 @@
       "name": "Newport News City",
       "type": "city",
       "fips": "700",
-      "jurisCode": "118",
+      "jurisCode": "121",
       "namePatterns": [
         "NEWPORT NEWS",
-        "118. Newport News City"
+        "121. City of Newport News"
       ],
       "mapCenter": [
         37.09,
@@ -3070,10 +3072,10 @@
       "name": "Norfolk City",
       "type": "city",
       "fips": "710",
-      "jurisCode": "119",
+      "jurisCode": "122",
       "namePatterns": [
         "NORFOLK",
-        "119. Norfolk City"
+        "122. City of Norfolk"
       ],
       "mapCenter": [
         36.85,
@@ -3097,10 +3099,10 @@
       "name": "Norton City",
       "type": "city",
       "fips": "720",
-      "jurisCode": "120",
+      "jurisCode": "146",
       "namePatterns": [
         "NORTON",
-        "120. Norton City"
+        "146. City of Norton"
       ],
       "mapCenter": [
         36.93,
@@ -3120,10 +3122,10 @@
       "name": "Petersburg City",
       "type": "city",
       "fips": "730",
-      "jurisCode": "121",
+      "jurisCode": "123",
       "namePatterns": [
         "PETERSBURG",
-        "121. Petersburg City"
+        "123. City of Petersburg"
       ],
       "mapCenter": [
         37.23,
@@ -3143,10 +3145,10 @@
       "name": "Poquoson City",
       "type": "city",
       "fips": "735",
-      "jurisCode": "122",
+      "jurisCode": "147",
       "namePatterns": [
         "POQUOSON",
-        "122. Poquoson City"
+        "147. City of Poquoson"
       ],
       "mapCenter": [
         37.12,
@@ -3166,10 +3168,10 @@
       "name": "Portsmouth City",
       "type": "city",
       "fips": "740",
-      "jurisCode": "123",
+      "jurisCode": "124",
       "namePatterns": [
         "PORTSMOUTH",
-        "123. Portsmouth City"
+        "124. City of Portsmouth"
       ],
       "mapCenter": [
         36.84,
@@ -3193,10 +3195,10 @@
       "name": "Radford City",
       "type": "city",
       "fips": "750",
-      "jurisCode": "124",
+      "jurisCode": "126",
       "namePatterns": [
         "RADFORD",
-        "124. Radford City"
+        "126. City of Radford"
       ],
       "mapCenter": [
         37.13,
@@ -3216,10 +3218,11 @@
       "name": "Richmond City",
       "type": "city",
       "fips": "760",
-      "jurisCode": "125",
+      "jurisCode": "127",
       "namePatterns": [
+        "CITY OF RICHMOND",
         "RICHMOND CITY",
-        "125. Richmond City"
+        "127. City of Richmond"
       ],
       "mapCenter": [
         37.54,
@@ -3243,10 +3246,11 @@
       "name": "Roanoke City",
       "type": "city",
       "fips": "770",
-      "jurisCode": "126",
+      "jurisCode": "128",
       "namePatterns": [
+        "CITY OF ROANOKE",
         "ROANOKE CITY",
-        "126. Roanoke City"
+        "128. City of Roanoke"
       ],
       "mapCenter": [
         37.27,
@@ -3266,10 +3270,10 @@
       "name": "Salem City",
       "type": "city",
       "fips": "775",
-      "jurisCode": "127",
+      "jurisCode": "129",
       "namePatterns": [
         "SALEM",
-        "127. Salem City"
+        "129. City of Salem"
       ],
       "mapCenter": [
         37.29,
@@ -3289,10 +3293,10 @@
       "name": "Staunton City",
       "type": "city",
       "fips": "790",
-      "jurisCode": "128",
+      "jurisCode": "132",
       "namePatterns": [
         "STAUNTON",
-        "128. Staunton City"
+        "132. City of Staunton"
       ],
       "mapCenter": [
         38.15,
@@ -3312,10 +3316,10 @@
       "name": "Suffolk City",
       "type": "city",
       "fips": "800",
-      "jurisCode": "129",
+      "jurisCode": "133",
       "namePatterns": [
         "SUFFOLK",
-        "129. Suffolk City"
+        "133. City of Suffolk"
       ],
       "mapCenter": [
         36.73,
@@ -3335,10 +3339,10 @@
       "name": "Virginia Beach City",
       "type": "city",
       "fips": "810",
-      "jurisCode": "130",
+      "jurisCode": "134",
       "namePatterns": [
         "VIRGINIA BEACH",
-        "130. Virginia Beach City"
+        "134. City of Virginia Beach"
       ],
       "mapCenter": [
         36.85,
@@ -3362,10 +3366,10 @@
       "name": "Waynesboro City",
       "type": "city",
       "fips": "820",
-      "jurisCode": "131",
+      "jurisCode": "136",
       "namePatterns": [
         "WAYNESBORO",
-        "131. Waynesboro City"
+        "136. City of Waynesboro"
       ],
       "mapCenter": [
         38.07,
@@ -3389,10 +3393,10 @@
       "name": "Williamsburg City",
       "type": "city",
       "fips": "830",
-      "jurisCode": "132",
+      "jurisCode": "137",
       "namePatterns": [
         "WILLIAMSBURG",
-        "132. Williamsburg City"
+        "137. City of Williamsburg"
       ],
       "mapCenter": [
         37.27,
@@ -3412,10 +3416,10 @@
       "name": "Winchester City",
       "type": "city",
       "fips": "840",
-      "jurisCode": "133",
+      "jurisCode": "138",
       "namePatterns": [
         "WINCHESTER",
-        "133. Winchester City"
+        "138. City of Winchester"
       ],
       "mapCenter": [
         39.19,
@@ -4604,7 +4608,9 @@
     "cityOnly": {
       "name": "City Roads Only",
       "description": "City/town agency-maintained roads only",
-      "ownershipValues": ["3. City or Town Hwy Agency"]
+      "ownershipValues": [
+        "3. City or Town Hwy Agency"
+      ]
     }
   },
   "states": {
