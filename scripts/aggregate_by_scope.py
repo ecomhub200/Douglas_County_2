@@ -187,15 +187,21 @@ def concat_county_csvs(member_counties, road_type, data_dir, output_path):
 
 
 def generate_group_csvs(group_type, group_id, member_counties, data_dir, output_dir):
-    """Generate 3 road-type CSVs for a region or MPO."""
+    """Generate road-type CSVs for a region or MPO.
+
+    Output filenames use just {road_type}.csv (no group_id prefix) to match
+    the R2 key convention expected by the frontend:
+        _region/{id}/{road_type}.csv
+        _mpo/{id}/{road_type}.csv
+    """
     logger.info(f"  Aggregating {group_type}/{group_id} ({len(member_counties)} counties)")
 
     for road_type in ROAD_TYPES:
-        output_path = Path(output_dir) / f"_{group_type}" / group_id / f"{group_id}_{road_type}.csv"
+        output_path = Path(output_dir) / f"_{group_type}" / group_id / f"{road_type}.csv"
         row_count = concat_county_csvs(member_counties, road_type, data_dir, output_path)
         if row_count > 0:
             size_mb = os.path.getsize(output_path) / (1024 * 1024)
-            logger.info(f"    {group_id}_{road_type}.csv: {row_count:,} rows ({size_mb:.1f} MB)")
+            logger.info(f"    {road_type}.csv: {row_count:,} rows ({size_mb:.1f} MB)")
 
 
 def main():
