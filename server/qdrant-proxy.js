@@ -16,7 +16,7 @@ const url = require('url');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { S3Client, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, HeadObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
 
 const PORT = process.env.PROXY_PORT || 3001;
@@ -1484,6 +1484,134 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // ---- Crash Alert CRUD: Save/List/Delete crash monitoring alerts in Firestore ----
+
+    // POST /crash-alerts/save — Create or update a crash alert
+    if (req.url === '/crash-alerts/save' && req.method === 'POST') {
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const body = await collectBody(req);
+                const data = JSON.parse(body);
+
+                const db = getFirestore();
+                const alertId = data.alertId || crypto.randomUUID();
+                const now = new Date().toISOString();
+
+                const alertDoc = {
+                    enabled: data.enabled !== false,
+                    locationName: data.locationName || '',
+                    locationType: data.locationType || 'route',  // 'route' | 'node'
+                    locationValue: data.locationValue || '',
+                    r2Path: data.r2Path || '',                   // e.g. 'colorado/douglas/all_roads.csv'
+                    recipients: data.recipients || [],
+                    thresholds: {
+                        crashCountEnabled: data.thresholds?.crashCountEnabled || false,
+                        crashCountThreshold: data.thresholds?.crashCountThreshold || 5,
+                        crashCountWindowMonths: data.thresholds?.crashCountWindowMonths || 6,
+                        severityEnabled: data.thresholds?.severityEnabled || false,
+                        severityLevel: data.thresholds?.severityLevel || 'KA',
+                        trendEnabled: data.thresholds?.trendEnabled || false,
+                        trendIncreasePercent: data.thresholds?.trendIncreasePercent || 25,
+                        trendWindowMonths: data.thresholds?.trendWindowMonths || 12
+                    },
+                    // Column name overrides (for multi-state support)
+                    routeColumn: data.routeColumn || 'RTE Name',
+                    nodeColumn: data.nodeColumn || 'Node',
+                    dateColumn: data.dateColumn || 'Crash Date',
+                    severityColumn: data.severityColumn || 'Crash Severity',
+                    cooldownDays: data.cooldownDays || 7,
+                    checkIntervalHours: data.checkIntervalHours || 6,
+                    state: data.state || '',
+                    jurisdiction: data.jurisdiction || '',
+                    agency: data.agency || '',
+                    updatedAt: now,
+                    lastAlertSent: data.lastAlertSent || null
+                };
+
+                if (!data.alertId) {
+                    alertDoc.createdAt = now;
+                }
+
+                // Calculate next check time
+                alertDoc.nextCheckAt = calculateNextAlertCheck(alertDoc);
+
+                await db.collection('users').doc(user.uid)
+                    .collection('crashAlerts').doc(alertId)
+                    .set(alertDoc, { merge: true });
+
+                // Invalidate alert cache
+                alertCache = { data: null, loadedAt: 0 };
+
+                console.log(`[CrashAlerts] Saved alert ${alertId} for user ${user.uid} (location: ${alertDoc.locationName})`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({ success: true, alertId, nextCheckAt: alertDoc.nextCheckAt }));
+            } catch (err) {
+                console.error(`[CrashAlerts] Save error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
+        return;
+    }
+
+    // GET /crash-alerts/list — List crash alerts for the authenticated user
+    if (req.url === '/crash-alerts/list' && req.method === 'GET') {
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const db = getFirestore();
+
+                const snapshot = await db.collection('users').doc(user.uid)
+                    .collection('crashAlerts').get();
+
+                const alerts = [];
+                snapshot.forEach(doc => {
+                    alerts.push({ id: doc.id, ...doc.data() });
+                });
+
+                console.log(`[CrashAlerts] Listed ${alerts.length} alerts for user ${user.uid}`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({ success: true, alerts }));
+            } catch (err) {
+                console.error(`[CrashAlerts] List error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
+        return;
+    }
+
+    // DELETE /crash-alerts/:id — Delete a specific crash alert
+    const crashAlertDeleteMatch = req.url.match(/^\/crash-alerts\/([a-zA-Z0-9_-]+)$/);
+    if (crashAlertDeleteMatch && req.method === 'DELETE') {
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const alertId = crashAlertDeleteMatch[1];
+                const db = getFirestore();
+
+                await db.collection('users').doc(user.uid)
+                    .collection('crashAlerts').doc(alertId)
+                    .delete();
+
+                alertCache = { data: null, loadedAt: 0 };
+
+                console.log(`[CrashAlerts] Deleted alert ${alertId} for user ${user.uid}`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({ success: true }));
+            } catch (err) {
+                console.error(`[CrashAlerts] Delete error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
+        return;
+    }
+
     // ---- Forecast Data Proxy: Fetch forecast JSON from R2 CDN ----
     // GET /forecasts/:state/:jurisdiction/:roadType (Nginx strips /api/ prefix)
     // Example: /forecasts/colorado/douglas/county_roads
@@ -2403,8 +2531,8 @@ server.listen(PORT, '127.0.0.1', () => {
 async function loadDueSchedules() {
     const now = Date.now();
 
-    // Return cached data if still fresh
-    if (scheduleCache.data && (now - scheduleCache.loadedAt) < SCHEDULE_CACHE_TTL) {
+    // Return cached data if still fresh (only cache non-empty results)
+    if (scheduleCache.data && scheduleCache.data.length > 0 && (now - scheduleCache.loadedAt) < SCHEDULE_CACHE_TTL) {
         return scheduleCache.data;
     }
 
@@ -2413,6 +2541,8 @@ async function loadDueSchedules() {
         const nowISO = new Date().toISOString();
 
         // Query all users' emailSchedules subcollections using collectionGroup
+        // REQUIRES composite index: emailSchedules(enabled ASC, nextRunAt ASC) with COLLECTION_GROUP scope
+        // Deploy via: firebase deploy --only firestore:indexes (see firestore.indexes.json)
         const snapshot = await db.collectionGroup('emailSchedules')
             .where('enabled', '==', true)
             .where('nextRunAt', '<=', nowISO)
@@ -2427,10 +2557,21 @@ async function loadDueSchedules() {
             });
         });
 
-        scheduleCache = { data: schedules, loadedAt: now };
+        // Only cache non-empty results to avoid masking real schedules during index creation
+        if (schedules.length > 0) {
+            scheduleCache = { data: schedules, loadedAt: now };
+        }
         return schedules;
     } catch (err) {
-        console.error(`[Scheduler] Failed to load schedules: ${err.message}`);
+        // Detect missing composite index error and provide actionable guidance
+        if (err.code === 9 || err.message.includes('index') || err.message.includes('FAILED_PRECONDITION')) {
+            console.error(`[Scheduler] MISSING FIRESTORE INDEX: The collectionGroup query on 'emailSchedules' requires a composite index.`);
+            console.error(`[Scheduler] Fix: Run 'firebase deploy --only firestore:indexes' or create the index manually in Firebase Console:`);
+            console.error(`[Scheduler]   Collection group: emailSchedules | Fields: enabled ASC, nextRunAt ASC`);
+            console.error(`[Scheduler] Error details: ${err.message}`);
+        } else {
+            console.error(`[Scheduler] Failed to load schedules: ${err.message}`);
+        }
         return [];
     }
 }
@@ -2497,5 +2638,476 @@ function startEmailScheduler() {
         processScheduledEmails();
     });
 
+    // Run crash alert monitoring every 6 hours (at minute 5 to avoid overlap with email scheduler)
+    cron.schedule('5 */6 * * *', () => {
+        processCrashAlerts();
+    });
+
     console.log('[Scheduler] Email scheduler started (checking every minute)');
+    console.log('[Scheduler] Crash alert monitor started (checking every 6 hours)');
+}
+
+// =============================================================================
+// Server-Side Crash Alert Monitoring (B/A Study Threshold Alerts)
+// =============================================================================
+
+const R2_PUBLIC_BASE = 'https://data.aicreatesai.com';
+
+// In-memory cache for crash alert configs (10-minute TTL)
+let alertCache = { data: null, loadedAt: 0 };
+const ALERT_CACHE_TTL = 10 * 60 * 1000;
+
+// In-memory cache for fetched crash CSVs (1-hour TTL, keyed by R2 path)
+const csvCache = new Map();
+const CSV_CACHE_TTL = 60 * 60 * 1000;
+
+async function loadDueCrashAlerts() {
+    const now = Date.now();
+
+    if (alertCache.data && alertCache.data.length > 0 && (now - alertCache.loadedAt) < ALERT_CACHE_TTL) {
+        return alertCache.data;
+    }
+
+    try {
+        const db = getFirestore();
+        const nowISO = new Date().toISOString();
+
+        // Query all users' crashAlerts subcollections
+        // REQUIRES composite index: crashAlerts(enabled ASC, nextCheckAt ASC) with COLLECTION_GROUP scope
+        const snapshot = await db.collectionGroup('crashAlerts')
+            .where('enabled', '==', true)
+            .where('nextCheckAt', '<=', nowISO)
+            .get();
+
+        const alerts = [];
+        snapshot.forEach(doc => {
+            alerts.push({
+                id: doc.id,
+                uid: doc.ref.parent.parent.id,
+                ...doc.data()
+            });
+        });
+
+        if (alerts.length > 0) {
+            alertCache = { data: alerts, loadedAt: now };
+        }
+        return alerts;
+    } catch (err) {
+        if (err.code === 9 || err.message.includes('index') || err.message.includes('FAILED_PRECONDITION')) {
+            console.error(`[CrashAlerts] MISSING FIRESTORE INDEX for crashAlerts collectionGroup query.`);
+            console.error(`[CrashAlerts] Fix: Run 'firebase deploy --only firestore:indexes' (see firestore.indexes.json)`);
+        } else {
+            console.error(`[CrashAlerts] Failed to load alerts: ${err.message}`);
+        }
+        return [];
+    }
+}
+
+/**
+ * Fetch and parse a crash CSV from R2 public CDN.
+ * Returns array of row objects with column headers as keys.
+ */
+async function fetchCrashCSV(r2Path) {
+    const now = Date.now();
+    const cached = csvCache.get(r2Path);
+    if (cached && (now - cached.loadedAt) < CSV_CACHE_TTL) {
+        return cached.rows;
+    }
+
+    const csvUrl = `${R2_PUBLIC_BASE}/${r2Path}`;
+    console.log(`[CrashAlerts] Fetching crash data: ${csvUrl}`);
+
+    return new Promise((resolve, reject) => {
+        https.get(csvUrl, (res) => {
+            if (res.statusCode === 301 || res.statusCode === 302) {
+                // Follow redirect
+                https.get(res.headers.location, (res2) => {
+                    if (res2.statusCode !== 200) {
+                        reject(new Error(`HTTP ${res2.statusCode} after redirect to ${res.headers.location}`));
+                        return;
+                    }
+                    collectHttpResponse(res2).then(data => {
+                        const rows = parseCSV(data);
+                        csvCache.set(r2Path, { rows, loadedAt: Date.now() });
+                        resolve(rows);
+                    }).catch(reject);
+                }).on('error', reject);
+                return;
+            }
+            if (res.statusCode !== 200) {
+                reject(new Error(`HTTP ${res.statusCode} fetching ${csvUrl}`));
+                return;
+            }
+            collectHttpResponse(res).then(data => {
+                const rows = parseCSV(data);
+                csvCache.set(r2Path, { rows, loadedAt: Date.now() });
+                console.log(`[CrashAlerts] Parsed ${rows.length} crash rows from ${r2Path}`);
+                resolve(rows);
+            }).catch(reject);
+        }).on('error', reject);
+    });
+}
+
+function collectHttpResponse(res) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        res.on('data', chunk => chunks.push(chunk));
+        res.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+        res.on('error', reject);
+    });
+}
+
+/**
+ * Minimal CSV parser — handles quoted fields and commas within quotes.
+ * Returns array of objects keyed by header names.
+ */
+function parseCSV(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return [];
+
+    const headers = splitCSVLine(lines[0]);
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+        const values = splitCSVLine(lines[i]);
+        // Accept rows with >= headers (trailing commas) or fewer (missing fields, padded with '')
+        if (values.length < headers.length) {
+            while (values.length < headers.length) values.push('');
+        }
+        const obj = {};
+        for (let j = 0; j < headers.length; j++) {
+            obj[headers[j]] = values[j] != null ? values[j] : '';
+        }
+        rows.push(obj);
+    }
+    return rows;
+}
+
+function splitCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+                current += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (ch === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+        } else {
+            current += ch;
+        }
+    }
+    result.push(current.trim());
+    return result;
+}
+
+/**
+ * Evaluate alert conditions against crash data for a single alert config.
+ * Mirrors the client-side evaluateBAAlertConditions() logic.
+ */
+function evaluateServerAlertConditions(alert, crashes) {
+    const conditions = [];
+    const thresholds = alert.thresholds || {};
+    const now = new Date();
+
+    // Filter crashes to the alert's location
+    let locationCrashes = crashes;
+    if (alert.locationType === 'route' && alert.locationValue) {
+        const routeCol = alert.routeColumn || 'RTE Name';
+        locationCrashes = crashes.filter(r => r[routeCol] === alert.locationValue);
+    } else if (alert.locationType === 'node' && alert.locationValue) {
+        const nodeCol = alert.nodeColumn || 'Node';
+        locationCrashes = crashes.filter(r => r[nodeCol] === alert.locationValue);
+    }
+
+    // 1. Crash Count Threshold
+    if (thresholds.crashCountEnabled) {
+        const windowMonths = thresholds.crashCountWindowMonths ?? 6;
+        const threshold = thresholds.crashCountThreshold ?? 5;
+        const cutoff = new Date(now);
+        cutoff.setMonth(cutoff.getMonth() - windowMonths);
+
+        const dateCol = alert.dateColumn || 'Crash Date';
+        const recentCrashes = locationCrashes.filter(r => {
+            const d = r[dateCol] ? new Date(r[dateCol]) : null;
+            return d && !isNaN(d) && d >= cutoff;
+        });
+
+        if (recentCrashes.length > threshold) {
+            conditions.push({
+                type: 'crash_count',
+                severity: 'warning',
+                title: 'Crash Count Threshold Exceeded',
+                message: `${recentCrashes.length} crashes in the last ${windowMonths} months (threshold: ${threshold})`,
+                value: recentCrashes.length,
+                threshold
+            });
+        }
+    }
+
+    // 2. Severity Alert
+    if (thresholds.severityEnabled) {
+        const level = thresholds.severityLevel ?? 'KA';
+        const targetSevs = level === 'K' ? ['K'] : level === 'KA' ? ['K', 'A'] : ['K', 'A', 'B'];
+        const last90Days = new Date(now);
+        last90Days.setDate(last90Days.getDate() - 90);
+
+        const dateCol = alert.dateColumn || 'Crash Date';
+        const sevCol = alert.severityColumn || 'Crash Severity';
+        const severeCrashes = locationCrashes.filter(r => {
+            const d = r[dateCol] ? new Date(r[dateCol]) : null;
+            const sev = (r[sevCol] || '').charAt(0).toUpperCase();
+            return d && !isNaN(d) && d >= last90Days && targetSevs.includes(sev);
+        });
+
+        if (severeCrashes.length > 0) {
+            const sevLabel = level === 'K' ? 'Fatal' : level === 'KA' ? 'Fatal + Serious Injury' : 'Any Injury';
+            conditions.push({
+                type: 'severity',
+                severity: 'critical',
+                title: `${sevLabel} Crash Detected`,
+                message: `${severeCrashes.length} ${sevLabel.toLowerCase()} crash(es) in the last 90 days`,
+                value: severeCrashes.length,
+                threshold: 0
+            });
+        }
+    }
+
+    // 3. Trend Detection (compare recent window to prior window)
+    if (thresholds.trendEnabled) {
+        const increaseThreshold = thresholds.trendIncreasePercent ?? 25;
+        const windowMonths = thresholds.trendWindowMonths ?? 12;
+        const dateCol = alert.dateColumn || 'Crash Date';
+
+        const recentStart = new Date(now);
+        recentStart.setMonth(recentStart.getMonth() - windowMonths);
+        const priorStart = new Date(recentStart);
+        priorStart.setMonth(priorStart.getMonth() - windowMonths);
+
+        const recentCount = locationCrashes.filter(r => {
+            const d = r[dateCol] ? new Date(r[dateCol]) : null;
+            return d && !isNaN(d) && d >= recentStart && d <= now;
+        }).length;
+
+        const priorCount = locationCrashes.filter(r => {
+            const d = r[dateCol] ? new Date(r[dateCol]) : null;
+            return d && !isNaN(d) && d >= priorStart && d < recentStart;
+        }).length;
+
+        if (priorCount > 0) {
+            const changePercent = ((recentCount - priorCount) / priorCount) * 100;
+            if (changePercent >= increaseThreshold) {
+                conditions.push({
+                    type: 'trend',
+                    severity: 'warning',
+                    title: 'Crash Rate Increase Detected',
+                    message: `Crash rate increased by ${changePercent.toFixed(1)}% (${priorCount} → ${recentCount} in ${windowMonths}-month windows, threshold: ${increaseThreshold}%)`,
+                    value: parseFloat(changePercent.toFixed(1)),
+                    threshold: increaseThreshold
+                });
+            }
+        }
+    }
+
+    return { triggered: conditions.length > 0, conditions };
+}
+
+/**
+ * Escape HTML special characters to prevent XSS in email content.
+ */
+function escapeHtml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Build HTML email for server-side crash alert notifications.
+ */
+function buildServerAlertEmailHtml(conditions, alert) {
+    const locationName = escapeHtml(alert.locationName || alert.locationValue || 'Unknown Location');
+    const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const appUrl = APP_URL || 'https://crashlens.aicreatesai.com';
+
+    const conditionRows = conditions.map(c => {
+        const bgColor = c.severity === 'critical' ? '#fef2f2' : '#fffbeb';
+        const borderColor = c.severity === 'critical' ? '#fecaca' : '#fde68a';
+        const iconColor = c.severity === 'critical' ? '#dc2626' : '#d97706';
+        return `
+            <div style="background:${bgColor};border:1.5px solid ${borderColor};border-radius:8px;padding:14px 16px;margin-bottom:10px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                    <span style="color:${iconColor};font-size:16px">&#9888;</span>
+                    <strong style="color:${iconColor};font-size:14px">${escapeHtml(c.title)}</strong>
+                </div>
+                <p style="margin:0;color:#334155;font-size:13px;line-height:1.5">${escapeHtml(c.message)}</p>
+            </div>`;
+    }).join('');
+
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+  <tr><td style="background:linear-gradient(135deg,#dc2626 0%,#ea580c 50%,#d97706 100%);padding:28px 32px;text-align:center;">
+    <h1 style="color:white;margin:0;font-size:22px;font-weight:600;letter-spacing:0.5px">CRASH LENS</h1>
+    <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:15px;font-weight:500">&#9888; Automated Crash Monitoring Alert</p>
+  </td></tr>
+  <tr><td style="padding:28px 32px;">
+    <p style="color:#1e293b;font-size:15px;margin:0 0 6px;line-height:1.6">
+        Alert triggered for <strong>${locationName}</strong>
+    </p>
+    <p style="color:#64748b;font-size:13px;margin:0 0 20px">${dateStr}</p>
+
+    <h3 style="margin:0 0 12px;color:#1e293b;font-size:15px;font-weight:600">Triggered Conditions</h3>
+    ${conditionRows}
+
+    <table cellpadding="0" cellspacing="0" style="margin:20px auto 24px;">
+    <tr><td style="background:#1a237e;border-radius:6px;padding:14px 32px;">
+      <a href="${appUrl}/app/" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;">Open Before/After Study in CRASH LENS</a>
+    </td></tr></table>
+
+    <div style="margin-top:20px;padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
+        <p style="margin:0;color:#475569;font-size:12px;line-height:1.5">
+            This is an automated alert from CRASH LENS crash monitoring. Log in to review the full Before/After analysis and adjust alert settings.
+        </p>
+    </div>
+  </td></tr>
+  <tr><td style="background:#f8f9fa;padding:20px 32px;text-align:center;border-top:1px solid #e8eaed;">
+    <p style="color:#999;font-size:12px;margin:0;">CRASH LENS by AI Creates AI &mdash; Traffic Safety Intelligence</p>
+    <p style="color:#bbb;font-size:11px;margin:4px 0 0;">To change your alert settings, open CRASH LENS &gt; Before/After Study &gt; Monitoring</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+/**
+ * Calculate next check time for a crash alert (every 6 hours by default).
+ */
+function calculateNextAlertCheck(alert) {
+    const intervalHours = alert.checkIntervalHours || 6;
+    return new Date(Date.now() + intervalHours * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * Main crash alert processing loop — runs on cron schedule.
+ * Fetches crash data from R2, evaluates thresholds, sends alert emails.
+ */
+async function processCrashAlerts() {
+    try {
+        const dueAlerts = await loadDueCrashAlerts();
+        if (dueAlerts.length === 0) return;
+
+        console.log(`[CrashAlerts] Processing ${dueAlerts.length} due alert(s)`);
+        const db = getFirestore();
+
+        // Group alerts by r2Path to avoid fetching same CSV multiple times
+        const alertsByPath = new Map();
+        for (const alert of dueAlerts) {
+            const r2Path = alert.r2Path;
+            if (!r2Path) {
+                console.warn(`[CrashAlerts] Alert ${alert.id} has no r2Path, rescheduling`);
+                // Still update nextCheckAt so this alert isn't re-queried every tick
+                try {
+                    await db.collection('users').doc(alert.uid)
+                        .collection('crashAlerts').doc(alert.id)
+                        .update({ nextCheckAt: calculateNextAlertCheck(alert), lastCheckedAt: new Date().toISOString() });
+                } catch (e) { /* ignore update failure */ }
+                continue;
+            }
+            if (!alertsByPath.has(r2Path)) alertsByPath.set(r2Path, []);
+            alertsByPath.get(r2Path).push(alert);
+        }
+
+        for (const [r2Path, alerts] of alertsByPath) {
+            let crashes;
+            try {
+                crashes = await fetchCrashCSV(r2Path);
+            } catch (fetchErr) {
+                console.error(`[CrashAlerts] Failed to fetch crash data from ${r2Path}: ${fetchErr.message}`);
+                continue;
+            }
+
+            for (const alert of alerts) {
+                try {
+                    // Check cooldown
+                    if (alert.lastAlertSent) {
+                        const cooldownMs = (alert.cooldownDays || 7) * 24 * 60 * 60 * 1000;
+                        const lastSent = new Date(alert.lastAlertSent).getTime();
+                        if (Date.now() - lastSent < cooldownMs) {
+                            // Still in cooldown, just update nextCheckAt
+                            await db.collection('users').doc(alert.uid)
+                                .collection('crashAlerts').doc(alert.id)
+                                .update({ nextCheckAt: calculateNextAlertCheck(alert) });
+                            continue;
+                        }
+                    }
+
+                    const evaluation = evaluateServerAlertConditions(alert, crashes);
+
+                    // Always update nextCheckAt
+                    const updateData = { nextCheckAt: calculateNextAlertCheck(alert), lastCheckedAt: new Date().toISOString() };
+
+                    if (evaluation.triggered) {
+                        const recipients = alert.recipients || [];
+                        if (recipients.length === 0) {
+                            console.warn(`[CrashAlerts] Alert ${alert.id} triggered but no recipients, skipping send`);
+                        } else {
+                            const html = buildServerAlertEmailHtml(evaluation.conditions, alert);
+                            const locationName = alert.locationName || alert.locationValue || 'Unknown Location';
+                            const subject = `Crash Monitoring Alert — ${locationName}`;
+                            const text = evaluation.conditions.map(c => `${c.title}: ${c.message}`).join('\n');
+
+                            for (const recipient of recipients) {
+                                try {
+                                    await sendViaBrevoApi(recipient, subject, html, text, null, {
+                                        tag: 'ba-monitoring-alert',
+                                        includeListHeaders: true
+                                    });
+                                    console.log(`[CrashAlerts] Alert sent to ${recipient} for ${locationName}`);
+                                } catch (sendErr) {
+                                    console.error(`[CrashAlerts] Failed to send to ${recipient}: ${sendErr.message}`);
+                                }
+                            }
+
+                            updateData.lastAlertSent = new Date().toISOString();
+                            updateData.lastTriggeredConditions = evaluation.conditions.map(c => ({
+                                type: c.type, severity: c.severity, title: c.title, message: c.message
+                            }));
+                        }
+                    }
+
+                    await db.collection('users').doc(alert.uid)
+                        .collection('crashAlerts').doc(alert.id)
+                        .update(updateData);
+
+                    console.log(`[CrashAlerts] Alert ${alert.id} checked${evaluation.triggered ? ' — TRIGGERED' : ' — no conditions met'}, next check: ${updateData.nextCheckAt}`);
+                } catch (alertErr) {
+                    console.error(`[CrashAlerts] Error processing alert ${alert.id}: ${alertErr.message}`);
+                }
+            }
+        }
+
+        // Invalidate cache after processing
+        alertCache = { data: null, loadedAt: 0 };
+    } catch (err) {
+        console.error(`[CrashAlerts] Error in processCrashAlerts: ${err.message}`);
+    }
+}
+
+// Export pure functions for testing (only when required as module, not when run directly)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        parseCSV,
+        splitCSVLine,
+        evaluateServerAlertConditions,
+        calculateNextRunAt,
+        calculateNextAlertCheck,
+        buildServerAlertEmailHtml,
+        escapeHtml
+    };
 }
