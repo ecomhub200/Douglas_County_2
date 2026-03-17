@@ -98,7 +98,7 @@ jobs:
           echo "Normalizing ${STATE_DISPLAY} data to Virginia standard"
           echo "=========================================="
           NORMALIZED=0
-          for f in data/DelawareDOT/*.csv; do
+          for f in data/DelawareDOT/*_crashes.csv; do
             [ -f "$f" ] || continue
             BASENAME=$(basename "$f" .csv)
             echo "  Normalizing: $f"

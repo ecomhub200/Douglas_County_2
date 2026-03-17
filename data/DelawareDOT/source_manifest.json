@@ -8,21 +8,24 @@
     "file_format": "JSON/CSV"
   },
   "jurisdiction_filters": {
-    "_description": "All 3 Delaware counties. FIPS codes are 5-digit (state 10 + 3-digit county).",
+    "_description": "All 3 Delaware counties. FIPS codes are 5-digit (state 10 + 3-digit county). CSV export uses 'COUNTY NAME', JSON API uses 'county_desc'.",
     "kent": {
       "fips": "10001",
       "county_name": "Kent",
-      "soql_filter": "county_name='Kent'"
+      "soql_filter": "county_desc='Kent'",
+      "csv_filter_column": "COUNTY NAME"
     },
     "new_castle": {
       "fips": "10003",
       "county_name": "New Castle",
-      "soql_filter": "county_name='New Castle'"
+      "soql_filter": "county_desc='New Castle'",
+      "csv_filter_column": "COUNTY NAME"
     },
     "sussex": {
       "fips": "10005",
       "county_name": "Sussex",
-      "soql_filter": "county_name='Sussex'"
+      "soql_filter": "county_desc='Sussex'",
+      "csv_filter_column": "COUNTY NAME"
     }
   },
   "api": {

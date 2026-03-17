@@ -1257,8 +1257,10 @@ class DelawareNormalizer(BaseNormalizer):
     - No node/intersection ID → empty (deferred)
     """
 
-    # Map from lowercase Socrata API names to UPPERCASE CSV/Excel names
-    # Used to normalize field access across both formats
+    # Map from canonical field names to UPPERCASE CSV/Excel names AND abbreviated
+    # Socrata JSON API names. The JSON API underwent a schema change where field
+    # names were shortened (e.g. crash_classification_description → crash_class_desc).
+    # We support all three formats: canonical, UPPERCASE, and abbreviated.
     _FIELD_ALIASES = {
         'crash_datetime': 'CRASH DATETIME',
         'crash_classification_description': 'CRASH CLASSIFICATION DESCRIPTION',
@@ -1281,6 +1283,33 @@ class DelawareNormalizer(BaseNormalizer):
         'day_of_week_description': 'DAY OF WEEK DESCRIPTION',
         'year': 'YEAR',
         'school_bus_involved_code': 'SCHOOL BUS INVOLVED CODE',
+    }
+
+    # Abbreviated Socrata JSON API field names (post-schema-change) mapped to
+    # the canonical names used by _get(). This allows the normalizer to work
+    # with data from the JSON API even after the field rename.
+    _ABBREVIATED_ALIASES = {
+        'crash_class_desc': 'crash_classification_description',
+        'crash_class': 'crash_classification_code',
+        'impact_desc': 'manner_of_impact_description',
+        'impact': 'manner_of_impact_code',
+        'weather_1_desc': 'weather_1_description',
+        'light_cond_desc': 'lighting_condition_description',
+        'light_cond': 'lighting_condition_code',
+        'road_surface_desc': 'road_surface_description',
+        'road_surface': 'road_surface_code',
+        'county_desc': 'county_name',
+        'county': 'county_code',
+        'ped_involved': 'pedestrian_involved',
+        'bike_involved': 'bicycled_involved',
+        'mc_involved': 'motorcycle_involved',
+        'mc_helmet_used': 'motorcycle_helmet_used',
+        'bike_helmet_used': 'bicycle_helmet_used',
+        'pri_contrib_circum': 'primary_contributing_circumstance_code',
+        'pri_contrib_circum_desc': 'primary_contributing_circumstance_description',
+        'priv_prop_coll': 'collision_on_private_property',
+        'day_of_week_desc': 'day_of_week_description',
+        'day_of_week': 'day_of_week_code',
     }
 
     # Crash classification → KABCO severity (case-insensitive via .strip().lower())
@@ -1321,26 +1350,44 @@ class DelawareNormalizer(BaseNormalizer):
     }
 
     def _get(self, row: Dict[str, str], primary: str, alt: str = '') -> str:
-        """Get field value trying lowercase API name, then UPPERCASE CSV name, then alt."""
-        val = (row.get(primary) or '').strip()
-        if not val:
-            # Try UPPERCASE alias
-            upper_alias = self._FIELD_ALIASES.get(primary, '')
-            if upper_alias:
-                raw = row.get(upper_alias)
-                val = str(raw).strip() if raw is not None else ''
+        """Get field value trying multiple name formats.
+
+        Lookup order for each field name:
+        1. Canonical lowercase (e.g. 'crash_classification_description')
+        2. UPPERCASE CSV alias (e.g. 'CRASH CLASSIFICATION DESCRIPTION')
+        3. Abbreviated API alias (e.g. 'crash_class_desc')
+        4. Alt field name (same lookup order)
+        """
+        val = self._try_field(row, primary)
         if not val and alt:
-            raw = row.get(alt)
-            val = str(raw).strip() if raw is not None else ''
-            if not val:
-                upper_alias = self._FIELD_ALIASES.get(alt, '')
-                if upper_alias:
-                    raw = row.get(upper_alias)
-                    val = str(raw).strip() if raw is not None else ''
-        # Treat 'NA', 'None', 'nan' as empty
+            val = self._try_field(row, alt)
+        # Treat sentinel values as empty
         if val in ('NA', 'None', 'nan', 'N/A', 'null'):
             return ''
         return val
+
+    def _try_field(self, row: Dict[str, str], field_name: str) -> str:
+        """Try to get a field value using all known name formats."""
+        # 1. Try the canonical name directly
+        val = (row.get(field_name) or '').strip()
+        if val:
+            return val
+        # 2. Try UPPERCASE CSV alias
+        upper_alias = self._FIELD_ALIASES.get(field_name, '')
+        if upper_alias:
+            raw = row.get(upper_alias)
+            val = str(raw).strip() if raw is not None else ''
+            if val:
+                return val
+        # 3. Try abbreviated API names (reverse lookup: find any abbreviated
+        #    key that maps to this canonical name)
+        for abbrev, canonical in self._ABBREVIATED_ALIASES.items():
+            if canonical == field_name:
+                raw = row.get(abbrev)
+                val = str(raw).strip() if raw is not None else ''
+                if val:
+                    return val
+        return ''
 
     def _is_truthy(self, value: str) -> bool:
         """Check if a Delaware boolean field value is truthy (Y/N or Yes/No)."""

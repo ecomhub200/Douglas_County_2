@@ -175,6 +175,69 @@ jobs:
 
           python scripts/init_cache.py --state "$STATE"
 
+      # ── Stage 0.5: Download from R2 (if no local CSV) ──
+      # When triggered by a state download workflow, the CSV only exists on
+      # R2 (the download ran on a different runner). Fetch it here so the
+      # pipeline has input data to process.
+      - name: "Stage 0.5: Download from R2 if needed"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET: "crash-lens-data"
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          INPUT_CSV="${{ needs.prepare.outputs.input_csv }}"
+          R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
+          SELECTION="${{ needs.prepare.outputs.selection }}"
+          JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
+
+          echo "=========================================="
+          echo "Stage 0.5: Download from R2 if needed"
+          echo "=========================================="
+
+          # Skip if input CSV already exists locally
+          if [ -n "$INPUT_CSV" ] && [ -f "$INPUT_CSV" ]; then
+            echo "  Input CSV exists locally: $INPUT_CSV"
+            exit 0
+          fi
+
+          echo "  No local CSV found — downloading from R2..."
+          mkdir -p "$DATA_DIR"
+          DOWNLOADED=0
+
+          echo "$JURISDICTIONS" | python3 -c "
+          import json, sys, subprocess, os
+          jurisdictions = json.load(sys.stdin)
+          data_dir = '$DATA_DIR'
+          r2_prefix = '$R2_PREFIX'
+          endpoint = os.environ.get('R2_ENDPOINT', '')
+          bucket = os.environ.get('R2_BUCKET', 'crash-lens-data')
+          downloaded = 0
+          for j in jurisdictions:
+              # Try downloading the normalized crashes CSV from R2
+              r2_key = f'{r2_prefix}/{j}/{j}_crashes.csv.gz'
+              local_gz = f'{data_dir}/{j}_crashes.csv.gz'
+              local_csv = f'{data_dir}/{j}_all_roads.csv'
+              try:
+                  result = subprocess.run([
+                      'aws', 's3', 'cp', f's3://{bucket}/{r2_key}', local_gz,
+                      '--endpoint-url', endpoint, '--only-show-errors'
+                  ], check=True, capture_output=True, timeout=120)
+                  # Decompress
+                  subprocess.run(['gunzip', '-f', local_gz], check=True)
+                  decompressed = local_gz.replace('.csv.gz', '.csv')
+                  if os.path.exists(decompressed):
+                      os.rename(decompressed, local_csv)
+                      size = os.path.getsize(local_csv)
+                      print(f'  Downloaded and decompressed: {j} ({size:,} bytes)')
+                      downloaded += 1
+              except Exception as e:
+                  print(f'  Could not download {r2_key}: {e}')
+          print(f'  Total downloaded: {downloaded}/{len(jurisdictions)}')
+          "
+
       # ── Stage 1: Split by Jurisdiction ──
       # Always run: pipeline may receive statewide CSV that needs splitting
       # into per-jurisdiction files (including city_roads, county_roads,
@@ -193,9 +256,17 @@ jobs:
 
           SPLIT_INPUT="$INPUT_CSV"
 
+          # If original input_csv not found, check for R2-downloaded file
           if [ -z "$SPLIT_INPUT" ] || [ ! -f "$SPLIT_INPUT" ]; then
-            echo "WARNING: No input CSV found for splitting"
-            exit 0
+            SELECTION="${{ needs.prepare.outputs.selection }}"
+            ALT_CSV="${{ needs.prepare.outputs.data_dir }}/${SELECTION}_all_roads.csv"
+            if [ -f "$ALT_CSV" ]; then
+              SPLIT_INPUT="$ALT_CSV"
+              echo "  Using R2-downloaded CSV: $SPLIT_INPUT"
+            else
+              echo "WARNING: No input CSV found for splitting"
+              exit 0
+            fi
           fi
 
           ARGS="--state $STATE --input $SPLIT_INPUT --output-dir $DATA_DIR"
