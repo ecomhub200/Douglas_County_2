@@ -343,24 +343,36 @@ CL.upload = CL.upload || {};
         localStorage.setItem('userPreferencesSaved', 'true');
         if (typeof updateCurrentSelectionDisplay === 'function') updateCurrentSelectionDisplay();
 
-        // Sync jurisdiction to Firestore user profile so it persists across devices/sessions
+        // Sync jurisdiction to Firestore user profile so it persists across devices/sessions.
+        // Uses the (userState, userJurisdiction) compound key — jurisdiction-agnostic across states.
         if (typeof CrashLensAuth !== 'undefined' && CrashLensAuth.currentUser) {
             var stateOption = stateSelect && stateSelect.options[stateSelect.selectedIndex];
             var jurisOption = jurisdictionSelect && jurisdictionSelect.options[jurisdictionSelect.selectedIndex];
-            var firebaseUpdate = {
+            var jurisUpdate = {
                 userState: (stateSelect && stateSelect.value) || '',
                 userStateName: stateOption ? stateOption.textContent.replace(/\s*\(.*\)\s*$/, '') : '',
                 userJurisdiction: (jurisdictionSelect && jurisdictionSelect.value) || '',
                 userJurisdictionName: jurisOption ? jurisOption.textContent : ''
             };
-            firebase.firestore().collection('users').doc(CrashLensAuth.currentUser.uid)
-                .update(firebaseUpdate)
-                .then(function() {
-                    console.log('[Preferences] Synced to Firestore:', firebaseUpdate);
-                })
-                .catch(function(err) {
-                    console.warn('[Preferences] Firestore sync failed:', err);
-                });
+            // Use dedicated jurisdiction update method if available, else direct Firestore update
+            if (typeof CrashLensAuth.updateUserJurisdiction === 'function') {
+                CrashLensAuth.updateUserJurisdiction(jurisUpdate)
+                    .then(function() {
+                        console.log('[Preferences] Synced jurisdiction to Firestore:', jurisUpdate);
+                    })
+                    .catch(function(err) {
+                        console.warn('[Preferences] Firestore jurisdiction sync failed:', err);
+                    });
+            } else if (typeof firebase !== 'undefined') {
+                firebase.firestore().collection('users').doc(CrashLensAuth.currentUser.uid)
+                    .update(jurisUpdate)
+                    .then(function() {
+                        console.log('[Preferences] Synced to Firestore:', jurisUpdate);
+                    })
+                    .catch(function(err) {
+                        console.warn('[Preferences] Firestore sync failed:', err);
+                    });
+            }
         }
 
         // Visual feedback

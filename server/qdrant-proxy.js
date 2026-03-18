@@ -1516,13 +1516,16 @@ const server = http.createServer((req, res) => {
                         severityLevel: data.thresholds?.severityLevel ?? 'KA',
                         trendEnabled: data.thresholds?.trendEnabled ?? false,
                         trendIncreasePercent: data.thresholds?.trendIncreasePercent ?? 25,
-                        trendWindowMonths: data.thresholds?.trendWindowMonths ?? 12
+                        trendWindowMonths: data.thresholds?.trendWindowMonths ?? 12,
+                        patternsEnabled: data.thresholds?.patternsEnabled ?? false
                     },
-                    // Column name overrides (for multi-state support)
+                    // Column name overrides (for multi-state / jurisdiction-agnostic support)
                     routeColumn: data.routeColumn || 'RTE Name',
                     nodeColumn: data.nodeColumn || 'Node',
                     dateColumn: data.dateColumn || 'Crash Date',
                     severityColumn: data.severityColumn || 'Crash Severity',
+                    weatherColumn: data.weatherColumn || 'Weather Condition',
+                    lightColumn: data.lightColumn || 'Light Condition',
                     cooldownDays: data.cooldownDays ?? 30,       // Monthly cycle — 30 day cooldown
                     state: data.state || '',
                     jurisdiction: data.jurisdiction || '',
@@ -2919,6 +2922,110 @@ function evaluateServerAlertConditions(alert, crashes) {
         }
     }
 
+    // 4. Situational Pattern Analysis (weather, lighting, day of week — 6/12/36 month trends)
+    if (thresholds.patternsEnabled) {
+        const dateCol = alert.dateColumn || 'Crash Date';
+        const weatherCol = alert.weatherColumn || 'Weather Condition';
+        const lightCol = alert.lightColumn || 'Light Condition';
+        const sevCol = alert.severityColumn || 'Crash Severity';
+
+        const windows = [
+            { months: 6, label: '6-Month' },
+            { months: 12, label: '12-Month' },
+            { months: 36, label: '36-Month' }
+        ];
+
+        const windowSnapshots = windows.map(w => {
+            const cutoff = new Date(now);
+            cutoff.setMonth(cutoff.getMonth() - w.months);
+            const windowCrashes = locationCrashes.filter(r => {
+                const d = r[dateCol] ? new Date(r[dateCol]) : null;
+                return d && !isNaN(d) && d >= cutoff && d <= now;
+            });
+
+            // Weather distribution
+            const weatherDist = {};
+            // Light distribution
+            const lightDist = {};
+            // Day of week distribution (0=Sun..6=Sat)
+            const dowDist = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+            // Severity counts for KA crashes in adverse conditions
+            let adverseWeatherKA = 0;
+            let nightKA = 0;
+
+            windowCrashes.forEach(r => {
+                const weather = (r[weatherCol] || 'Unknown').trim();
+                weatherDist[weather] = (weatherDist[weather] || 0) + 1;
+
+                const light = (r[lightCol] || 'Unknown').trim();
+                lightDist[light] = (lightDist[light] || 0) + 1;
+
+                const d = r[dateCol] ? new Date(r[dateCol]) : null;
+                if (d && !isNaN(d)) {
+                    dowDist[d.getDay()]++;
+                }
+
+                const sev = (r[sevCol] || '').charAt(0).toUpperCase();
+                const isAdverse = /rain|snow|fog|sleet|ice|severe|storm/i.test(weather);
+                const isNight = /dark|night/i.test(light);
+                const isKA = sev === 'K' || sev === 'A';
+                if (isAdverse && isKA) adverseWeatherKA++;
+                if (isNight && isKA) nightKA++;
+            });
+
+            // Calculate adverse weather % and night %
+            const total = windowCrashes.length;
+            const adverseCount = Object.entries(weatherDist)
+                .filter(([k]) => /rain|snow|fog|sleet|ice|severe|storm/i.test(k))
+                .reduce((s, [, v]) => s + v, 0);
+            const nightCount = Object.entries(lightDist)
+                .filter(([k]) => /dark|night/i.test(k))
+                .reduce((s, [, v]) => s + v, 0);
+
+            // Find peak day
+            const dowNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            let peakDay = 0;
+            let peakDayCount = 0;
+            for (let i = 0; i < 7; i++) {
+                if (dowDist[i] > peakDayCount) {
+                    peakDay = i;
+                    peakDayCount = dowDist[i];
+                }
+            }
+            const weekendCount = dowDist[0] + dowDist[6];
+            const weekdayCount = total - weekendCount;
+
+            return {
+                label: w.label,
+                months: w.months,
+                total,
+                weatherDist,
+                lightDist,
+                dowDist,
+                adverseWeatherPct: total > 0 ? ((adverseCount / total) * 100).toFixed(1) : '0.0',
+                adverseCount,
+                nightPct: total > 0 ? ((nightCount / total) * 100).toFixed(1) : '0.0',
+                nightCount,
+                adverseWeatherKA,
+                nightKA,
+                peakDay: dowNames[peakDay],
+                peakDayCount,
+                peakDayPct: total > 0 ? ((peakDayCount / total) * 100).toFixed(1) : '0.0',
+                weekendPct: total > 0 ? ((weekendCount / total) * 100).toFixed(1) : '0.0',
+                weekdayPct: total > 0 ? ((weekdayCount / total) * 100).toFixed(1) : '0.0'
+            };
+        });
+
+        // Always include patterns as a context condition (not a threshold trigger)
+        conditions.push({
+            type: 'situational_patterns',
+            severity: 'info',
+            title: 'Situational Awareness — Crash Patterns',
+            message: 'Weather, lighting, and day-of-week pattern analysis across multiple time windows',
+            windows: windowSnapshots
+        });
+    }
+
     return { triggered: conditions.length > 0, conditions };
 }
 
@@ -2937,7 +3044,11 @@ function buildServerAlertEmailHtml(conditions, alert) {
     const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const appUrl = APP_URL || 'https://crashlens.aicreatesai.com';
 
-    const conditionRows = conditions.map(c => {
+    // Separate threshold conditions from pattern analysis
+    const thresholdConditions = conditions.filter(c => c.type !== 'situational_patterns');
+    const patternCondition = conditions.find(c => c.type === 'situational_patterns');
+
+    const conditionRows = thresholdConditions.map(c => {
         const bgColor = c.severity === 'critical' ? '#fef2f2' : '#fffbeb';
         const borderColor = c.severity === 'critical' ? '#fecaca' : '#fde68a';
         const iconColor = c.severity === 'critical' ? '#dc2626' : '#d97706';
@@ -2950,6 +3061,83 @@ function buildServerAlertEmailHtml(conditions, alert) {
                 <p style="margin:0;color:#334155;font-size:13px;line-height:1.5">${escapeHtml(c.message)}</p>
             </div>`;
     }).join('');
+
+    // Build situational patterns section if present
+    let patternsSection = '';
+    if (patternCondition && patternCondition.windows) {
+        const cellStyle = 'padding:6px 10px;font-size:12px;color:#334155;border-bottom:1px solid #e2e8f0;';
+        const headerCellStyle = 'padding:8px 10px;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #cbd5e1;background:#f8fafc;';
+
+        const windowRows = patternCondition.windows.map(w => `
+            <tr>
+                <td style="${cellStyle}font-weight:600">${w.label}</td>
+                <td style="${cellStyle}text-align:center">${w.total}</td>
+                <td style="${cellStyle}text-align:center">${w.adverseWeatherPct}%<span style="color:#94a3b8;font-size:11px"> (${w.adverseCount})</span></td>
+                <td style="${cellStyle}text-align:center">${w.nightPct}%<span style="color:#94a3b8;font-size:11px"> (${w.nightCount})</span></td>
+                <td style="${cellStyle}text-align:center">${w.peakDay}<span style="color:#94a3b8;font-size:11px"> (${w.peakDayPct}%)</span></td>
+                <td style="${cellStyle}text-align:center">${w.weekendPct}%</td>
+            </tr>`).join('');
+
+        // Top weather conditions from the 12-month window
+        const w12 = patternCondition.windows.find(w => w.months === 12) || patternCondition.windows[0];
+        const topWeather = Object.entries(w12.weatherDist)
+            .filter(([k]) => k !== 'Unknown')
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([k, v]) => `${escapeHtml(k)}: ${v} (${(v / w12.total * 100).toFixed(0)}%)`)
+            .join(', ');
+        const topLight = Object.entries(w12.lightDist)
+            .filter(([k]) => k !== 'Unknown')
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([k, v]) => `${escapeHtml(k)}: ${v} (${(v / w12.total * 100).toFixed(0)}%)`)
+            .join(', ');
+
+        // Trend arrows: compare 6-month to 36-month averages
+        const w6 = patternCondition.windows.find(w => w.months === 6);
+        const w36 = patternCondition.windows.find(w => w.months === 36);
+        let trendNote = '';
+        if (w6 && w36 && w36.total > 0) {
+            const monthlyAvg36 = w36.total / 36;
+            const monthlyAvg6 = w6.total / 6;
+            if (monthlyAvg36 > 0) {
+                const trendPct = ((monthlyAvg6 - monthlyAvg36) / monthlyAvg36 * 100).toFixed(0);
+                const arrow = trendPct > 10 ? '&#9650;' : trendPct < -10 ? '&#9660;' : '&#9644;';
+                const trendColor = trendPct > 10 ? '#dc2626' : trendPct < -10 ? '#16a34a' : '#64748b';
+                trendNote = `<p style="margin:8px 0 0;color:${trendColor};font-size:12px;font-weight:600">${arrow} Monthly crash rate trend: ${trendPct > 0 ? '+' : ''}${trendPct}% (6-mo avg vs 36-mo avg)</p>`;
+            }
+        }
+
+        patternsSection = `
+    <div style="margin-top:24px;border-top:2px solid #e2e8f0;padding-top:20px">
+        <h3 style="margin:0 0 4px;color:#1e293b;font-size:15px;font-weight:600">Situational Awareness</h3>
+        <p style="margin:0 0 14px;color:#64748b;font-size:12px">Weather, lighting &amp; day-of-week patterns across time windows</p>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;border-collapse:collapse;">
+            <thead>
+                <tr>
+                    <th style="${headerCellStyle}text-align:left">Window</th>
+                    <th style="${headerCellStyle}text-align:center">Total</th>
+                    <th style="${headerCellStyle}text-align:center">Adverse Wx</th>
+                    <th style="${headerCellStyle}text-align:center">Night</th>
+                    <th style="${headerCellStyle}text-align:center">Peak Day</th>
+                    <th style="${headerCellStyle}text-align:center">Weekend</th>
+                </tr>
+            </thead>
+            <tbody>${windowRows}</tbody>
+        </table>
+
+        ${trendNote}
+
+        <div style="margin-top:14px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px">
+            <p style="margin:0 0 4px;color:#1e40af;font-size:12px;font-weight:600">12-Month Breakdown</p>
+            <p style="margin:0;color:#334155;font-size:12px;line-height:1.6">
+                <strong>Weather:</strong> ${topWeather || 'No data'}<br>
+                <strong>Lighting:</strong> ${topLight || 'No data'}
+            </p>
+        </div>
+    </div>`;
+    }
 
     return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -2967,8 +3155,10 @@ function buildServerAlertEmailHtml(conditions, alert) {
     </p>
     <p style="color:#64748b;font-size:13px;margin:0 0 20px">${dateStr}</p>
 
-    <h3 style="margin:0 0 12px;color:#1e293b;font-size:15px;font-weight:600">Triggered Conditions</h3>
-    ${conditionRows}
+    ${thresholdConditions.length > 0 ? `<h3 style="margin:0 0 12px;color:#1e293b;font-size:15px;font-weight:600">Triggered Conditions</h3>
+    ${conditionRows}` : ''}
+
+    ${patternsSection}
 
     <table cellpadding="0" cellspacing="0" style="margin:20px auto 24px;">
     <tr><td style="background:#1a237e;border-radius:6px;padding:14px 32px;">

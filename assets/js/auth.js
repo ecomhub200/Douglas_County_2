@@ -515,6 +515,30 @@ const CrashLensAuth = {
   },
 
   /**
+   * Update only the jurisdiction fields in the user's Firestore profile.
+   * Jurisdiction-agnostic: stores the (userState, userJurisdiction) compound key
+   * so the profile works correctly across any state/jurisdiction system.
+   * @param {Object} data - { userState, userStateName, userJurisdiction, userJurisdictionName }
+   */
+  updateUserJurisdiction: async function(data) {
+    if (!this.currentUser) return;
+
+    const userRef = firebase.firestore().collection('users').doc(this.currentUser.uid);
+    const updates = {};
+    if (data.userState !== undefined) updates.userState = data.userState;
+    if (data.userStateName !== undefined) updates.userStateName = data.userStateName;
+    if (data.userJurisdiction !== undefined) updates.userJurisdiction = data.userJurisdiction;
+    if (data.userJurisdictionName !== undefined) updates.userJurisdictionName = data.userJurisdictionName;
+
+    if (Object.keys(updates).length === 0) return;
+
+    await userRef.update(updates);
+    // Merge into cached userData
+    if (this.userData) Object.assign(this.userData, updates);
+    console.log('[Auth] User jurisdiction updated:', updates);
+  },
+
+  /**
    * Check if user needs email verification
    */
   needsEmailVerification: function() {
