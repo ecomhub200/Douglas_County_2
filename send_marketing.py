@@ -30,7 +30,7 @@ from pathlib import Path
 # =============================================================================
 
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
-FROM_EMAIL = os.environ.get('NOTIFICATION_FROM_EMAIL', 'notifications@crashlens.aicreatesai.com')
+FROM_EMAIL = os.environ.get('NOTIFICATION_FROM_EMAIL', 'notifications@aicreatesai.com')
 FROM_NAME = os.environ.get('MARKETING_FROM_NAME', 'CRASH LENS')
 REPLY_TO = os.environ.get('MARKETING_REPLY_TO', FROM_EMAIL)
 

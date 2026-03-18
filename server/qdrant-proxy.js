@@ -154,7 +154,7 @@ function sendViaBrevoApi(recipients, subject, htmlBody, textBody, attachment, op
             headers: {
                 'X-Entity-Ref-ID': crypto.randomUUID(),
                 ...(options.includeListHeaders ? {
-                    'List-Unsubscribe': '<mailto:unsubscribe@crashlens.aicreatesai.com?subject=unsubscribe>'
+                    'List-Unsubscribe': '<mailto:unsubscribe@aicreatesai.com?subject=unsubscribe>'
                 } : {})
             }
         };
@@ -1212,7 +1212,219 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // ---- Subscriber Management: Save subscribers to R2 ----
+    // ---- Subscriber Management (Firestore-backed, auth required) ----
+
+    // POST /subscribers/db/save — Save subscribers to Firestore (auth required) + write-through to R2
+    if (req.url === '/subscribers/db/save' && req.method === 'POST') {
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const body = await collectBody(req);
+                const data = JSON.parse(body);
+
+                const { stateKey, jurisdiction, subscribers } = data;
+                if (!stateKey || !jurisdiction || !Array.isArray(subscribers)) {
+                    res.writeHead(400, corsHeaders);
+                    res.end(JSON.stringify({ error: 'Missing required fields: stateKey, jurisdiction, subscribers[]' }));
+                    return;
+                }
+
+                // Deduplicate by email (case-insensitive)
+                const seen = new Map();
+                const deduped = [];
+                for (const sub of subscribers) {
+                    if (!sub.address) continue;
+                    const key = sub.address.trim().toLowerCase();
+                    if (!seen.has(key)) {
+                        seen.set(key, true);
+                        deduped.push({ ...sub, address: key });
+                    }
+                }
+
+                const db = getFirestore();
+                const docId = `${stateKey}_${jurisdiction}`.replace(/[\/\\]/g, '_');
+                const now = new Date().toISOString();
+
+                await db.collection('users').doc(user.uid)
+                    .collection('subscribers').doc(docId)
+                    .set({
+                        stateKey,
+                        jurisdiction,
+                        subscribers: deduped,
+                        lastUpdated: now,
+                        updatedAt: now
+                    }, { merge: false });
+
+                console.log(`[Subscribers/DB] Saved ${deduped.length} subscribers for user ${user.uid} (${docId})`);
+
+                // Write-through to R2 for GitHub Actions / cron access (non-blocking)
+                if (R2_WORKER_URL && R2_WORKER_SECRET) {
+                    const r2Key = `${stateKey}/${jurisdiction}/subscribers.json`;
+                    const jsonData = JSON.stringify({
+                        lastUpdated: now,
+                        jurisdiction,
+                        stateKey,
+                        subscribers: deduped
+                    }, null, 2);
+
+                    const uploadUrl = `${R2_WORKER_URL.replace(/\/+$/, '')}/${r2Key}`;
+                    const parsedUrl = new URL(uploadUrl);
+
+                    const workerReq = https.request({
+                        hostname: parsedUrl.hostname,
+                        port: 443,
+                        path: parsedUrl.pathname + parsedUrl.search,
+                        method: 'PUT',
+                        headers: {
+                            'X-Upload-Secret': R2_WORKER_SECRET,
+                            'Content-Type': 'application/json',
+                            'Content-Length': Buffer.byteLength(jsonData)
+                        }
+                    }, (workerRes) => {
+                        let rd = '';
+                        workerRes.on('data', chunk => { rd += chunk; });
+                        workerRes.on('end', () => {
+                            if (workerRes.statusCode >= 200 && workerRes.statusCode < 300) {
+                                console.log(`[Subscribers/DB] R2 write-through success: ${r2Key}`);
+                            } else {
+                                console.warn(`[Subscribers/DB] R2 write-through failed: HTTP ${workerRes.statusCode}`);
+                            }
+                        });
+                    });
+                    workerReq.on('error', (err) => {
+                        console.warn(`[Subscribers/DB] R2 write-through error: ${err.message}`);
+                    });
+                    workerReq.write(jsonData);
+                    workerReq.end();
+                }
+
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({
+                    success: true,
+                    count: deduped.length,
+                    docId,
+                    savedAt: now
+                }));
+            } catch (err) {
+                console.error(`[Subscribers/DB] Save error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
+        return;
+    }
+
+    // GET /subscribers/db/load — Load subscribers from Firestore (auth required)
+    if (req.url.startsWith('/subscribers/db/load') && req.method === 'GET') {
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const parsed = url.parse(req.url, true);
+                const stateKey = parsed.query.state;
+                const jurisdiction = parsed.query.jurisdiction;
+
+                if (!stateKey || !jurisdiction) {
+                    res.writeHead(400, corsHeaders);
+                    res.end(JSON.stringify({ error: 'Missing required query params: state, jurisdiction' }));
+                    return;
+                }
+
+                const db = getFirestore();
+                const docId = `${stateKey}_${jurisdiction}`.replace(/[\/\\]/g, '_');
+
+                const doc = await db.collection('users').doc(user.uid)
+                    .collection('subscribers').doc(docId).get();
+
+                if (doc.exists) {
+                    const data = doc.data();
+                    console.log(`[Subscribers/DB] Loaded ${data.subscribers?.length || 0} subscribers for user ${user.uid}`);
+                    res.writeHead(200, corsHeaders);
+                    res.end(JSON.stringify({
+                        success: true,
+                        subscribers: data.subscribers || [],
+                        lastUpdated: data.lastUpdated || null
+                    }));
+                } else {
+                    console.log(`[Subscribers/DB] No subscribers found for user ${user.uid} (${docId})`);
+                    res.writeHead(200, corsHeaders);
+                    res.end(JSON.stringify({ success: true, subscribers: [], lastUpdated: null }));
+                }
+            } catch (err) {
+                console.error(`[Subscribers/DB] Load error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
+        return;
+    }
+
+    // ---- Notification Preferences CRUD (Firestore-backed, auth required) ----
+
+    // POST /preferences/save — Save full notification preferences to Firestore
+    if (req.url === '/preferences/save' && req.method === 'POST') {
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const body = await collectBody(req);
+                const data = JSON.parse(body);
+
+                const db = getFirestore();
+                const now = new Date().toISOString();
+
+                // Save preferences under user doc
+                await db.collection('users').doc(user.uid)
+                    .collection('notificationPreferences').doc('current')
+                    .set({
+                        ...data,
+                        updatedAt: now
+                    }, { merge: false });
+
+                console.log(`[Preferences] Saved notification preferences for user ${user.uid}`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({ success: true, savedAt: now }));
+            } catch (err) {
+                console.error(`[Preferences] Save error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
+        return;
+    }
+
+    // GET /preferences/load — Load notification preferences from Firestore
+    if (req.url === '/preferences/load' && req.method === 'GET') {
+        (async () => {
+            try {
+                const user = await verifyFirebaseToken(req);
+                const db = getFirestore();
+
+                const doc = await db.collection('users').doc(user.uid)
+                    .collection('notificationPreferences').doc('current').get();
+
+                if (doc.exists) {
+                    const data = doc.data();
+                    console.log(`[Preferences] Loaded notification preferences for user ${user.uid}`);
+                    res.writeHead(200, corsHeaders);
+                    res.end(JSON.stringify({ success: true, preferences: data }));
+                } else {
+                    console.log(`[Preferences] No preferences found for user ${user.uid}`);
+                    res.writeHead(200, corsHeaders);
+                    res.end(JSON.stringify({ success: true, preferences: null }));
+                }
+            } catch (err) {
+                console.error(`[Preferences] Load error: ${err.message}`);
+                const status = err.message.includes('Authorization') ? 401 : 500;
+                res.writeHead(status, corsHeaders);
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        })();
+        return;
+    }
+
+    // ---- Subscriber Management (Legacy R2-only, no auth — kept for backward compat) ----
     if (req.url === '/subscribers/save' && req.method === 'POST') {
         if (!R2_WORKER_URL || !R2_WORKER_SECRET) {
             res.writeHead(503, corsHeaders);

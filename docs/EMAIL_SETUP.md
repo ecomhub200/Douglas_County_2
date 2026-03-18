@@ -34,11 +34,11 @@ xkeysib-abc123def456...very-long-string...xyz789
 
 1. Go to **Settings > Senders, Domains & Dedicated IPs**
 2. Click **Add a sender**
-3. Add: `notifications@crashlens.aicreatesai.com`
+3. Add: `notifications@aicreatesai.com`
 4. Verify via the confirmation email Brevo sends
 
 For better deliverability, also verify the domain:
-1. Click **Add a domain** > enter `crashlens.aicreatesai.com`
+1. Click **Add a domain** > enter `aicreatesai.com`
 2. Add the DNS records Brevo provides:
    - **SPF record** (TXT)
    - **DKIM record** (TXT)
@@ -51,7 +51,7 @@ In your GitHub repo: **Settings > Secrets and variables > Actions > New reposito
 | Secret Name | Value | Example |
 |------------|-------|---------|
 | `BREVO_API_KEY` | Your Brevo API key | `xkeysib-abc123...` |
-| `NOTIFICATION_FROM_EMAIL` | Your verified sender | `notifications@crashlens.aicreatesai.com` |
+| `NOTIFICATION_FROM_EMAIL` | Your verified sender | `notifications@aicreatesai.com` |
 
 **Only 2 secrets needed.** That's it.
 
@@ -94,7 +94,7 @@ To route Firebase password reset and verification emails through Brevo:
 2. In Firebase Console > **Authentication > Templates**:
    - Click the pencil icon next to "SMTP Settings"
    - Enter the Brevo SMTP credentials above
-   - Set sender to: `noreply@crashlens.aicreatesai.com`
+   - Set sender to: `noreply@aicreatesai.com`
    - Click **Save**
 
 ## Email Systems
@@ -139,7 +139,7 @@ Your API key is invalid. Fix it:
 ### 400 "Sender not found"
 Your sender email isn't verified in Brevo:
 1. Go to **Settings > Senders** in Brevo
-2. Add and verify `notifications@crashlens.aicreatesai.com`
+2. Add and verify `notifications@aicreatesai.com`
 
 ### Emails going to spam / quarantine (especially .gov recipients)
 
