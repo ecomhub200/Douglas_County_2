@@ -161,9 +161,14 @@ function evaluateServerAlertConditions(alert, crashes) {
     return { triggered: conditions.length > 0, conditions };
 }
 
-function calculateNextAlertCheck(alert) {
-    const intervalHours = alert.checkIntervalHours || 6;
-    return new Date(Date.now() + intervalHours * 60 * 60 * 1000).toISOString();
+function calculateNextAlertCheck(/* alert */) {
+    const now = new Date();
+    let candidate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 12, 5, 0));
+    for (let i = 0; i < 7; i++) {
+        if (candidate.getUTCDay() === 3) break;
+        candidate.setUTCDate(candidate.getUTCDate() + 1);
+    }
+    return candidate.toISOString();
 }
 
 function calculateNextRunAt(schedule) {
@@ -589,25 +594,47 @@ describe('evaluateServerAlertConditions', () => {
 // CALCULATE NEXT ALERT CHECK TESTS
 // =============================================================================
 
-describe('calculateNextAlertCheck', () => {
-    it('should return 6 hours from now by default', () => {
+describe('calculateNextAlertCheck — monthly (first Wednesday)', () => {
+    it('should return a date in the future', () => {
         const result = calculateNextAlertCheck({});
         const nextCheck = new Date(result);
-        const sixHoursFromNow = Date.now() + 6 * 60 * 60 * 1000;
-        assert.ok(Math.abs(nextCheck.getTime() - sixHoursFromNow) < 5000);
+        assert.ok(nextCheck > new Date(), 'Next check should be in the future');
     });
 
-    it('should respect custom checkIntervalHours', () => {
-        const result = calculateNextAlertCheck({ checkIntervalHours: 12 });
+    it('should return a Wednesday (day 3)', () => {
+        const result = calculateNextAlertCheck({});
         const nextCheck = new Date(result);
-        const twelveHoursFromNow = Date.now() + 12 * 60 * 60 * 1000;
-        assert.ok(Math.abs(nextCheck.getTime() - twelveHoursFromNow) < 5000);
+        assert.equal(nextCheck.getUTCDay(), 3, 'Next check should be a Wednesday');
+    });
+
+    it('should return day 1-7 of the month (first week)', () => {
+        const result = calculateNextAlertCheck({});
+        const nextCheck = new Date(result);
+        assert.ok(nextCheck.getUTCDate() >= 1 && nextCheck.getUTCDate() <= 7,
+            `Day ${nextCheck.getUTCDate()} should be between 1 and 7`);
+    });
+
+    it('should be in the next month (not current month)', () => {
+        const result = calculateNextAlertCheck({});
+        const nextCheck = new Date(result);
+        const now = new Date();
+        // Should be at least next month
+        const nextMonth = (now.getUTCMonth() + 1) % 12;
+        assert.equal(nextCheck.getUTCMonth(), nextMonth,
+            `Month should be ${nextMonth} (next month), got ${nextCheck.getUTCMonth()}`);
     });
 
     it('should return valid UTC ISO string', () => {
         const result = calculateNextAlertCheck({});
         assert.ok(result.endsWith('Z'));
         assert.ok(!isNaN(new Date(result).getTime()));
+    });
+
+    it('should schedule at 12:05 UTC (roughly 8 AM ET)', () => {
+        const result = calculateNextAlertCheck({});
+        const nextCheck = new Date(result);
+        assert.equal(nextCheck.getUTCHours(), 12);
+        assert.equal(nextCheck.getUTCMinutes(), 5);
     });
 });
 

@@ -311,9 +311,12 @@ function calculateNextRunAt(schedule) {
 
 function buildScheduledEmailHtml(schedule) {
     const appUrl = APP_URL || 'https://crashlens.aicreatesai.com';
-    const agency = schedule.agency || 'Your Agency';
+    const agency = escapeHtml(schedule.agency || 'Your Agency');
     const jurisdiction = schedule.jurisdiction || 'your jurisdiction';
+    const jurisdictionDisplay = escapeHtml(jurisdiction.charAt(0).toUpperCase() + jurisdiction.slice(1));
     const state = schedule.state || '';
+    const frequency = escapeHtml(schedule.frequency || 'periodic');
+    const reportType = escapeHtml(schedule.reportType || 'Comprehensive');
 
     return `<!DOCTYPE html>
 <html>
@@ -327,13 +330,13 @@ function buildScheduledEmailHtml(schedule) {
     <p style="color:#b3bef5;margin:8px 0 0;font-size:14px;">Scheduled Crash Analysis Report</p>
   </td></tr>
   <tr><td style="padding:32px 40px;">
-    <h2 style="color:#1a237e;margin:0 0 16px;font-size:20px;">${agency} — ${jurisdiction.charAt(0).toUpperCase() + jurisdiction.slice(1)}</h2>
-    <p style="color:#555;line-height:1.6;margin:0 0 24px;">Your scheduled ${schedule.frequency || 'periodic'} crash analysis report is ready for review. Click below to open the full interactive report in CRASH LENS.</p>
+    <h2 style="color:#1a237e;margin:0 0 16px;font-size:20px;">${agency} — ${jurisdictionDisplay}</h2>
+    <p style="color:#555;line-height:1.6;margin:0 0 24px;">Your scheduled ${frequency} crash analysis report is ready for review. Click below to open the full interactive report in CRASH LENS.</p>
     <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
     <tr><td style="background:#1a237e;border-radius:6px;padding:14px 32px;">
       <a href="${appUrl}/app/?state=${encodeURIComponent(state)}&jurisdiction=${encodeURIComponent(jurisdiction)}" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;">View Full Report in CRASH LENS</a>
     </td></tr></table>
-    <p style="color:#888;font-size:13px;margin:0;">Report type: ${schedule.reportType || 'Comprehensive'} | Frequency: ${schedule.frequency || 'Weekly'}</p>
+    <p style="color:#888;font-size:13px;margin:0;">Report type: ${reportType} | Frequency: ${frequency}</p>
   </td></tr>
   <tr><td style="background:#f8f9fa;padding:20px 40px;text-align:center;border-top:1px solid #e8eaed;">
     <p style="color:#999;font-size:12px;margin:0;">CRASH LENS by AI Creates AI &mdash; Traffic Safety Intelligence</p>
@@ -1506,22 +1509,21 @@ const server = http.createServer((req, res) => {
                     r2Path: data.r2Path || '',                   // e.g. 'colorado/douglas/all_roads.csv'
                     recipients: data.recipients || [],
                     thresholds: {
-                        crashCountEnabled: data.thresholds?.crashCountEnabled || false,
-                        crashCountThreshold: data.thresholds?.crashCountThreshold || 5,
-                        crashCountWindowMonths: data.thresholds?.crashCountWindowMonths || 6,
-                        severityEnabled: data.thresholds?.severityEnabled || false,
-                        severityLevel: data.thresholds?.severityLevel || 'KA',
-                        trendEnabled: data.thresholds?.trendEnabled || false,
-                        trendIncreasePercent: data.thresholds?.trendIncreasePercent || 25,
-                        trendWindowMonths: data.thresholds?.trendWindowMonths || 12
+                        crashCountEnabled: data.thresholds?.crashCountEnabled ?? false,
+                        crashCountThreshold: data.thresholds?.crashCountThreshold ?? 5,
+                        crashCountWindowMonths: data.thresholds?.crashCountWindowMonths ?? 6,
+                        severityEnabled: data.thresholds?.severityEnabled ?? false,
+                        severityLevel: data.thresholds?.severityLevel ?? 'KA',
+                        trendEnabled: data.thresholds?.trendEnabled ?? false,
+                        trendIncreasePercent: data.thresholds?.trendIncreasePercent ?? 25,
+                        trendWindowMonths: data.thresholds?.trendWindowMonths ?? 12
                     },
                     // Column name overrides (for multi-state support)
                     routeColumn: data.routeColumn || 'RTE Name',
                     nodeColumn: data.nodeColumn || 'Node',
                     dateColumn: data.dateColumn || 'Crash Date',
                     severityColumn: data.severityColumn || 'Crash Severity',
-                    cooldownDays: data.cooldownDays || 7,
-                    checkIntervalHours: data.checkIntervalHours || 6,
+                    cooldownDays: data.cooldownDays ?? 30,       // Monthly cycle — 30 day cooldown
                     state: data.state || '',
                     jurisdiction: data.jurisdiction || '',
                     agency: data.agency || '',
@@ -2638,13 +2640,16 @@ function startEmailScheduler() {
         processScheduledEmails();
     });
 
-    // Run crash alert monitoring every 6 hours (at minute 5 to avoid overlap with email scheduler)
-    cron.schedule('5 */6 * * *', () => {
+    // Run crash alert monitoring on the 1st Wednesday of every month at 8:05 AM ET
+    // Cron: minute 5, hour 12 (UTC = 8 AM ET in EDT / 7 AM ET in EST), day 1-7, every month, Wednesday (3)
+    // Since cron can't express "first Wednesday", we check inside the handler
+    cron.schedule('5 12 1-7 * 3', () => {
+        console.log('[CrashAlerts] First-Wednesday-of-month cron triggered, processing alerts...');
         processCrashAlerts();
     });
 
     console.log('[Scheduler] Email scheduler started (checking every minute)');
-    console.log('[Scheduler] Crash alert monitor started (checking every 6 hours)');
+    console.log('[Scheduler] Crash alert monitor started (first Wednesday of each month, ~8 AM ET)');
 }
 
 // =============================================================================
@@ -2986,11 +2991,19 @@ function buildServerAlertEmailHtml(conditions, alert) {
 }
 
 /**
- * Calculate next check time for a crash alert (every 6 hours by default).
+ * Calculate next check time for a crash alert — first Wednesday of next month at 8:05 AM ET.
+ * Crash data updates monthly, so checking more often is wasteful.
  */
-function calculateNextAlertCheck(alert) {
-    const intervalHours = alert.checkIntervalHours || 6;
-    return new Date(Date.now() + intervalHours * 60 * 60 * 1000).toISOString();
+function calculateNextAlertCheck(/* alert */) {
+    const now = new Date();
+    // Start from the 1st of next month
+    let candidate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 12, 5, 0));
+    // Find the first Wednesday (day 3) within days 1-7
+    for (let i = 0; i < 7; i++) {
+        if (candidate.getUTCDay() === 3) break;
+        candidate.setUTCDate(candidate.getUTCDate() + 1);
+    }
+    return candidate.toISOString();
 }
 
 /**
@@ -3034,9 +3047,9 @@ async function processCrashAlerts() {
 
             for (const alert of alerts) {
                 try {
-                    // Check cooldown
+                    // Check cooldown (default 30 days for monthly schedule)
                     if (alert.lastAlertSent) {
-                        const cooldownMs = (alert.cooldownDays || 7) * 24 * 60 * 60 * 1000;
+                        const cooldownMs = (alert.cooldownDays ?? 30) * 24 * 60 * 60 * 1000;
                         const lastSent = new Date(alert.lastAlertSent).getTime();
                         if (Date.now() - lastSent < cooldownMs) {
                             // Still in cooldown, just update nextCheckAt
