@@ -46,7 +46,7 @@ def validate_config():
     if not FROM_EMAIL:
         print("[ERROR] NOTIFICATION_FROM_EMAIL environment variable not set")
         print("  Set this to your verified Brevo sender address")
-        print("  Example: notifications@crashlens.aicreatesai.com")
+        print("  Example: notifications@aicreatesai.com")
         sys.exit(1)
 
     # Prefer SMTP mode if credentials are available (most reliable)

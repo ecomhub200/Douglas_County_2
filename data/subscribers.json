@@ -33,7 +33,7 @@
   ],
   "configuration": {
     "emailProvider": "brevo",
-    "fromEmail": "notifications@crashlens.aicreatesai.com",
+    "fromEmail": "notifications@aicreatesai.com",
     "replyToEmail": "support@aicreatesai.com",
     "unsubscribeUrl": "https://crashlens.aicreatesai.com/unsubscribe",
     "preferencesUrl": "https://crashlens.aicreatesai.com/preferences",

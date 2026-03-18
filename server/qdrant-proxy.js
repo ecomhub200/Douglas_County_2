@@ -154,7 +154,7 @@ function sendViaBrevoApi(recipients, subject, htmlBody, textBody, attachment, op
             headers: {
                 'X-Entity-Ref-ID': crypto.randomUUID(),
                 ...(options.includeListHeaders ? {
-                    'List-Unsubscribe': '<mailto:unsubscribe@crashlens.aicreatesai.com?subject=unsubscribe>'
+                    'List-Unsubscribe': '<mailto:unsubscribe@aicreatesai.com?subject=unsubscribe>'
                 } : {})
             }
         };
