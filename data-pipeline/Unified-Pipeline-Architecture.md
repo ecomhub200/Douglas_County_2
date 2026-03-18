@@ -2,7 +2,7 @@
 
 **Version:** 6.0
 **Last Updated:** March 2026
-**Purpose:** Replace 40+ separate workflows with a two-workflow system: state-specific download/convert workflows (with scope dropdowns) that automatically trigger a single unified processing pipeline. The conversion step produces a Virginia-compatible CSV with standardized columns plus any unmapped state-specific columns appended at the end with a `_{state}_` prefix. Validation and geocoding are handled separately on Cloudflare Workers.
+**Purpose:** Replace 40+ separate workflows with a two-workflow system: state-specific download/convert workflows (with scope dropdowns) that automatically trigger a single unified processing pipeline. The conversion step produces a Virginia-compatible CSV with standardized columns plus any unmapped state-specific columns appended at the end with a `_{state}_` prefix. Validation and auto-correction run automatically in Stage 4.5 via headless Playwright against the existing `crash-data-validator-v13.html` engine.
 
 **Design Decision:** State-specific download + merge + convert workflows (with state/scope/jurisdiction dropdowns) → auto-trigger unified `pipeline.yml` starting at Init Cache.
 
@@ -21,7 +21,7 @@
 5. [State-Specific Workflow Template](#5-state-specific-workflow-template)
 6. [Layer 2: Scope Resolver](#6-layer-2-scope-resolver)
 7. [Layer 3: Unified Processing Pipeline](#7-layer-3-unified-processing)
-8. [Validation and Geocoding (Cloudflare Workers)](#8-validation-and-geocoding)
+8. [Validation and Auto-Correction (Stage 4.5)](#8-validation-and-auto-correction)
 9. [Unified Stage 0: Init Cache](#9-stage-0-init-cache)
 10. [Unified Stage 1: Split by Jurisdiction](#10-stage-1-split-by-jurisdiction)
 11. [Unified Stage 2: Split by Road Type](#11-stage-2-split-by-road-type)
@@ -80,7 +80,7 @@ When the processing pipeline changes (add a stage, fix upload logic, change a fl
 |--------|-------------|-----|
 | `batch-all-jurisdictions.yml` | Split-first pattern, batch upload via AWS CLI, aggregate generation | Proven at scale (399 CSVs for Virginia) |
 | `download-data.yml` (Virginia) | Single-jurisdiction mode, scheduled triggers | Daily operations |
-| `process-cdot-data.yml` (Colorado) | Auto-trigger from download, convert → validate → geocode → split chain | Multi-stage orchestration |
+| `process-cdot-data.yml` (Colorado) | Auto-trigger from download, convert → split → upload → validate (Stage 4.5) chain | Multi-stage orchestration |
 | `data-pipeline-download-to-R2-storage-pipeline.md` | 9-stage conceptual model, config templates, onboarding checklist | Documentation foundation |
 
 ---
@@ -115,13 +115,13 @@ When the processing pipeline changes (add a stage, fix upload logic, change a fl
 │  │  LAYER 2: UNIFIED PIPELINE (pipeline.yml)                    │    │
 │  │  Input: Virginia-compatible CSV + scope metadata             │    │
 │  │                                                              │    │
-│  │  NOTE: Validation and geocoding handled on Cloudflare        │    │
 │  │                                                              │    │
 │  │  Stage 0: INIT CACHE (state-isolated cache setup)            │    │
 │  │  Stage 1: SPLIT BY JURISDICTION (if batch mode)              │    │
-│  │  Stage 2: SPLIT BY ROAD TYPE (3 CSVs per jurisdiction)       │    │
+│  │  Stage 2: SPLIT BY ROAD TYPE (4 CSVs per jurisdiction)       │    │
 │  │  Stage 3: AGGREGATE BY SCOPE (CSV — region/MPO/statewide)    │    │
 │  │  Stage 4: UPLOAD all CSVs to R2                              │    │
+│  │  Stage 4.5: VALIDATE & AUTO-CORRECT (headless Playwright)    │    │
 │  │  Stage 5: PREDICT (SageMaker Chronos-2 — optional)           │    │
 │  │  Stage 5b: UPLOAD forecast JSONs to R2                       │    │
 │  │  Stage 6: MANIFEST UPDATE + GIT COMMIT                       │    │
@@ -133,12 +133,21 @@ When the processing pipeline changes (add a stage, fix upload logic, change a fl
 ### The Key Boundary
 
 **State-specific workflow** = Download + Merge + Convert → produce Virginia-compatible CSV → auto-trigger pipeline.yml.
-**Unified pipeline.yml** = Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Upload Forecasts → Manifest.
-**Note:** Validation and geocoding are handled separately on Cloudflare Workers, not in the pipeline.
+**Unified pipeline.yml** = Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Validate & Auto-Correct → Predict → Upload Forecasts → Manifest.
 
-### Validation and Geocoding
+### Validation and Auto-Correction (Stage 4.5)
 
-In v6, Validate and Geocode are **no longer part of the pipeline**. They are handled separately on Cloudflare Workers. The pipeline assumes input CSVs are already validated and geocoded. This simplifies the pipeline and reduces GitHub Actions runtime.
+Validation and auto-correction run **inside the pipeline** as Stage 4.5, after CSVs are uploaded to R2. The headless runner (`scripts/run-validator-headless.py`) drives the same `crash-data-validator-v13.html` engine used in the Upload tab — via Playwright headless Chromium. This ensures a **single validation engine** for both manual (UI) and autonomous (pipeline) triggers.
+
+**Dual-trigger model:**
+| Trigger | When | What Runs | Output |
+|---------|------|-----------|--------|
+| **Manual** | User opens Upload tab | `crash-data-validator-v13.html` iframe | Interactive review + auto-correct + push to R2 |
+| **Autonomous** | Pipeline Stage 4.5 (monthly data update) | `run-validator-headless.py` → same HTML engine | Corrected CSVs + `validation_report_*.json` uploaded to R2 |
+
+**Road types validated:** `all_roads`, `county_roads`, `city_roads` (if configured), `no_interstate` — all 4 split variants per jurisdiction.
+
+**Non-blocking:** Stage 4.5 uses `continue-on-error` semantics — issues are reported via GitHub Actions `::warning::` annotations but do not fail the pipeline. Forecasts (Stage 5) proceed against the auto-corrected data.
 
 ### Two Processing Modes
 
@@ -343,7 +352,7 @@ For **Colorado** (yearly archives): The download script downloads year-by-year (
 
 For states where users download only one county at a time: No statewide CSV is created; the single county CSV goes directly through the pipeline.
 
-**Note:** Validation and geocoding are handled separately on Cloudflare Workers before the data reaches the pipeline.
+**Note:** Validation and auto-correction run in Stage 4.5 after upload to R2, using the headless validator engine.
 
 ### 3.9 Hierarchy Drives Scope Resolution
 
@@ -759,14 +768,13 @@ Output: {
 
 The unified pipeline has **7 stages** (0-6, plus 5b). It receives Virginia-compatible CSVs from the state-specific workflow and handles all generic processing.
 
-**New in v6:** Validate and Geocode are no longer in the pipeline — they are handled separately on Cloudflare Workers. Stage 0 (Init Cache) added for state-isolated cache setup. Statewide gzip upload removed. Forecast JSON upload split into its own step (5b). Split by road type now uses dedicated `scripts/split_road_type.py`.
+**New in v6:** Validate and Geocode moved to Stage 4.5 (headless Playwright running `crash-data-validator-v13.html`). Stage 0 (Init Cache) added for state-isolated cache setup. Statewide gzip upload removed. Forecast JSON upload split into its own step (5b). Split by road type now uses dedicated `scripts/split_road_type.py`. City roads (`city_roads.csv`) added as 4th road-type split variant.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │          UNIFIED PROCESSING PIPELINE v6 (pipeline.yml)              │
 │          Input: Virginia-compatible CSV from state workflow          │
 │          Triggered automatically by state workflow                   │
-│          NOTE: Validation & geocoding handled on Cloudflare          │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  Stage 0:  INIT CACHE (state-isolated cache directory setup)        │
@@ -775,8 +783,9 @@ The unified pipeline has **7 stages** (0-6, plus 5b). It receives Virginia-compa
 │       ↓    (scripts/split_jurisdictions.py)                         │
 │                                                                     │
 │  ┌─── FOR EACH JURISDICTION ───────────────────────────────────┐    │
-│  │  Stage 2:  SPLIT BY ROAD TYPE (3 CSVs per jurisdiction)     │    │
+│  │  Stage 2:  SPLIT BY ROAD TYPE (4 CSVs per jurisdiction)     │    │
 │  │            (scripts/split_road_type.py)                      │    │
+│  │            → all_roads, county_roads, city_roads, no_interstate  │
 │  └─────────────────────────────────────────────────────────────┘    │
 │       ↓                                                             │
 │  Stage 3:  AGGREGATE BY SCOPE (CSV — concat county rows)           │
@@ -784,9 +793,14 @@ The unified pipeline has **7 stages** (0-6, plus 5b). It receives Virginia-compa
 │       └─ Federal cross-state aggregates (statewide scope only)     │
 │       ↓                                                             │
 │  Stage 4:  UPLOAD ALL CSVs to R2                                    │
-│       ├─ 4a: County CSVs (3 per jurisdiction)                      │
-│       ├─ 4b: Region/MPO aggregate CSVs (3 per group)              │
+│       ├─ 4a: County CSVs (4 per jurisdiction)                      │
+│       ├─ 4b: Region/MPO aggregate CSVs (4 per group)              │
 │       └─ 4c: Federal aggregate CSVs (statewide scope only)        │
+│       ↓                                                             │
+│  Stage 4.5: VALIDATE & AUTO-CORRECT (headless Playwright)          │
+│       ├─ scripts/run-validator-headless.py                         │
+│       ├─ Reads CSVs from R2 → validates → auto-corrects           │
+│       └─ Re-uploads corrected CSVs + validation reports to R2     │
 │       ↓                                                             │
 │  Stage 5:  PREDICT (SageMaker Chronos-2 forecasts — optional)       │
 │       ↓                                                             │
@@ -799,9 +813,9 @@ The unified pipeline has **7 stages** (0-6, plus 5b). It receives Virginia-compa
 
 ### 7.2 What Changed From v5 → v6
 
-| v5 (8 stages) | v6 (7 stages — validation/geocoding on Cloudflare) |
+| v5 (8 stages) | v6 (8 stages — validation in Stage 4.5 via headless Playwright) |
 |----------------|---------------------------|
-| Stage 1: Validate | — (moved to Cloudflare Workers) |
+| Stage 1: Validate | Stage 4.5: Validate & Auto-Correct (headless Playwright) |
 | Stage 2: Geocode | — (moved to Cloudflare Workers) |
 | ── SAVE statewide CSV ── | — (removed) |
 | Stage 3: Split by Jurisdiction | Stage 0: Init Cache (NEW) |
@@ -813,19 +827,74 @@ The unified pipeline has **7 stages** (0-6, plus 5b). It receives Virginia-compa
 | | Stage 5b: Upload Forecast JSONs (NEW) |
 | | Stage 6: Manifest Update + Git Commit |
 
-**Key changes in v6:** Validate and Geocode moved to Cloudflare Workers — no longer in pipeline. Stage 0 (Init Cache) added. Statewide gzip upload removed. Forecast JSON upload split into its own step (5b). Split by road type now uses dedicated `scripts/split_road_type.py` instead of `process_crash_data.py --split-only`. Pipeline inputs simplified (no `skip_validation`/`skip_geocode`).
+**Key changes in v6:** Validate and auto-correct run as Stage 4.5 via headless Playwright against `crash-data-validator-v13.html`. Stage 0 (Init Cache) added. Statewide gzip upload removed. Forecast JSON upload split into its own step (5b). Split by road type now uses dedicated `scripts/split_road_type.py` with city roads as 4th variant. `skip_validation` input added to all pipeline YAMLs.
 
 ---
 
-## 8. Validation and Geocoding (Cloudflare Workers)
+## 8. Validation and Auto-Correction (Stage 4.5)
 
-In v6, Validate and Geocode are **no longer part of the pipeline**. They are handled separately on Cloudflare Workers. The pipeline assumes input CSVs are already validated and geocoded. This simplifies the pipeline and reduces GitHub Actions runtime.
+### Architecture
 
-**For reference**, the previous pipeline (v5) included:
-- **Stage 1 (Validate):** QA/QC on the full dataset — coordinate bounds, severity values, date ranges, mandatory fields, duplicates. Used incremental caching with state-isolated hash files.
-- **Stage 2 (Geocode):** Fill missing GPS coordinates using node lookup, Nominatim/OSM, and persistent cache. Used state-isolated geocoding cache.
+Stage 4.5 runs the **same `crash-data-validator-v13.html`** engine used in the Upload tab UI, but driven headlessly by Playwright in the pipeline. This ensures a single validation codebase for both manual and autonomous triggers.
 
-Both stages now run on Cloudflare Workers with the same logic but better performance and cost characteristics. See Appendix G for the cache architecture that was used in v5 (still relevant for the Cloudflare implementation).
+**Script:** `scripts/run-validator-headless.py`
+
+**Flow:**
+```
+Stage 4 uploads CSVs to R2
+    ↓
+Stage 4.5: run-validator-headless.py
+    ├─ Launches headless Chromium via Playwright
+    ├─ Serves crash-data-validator-v13.html locally
+    ├─ For each jurisdiction × road_type:
+    │   ├─ Injects jurisdiction config (state, county, bounds, r2Path)
+    │   ├─ Triggers selectFile() → runAutonomousPipeline()
+    │   │   ├─ Load CSV from R2 CDN
+    │   │   ├─ Run all validation checks (bounds, GPS, severity, dates, duplicates, etc.)
+    │   │   └─ Run auto-corrections (route-median GPS, severity fix, date normalization, etc.)
+    │   ├─ Extracts corrected CSV from page memory
+    │   └─ Saves validation_report_{jurisdiction}_{road_type}.json
+    ├─ Re-uploads corrected CSVs to R2 (overwrites originals)
+    ├─ Uploads validation reports to R2
+    └─ Outputs validation_summary.json
+    ↓
+Stage 5 runs forecasts against validated data
+```
+
+**Road types validated:** `all_roads`, `county_roads`, `city_roads` (if `splitConfig.cityRoads` exists), `no_interstate`.
+
+**Skippable:** `skip_validation: 'true'` input parameter.
+
+**Non-blocking:** Issues produce `::warning::` GitHub Actions annotations but do not fail the pipeline.
+
+### Validation Checks (from crash-data-validator-v13.html)
+
+| Check | What It Does |
+|-------|-------------|
+| County boundary | Flags coordinates outside jurisdiction bbox |
+| Missing GPS | Detects zero/null/missing x,y coordinates |
+| Coordinate precision | Warns on <4 decimal places |
+| Duplicates | Composite key: Document Nbr + Date + Time |
+| KABCO severity | Cross-checks severity vs injury counts |
+| Date/time | Validates parseable dates in expected range |
+| Missing fields | Checks critical fields (severity, collision type, etc.) |
+| Cross-field | Consistency between related fields |
+
+### Auto-Corrections Applied
+
+| Fix | Method |
+|-----|--------|
+| KABCO severity | Recalculates from K/A/B/C people counts |
+| Cross-field flags | Fixes inconsistent pedestrian/bike/work zone flags |
+| Date normalization | Standardizes date formats |
+| Missing GPS | Route-median inference (median coords from same route) |
+| Out-of-bounds | Route-median snap (replace with route's median coords) |
+| Whitespace | Trim + normalize all text fields |
+| Missing fields | Infer Functional Class/Facility Type from route patterns |
+
+### Previous Architecture (v5)
+
+For reference, the v5 pipeline included separate Stage 1 (Validate) and Stage 2 (Geocode) as Python scripts. These were replaced by Stage 4.5 which uses the same browser-based validator engine as the UI, ensuring feature parity between manual and autonomous validation.
 
 ---
 
@@ -1444,7 +1513,7 @@ fi
 # Stage order: Init Cache → Split Jurisdiction → Split Road Type →
 #              Aggregate (CSV) → Upload → Predict → Manifest
 #
-# NOTE: Validation and Geocoding are handled separately on Cloudflare.
+# NOTE: Validation runs in Stage 4.5 via headless Playwright (crash-data-validator-v13.html).
 #
 # Scope-aware: generates region/MPO aggregate CSVs based on user selection.
 # ==============================================================================
@@ -1612,7 +1681,7 @@ jobs:
           python scripts/init_cache.py --state "$STATE"
 
       # ── Stage 1: Split by Jurisdiction (batch mode only) ──
-      # NOTE: Validation (old Stage 1) and Geocoding (old Stage 2) are now
+      # NOTE: Validation runs as Stage 4.5 via headless Playwright. Old Stage 1/2 are now
       #       handled separately on Cloudflare Workers.
       - name: "Stage 1: Split by jurisdiction"
         if: needs.prepare.outputs.download_mode == 'statewide'
@@ -1773,7 +1842,7 @@ jobs:
             done
           fi
 
-          # NOTE: Statewide gzip upload removed — validation/geocoding handled on Cloudflare
+          # NOTE: Statewide gzip upload removed — validation runs in Stage 4.5
 
       # ── Stage 5: Predict (Forecasts) ──
       - name: "Stage 5: Generate forecasts"
