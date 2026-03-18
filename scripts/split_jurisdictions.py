@@ -205,6 +205,37 @@ def filter_jurisdiction_colorado(df, jkey, jconfig):
     return df[mask].copy()
 
 
+def filter_jurisdiction_delaware(df, jconfig):
+    """Filter Delaware dataframe by county name patterns."""
+    name_patterns = jconfig.get('namePatterns', [])
+    if not name_patterns:
+        logger.warning("  No namePatterns in Delaware jurisdiction config")
+        return pd.DataFrame()
+
+    # Find county column (normalized data uses 'county_name' or 'JURISDICTION')
+    county_col = None
+    for col in ['county_name', 'COUNTY_NAME', 'County_Name', 'JURISDICTION',
+                 'Jurisdiction', 'jurisdiction', 'county', 'County', 'COUNTY']:
+        if col in df.columns:
+            county_col = col
+            break
+
+    if not county_col:
+        logger.warning("  No county/jurisdiction column found for Delaware filtering")
+        return pd.DataFrame()
+
+    mask = pd.Series([False] * len(df), index=df.index)
+    for pattern in name_patterns:
+        try:
+            mask |= df[county_col].astype(str).str.contains(
+                pattern, case=False, na=False, regex=True
+            )
+        except re.error:
+            mask |= df[county_col].astype(str).str.lower() == pattern.lower()
+
+    return df[mask].copy()
+
+
 def filter_by_road_system(df, filter_profile):
     """Apply road-type filter to dataframe."""
     system_values = filter_profile.get('systemValues', [])
@@ -434,6 +465,10 @@ def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
             jdf = filter_jurisdiction_virginia(df, jconfig)
         elif state == 'colorado':
             jdf = filter_jurisdiction_colorado(df, jid, jconfig)
+        elif state == 'delaware':
+            jdf = filter_jurisdiction_delaware(df, jconfig)
+        elif state == 'maryland':
+            jdf = filter_jurisdiction_virginia(df, jconfig)  # Same namePatterns logic
         else:
             logger.warning(f"  Unknown state: {state}")
             results['failed'] += 1
@@ -452,8 +487,13 @@ def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
         if state == 'virginia':
             jdf = standardize_columns_virginia(jdf)
 
-        # For Colorado, strip the co_ prefix for file naming
-        file_jid = jid.replace('co_', '') if state == 'colorado' else jid
+        # Strip state prefix for file naming (co_ for Colorado, de_ for Delaware)
+        if state == 'colorado':
+            file_jid = jid.replace('co_', '')
+        elif state == 'delaware':
+            file_jid = jid.replace('de_', '')
+        else:
+            file_jid = jid
 
         # Apply each road-type filter and save
         detail = {'status': 'success', 'records': len(jdf), 'files': {}}
