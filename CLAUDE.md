@@ -78,6 +78,14 @@ When working on this project, act as:
 - Test changes don't affect unrelated features
 - Follow the **modular architecture** — separate HTML, CSS, and JS into distinct files/modules
 
+### 6. Protected Workflows — DO NOT MODIFY
+The following GitHub Actions workflows are **production-stable** and must **never** be edited:
+
+- **Colorado (CDOT)**: All files matching `download-colorado-*`, `batch-colorado-*`, or any CDOT-related pipeline/workflow
+- **Virginia (VDOT)**: All files matching `download-virginia-*`, `virginia-batch-*`, or any VDOT-related pipeline/workflow
+
+These pipelines are working correctly in production. If a change seems needed, **ask the user first** and explain why before touching any of these files.
+
 ## Project-Specific Guidelines
 
 ### Architecture

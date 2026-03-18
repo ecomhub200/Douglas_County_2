@@ -45,6 +45,22 @@ SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 
 
+def _get_state_abbr(state):
+    """Return 2-letter state abbreviation from states/<state>/config.json or fallback."""
+    state_config_path = PROJECT_ROOT / 'states' / state / 'config.json'
+    if state_config_path.exists():
+        with open(state_config_path) as f:
+            sc = json.load(f)
+        abbr = sc.get('state', {}).get('abbreviation', '')
+        if abbr:
+            return abbr.upper()
+    _COMMON = {'virginia': 'VA', 'colorado': 'CO', 'maryland': 'MD',
+                'delaware': 'DE', 'california': 'CA', 'texas': 'TX',
+                'florida': 'FL', 'new_york': 'NY', 'pennsylvania': 'PA',
+                'ohio': 'OH', 'georgia': 'GA', 'north_carolina': 'NC'}
+    return _COMMON.get(state, state.upper()[:2])
+
+
 def load_config(state):
     """Load main config.json and state-specific config."""
     config_path = PROJECT_ROOT / 'config.json'
@@ -62,28 +78,35 @@ def load_config(state):
 
 
 def get_jurisdictions(config, state):
-    """Get all jurisdiction configs for a given state."""
-    jurisdictions = config.get('jurisdictions', {})
-    state_abbr = {
-        'virginia': 'VA', 'colorado': 'CO'
-    }.get(state, state.upper()[:2])
+    """Get all jurisdiction configs for a given state.
 
+    State-agnostic: matches jurisdictions by their explicit "state" field
+    (e.g. "state": "CO"), falling back to legacy Virginia convention
+    (no state field, no prefix).
+    """
+    state_abbr = _get_state_abbr(state)
+
+    jurisdictions = config.get('jurisdictions', {})
     result = {}
     for jid, jconfig in jurisdictions.items():
         if jid.startswith('_'):
             continue  # Skip separators
+        if not isinstance(jconfig, dict):
+            continue
 
-        # Check explicit state field first (e.g., "state": "CO")
+        # Check explicit state field (e.g., "state": "CO", "state": "DE")
         j_state = jconfig.get('state', '')
         if j_state:
             if j_state.upper() == state_abbr:
                 result[jid] = jconfig
             continue
 
-        # Fallback: Virginia jurisdictions have no prefix; Colorado uses "co_"
-        if state == 'virginia' and not jid.startswith('co_'):
-            result[jid] = jconfig
-        elif state == 'colorado' and jid.startswith('co_'):
+        # Legacy fallback: Virginia jurisdictions have no "state" field and no prefix
+        if state == 'virginia':
+            # Skip entries that look like they belong to other states (co_, de_, md_, etc.)
+            prefix = jid.split('_')[0] if '_' in jid else ''
+            if len(prefix) == 2 and prefix.isalpha() and prefix.upper() != 'VA':
+                continue
             result[jid] = jconfig
 
     return result
@@ -121,7 +144,7 @@ def get_filter_profiles(config):
 
 
 def filter_jurisdiction_virginia(df, jconfig):
-    """Filter Virginia dataframe by jurisdiction config."""
+    """Filter Virginia dataframe by jurisdiction config (production-stable)."""
     juris_code = jconfig.get('jurisCode', '')
     name_patterns = jconfig.get('namePatterns', [])
     fips = jconfig.get('fips', '')
@@ -187,7 +210,7 @@ def filter_jurisdiction_virginia(df, jconfig):
 
 
 def filter_jurisdiction_colorado(df, jkey, jconfig):
-    """Filter Colorado dataframe by county name."""
+    """Filter Colorado dataframe by county name (production-stable)."""
     county_name = jconfig.get('county', jkey.upper())
 
     # Find county column
@@ -202,6 +225,109 @@ def filter_jurisdiction_colorado(df, jkey, jconfig):
         return pd.DataFrame()
 
     mask = df[county_col].astype(str).str.strip().str.upper() == county_name.upper()
+    return df[mask].copy()
+
+
+def filter_jurisdiction_generic(df, jid, jconfig):
+    """Filter dataframe to a single jurisdiction using all available strategies.
+
+    State-agnostic: works for any state by trying jurisCode, FIPS, county name,
+    and namePatterns in priority order.  Any match across strategies is OR'd in.
+    """
+    juris_code = jconfig.get('jurisCode', '')
+    name_patterns = jconfig.get('namePatterns', [])
+    fips = jconfig.get('fips', '')
+    county_name = jconfig.get('county', '')  # Colorado-style exact county match
+
+    mask = pd.Series([False] * len(df), index=df.index)
+    matched_strategy = []
+
+    # --- Strategy 1: Jurisdiction code ---
+    if juris_code:
+        _JURIS_CODE_COLS = [
+            'Juris Code', 'Juris_Code', 'JURIS_CODE', 'juris_code',
+            'Jurisdiction Code', 'JURISDICTION_CODE', 'JURISCODE',
+        ]
+        for col in _JURIS_CODE_COLS:
+            if col in df.columns:
+                code_str = str(juris_code)
+                mask |= df[col].astype(str).str.strip() == code_str
+                if code_str.isdigit():
+                    mask |= df[col].astype(str).str.strip() == str(int(code_str))
+                matched_strategy.append(f'jurisCode via {col}')
+                break
+        else:
+            # Fuzzy fallback: any column containing 'juris' and 'code'
+            for col in df.columns:
+                if 'juris' in col.lower() and 'code' in col.lower():
+                    mask |= df[col].astype(str).str.strip() == str(juris_code)
+                    matched_strategy.append(f'jurisCode via {col} (fuzzy)')
+                    break
+
+    # --- Strategy 2: FIPS code ---
+    if fips:
+        _FIPS_COLS = ['FIPS', 'fips', 'County_FIPS', 'COUNTY_FIPS', 'county_fips']
+        for col in _FIPS_COLS:
+            if col in df.columns:
+                mask |= df[col].astype(str).str.strip() == str(fips)
+                matched_strategy.append(f'fips via {col}')
+                break
+
+    # --- Strategy 3: Exact county name (Colorado-style) ---
+    if county_name:
+        _COUNTY_COLS = ['County', 'county', 'COUNTY', 'County_Name', 'county_name',
+                        'COUNTY_NAME']
+        for col in _COUNTY_COLS:
+            if col in df.columns:
+                mask |= df[col].astype(str).str.strip().str.upper() == county_name.upper()
+                matched_strategy.append(f'county via {col}')
+                break
+
+    # --- Strategy 4: Name patterns (regex match on jurisdiction/county columns) ---
+    if name_patterns:
+        _NAME_COLS = [
+            'Physical Juris Name', 'Physical_Juris_Name', 'PHYSICAL_JURIS_NAME',
+            'Physical_Jurisdiction', 'PHYSICAL_JURISDICTION',
+            'JURISDICTION', 'Jurisdiction', 'jurisdiction',
+            'Jurisdiction_Name', 'JURISDICTION_NAME',
+            'County_City', 'COUNTY_CITY',
+            'county_name', 'COUNTY_NAME', 'County_Name',
+            'County', 'county', 'COUNTY',
+        ]
+        col_found = False
+        for col in _NAME_COLS:
+            if col in df.columns:
+                for pattern in name_patterns:
+                    try:
+                        mask |= df[col].astype(str).str.contains(
+                            pattern, case=False, na=False, regex=True
+                        )
+                    except re.error:
+                        mask |= df[col].astype(str).str.lower() == pattern.lower()
+                matched_strategy.append(f'namePatterns via {col}')
+                col_found = True
+                break
+
+        if not col_found:
+            # Fuzzy fallback: any column containing 'juris' and 'name'
+            for col in df.columns:
+                if 'juris' in col.lower() and 'name' in col.lower():
+                    for pattern in name_patterns:
+                        try:
+                            mask |= df[col].astype(str).str.contains(
+                                pattern, case=False, na=False, regex=True
+                            )
+                        except re.error:
+                            mask |= df[col].astype(str).str.lower() == pattern.lower()
+                    matched_strategy.append(f'namePatterns via {col} (fuzzy)')
+                    break
+
+    if matched_strategy:
+        logger.debug(f"  Filter strategies used: {', '.join(matched_strategy)}")
+    else:
+        logger.warning(f"  No filter strategy available for {jid} — "
+                       f"config has neither jurisCode, fips, county, nor namePatterns")
+
     return df[mask].copy()
 
 
@@ -430,14 +556,13 @@ def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
         logger.info(f"[{idx}/{total}] Processing: {jname} ({jid})")
 
         # Filter to this jurisdiction
+        # State-specific filters first (production-stable), generic fallback for new states
         if state == 'virginia':
             jdf = filter_jurisdiction_virginia(df, jconfig)
         elif state == 'colorado':
             jdf = filter_jurisdiction_colorado(df, jid, jconfig)
         else:
-            logger.warning(f"  Unknown state: {state}")
-            results['failed'] += 1
-            continue
+            jdf = filter_jurisdiction_generic(df, jid, jconfig)
 
         if jdf.empty:
             logger.warning(f"  EMPTY: No records found for {jname}")
@@ -452,8 +577,11 @@ def split_state(df, state, config, jurisdictions, output_dir, dry_run=False,
         if state == 'virginia':
             jdf = standardize_columns_virginia(jdf)
 
-        # For Colorado, strip the co_ prefix for file naming
-        file_jid = jid.replace('co_', '') if state == 'colorado' else jid
+        # Strip state prefix for file naming (e.g. co_douglas → douglas)
+        # Uses the state abbreviation to detect prefixes like co_, de_, md_, etc.
+        state_abbr_lower = _get_state_abbr(state).lower()
+        prefix = f"{state_abbr_lower}_"
+        file_jid = jid[len(prefix):] if jid.startswith(prefix) else jid
 
         # Apply each road-type filter and save
         detail = {'status': 'success', 'records': len(jdf), 'files': {}}
@@ -524,9 +652,8 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
-    parser.add_argument('--state', '-s', required=True,
-                        choices=['virginia', 'colorado', 'maryland', 'delaware'],
-                        help='State to process')
+    parser.add_argument('--state', '-s', required=True, type=str.lower,
+                        help='State to process (e.g. virginia, colorado, delaware)')
     parser.add_argument('--input', '-i', type=str,
                         help='Input statewide CSV file')
     parser.add_argument('--output-dir', '-o', type=str,
