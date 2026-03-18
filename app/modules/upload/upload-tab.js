@@ -343,6 +343,26 @@ CL.upload = CL.upload || {};
         localStorage.setItem('userPreferencesSaved', 'true');
         if (typeof updateCurrentSelectionDisplay === 'function') updateCurrentSelectionDisplay();
 
+        // Sync jurisdiction to Firestore user profile so it persists across devices/sessions
+        if (typeof CrashLensAuth !== 'undefined' && CrashLensAuth.currentUser) {
+            var stateOption = stateSelect && stateSelect.options[stateSelect.selectedIndex];
+            var jurisOption = jurisdictionSelect && jurisdictionSelect.options[jurisdictionSelect.selectedIndex];
+            var firebaseUpdate = {
+                userState: (stateSelect && stateSelect.value) || '',
+                userStateName: stateOption ? stateOption.textContent.replace(/\s*\(.*\)\s*$/, '') : '',
+                userJurisdiction: (jurisdictionSelect && jurisdictionSelect.value) || '',
+                userJurisdictionName: jurisOption ? jurisOption.textContent : ''
+            };
+            firebase.firestore().collection('users').doc(CrashLensAuth.currentUser.uid)
+                .update(firebaseUpdate)
+                .then(function() {
+                    console.log('[Preferences] Synced to Firestore:', firebaseUpdate);
+                })
+                .catch(function(err) {
+                    console.warn('[Preferences] Firestore sync failed:', err);
+                });
+        }
+
         // Visual feedback
         var saveBtn = document.getElementById('savePrefsBtn');
         if (saveBtn) {
