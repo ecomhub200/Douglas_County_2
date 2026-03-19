@@ -1016,14 +1016,16 @@ The pipeline has two jobs:
 | pipeline.yml Stage | Description | Skipped? |
 |--------------------|-------------|----------|
 | Stage 0 | Initialize state-isolated cache | No |
-| Stage 1 | Validate (fallback) | **Yes by default** — Cloudflare handles this |
-| Stage 2 | Geocode (fallback) | **Yes by default** — Cloudflare handles this |
-| Stage 3 | Split by jurisdiction (statewide mode only) | No |
-| Stage 4 | Split by road type | No |
-| Stage 5 | Aggregate by scope (CSV) | No |
-| Stage 6 | Upload to R2 (triggers Cloudflare validation) | No |
-| Stage 7 | Generate forecasts + upload forecast JSONs | No (unless `skip_forecasts=true`) |
-| Stage 8 | Commit manifest and metadata | No |
+| Stage 0.1 | Validate & auto-heal hierarchy.json (orphaned counties, empty MPOs) | No (non-fatal) |
+| Stage 0.5 | Download from R2 (if no local CSV) | Conditional |
+| Stage 1 | Split by jurisdiction (statewide mode only) | No |
+| Stage 2 | Split by road type (4 CSVs per jurisdiction) | No |
+| Stage 2.5 | Derive missing Ownership column (non-VDOT states) | No (non-fatal) |
+| Stage 3 | Aggregate by scope (CSV) | No |
+| Stage 4 | Upload to R2 (triggers Cloudflare validation) | No |
+| Stage 4.5 | Validate & auto-correct (headless Playwright) | No (unless `skip_validation=true`) |
+| Stage 5 | Generate forecasts + upload forecast JSONs | No (unless `skip_forecasts=true`) |
+| Stage 6 | Commit manifest and metadata | No |
 
 ### 14.2 Workflow Inputs
 
@@ -1296,7 +1298,7 @@ Traffic Control Status
 Functional Class
 Area Type
 Facility Type
-Ownership
+Ownership             — Road ownership (derived in Stage 2.5 if empty; see validate_hierarchy.py)
 First Harmful Event
 First Harmful Event Loc
 Relation To Roadway

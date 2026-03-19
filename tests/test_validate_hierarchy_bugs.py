@@ -27,6 +27,10 @@ Validates that:
  22. Ownership CSV check backfills empty rows correctly
  23. Ownership CSV check preserves existing valid values
  24. Pipeline Stage 2.5 exists for Ownership derivation
+ 25. Unified-Pipeline-Architecture.md documents Stage 0.1
+ 26. Unified-Pipeline-Architecture.md documents Stage 2.5
+ 27. data-pipeline-download-to-R2 doc lists new stages
+ 28. All 6 Ownership values documented in architecture doc
 
 Run with:
     python tests/test_validate_hierarchy_bugs.py
@@ -643,6 +647,51 @@ def test_pipeline_stage_25_after_roadtype_before_aggregate():
     pos_aggregate = content.find("Stage 3: Aggregate")
     assert pos_roadtype < pos_ownership < pos_aggregate, \
         "Stage order must be: 2 (road type) → 2.5 (ownership) → 3 (aggregate)"
+
+
+# ── Test 17: Documentation updated ───────────────────────────────────────────
+
+def test_unified_architecture_doc_has_stage_01():
+    """Unified-Pipeline-Architecture.md must document Stage 0.1."""
+    doc = PROJECT_ROOT / "data-pipeline" / "Unified-Pipeline-Architecture.md"
+    if not doc.exists():
+        pytest.skip("Architecture doc not found")
+    content = doc.read_text()
+    assert "Stage 0.1" in content, "Architecture doc must mention Stage 0.1"
+    assert "validate_hierarchy" in content, "Architecture doc must reference validate_hierarchy.py"
+
+
+def test_unified_architecture_doc_has_stage_25():
+    """Unified-Pipeline-Architecture.md must document Stage 2.5."""
+    doc = PROJECT_ROOT / "data-pipeline" / "Unified-Pipeline-Architecture.md"
+    if not doc.exists():
+        pytest.skip("Architecture doc not found")
+    content = doc.read_text()
+    assert "Stage 2.5" in content, "Architecture doc must mention Stage 2.5"
+    assert "Derive Ownership" in content or "DERIVE OWNERSHIP" in content, \
+        "Architecture doc must describe Ownership derivation"
+
+
+def test_download_pipeline_doc_has_new_stages():
+    """data-pipeline-download-to-R2-storage-pipeline.md must list new stages."""
+    doc = PROJECT_ROOT / "data-pipeline" / "data-pipeline-download-to-R2-storage-pipeline.md"
+    if not doc.exists():
+        pytest.skip("Download pipeline doc not found")
+    content = doc.read_text()
+    assert "Stage 0.1" in content, "Download pipeline doc must mention Stage 0.1"
+    assert "Stage 2.5" in content, "Download pipeline doc must mention Stage 2.5"
+
+
+def test_ownership_values_documented():
+    """Architecture doc must list all 6 Ownership values."""
+    doc = PROJECT_ROOT / "data-pipeline" / "Unified-Pipeline-Architecture.md"
+    if not doc.exists():
+        pytest.skip("Architecture doc not found")
+    content = doc.read_text()
+    assert "State Hwy Agency" in content
+    assert "County Hwy Agency" in content
+    assert "City or Town Hwy Agency" in content
+    assert "Private/Unknown" in content
 
 
 # ─────────────────────────────────────────────────────────────────────────────

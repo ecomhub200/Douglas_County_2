@@ -23,8 +23,10 @@
 7. [Layer 3: Unified Processing Pipeline](#7-layer-3-unified-processing)
 8. [Validation and Auto-Correction (Stage 4.5)](#8-validation-and-auto-correction)
 9. [Unified Stage 0: Init Cache](#9-stage-0-init-cache)
+9b. [Unified Stage 0.1: Validate Hierarchy](#9b-stage-01-validate-hierarchy)
 10. [Unified Stage 1: Split by Jurisdiction](#10-stage-1-split-by-jurisdiction)
 11. [Unified Stage 2: Split by Road Type](#11-stage-2-split-by-road-type)
+11b. [Unified Stage 2.5: Derive Ownership](#11b-stage-25-derive-ownership)
 12. [Unified Stage 3: Aggregate by Scope (CSV)](#12-stage-3-aggregate-by-scope)
 13. [Unified Stage 4: Upload to R2](#13-stage-4-upload-to-r2)
 14. [Unified Stage 5: Predict (Forecast)](#14-stage-5-predict)
@@ -117,8 +119,10 @@ When the processing pipeline changes (add a stage, fix upload logic, change a fl
 │  │                                                              │    │
 │  │                                                              │    │
 │  │  Stage 0: INIT CACHE (state-isolated cache setup)            │    │
+│  │  Stage 0.1: VALIDATE HIERARCHY (auto-heal hierarchy.json)   │    │
 │  │  Stage 1: SPLIT BY JURISDICTION (if batch mode)              │    │
 │  │  Stage 2: SPLIT BY ROAD TYPE (4 CSVs per jurisdiction)       │    │
+│  │  Stage 2.5: DERIVE OWNERSHIP (backfill empty Ownership col)  │    │
 │  │  Stage 3: AGGREGATE BY SCOPE (CSV — region/MPO/statewide)    │    │
 │  │  Stage 4: UPLOAD all CSVs to R2                              │    │
 │  │  Stage 4.5: VALIDATE & AUTO-CORRECT (headless Playwright)    │    │
@@ -133,7 +137,7 @@ When the processing pipeline changes (add a stage, fix upload logic, change a fl
 ### The Key Boundary
 
 **State-specific workflow** = Download + Merge + Convert → produce Virginia-compatible CSV → auto-trigger pipeline.yml.
-**Unified pipeline.yml** = Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Validate & Auto-Correct → Predict → Upload Forecasts → Manifest.
+**Unified pipeline.yml** = Init Cache → Validate Hierarchy → Split Jurisdiction → Split Road Type → Derive Ownership → Aggregate (CSV) → Upload → Validate & Auto-Correct → Predict → Upload Forecasts → Manifest.
 
 ### Validation and Auto-Correction (Stage 4.5)
 
@@ -779,6 +783,8 @@ The unified pipeline has **7 stages** (0-6, plus 5b). It receives Virginia-compa
 │                                                                     │
 │  Stage 0:  INIT CACHE (state-isolated cache directory setup)        │
 │       ↓                                                             │
+│  Stage 0.1: VALIDATE HIERARCHY (auto-heal hierarchy.json)          │
+│       ↓     (scripts/validate_hierarchy.py)                        │
 │  Stage 1:  SPLIT BY JURISDICTION (if batch mode)                    │
 │       ↓    (scripts/split_jurisdictions.py)                         │
 │                                                                     │
@@ -788,6 +794,8 @@ The unified pipeline has **7 stages** (0-6, plus 5b). It receives Virginia-compa
 │  │            → all_roads, county_roads, city_roads, no_interstate  │
 │  └─────────────────────────────────────────────────────────────┘    │
 │       ↓                                                             │
+│  Stage 2.5: DERIVE OWNERSHIP (backfill empty Ownership column)     │
+│       ↓     (scripts/validate_hierarchy.py --data-dir)             │
 │  Stage 3:  AGGREGATE BY SCOPE (CSV — concat county rows)           │
 │       ├─ State-level aggregates (scripts/aggregate_by_scope.py)    │
 │       └─ Federal cross-state aggregates (statewide scope only)     │
@@ -827,7 +835,7 @@ The unified pipeline has **7 stages** (0-6, plus 5b). It receives Virginia-compa
 | | Stage 5b: Upload Forecast JSONs (NEW) |
 | | Stage 6: Manifest Update + Git Commit |
 
-**Key changes in v6:** Validate and auto-correct run as Stage 4.5 via headless Playwright against `crash-data-validator-v13.html`. Stage 0 (Init Cache) added. Statewide gzip upload removed. Forecast JSON upload split into its own step (5b). Split by road type now uses dedicated `scripts/split_road_type.py` with city roads as 4th variant. `skip_validation` input added to all pipeline YAMLs.
+**Key changes in v6:** Validate and auto-correct run as Stage 4.5 via headless Playwright against `crash-data-validator-v13.html`. Stage 0 (Init Cache) added. Stage 0.1 (Validate Hierarchy) added for auto-healing hierarchy.json gaps. Stage 2.5 (Derive Ownership) added for backfilling empty Ownership columns in non-VDOT states. Statewide gzip upload removed. Forecast JSON upload split into its own step (5b). Split by road type now uses dedicated `scripts/split_road_type.py` with city roads as 4th variant. `skip_validation` input added to all pipeline YAMLs.
 
 ---
 
@@ -909,6 +917,53 @@ python scripts/init_cache.py --state ${STATE}
 ```
 
 This ensures cache directories exist and are properly structured before subsequent stages run.
+
+---
+
+## 9b. Unified Stage 0.1: Validate Hierarchy
+
+### What It Does
+
+Validates and auto-heals `states/{state}/hierarchy.json` before any data processing. Detects structural issues that would cause downstream ranking/aggregation failures:
+
+| Check | Level | Auto-healable? |
+|-------|-------|----------------|
+| **Orphaned counties** — in `allCounties` but not assigned to any region | warning | Yes (nearest region by centroid) |
+| **Empty MPO counties** — MPOs with `counties: []` (breaks aggregation) | warning | Yes (spatial matching within 60-100km) |
+| **Missing counties** — in Census reference data but absent from `allCounties` | error | Yes (adds from Census) |
+| **Unresolvable FIPS** — referenced in regions/MPOs but not in `allCounties` | error | No |
+| **Region coverage** — % of counties assigned to a region | info | — |
+| **MPO coverage** — % of counties assigned to an MPO | info | — |
+
+### Command
+
+```bash
+python scripts/validate_hierarchy.py --state ${STATE}
+
+# Preview only (no modifications):
+python scripts/validate_hierarchy.py --state ${STATE} --dry-run
+
+# CI gating mode (exit non-zero if unfixable issues remain):
+python scripts/validate_hierarchy.py --state ${STATE} --strict
+```
+
+### Auto-Heal Strategy
+
+- Uses `states/geography/us_counties.json` (Census) and `states/geography/us_mpos.json` (BTS) as reference data
+- Assigns orphaned counties to nearest region by haversine distance between county centroid and region center
+- Assigns counties to empty MPOs via spatial matching (60km radius, expanding to 100km if needed)
+- All changes are written back to `hierarchy.json` and logged
+
+### Non-Fatal
+
+Stage 0.1 uses `|| { echo "::warning::..." }` semantics — issues are reported but do not fail the pipeline. This ensures existing workflows are never blocked.
+
+### Known Issues Detected
+
+| State | Issues | Details |
+|-------|--------|---------|
+| Virginia | 28 | 21 orphaned counties, 7 empty MPOs |
+| Colorado | 5 | 3 orphaned counties, 2 empty MPOs |
 
 ---
 
@@ -1036,6 +1091,59 @@ Each state defines its own `splitConfig` in `states/{state}/config.json` → `ro
 | `scripts/split_road_type.py` | Splits individual jurisdiction's `all_roads.csv` → 3 variants | `states/{state}/config.json` → `roadSystems.splitConfig` |
 | `scripts/split_jurisdictions.py` | Splits statewide CSV → per-jurisdiction CSVs with 3 road-type variants | Same `splitConfig` (preferred) or falls back to `config.json` → `filterProfiles` |
 | `download_crash_data.py` | Downloads and optionally filters during download | `config.json` → `filterProfiles` (must use `allRoads` for `_all_roads.csv`) |
+
+---
+
+## 11b. Unified Stage 2.5: Derive Ownership
+
+### What It Does
+
+Non-VDOT states (Colorado, Maryland, Delaware) output empty `Ownership` columns during normalization, because their source data doesn't have a direct ownership field. This breaks Virginia's `splitConfig` which uses `Ownership` to classify county vs. city roads.
+
+Stage 2.5 scans all `*_all_roads.csv` files in the data directory and **derives Ownership** from existing columns:
+
+| SYSTEM Value | Physical Juris Name | Derived Ownership |
+|-------------|-------------------|-------------------|
+| `VDOT Interstate`, `Interstate`, `Primary`, `Secondary` | any | `1. State Hwy Agency` |
+| `NonVDOT *` or empty | `City of X`, `Town of X`, VDOT code ≥100 | `3. City or Town Hwy Agency` |
+| `NonVDOT *` or empty | `X County`, VDOT code <100 | `2. County Hwy Agency` |
+| empty | empty | `6. Private/Unknown Roads` |
+
+### The 6 Standard Ownership Values
+
+These match VDOT's classification system:
+
+1. `1. State Hwy Agency` — State DOT-maintained roads (interstates, primaries, secondaries)
+2. `2. County Hwy Agency` — County-maintained roads
+3. `3. City or Town Hwy Agency` — City/town-maintained roads
+4. `4. Federal Roads` — Federal agency roads (military bases, national parks)
+5. `5. Toll Roads Maintained by Others` — Toll authorities
+6. `6. Private/Unknown Roads` — Private or unclassifiable roads
+
+### Command
+
+```bash
+python scripts/validate_hierarchy.py --state ${STATE} --data-dir ${DATA_DIR}
+```
+
+### Derivation Logic
+
+The function `derive_ownership()` in `scripts/validate_hierarchy.py` uses a priority-based decision tree:
+
+1. **Check SYSTEM column** — If the road is on the state highway system (Interstate, Primary, Secondary), it's always State Hwy Agency regardless of jurisdiction
+2. **Check Physical Juris Name** — For non-state roads:
+   - VDOT numeric codes: `≥100` = city/town, `<100` = county
+   - Text patterns: `"City of"` / `"Town of"` prefix = city/town
+   - `"County"` suffix = county
+3. **Fallback** — Empty system + empty jurisdiction = Private/Unknown
+
+### Non-Fatal
+
+Stage 2.5 uses non-fatal error handling. If no CSVs exist or all Ownership values are already populated, the stage is a no-op.
+
+### Why This Matters
+
+Without Ownership, the `splitConfig` for county/city road classification fails silently — `county_roads.csv` and `city_roads.csv` end up empty for non-VDOT states. This stage ensures all states can produce meaningful road-type splits.
 
 ---
 
