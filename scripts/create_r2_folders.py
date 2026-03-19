@@ -244,6 +244,8 @@ def generate_all_folders(state_filter=None, top_level_only=False):
         "shared/",
         "shared/boundaries/",
         "shared/mutcd/",
+        "states/",
+        "states/geography/",
     ])
 
     # ── Per-state folders ──
@@ -350,6 +352,139 @@ def create_folders_batch(folders, dry_run=False):
     return failed == 0
 
 
+GEOGRAPHY_FILES = [
+    "us_counties.json",
+    "us_county_subdivisions.json",
+    "us_mpos.json",
+    "us_places.json",
+    "us_states.json",
+]
+
+
+def upload_geography_files(dry_run=False):
+    """Upload geography JSON files from states/geography/ to R2.
+
+    These files are needed by the HTML normalization tools and the frontend
+    for FIPS resolution, MPO lookups, and coordinate-based geography matching.
+
+    R2 path: states/geography/{filename}
+    Public URL: https://data.aicreatesai.com/states/geography/{filename}
+    """
+    project_root = get_project_root()
+    geo_dir = project_root / "states" / "geography"
+
+    if not geo_dir.exists():
+        print(f"\n  [WARN] Geography directory not found: {geo_dir}")
+        return 0, 0
+
+    uploaded = 0
+    failed = 0
+
+    print(f"\n{'='*60}")
+    print(f"Uploading geography files to R2")
+    print(f"  Source: {geo_dir}")
+    print(f"  Dest:   s3://{BUCKET}/states/geography/")
+    print(f"{'='*60}\n")
+
+    for filename in GEOGRAPHY_FILES:
+        local_path = geo_dir / filename
+        if not local_path.exists():
+            print(f"  [SKIP] {filename} — not found locally")
+            continue
+
+        r2_key = f"states/geography/{filename}"
+        size_kb = local_path.stat().st_size / 1024
+        size_label = f"{size_kb:.0f}KB" if size_kb < 1024 else f"{size_kb/1024:.1f}MB"
+
+        if dry_run:
+            print(f"  [DRY-RUN] Would upload: {filename} ({size_label}) → {r2_key}")
+            uploaded += 1
+            continue
+
+        import gzip as gz
+        import shutil
+        gz_path = str(local_path) + ".gz"
+        with open(local_path, 'rb') as f_in:
+            with gz.open(gz_path, 'wb', compresslevel=6) as f_out:
+                shutil.copyfileobj(f_in, f_out)
+
+        gz_size_kb = os.path.getsize(gz_path) / 1024
+        gz_label = f"{gz_size_kb:.0f}KB" if gz_size_kb < 1024 else f"{gz_size_kb/1024:.1f}MB"
+
+        cmd = [
+            "aws", "s3", "cp", gz_path, f"s3://{BUCKET}/{r2_key}",
+            "--endpoint-url", ENDPOINT,
+            "--content-type", "application/json",
+            "--content-encoding", "gzip",
+            "--only-show-errors",
+        ]
+
+        success = False
+        for attempt in range(3):
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if result.returncode == 0:
+                    success = True
+                    break
+                print(f"  [WARN] Attempt {attempt+1} failed for {filename}: {result.stderr.strip()}")
+            except subprocess.TimeoutExpired:
+                print(f"  [WARN] Timeout on attempt {attempt+1} for {filename}")
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+
+        if os.path.exists(gz_path):
+            os.remove(gz_path)
+
+        if success:
+            print(f"  [OK] {filename} ({size_label} → {gz_label} gzip) → {r2_key}")
+            uploaded += 1
+        else:
+            print(f"  [FAIL] {filename}")
+            failed += 1
+
+    # Also upload hierarchy.json per state to R2
+    print(f"\n  Uploading per-state hierarchy.json files...")
+    for state_prefix in sorted(STATE_MAP.keys()):
+        state_cfg = STATE_MAP[state_prefix]
+        hierarchy_name = state_cfg.get("hierarchy")
+        if not hierarchy_name:
+            continue
+
+        hierarchy_path = project_root / "states" / hierarchy_name / "hierarchy.json"
+        if not hierarchy_path.exists():
+            continue
+
+        r2_key = f"{state_prefix}/_state/hierarchy.json"
+        size_kb = hierarchy_path.stat().st_size / 1024
+
+        if dry_run:
+            print(f"  [DRY-RUN] Would upload: {state_prefix}/hierarchy.json ({size_kb:.0f}KB)")
+            uploaded += 1
+            continue
+
+        cmd = [
+            "aws", "s3", "cp", str(hierarchy_path), f"s3://{BUCKET}/{r2_key}",
+            "--endpoint-url", ENDPOINT,
+            "--content-type", "application/json",
+            "--only-show-errors",
+        ]
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode == 0:
+                print(f"  [OK] {state_prefix}/hierarchy.json → {r2_key}")
+                uploaded += 1
+            else:
+                print(f"  [FAIL] {state_prefix}/hierarchy.json: {result.stderr.strip()}")
+                failed += 1
+        except subprocess.TimeoutExpired:
+            print(f"  [FAIL] {state_prefix}/hierarchy.json: timeout")
+            failed += 1
+
+    print(f"\n  Geography upload: {uploaded} uploaded, {failed} failed")
+    return uploaded, failed
+
+
 def main():
     parser = argparse.ArgumentParser(description="Create R2 folder structure")
     parser.add_argument("--dry-run", action="store_true",
@@ -360,6 +495,10 @@ def main():
                         help="Just list all folder paths and exit")
     parser.add_argument("--top-level-only", action="store_true",
                         help="Only create state meta folders + regions + MPOs (skip jurisdictions)")
+    parser.add_argument("--upload-geography", action="store_true",
+                        help="Upload geography JSONs and hierarchy files to R2")
+    parser.add_argument("--geography-only", action="store_true",
+                        help="ONLY upload geography files (skip folder creation)")
     args = parser.parse_args()
 
     # Validate environment
@@ -370,6 +509,10 @@ def main():
         if not os.environ.get("AWS_ACCESS_KEY_ID"):
             print("ERROR: AWS_ACCESS_KEY_ID environment variable required")
             sys.exit(1)
+
+    if args.geography_only:
+        uploaded, failed = upload_geography_files(dry_run=args.dry_run)
+        sys.exit(0 if failed == 0 else 1)
 
     print("Generating R2 folder structure...")
     folders = generate_all_folders(
@@ -389,6 +532,13 @@ def main():
         print("\n[DRY-RUN MODE] No changes will be made.\n")
 
     success = create_folders_batch(folders, dry_run=args.dry_run)
+
+    # Upload geography files if --upload-geography flag or running all states
+    if args.upload_geography or (not args.state and not args.top_level_only):
+        uploaded, failed = upload_geography_files(dry_run=args.dry_run)
+        if failed > 0:
+            success = False
+
     sys.exit(0 if success else 1)
 
 

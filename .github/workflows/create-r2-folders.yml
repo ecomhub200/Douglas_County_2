@@ -36,11 +36,17 @@ on:
           - all
           - top_level_only
           - single_state
+          - geography_only
       state:
         description: 'State prefix (only used when scope=single_state)'
         required: false
         default: ''
         type: string
+      upload_geography:
+        description: 'Upload geography JSONs + hierarchy files to R2 (us_counties.json, us_mpos.json, etc.)'
+        required: false
+        default: true
+        type: boolean
       dry_run:
         description: 'Dry run (list folders without creating)'
         required: false
@@ -99,8 +105,10 @@ jobs:
         run: |
           ARGS=""
 
-          # Determine scope
-          if [ "${{ inputs.scope }}" = "single_state" ] && [ -n "${{ inputs.state }}" ]; then
+          if [ "${{ inputs.scope }}" = "geography_only" ]; then
+            ARGS="--geography-only"
+            echo "Scope: geography files only (us_counties.json, us_mpos.json, hierarchy.json, etc.)"
+          elif [ "${{ inputs.scope }}" = "single_state" ] && [ -n "${{ inputs.state }}" ]; then
             ARGS="--state ${{ inputs.state }}"
             echo "Scope: single state (${{ inputs.state }})"
           elif [ "${{ inputs.scope }}" = "top_level_only" ]; then
@@ -110,7 +118,11 @@ jobs:
             echo "Scope: all states, regions, MPOs, and jurisdictions"
           fi
 
-          # Add dry-run flag if requested
+          if [ "${{ inputs.upload_geography }}" = "true" ] && [ "${{ inputs.scope }}" != "geography_only" ]; then
+            ARGS="$ARGS --upload-geography"
+            echo "Geography upload: enabled"
+          fi
+
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             ARGS="$ARGS --dry-run"
           fi
@@ -142,6 +154,14 @@ jobs:
           echo ""
           echo "Listing Maryland structure (sample)..."
           aws s3 ls "s3://${R2_BUCKET}/maryland/" --endpoint-url "$ENDPOINT" | head -25
+
+          echo ""
+          echo "Listing geography files..."
+          aws s3 ls "s3://${R2_BUCKET}/states/geography/" --endpoint-url "$ENDPOINT"
+
+          echo ""
+          echo "Listing Delaware structure..."
+          aws s3 ls "s3://${R2_BUCKET}/delaware/" --endpoint-url "$ENDPOINT" | head -25
 
           # Count total objects
           echo ""
