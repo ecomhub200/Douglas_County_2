@@ -1,0 +1,1025 @@
+# ==============================================================================
+# Delaware — Batch Pipeline (Statewide Processing with Normalization Validation)
+# ==============================================================================
+# Processes Delaware statewide crash data through the pipeline.
+# Triggered by delaware-batch-all-jurisdictions.yml after it normalizes and
+# uploads the statewide CSV to R2.
+#
+# KEY DIFFERENCE from batch-pipeline.yml:
+#   - Adds a normalization validation step between Stage 0 (Init Cache) and
+#     Stage 1 (Split by Jurisdiction) to verify Delaware-specific data quality
+#   - Uses delaware-specific geography lookups (3 counties, 3 MPOs, 3 districts)
+#   - Validates CrashLens 69-column schema compliance before splitting
+#
+# Stage order: Download from R2 → Init Cache → **VALIDATE NORMALIZATION** →
+#              Split Jurisdiction → Split Road Type → Aggregate (CSV) →
+#              Upload → Validate → Predict → Aggregate Forecasts → Manifest
+#
+# This is a DUPLICATE of batch-pipeline.yml. The original is NOT modified.
+# ==============================================================================
+
+name: "Delaware: Batch Pipeline"
+
+on:
+  workflow_dispatch:
+    inputs:
+      state:
+        description: 'State to process (always delaware)'
+        required: false
+        default: 'delaware'
+        type: string
+
+      scope:
+        description: 'Processing scope'
+        required: false
+        default: 'statewide'
+        type: string
+
+      selection:
+        description: 'Selection (blank for statewide)'
+        required: false
+        default: ''
+        type: string
+
+      r2_data_key:
+        description: 'R2 key for normalized statewide CSV'
+        required: true
+        type: string
+
+      skip_forecasts:
+        description: 'Skip forecast generation'
+        required: false
+        default: 'false'
+        type: string
+
+      skip_validation:
+        description: 'Skip headless validation (Stage 4.5)'
+        required: false
+        default: 'false'
+        type: string
+
+      dry_run:
+        description: 'Dry run (no uploads, no commits)'
+        required: false
+        default: 'false'
+        type: string
+
+env:
+  NOTIFICATION_EMAIL: ecomhub200@gmail.com
+
+jobs:
+  # ============================================================
+  # JOB 1: Resolve scope + Download from R2
+  # ============================================================
+  prepare:
+    name: "Prepare (Delaware)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      state: ${{ steps.resolve.outputs.state }}
+      scope: ${{ steps.resolve.outputs.scope }}
+      selection: ${{ steps.resolve.outputs.selection }}
+      dot_name: ${{ steps.resolve.outputs.dot_name }}
+      data_dir: ${{ steps.resolve.outputs.data_dir }}
+      r2_prefix: ${{ steps.resolve.outputs.r2_prefix }}
+      download_mode: ${{ steps.resolve.outputs.download_mode }}
+      jurisdiction_count: ${{ steps.resolve.outputs.jurisdiction_count }}
+      jurisdictions_json: ${{ steps.resolve.outputs.jurisdictions_json }}
+      input_csv: ${{ steps.download_r2.outputs.input_csv }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas requests openpyxl awscli
+
+      - name: Resolve scope
+        id: resolve
+        run: |
+          STATE="${{ github.event.inputs.state || 'delaware' }}"
+          SCOPE="${{ github.event.inputs.scope || 'statewide' }}"
+          SELECTION="${{ github.event.inputs.selection }}"
+
+          RESOLVED=$(python scripts/resolve_scope.py \
+            --state "$STATE" --scope "$SCOPE" --selection "$SELECTION" --json)
+
+          DOT_NAME=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.load(sys.stdin)['dot_name'])")
+          DATA_DIR=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.load(sys.stdin)['data_dir'])")
+          R2_PREFIX=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.load(sys.stdin)['r2_prefix'])")
+          DOWNLOAD_MODE=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.load(sys.stdin)['download_mode'])")
+          JCOUNT=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.load(sys.stdin)['jurisdiction_count'])")
+          JURISDICTIONS=$(echo "$RESOLVED" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['jurisdictions']))")
+
+          echo "state=$STATE" >> $GITHUB_OUTPUT
+          echo "scope=$SCOPE" >> $GITHUB_OUTPUT
+          echo "selection=$SELECTION" >> $GITHUB_OUTPUT
+          echo "dot_name=$DOT_NAME" >> $GITHUB_OUTPUT
+          echo "data_dir=$DATA_DIR" >> $GITHUB_OUTPUT
+          echo "r2_prefix=$R2_PREFIX" >> $GITHUB_OUTPUT
+          echo "download_mode=$DOWNLOAD_MODE" >> $GITHUB_OUTPUT
+          echo "jurisdiction_count=$JCOUNT" >> $GITHUB_OUTPUT
+          echo "jurisdictions_json=$JURISDICTIONS" >> $GITHUB_OUTPUT
+
+      # ── Download normalized statewide CSV from R2 ──
+      - name: "Download normalized statewide CSV from R2"
+        id: download_r2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          STATE="${{ steps.resolve.outputs.state }}"
+          DATA_DIR="${{ steps.resolve.outputs.data_dir }}"
+          R2_KEY="${{ github.event.inputs.r2_data_key }}"
+          R2_PREFIX="${{ steps.resolve.outputs.r2_prefix }}"
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+
+          PRIMARY_KEY="${R2_PREFIX}/_state/statewide_all_roads.csv.gz"
+
+          echo "=========================================="
+          echo "Downloading normalized Delaware CSV from R2"
+          echo "  Primary: $PRIMARY_KEY"
+          echo "  Fallback: $R2_KEY"
+          echo "=========================================="
+
+          mkdir -p "$DATA_DIR"
+          LOCAL_CSV="$DATA_DIR/${STATE}_statewide_all_roads.csv"
+          DOWNLOADED=false
+
+          for i in 1 2 3 4; do
+            if aws s3 cp "s3://$R2_BUCKET/$PRIMARY_KEY" "${LOCAL_CSV}.gz" \
+              --endpoint-url "$R2_ENDPOINT" --only-show-errors; then
+              echo "Download succeeded from _state/"
+              gunzip -f "${LOCAL_CSV}.gz"
+              DOWNLOADED=true
+              break
+            fi
+            echo "Download failed (attempt $i/4), retrying in $((2 ** i))s..."
+            sleep $((2 ** i))
+          done
+
+          if [ "$DOWNLOADED" = "false" ] && [ -n "$R2_KEY" ]; then
+            echo "Primary key failed — trying fallback: $R2_KEY"
+            for i in 1 2 3; do
+              if aws s3 cp "s3://$R2_BUCKET/$R2_KEY" "$LOCAL_CSV" \
+                --endpoint-url "$R2_ENDPOINT" --only-show-errors; then
+                echo "Fallback download succeeded"
+                DOWNLOADED=true
+                break
+              fi
+              sleep $((2 ** i))
+            done
+          fi
+
+          if [ "$DOWNLOADED" = "false" ] || [ ! -f "$LOCAL_CSV" ]; then
+            echo "::error::Failed to download statewide CSV from R2"
+            exit 1
+          fi
+
+          if file "$LOCAL_CSV" | grep -q gzip; then
+            mv "$LOCAL_CSV" "${LOCAL_CSV}.gz"
+            gunzip -f "${LOCAL_CSV}.gz"
+          fi
+
+          TOTAL=$(wc -l < "$LOCAL_CSV" | tr -d ' ')
+          SIZE=$(ls -lh "$LOCAL_CSV" | awk '{print $5}')
+          echo "Downloaded: $LOCAL_CSV ($((TOTAL - 1)) records, $SIZE)"
+          echo "input_csv=$LOCAL_CSV" >> $GITHUB_OUTPUT
+
+  # ============================================================
+  # JOB 2: Process (Stages 0-6 with normalization validation)
+  # ============================================================
+  process:
+    name: "Process (Delaware)"
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pandas requests openpyxl awscli
+
+      # Install Playwright + Node.js for headless HTML normalization tool
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          pip install playwright --quiet
+          playwright install chromium --with-deps
+
+      # ── Download statewide CSV from R2 (process job needs its own copy) ──
+      - name: "Download statewide CSV from R2"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          R2_KEY="${{ github.event.inputs.r2_data_key }}"
+          R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+          PRIMARY_KEY="${R2_PREFIX}/_state/statewide_all_roads.csv.gz"
+
+          mkdir -p "$DATA_DIR"
+          LOCAL_CSV="$DATA_DIR/${STATE}_statewide_all_roads.csv"
+          DOWNLOADED=false
+
+          for i in 1 2 3 4; do
+            if aws s3 cp "s3://$R2_BUCKET/$PRIMARY_KEY" "${LOCAL_CSV}.gz" \
+              --endpoint-url "$R2_ENDPOINT" --only-show-errors; then
+              gunzip -f "${LOCAL_CSV}.gz"
+              DOWNLOADED=true
+              break
+            fi
+            sleep $((2 ** i))
+          done
+
+          if [ "$DOWNLOADED" = "false" ] && [ -n "$R2_KEY" ]; then
+            for i in 1 2 3; do
+              if aws s3 cp "s3://$R2_BUCKET/$R2_KEY" "$LOCAL_CSV" \
+                --endpoint-url "$R2_ENDPOINT" --only-show-errors; then
+                DOWNLOADED=true
+                break
+              fi
+              sleep $((2 ** i))
+            done
+          fi
+
+          if [ -f "$LOCAL_CSV" ] && file "$LOCAL_CSV" | grep -q gzip; then
+            mv "$LOCAL_CSV" "${LOCAL_CSV}.gz"
+            gunzip -f "${LOCAL_CSV}.gz"
+          fi
+
+          TOTAL=$(wc -l < "$LOCAL_CSV" | tr -d ' ')
+          echo "Ready: $LOCAL_CSV ($((TOTAL - 1)) records)"
+
+      # ── Stage 0: Initialize Cache ──
+      - name: "Stage 0: Initialize cache"
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          echo "=========================================="
+          echo "Stage 0: Initialize state-isolated cache"
+          echo "State: $STATE"
+          echo "=========================================="
+          python scripts/init_cache.py --state "$STATE"
+
+      # ══════════════════════════════════════════════════════════════
+      # DELAWARE-SPECIFIC: Stage 0.25 — Run HTML Normalization Tool (Headless)
+      # Runs the delware_normalization-rank-validation.html tool via Playwright
+      # to perform FIPS resolution, EPDO scoring, and jurisdiction ranking
+      # that the Python normalizer alone cannot do.
+      # ══════════════════════════════════════════════════════════════
+      - name: "Stage 0.25: 🔄 Run HTML normalization tool (headless)"
+        id: html_normalize
+        timeout-minutes: 30
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          LOCAL_CSV="$DATA_DIR/${STATE}_statewide_all_roads.csv"
+
+          echo "=========================================="
+          echo "Stage 0.25: Headless HTML Normalization Tool"
+          echo "  HTML: states/delaware/delware_normalization-rank-validation.html"
+          echo "  CSV:  $LOCAL_CSV"
+          echo "=========================================="
+
+          # Create a headless runner script
+          cat > /tmp/run_html_normalizer.py << 'PYEOF'
+          import asyncio
+          import sys
+          import os
+          import time
+          from playwright.async_api import async_playwright
+
+          async def run_normalizer(html_path, csv_path, output_dir, timeout=600):
+              """Run the normalization HTML tool headlessly via Playwright."""
+              abs_html = os.path.abspath(html_path)
+              abs_csv = os.path.abspath(csv_path)
+
+              print(f"  HTML tool: {abs_html}")
+              print(f"  Input CSV: {abs_csv}")
+              print(f"  Timeout: {timeout}s")
+
+              async with async_playwright() as p:
+                  browser = await p.chromium.launch(headless=True)
+                  context = await browser.new_context()
+                  page = await context.new_page()
+
+                  # Capture console output
+                  page.on("console", lambda msg: print(f"  [browser] {msg.text}"))
+
+                  # Navigate to the HTML tool
+                  url = f"file://{abs_html}"
+                  await page.goto(url, wait_until="networkidle")
+                  print("  Page loaded")
+
+                  # Select Delaware state
+                  await page.select_option("#stateSelect", "delaware")
+                  await page.wait_for_timeout(500)
+                  print("  State selected: delaware")
+
+                  # Upload the CSV file via the local file input
+                  file_input = await page.query_selector("input[type='file']")
+                  if file_input:
+                      await file_input.set_input_files(abs_csv)
+                      print(f"  CSV uploaded: {os.path.basename(abs_csv)}")
+                      await page.wait_for_timeout(2000)
+                  else:
+                      print("  WARNING: No file input found, attempting R2 fetch mode")
+
+                  # Run normalization step
+                  try:
+                      await page.evaluate("runNormalization()")
+                      print("  Normalization started...")
+                      # Wait for normalization to complete (watch for toast or data)
+                      await page.wait_for_function(
+                          "() => window.APP && window.APP.normalizedData && window.APP.normalizedData.length > 0",
+                          timeout=timeout * 1000
+                      )
+                      row_count = await page.evaluate("window.APP.normalizedData.length")
+                      print(f"  Normalization complete: {row_count} rows")
+                  except Exception as e:
+                      print(f"  WARNING: Normalization step: {e}")
+
+                  # Run FIPS resolution
+                  try:
+                      await page.evaluate("runFIPSResolution()")
+                      print("  FIPS resolution started...")
+                      await page.wait_for_timeout(5000)
+                      print("  FIPS resolution complete")
+                  except Exception as e:
+                      print(f"  WARNING: FIPS resolution: {e}")
+
+                  # Run enrichment and ranking
+                  try:
+                      await page.evaluate("runEnrichAndRank()")
+                      print("  Enrichment & ranking started...")
+                      await page.wait_for_function(
+                          "() => window.APP && window.APP.enrichedData && window.APP.enrichedData.length > 0",
+                          timeout=120000
+                      )
+                      row_count = await page.evaluate("window.APP.enrichedData.length")
+                      print(f"  Enrichment complete: {row_count} rows")
+                  except Exception as e:
+                      print(f"  WARNING: Enrichment: {e}")
+
+                  # Export the normalized CSV via browser
+                  try:
+                      download_promise = page.expect_download()
+
+                      # Try clicking the export button
+                      export_btn = await page.query_selector("button:has-text('Export')")
+                      if export_btn:
+                          await export_btn.click()
+                      else:
+                          # Trigger download via JS
+                          await page.evaluate("""() => {
+                              if (window.APP.enrichedData) {
+                                  const data = window.APP.enrichedData;
+                                  const headers = Object.keys(data[0]);
+                                  const csv = [headers.join(',')].concat(
+                                      data.map(r => headers.map(h => {
+                                          let v = (r[h] || '').toString();
+                                          if (v.includes(',') || v.includes('"') || v.includes('\\n'))
+                                              v = '"' + v.replace(/"/g, '""') + '"';
+                                          return v;
+                                      }).join(','))
+                                  ).join('\\n');
+                                  const blob = new Blob([csv], {type: 'text/csv'});
+                                  const a = document.createElement('a');
+                                  a.href = URL.createObjectURL(blob);
+                                  a.download = 'delaware_normalized_ranked.csv';
+                                  a.click();
+                              }
+                          }""")
+
+                      download = await download_promise
+                      output_path = os.path.join(output_dir, "delaware_normalized_ranked.csv")
+                      await download.save_as(output_path)
+                      size_mb = os.path.getsize(output_path) / (1024*1024)
+                      print(f"  Exported: {output_path} ({size_mb:.1f} MB)")
+                  except Exception as e:
+                      print(f"  WARNING: Export via download failed: {e}")
+                      # Fallback: extract data via JS and write directly
+                      try:
+                          csv_content = await page.evaluate("""() => {
+                              const data = window.APP.enrichedData || window.APP.normalizedData;
+                              if (!data || !data.length) return null;
+                              const headers = Object.keys(data[0]);
+                              return [headers.join(',')].concat(
+                                  data.map(r => headers.map(h => {
+                                      let v = (r[h] || '').toString();
+                                      if (v.includes(',') || v.includes('"') || v.includes('\\n'))
+                                          v = '"' + v.replace(/"/g, '""') + '"';
+                                      return v;
+                                  }).join(','))
+                              ).join('\\n');
+                          }""")
+                          if csv_content:
+                              output_path = os.path.join(output_dir, "delaware_normalized_ranked.csv")
+                              with open(output_path, 'w') as f:
+                                  f.write(csv_content)
+                              size_mb = os.path.getsize(output_path) / (1024*1024)
+                              print(f"  Exported (JS fallback): {output_path} ({size_mb:.1f} MB)")
+                          else:
+                              print("  ERROR: No data available to export")
+                      except Exception as e2:
+                          print(f"  ERROR: JS fallback also failed: {e2}")
+
+                  await browser.close()
+
+          if __name__ == "__main__":
+              html_path = sys.argv[1]
+              csv_path = sys.argv[2]
+              output_dir = sys.argv[3]
+              asyncio.run(run_normalizer(html_path, csv_path, output_dir))
+          PYEOF
+
+          # Run the headless normalizer
+          python /tmp/run_html_normalizer.py \
+            "states/delaware/delware_normalization-rank-validation.html" \
+            "$LOCAL_CSV" \
+            "$DATA_DIR"
+
+          # Check if enriched output was produced
+          ENRICHED_CSV="$DATA_DIR/delaware_normalized_ranked.csv"
+          if [ -f "$ENRICHED_CSV" ]; then
+            TOTAL=$(wc -l < "$ENRICHED_CSV" | tr -d ' ')
+            echo "HTML normalization output: $ENRICHED_CSV ($((TOTAL - 1)) records)"
+
+            # Replace the statewide CSV with the enriched version
+            cp "$ENRICHED_CSV" "$LOCAL_CSV"
+            echo "Replaced statewide CSV with enriched version"
+          else
+            echo "WARNING: HTML normalization did not produce output — continuing with de_normalize.py output"
+          fi
+
+      # ══════════════════════════════════════════════════════════════
+      # DELAWARE-SPECIFIC: Stage 0.5 — Validate Normalization
+      # Runs BETWEEN Stage 0 (Init Cache) and Stage 1 (Split by Jurisdiction)
+      # Ensures the normalized CSV has all required columns, valid KABCO codes,
+      # proper crash IDs, parsed datetimes, and assigned geography (FIPS/MPO).
+      # ══════════════════════════════════════════════════════════════
+      - name: "Stage 0.5: 🔍 Validate Delaware normalization"
+        id: validate_normalization
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          LOCAL_CSV="$DATA_DIR/${STATE}_statewide_all_roads.csv"
+
+          echo "=========================================="
+          echo "Stage 0.5: Delaware Normalization Validation"
+          echo "=========================================="
+
+          python3 -c "
+          import pandas as pd
+          import json
+          import sys
+
+          csv_path = '$LOCAL_CSV'
+          df = pd.read_csv(csv_path, dtype=str, nrows=10000, low_memory=False)
+          total = len(df)
+          errors = []
+          warnings = []
+
+          # 1. Check required columns
+          required_cols = [
+              'Document Nbr', 'Crash Year', 'Crash Date', 'Crash Military Time',
+              'Crash Severity', 'Physical Juris Name', 'x', 'y',
+              'Collision Type', 'Weather Condition', 'Light Condition'
+          ]
+          missing = [c for c in required_cols if c not in df.columns]
+          if missing:
+              errors.append(f'Missing required columns: {missing}')
+              print(f'FAIL: Missing columns: {missing}')
+
+          # 2. Validate KABCO severity
+          if 'Crash Severity' in df.columns:
+              valid_sev = df['Crash Severity'].isin(['K', 'A', 'B', 'C', 'O'])
+              pct = valid_sev.mean() * 100
+              if pct < 95:
+                  errors.append(f'Severity KABCO compliance: {pct:.1f}% (need >95%)')
+              else:
+                  print(f'OK: Severity KABCO compliance: {pct:.1f}%')
+              bad = df[~valid_sev]['Crash Severity'].unique()[:5]
+              if len(bad) > 0:
+                  warnings.append(f'Invalid severity values: {list(bad)}')
+
+          # 3. Validate crash IDs
+          if 'Document Nbr' in df.columns:
+              has_id = df['Document Nbr'].notna() & (df['Document Nbr'] != '')
+              pct = has_id.mean() * 100
+              if pct < 99:
+                  errors.append(f'Crash ID coverage: {pct:.1f}% (need >99%)')
+              else:
+                  print(f'OK: Crash ID coverage: {pct:.1f}%')
+
+          # 4. Validate dates
+          if 'Crash Date' in df.columns:
+              has_date = df['Crash Date'].notna() & (df['Crash Date'] != '')
+              pct = has_date.mean() * 100
+              if pct < 95:
+                  warnings.append(f'Date coverage: {pct:.1f}%')
+              else:
+                  print(f'OK: Date coverage: {pct:.1f}%')
+
+          # 5. Validate jurisdiction names
+          if 'Physical Juris Name' in df.columns:
+              has_juris = df['Physical Juris Name'].notna() & (df['Physical Juris Name'] != '') & (df['Physical Juris Name'] != 'Unknown')
+              pct = has_juris.mean() * 100
+              if pct < 90:
+                  errors.append(f'Jurisdiction coverage: {pct:.1f}% (need >90%)')
+              else:
+                  print(f'OK: Jurisdiction coverage: {pct:.1f}%')
+
+          # 6. Validate coordinates
+          if 'x' in df.columns and 'y' in df.columns:
+              has_coords = (df['x'].notna() & (df['x'] != '') & (df['x'] != '0') &
+                           df['y'].notna() & (df['y'] != '') & (df['y'] != '0'))
+              pct = has_coords.mean() * 100
+              if pct < 80:
+                  warnings.append(f'Coordinate coverage: {pct:.1f}%')
+              else:
+                  print(f'OK: Coordinate coverage: {pct:.1f}%')
+
+          # 7. Check Delaware coordinate bounds
+          if 'x' in df.columns and 'y' in df.columns:
+              try:
+                  lons = pd.to_numeric(df['x'], errors='coerce')
+                  lats = pd.to_numeric(df['y'], errors='coerce')
+                  valid_bounds = ((lats >= 38.4) & (lats <= 39.9) & (lons >= -75.8) & (lons <= -75.0))
+                  valid_with_coords = valid_bounds[lats.notna() & lons.notna()]
+                  pct = valid_with_coords.mean() * 100 if len(valid_with_coords) > 0 else 0
+                  if pct < 90:
+                      warnings.append(f'Coordinates within DE bounds: {pct:.1f}%')
+                  else:
+                      print(f'OK: Coordinates within DE bounds: {pct:.1f}%')
+              except:
+                  warnings.append('Could not validate coordinate bounds')
+
+          # Summary
+          print(f'')
+          print(f'Validation Summary:')
+          print(f'  Rows sampled: {total}')
+          print(f'  Columns: {len(df.columns)}')
+          print(f'  Errors: {len(errors)}')
+          print(f'  Warnings: {len(warnings)}')
+
+          for e in errors:
+              print(f'  ERROR: {e}')
+          for w in warnings:
+              print(f'  WARNING: {w}')
+
+          if errors:
+              print(f'')
+              print(f'CRITICAL: {len(errors)} validation error(s) found.')
+              print(f'The data may have normalization issues. Proceeding with caution.')
+              # Don't exit 1 — let pipeline continue but log warnings
+          else:
+              print(f'')
+              print(f'All validation checks passed.')
+          "
+
+          echo "Stage 0.5 complete"
+
+      # ── Stage 1: Split by Jurisdiction ──
+      - name: "Stage 1: Split by jurisdiction"
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          INPUT_CSV="${{ needs.prepare.outputs.input_csv }}"
+          JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
+
+          echo "=========================================="
+          echo "Stage 1: Split CSV into jurisdictions"
+          echo "=========================================="
+
+          SPLIT_INPUT="$INPUT_CSV"
+          if [ -z "$SPLIT_INPUT" ] || [ ! -f "$SPLIT_INPUT" ]; then
+            echo "WARNING: No input CSV found for splitting"
+            exit 0
+          fi
+
+          ARGS="--state $STATE --input $SPLIT_INPUT --output-dir $DATA_DIR"
+
+          JCOUNT="${{ needs.prepare.outputs.jurisdiction_count }}"
+          TOTAL_STATE=$(python scripts/resolve_scope.py --state $STATE --scope statewide --json | \
+                        python3 -c "import json,sys; print(json.load(sys.stdin)['jurisdiction_count'])")
+
+          if [ "$JCOUNT" != "$TOTAL_STATE" ]; then
+            JURIS_LIST=$(echo "$JURISDICTIONS" | python3 -c "import json,sys; print(' '.join(json.load(sys.stdin)))")
+            ARGS="$ARGS --jurisdictions $JURIS_LIST"
+          fi
+
+          python scripts/split_jurisdictions.py $ARGS
+
+      # ── Stage 2: Split by Road Type ──
+      - name: "Stage 2: Split by road type"
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
+
+          echo "=========================================="
+          echo "Stage 2: Split by road type (4 CSVs per jurisdiction)"
+          echo "=========================================="
+
+          JURIS_LIST=$(echo "$JURISDICTIONS" | python3 -c "import json,sys; print(' '.join(json.load(sys.stdin)))")
+
+          python scripts/split_road_type.py \
+            --state "$STATE" \
+            --jurisdictions $JURIS_LIST \
+            --data-dir "$DATA_DIR" || {
+            echo "WARNING: Road-type split had issues (non-fatal)"
+          }
+
+      # ── Stage 3: Aggregate by Scope (CSV) ──
+      - name: "Stage 3: Aggregate by scope (CSV)"
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          SCOPE="${{ needs.prepare.outputs.scope }}"
+          SELECTION="${{ needs.prepare.outputs.selection }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+
+          echo "=========================================="
+          echo "Stage 3: Aggregate by scope (scope=$SCOPE, format=CSV)"
+          echo "=========================================="
+
+          python scripts/aggregate_by_scope.py \
+            --state "$STATE" \
+            --scope "$SCOPE" \
+            --selection "$SELECTION" \
+            --data-dir "$DATA_DIR" \
+            --output-format csv \
+            --output-dir "$DATA_DIR" || {
+            echo "WARNING: State aggregates failed (non-fatal)"
+          }
+
+          if [ "$SCOPE" = "statewide" ]; then
+            python scripts/aggregate_by_scope.py \
+              --federal \
+              --output-format csv \
+              --data-dir "$DATA_DIR" \
+              --output-dir data || {
+              echo "WARNING: Federal aggregates failed (non-fatal)"
+            }
+          fi
+
+      # ── Stage 4: Upload to R2 ──
+      - name: "Stage 4: Upload to R2"
+        if: github.event.inputs.dry_run != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
+          SCOPE="${{ needs.prepare.outputs.scope }}"
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+
+          echo "=========================================="
+          echo "Stage 4: Upload to R2 (all CSVs)"
+          echo "=========================================="
+
+          # 4a: Upload jurisdiction CSVs (gzip-compressed)
+          MANIFEST=$(python scripts/split_jurisdictions.py \
+            --state "$STATE" --r2-manifest --r2-prefix "$R2_PREFIX" --output-dir "$DATA_DIR")
+
+          echo "$MANIFEST" | python3 -c "
+          import json, sys, subprocess, os, gzip as gz, shutil
+          files = json.load(sys.stdin)
+          endpoint = '$R2_ENDPOINT'
+          bucket = '$R2_BUCKET'
+          success = failed = skipped = 0
+          saved_bytes = 0
+          for i, entry in enumerate(files):
+              local = entry['local_path']
+              r2_key = entry['r2_key']
+              if not os.path.exists(local):
+                  skipped += 1
+                  continue
+              try:
+                  gz_path = local + '.gz'
+                  orig_size = os.path.getsize(local)
+                  with open(local, 'rb') as f_in:
+                      with gz.open(gz_path, 'wb', compresslevel=6) as f_out:
+                          shutil.copyfileobj(f_in, f_out)
+                  gz_size = os.path.getsize(gz_path)
+                  saved_bytes += (orig_size - gz_size)
+                  subprocess.run([
+                      'aws', 's3', 'cp', gz_path, f's3://{bucket}/{r2_key}',
+                      '--endpoint-url', endpoint,
+                      '--content-type', 'text/csv',
+                      '--content-encoding', 'gzip',
+                      '--only-show-errors'
+                  ], check=True, capture_output=True, timeout=120)
+                  os.remove(gz_path)
+                  success += 1
+              except Exception as e:
+                  print(f'  FAIL: {r2_key}: {e}')
+                  failed += 1
+                  if os.path.exists(local + '.gz'):
+                      os.remove(local + '.gz')
+              if (i + 1) % 50 == 0 or (i + 1) == len(files):
+                  print(f'  Progress: {i+1}/{len(files)} ({success} ok, {failed} fail, {skipped} skip)')
+          print(f'County CSV upload: {success} ok, {failed} fail, {skipped} skip')
+          print(f'  Gzip savings: {saved_bytes / 1024 / 1024:.1f} MB saved')
+          "
+
+          # 4b: Upload region/MPO aggregate CSVs
+          find "$DATA_DIR" -path "*/_region/*" -name "*.csv" -o -path "*/_mpo/*" -name "*.csv" 2>/dev/null | while read f; do
+            REL="${f#$DATA_DIR/}"
+            R2_KEY="$R2_PREFIX/$REL"
+            GZ_FILE="${f}.gz"
+            gzip -c "$f" > "$GZ_FILE"
+            aws s3 cp "$GZ_FILE" "s3://$R2_BUCKET/$R2_KEY" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type "text/csv" \
+              --content-encoding "gzip" \
+              --only-show-errors || echo "  WARN: failed to upload $R2_KEY"
+            rm -f "$GZ_FILE"
+          done
+
+          # 4c: Upload federal aggregate CSVs (statewide only)
+          if [ "$SCOPE" = "statewide" ]; then
+            find "data/_federal" -name "*.csv" 2>/dev/null | while read f; do
+              R2_KEY="_federal/${f#data/_federal/}"
+              GZ_FILE="${f}.gz"
+              gzip -c "$f" > "$GZ_FILE"
+              aws s3 cp "$GZ_FILE" "s3://$R2_BUCKET/$R2_KEY" \
+                --endpoint-url "$R2_ENDPOINT" \
+                --content-type "text/csv" \
+                --content-encoding "gzip" \
+                --only-show-errors || true
+              rm -f "$GZ_FILE"
+            done
+          fi
+
+      # ── Stage 4.5: Validate & Auto-Correct (Headless) ──
+      - name: "Stage 4.5: Validate & auto-correct (headless)"
+        if: github.event.inputs.skip_validation != 'true' && github.event.inputs.dry_run != 'true'
+        timeout-minutes: 30
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+
+          echo "=========================================="
+          echo "Stage 4.5: Headless validation & auto-correct"
+          echo "=========================================="
+
+          pip install playwright --quiet 2>/dev/null
+          playwright install chromium --with-deps 2>/dev/null
+
+          python scripts/run-validator-headless.py \
+            --state "$STATE" \
+            --auto \
+            --data-dir "$DATA_DIR" \
+            --timeout 300 || {
+            echo "::warning::Stage 4.5: Validation had issues (non-fatal)"
+          }
+
+          # Re-upload corrected CSVs to R2
+          CORRECTED_COUNT=0
+          for csv_file in "$DATA_DIR"/*_all_roads.csv "$DATA_DIR"/*_county_roads.csv \
+                          "$DATA_DIR"/*_city_roads.csv "$DATA_DIR"/*_no_interstate.csv; do
+            [ -f "$csv_file" ] || continue
+            BASENAME=$(basename "$csv_file")
+            JURIS=$(echo "$BASENAME" | sed -E 's/_(all_roads|county_roads|city_roads|no_interstate)\.csv$//')
+            R2_KEY="${R2_PREFIX}/${JURIS}/${BASENAME#${JURIS}_}"
+            GZ_FILE="${csv_file}.gz"
+            gzip -c "$csv_file" > "$GZ_FILE"
+            aws s3 cp "$GZ_FILE" "s3://$R2_BUCKET/$R2_KEY" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type "text/csv" \
+              --content-encoding "gzip" \
+              --only-show-errors || true
+            rm -f "$GZ_FILE"
+            CORRECTED_COUNT=$((CORRECTED_COUNT + 1))
+          done
+
+          # Upload validation reports
+          for report in "$DATA_DIR"/validation_report_*.json; do
+            [ -f "$report" ] || continue
+            BASENAME=$(basename "$report")
+            JURIS=$(echo "$BASENAME" | sed -E 's/^validation_report_//; s/_(all_roads|county_roads|city_roads|no_interstate)\.json$//')
+            R2_KEY="${R2_PREFIX}/${JURIS}/${BASENAME}"
+            aws s3 cp "$report" "s3://$R2_BUCKET/$R2_KEY" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type "application/json" \
+              --only-show-errors || true
+          done
+
+          if [ -f "$DATA_DIR/validation_summary.json" ]; then
+            aws s3 cp "$DATA_DIR/validation_summary.json" \
+              "s3://$R2_BUCKET/${R2_PREFIX}/validation_summary.json" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type "application/json" \
+              --only-show-errors || true
+          fi
+
+          echo "Stage 4.5 complete: re-uploaded $CORRECTED_COUNT corrected CSVs"
+
+      # ── Stage 5: Predict (Forecasts) ──
+      - name: "Stage 5: Generate forecasts"
+        if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
+        timeout-minutes: 60
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
+
+          echo "=========================================="
+          echo "Stage 5: Forecast generation (per county)"
+          echo "=========================================="
+
+          echo "$JURISDICTIONS" | python3 -c "
+          import json, sys, subprocess
+          jurisdictions = json.load(sys.stdin)
+          state = '$STATE'
+          data_dir = '$DATA_DIR'
+          success = 0
+          for j in jurisdictions:
+              cmd = ['python', 'scripts/generate_forecast.py',
+                     '--all-road-types', '--jurisdiction', j, '--data-dir', data_dir,
+                     '--state', state, '--source', 'r2']
+              result = subprocess.run(cmd, capture_output=True)
+              if result.returncode == 0:
+                  success += 1
+              else:
+                  print(f'    WARNING: Forecast failed for {j} (non-fatal)')
+          print(f'Forecasts: {success}/{len(jurisdictions)} jurisdictions')
+          "
+
+      # ── Stage 5b: Upload forecast JSONs to R2 ──
+      - name: "Stage 5b: Upload forecast JSONs to R2"
+        if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
+          JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+
+          echo "$JURISDICTIONS" | python3 -c "
+          import json, sys, subprocess, os, gzip as gz, shutil
+          jurisdictions = json.load(sys.stdin)
+          data_dir = '$DATA_DIR'
+          r2_prefix = '$R2_PREFIX'
+          endpoint = '$R2_ENDPOINT'
+          bucket = '$R2_BUCKET'
+          uploaded = skipped = 0
+          for j in jurisdictions:
+              for rt in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
+                  local_path = os.path.join(data_dir, f'forecasts_{rt}.json')
+                  if not os.path.exists(local_path):
+                      local_path = os.path.join(data_dir, j, f'forecasts_{rt}.json')
+                  if not os.path.exists(local_path):
+                      skipped += 1
+                      continue
+                  r2_key = f'{r2_prefix}/{j}/forecasts_{rt}.json'
+                  try:
+                      gz_path = local_path + '.gz'
+                      orig_size = os.path.getsize(local_path)
+                      with open(local_path, 'rb') as f_in:
+                          with gz.open(gz_path, 'wb', compresslevel=6) as f_out:
+                              shutil.copyfileobj(f_in, f_out)
+                      subprocess.run([
+                          'aws', 's3', 'cp', gz_path, f's3://{bucket}/{r2_key}',
+                          '--endpoint-url', endpoint,
+                          '--content-type', 'application/json',
+                          '--content-encoding', 'gzip',
+                          '--only-show-errors'
+                      ], check=True, capture_output=True, timeout=120)
+                      os.remove(gz_path)
+                      uploaded += 1
+                  except Exception as e:
+                      print(f'  FAIL: {r2_key}: {e}')
+                      if os.path.exists(local_path + '.gz'):
+                          os.remove(local_path + '.gz')
+          print(f'Forecast upload: {uploaded} uploaded, {skipped} skipped')
+          "
+
+      # ── Stage 5c: Aggregate Forecasts (Region + MPO) ──
+      - name: "Stage 5c: Aggregate forecasts (region + MPO)"
+        if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+
+          python scripts/aggregate_forecasts.py \
+            --state "$STATE" \
+            --scope statewide \
+            --data-dir "$DATA_DIR" \
+            --output-dir "$DATA_DIR" || {
+            echo "WARNING: Forecast aggregation had issues (non-fatal)"
+          }
+
+      # ── Stage 5d: Upload region/MPO forecast JSONs to R2 ──
+      - name: "Stage 5d: Upload region/MPO forecast JSONs to R2"
+        if: github.event.inputs.skip_forecasts != 'true' && github.event.inputs.dry_run != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+          R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+
+          find "$DATA_DIR" \( -path "*/_region/*" -o -path "*/_mpo/*" \) -name "forecasts_*.json" 2>/dev/null | while read f; do
+            REL="${f#$DATA_DIR/}"
+            R2_KEY="$R2_PREFIX/$REL"
+            aws s3 cp "$f" "s3://$R2_BUCKET/$R2_KEY" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type "application/json" \
+              --only-show-errors || echo "  WARN: failed to upload $R2_KEY"
+          done
+
+      # ── Stage 6: Commit ──
+      - name: "Stage 6: Commit manifest and metadata"
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          SCOPE="${{ needs.prepare.outputs.scope }}"
+          SELECTION="${{ needs.prepare.outputs.selection || 'all' }}"
+          JCOUNT="${{ needs.prepare.outputs.jurisdiction_count }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add data/r2-manifest.json 2>/dev/null || true
+          git add data/*/.split_report.json 2>/dev/null || true
+
+          if git diff --cached --quiet; then
+            echo "No metadata changes to commit"
+          else
+            git commit -m "delaware-pipeline: ${SCOPE}/${SELECTION} — ${JCOUNT} jurisdictions ($(date -u '+%Y-%m-%d'))"
+
+            for i in 1 2 3 4; do
+              if git push origin main; then
+                echo "Push succeeded"
+                break
+              fi
+              sleep $((2 ** i))
+              git fetch origin main
+              git rebase origin/main || git pull --no-edit origin main
+            done
+          fi
+
+      # ── Summary ──
+      - name: Job summary
+        if: always()
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          SCOPE="${{ needs.prepare.outputs.scope }}"
+          SELECTION="${{ needs.prepare.outputs.selection || 'all' }}"
+          echo "## Delaware Batch Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| State | Delaware |" >> $GITHUB_STEP_SUMMARY
+          echo "| Scope | $SCOPE ($SELECTION) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Jurisdictions | ${{ needs.prepare.outputs.jurisdiction_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Data Source | R2: ${{ github.event.inputs.r2_data_key }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stages | R2 Download → Init Cache → **Validate Normalization** → Split Jurisdiction → Split Road Type → Aggregate → Upload → Validate → Predict → Aggregate Forecasts → Manifest |" >> $GITHUB_STEP_SUMMARY
