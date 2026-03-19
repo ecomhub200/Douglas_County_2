@@ -36,18 +36,25 @@ from datetime import datetime, timezone
 # The Census Bureau periodically retires vintage services, so we try multiple.
 TIGER_SERVICES = [
     "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer",
-    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer",
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer",
     "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer",
     "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer",
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer",
 ]
 TIGER_BASE = None  # Resolved dynamically at startup
 
 # Layer name → expected ArcGIS layer names (for dynamic lookup)
+# Census renames layers between vintages, so we try many variants
 TIGER_LAYER_NAMES = {
-    "states": ["States", "Census States"],
-    "counties": ["Counties", "Census Counties"],
-    "places": ["Places", "Incorporated Places", "Census Places"],
-    "county_subdivisions": ["County Subdivisions", "Census County Subdivisions"],
+    "states": ["States", "Census States", "Current States", "2020 Census States",
+               "ACS 2024 States", "ACS 2025 States"],
+    "counties": ["Counties", "Census Counties", "Current Counties", "2020 Census Counties",
+                 "ACS 2024 Counties", "ACS 2025 Counties"],
+    "places": ["Places", "Incorporated Places", "Census Places", "Current Places",
+               "2020 Census Places", "ACS 2024 Places", "ACS 2025 Places"],
+    "county_subdivisions": ["County Subdivisions", "Census County Subdivisions",
+                            "Current County Subdivisions", "2020 Census County Subdivisions",
+                            "ACS 2024 County Subdivisions", "ACS 2025 County Subdivisions"],
 }
 
 # Fallback layer IDs (last known good — used only if dynamic lookup fails)
@@ -83,6 +90,8 @@ def arcgis_query_all(url, where="1=1", out_fields="*", return_geometry=True,
 
     all_features = []
     offset = 0
+    supports_pagination = True  # assume yes, disable if server rejects it
+    error_retries = 0  # prevent infinite retry loops
 
     while True:
         params = {
@@ -91,9 +100,11 @@ def arcgis_query_all(url, where="1=1", out_fields="*", return_geometry=True,
             "returnGeometry": "true" if return_geometry else "false",
             "outSR": out_sr,
             "f": "json",
-            "resultOffset": offset,
-            "resultRecordCount": page_size,
         }
+        # Only add pagination params if server supports them
+        if supports_pagination:
+            params["resultOffset"] = offset
+            params["resultRecordCount"] = page_size
         if extra_params:
             params.update(extra_params)
 
@@ -123,6 +134,24 @@ def arcgis_query_all(url, where="1=1", out_fields="*", return_geometry=True,
             code = err.get("code", "?")
             msg = err.get("message", "Unknown error")
             details = err.get("details", [])
+
+            # Try automatic recovery strategies (max 3 retries to prevent loops)
+            if error_retries < 3 and offset == 0:
+                error_retries += 1
+
+                # Strategy 1: Remove pagination params
+                if supports_pagination:
+                    supports_pagination = False
+                    print(f"  ⚠ Query failed with pagination params, retrying without...")
+                    continue
+
+                # Strategy 2: Switch to wildcard fields
+                if out_fields != "*":
+                    print(f"  ⚠ Query failed with specific fields, retrying with outFields=*...")
+                    out_fields = "*"
+                    supports_pagination = True  # re-enable and try again
+                    continue
+
             print(f"  ✗ ArcGIS API error (code {code}): {msg}")
             if details:
                 for d in details[:3]:
@@ -185,6 +214,21 @@ def compute_centroid_from_point(geometry):
     return None, None
 
 
+# ─── Field name resolution ───────────────────────────────────────────────────
+
+def _get_field(attr, *candidates, default=""):
+    """
+    Get a field value from ArcGIS attributes, trying multiple candidate names.
+    Census TIGERweb periodically renames fields between vintages (e.g., NAME vs NAME20,
+    STUSAB vs STUSPS, FUNCSTAT vs FUNCSTAT20).
+    """
+    for name in candidates:
+        val = attr.get(name)
+        if val is not None and val != "":
+            return val
+    return default
+
+
 # ─── Dynamic service discovery ───────────────────────────────────────────────
 
 def _discover_tiger_service():
@@ -214,15 +258,51 @@ def _discover_tiger_service():
             # Build lookup: layer name → layer id
             layer_lookup = {layer["name"]: layer["id"] for layer in layers}
 
-            # Verify we can find our required layers
+            # Verify we can find our required layers (exact match first, then substring)
             resolved = {}
             for key, candidate_names in TIGER_LAYER_NAMES.items():
+                # Try exact match first
                 for name in candidate_names:
                     if name in layer_lookup:
                         resolved[key] = layer_lookup[name]
                         break
+                # If no exact match, try case-insensitive substring match
+                if key not in resolved:
+                    # e.g., key="states" should match "Census 2020 States" or "States (Current)"
+                    search_term = key.replace("_", " ")  # "county_subdivisions" → "county subdivisions"
+                    for layer_name, layer_id in layer_lookup.items():
+                        if search_term in layer_name.lower():
+                            resolved[key] = layer_id
+                            print(f"    (fuzzy match: '{layer_name}' → {key})")
+                            break
 
             if len(resolved) >= 2:  # At least states + counties
+                # Verify a query actually works on one of the discovered layers
+                test_layer_id = resolved.get("states") or list(resolved.values())[0]
+                test_url = f"{service_url}/{test_layer_id}/query"
+                try:
+                    test_resp = requests.get(test_url, params={
+                        "where": "1=1", "outFields": "*",
+                        "returnGeometry": "false", "f": "json",
+                        "resultRecordCount": 1
+                    }, timeout=15)
+                    test_data = test_resp.json()
+                    if "error" in test_data:
+                        # Try without pagination
+                        test_resp = requests.get(test_url, params={
+                            "where": "1=1", "outFields": "*",
+                            "returnGeometry": "false", "f": "json",
+                        }, timeout=15)
+                        test_data = test_resp.json()
+                    if "error" in test_data:
+                        print(f"  ⚠ {service_name}: Layers found but queries fail — {test_data['error'].get('message', '?')}")
+                        continue
+                    if test_data.get("features"):
+                        sample_fields = list(test_data["features"][0].get("attributes", {}).keys())
+                        print(f"  ✓ Query verified. Sample fields: {sample_fields[:8]}")
+                except Exception as e:
+                    print(f"  ⚠ {service_name}: Query verification failed — {e}")
+                    # Still use this service; the error might be transient
                 TIGER_BASE = service_url
                 print(f"  ✓ Using {service_name}")
                 for key, layer_id in resolved.items():
@@ -286,6 +366,30 @@ def _ensure_service():
     _, _discovered_layers = _discover_tiger_service()
 
 
+def _query_with_state_filter(url, state_fips, label):
+    """
+    Query an ArcGIS layer with optional state FIPS filter.
+    Tries multiple field name variants for the state filter since Census
+    renames fields between vintages (STATE vs STATEFP vs STATEFP20).
+    """
+    if not state_fips:
+        return arcgis_query_all(url, where="1=1", out_fields="*",
+                                return_geometry=True, label=label)
+
+    # Try each state field name variant
+    for field_name in ["STATE", "STATEFP", "STATEFP20", "STATEFP10"]:
+        where = f"{field_name}='{state_fips}'"
+        features = arcgis_query_all(url, where=where, out_fields="*",
+                                    return_geometry=True, label=label)
+        if features:
+            return features
+
+    # Fallback: download all and filter client-side
+    print(f"  ⚠ State filter failed, downloading all and filtering locally...")
+    return arcgis_query_all(url, where="1=1", out_fields="*",
+                            return_geometry=True, label=label)
+
+
 # ─── Layer download functions ────────────────────────────────────────────────
 
 def download_states():
@@ -296,15 +400,19 @@ def download_states():
     features = arcgis_query_all(
         url,
         where="1=1",
-        out_fields="GEOID,NAME,STUSAB,FUNCSTAT,ALAND,AWATER",
+        out_fields="*",
         return_geometry=True,
         label="states"
     )
 
+    if features:
+        sample = features[0].get("attributes", {})
+        print(f"  Available fields: {list(sample.keys())}")
+
     states = []
     for f in features:
         attr = f.get("attributes", {})
-        geoid = attr.get("GEOID", "")
+        geoid = _get_field(attr, "GEOID", "GEOID20", "GEOID10", "GEO_ID")
         # Skip territories (only 50 states + DC)
         if geoid not in _VALID_STATE_FIPS:
             continue
@@ -312,12 +420,12 @@ def download_states():
         centroid, bbox = compute_centroid_from_rings(f.get("geometry", {}))
         states.append({
             "fips": geoid,
-            "name": attr.get("NAME", ""),
-            "abbreviation": attr.get("STUSAB", ""),
+            "name": _get_field(attr, "NAME", "NAME20", "NAME10", "STATE_NAME"),
+            "abbreviation": _get_field(attr, "STUSAB", "STUSPS", "STUSPS20", "STATE_ABBR"),
             "centroid": centroid,  # [lon, lat]
             "bbox": bbox,         # [west, south, east, north]
-            "landAreaSqM": attr.get("ALAND"),
-            "waterAreaSqM": attr.get("AWATER"),
+            "landAreaSqM": _get_field(attr, "ALAND", "ALAND20", "ALAND10", default=None),
+            "waterAreaSqM": _get_field(attr, "AWATER", "AWATER20", "AWATER10", default=None),
         })
 
     states.sort(key=lambda s: s["fips"])
@@ -331,32 +439,29 @@ def download_counties(state_fips=None):
     _ensure_service()
     url = _resolve_layer_url("counties", _discovered_layers)
 
-    where = f"STATE='{state_fips}'" if state_fips else "1=1"
-    features = arcgis_query_all(
-        url,
-        where=where,
-        out_fields="GEOID,STATE,COUNTY,NAME,LSAD,FUNCSTAT,ALAND,AWATER",
-        return_geometry=True,
-        label="counties"
-    )
+    features = _query_with_state_filter(url, state_fips, "counties")
+
+    if features:
+        sample = features[0].get("attributes", {})
+        print(f"  Available fields: {list(sample.keys())}")
 
     counties = []
     for f in features:
         attr = f.get("attributes", {})
-        state = attr.get("STATE", "")
+        state = _get_field(attr, "STATE", "STATEFP", "STATEFP20", "STATEFP10")
         if state not in _VALID_STATE_FIPS:
             continue
 
         centroid, bbox = compute_centroid_from_rings(f.get("geometry", {}))
         counties.append({
             "stateFips": state,
-            "countyFips": attr.get("COUNTY", ""),
-            "geoid": attr.get("GEOID", ""),
-            "name": attr.get("NAME", ""),
-            "lsad": attr.get("LSAD", ""),      # 06=County, 03=City/Borough, 04=Borough, 12=Parish, 15=city(VA), 25=city(MO/NV)
+            "countyFips": _get_field(attr, "COUNTY", "COUNTYFP", "COUNTYFP20", "COUNTYFP10"),
+            "geoid": _get_field(attr, "GEOID", "GEOID20", "GEOID10"),
+            "name": _get_field(attr, "NAME", "NAME20", "NAME10", "BASENAME"),
+            "lsad": _get_field(attr, "LSAD", "LSAD20", "LSAD10"),
             "centroid": centroid,
             "bbox": bbox,
-            "landAreaSqM": attr.get("ALAND"),
+            "landAreaSqM": _get_field(attr, "ALAND", "ALAND20", "ALAND10", default=None),
         })
 
     counties.sort(key=lambda c: c["geoid"])
@@ -370,41 +475,39 @@ def download_places(state_fips=None):
     _ensure_service()
     url = _resolve_layer_url("places", _discovered_layers)
 
-    where = f"STATE='{state_fips}'" if state_fips else "1=1"
-    features = arcgis_query_all(
-        url,
-        where=where,
-        out_fields="GEOID,STATE,PLACEFP,NAME,NAMELSAD,LSAD,FUNCSTAT,ALAND",
-        return_geometry=True,
-        label="places"
-    )
+    features = _query_with_state_filter(url, state_fips, "places")
+
+    if features:
+        sample = features[0].get("attributes", {})
+        print(f"  Available fields: {list(sample.keys())}")
 
     places = []
     for f in features:
         attr = f.get("attributes", {})
-        state = attr.get("STATE", "")
+        state = _get_field(attr, "STATE", "STATEFP", "STATEFP20", "STATEFP10")
         if state not in _VALID_STATE_FIPS:
             continue
 
-        funcstat = attr.get("FUNCSTAT", "")
+        funcstat = _get_field(attr, "FUNCSTAT", "FUNCSTAT20", "FUNCSTAT10")
         # A = Active, S = Statistical (CDP). Include both.
-        if funcstat not in ("A", "S"):
+        # If FUNCSTAT is not available, include the record anyway
+        if funcstat and funcstat not in ("A", "S"):
             continue
 
         centroid, bbox = compute_centroid_from_rings(f.get("geometry", {}))
-        lsad = attr.get("LSAD", "")
+        lsad = _get_field(attr, "LSAD", "LSAD20", "LSAD10")
         places.append({
             "stateFips": state,
-            "placeFips": attr.get("PLACEFP", ""),
-            "geoid": attr.get("GEOID", ""),
-            "name": attr.get("NAME", ""),
-            "fullName": attr.get("NAMELSAD", ""),
+            "placeFips": _get_field(attr, "PLACEFP", "PLACEFP20", "PLACEFP10"),
+            "geoid": _get_field(attr, "GEOID", "GEOID20", "GEOID10"),
+            "name": _get_field(attr, "NAME", "NAME20", "NAME10", "BASENAME"),
+            "fullName": _get_field(attr, "NAMELSAD", "NAMELSAD20", "NAMELSAD10"),
             "lsad": lsad,
             "type": _LSAD_PLACE_TYPE.get(lsad, "other"),
-            "funcstat": funcstat,  # A=incorporated, S=statistical/CDP
+            "funcstat": funcstat or "A",  # default to Active if field not available
             "centroid": centroid,
             "bbox": bbox,
-            "landAreaSqM": attr.get("ALAND"),
+            "landAreaSqM": _get_field(attr, "ALAND", "ALAND20", "ALAND10", default=None),
         })
 
     places.sort(key=lambda p: p["geoid"])
@@ -418,36 +521,34 @@ def download_county_subdivisions(state_fips=None):
     _ensure_service()
     url = _resolve_layer_url("county_subdivisions", _discovered_layers)
 
-    where = f"STATE='{state_fips}'" if state_fips else "1=1"
-    features = arcgis_query_all(
-        url,
-        where=where,
-        out_fields="GEOID,STATE,COUNTY,COUSUBFP,NAME,NAMELSAD,LSAD,FUNCSTAT",
-        return_geometry=True,
-        label="county subdivisions"
-    )
+    features = _query_with_state_filter(url, state_fips, "county subdivisions")
+
+    if features:
+        sample = features[0].get("attributes", {})
+        print(f"  Available fields: {list(sample.keys())}")
 
     subdivisions = []
     for f in features:
         attr = f.get("attributes", {})
-        state = attr.get("STATE", "")
+        state = _get_field(attr, "STATE", "STATEFP", "STATEFP20", "STATEFP10")
         if state not in _VALID_STATE_FIPS:
             continue
 
-        funcstat = attr.get("FUNCSTAT", "")
-        if funcstat not in ("A", "S"):
+        funcstat = _get_field(attr, "FUNCSTAT", "FUNCSTAT20", "FUNCSTAT10")
+        # If FUNCSTAT is not available, include the record anyway
+        if funcstat and funcstat not in ("A", "S"):
             continue
 
         centroid, bbox = compute_centroid_from_rings(f.get("geometry", {}))
         subdivisions.append({
             "stateFips": state,
-            "countyFips": attr.get("COUNTY", ""),
-            "cousubFips": attr.get("COUSUBFP", ""),
-            "geoid": attr.get("GEOID", ""),
-            "name": attr.get("NAME", ""),
-            "fullName": attr.get("NAMELSAD", ""),
-            "lsad": attr.get("LSAD", ""),
-            "funcstat": funcstat,
+            "countyFips": _get_field(attr, "COUNTY", "COUNTYFP", "COUNTYFP20", "COUNTYFP10"),
+            "cousubFips": _get_field(attr, "COUSUBFP", "COUSUBFP20", "COUSUBFP10"),
+            "geoid": _get_field(attr, "GEOID", "GEOID20", "GEOID10"),
+            "name": _get_field(attr, "NAME", "NAME20", "NAME10", "BASENAME"),
+            "fullName": _get_field(attr, "NAMELSAD", "NAMELSAD20", "NAMELSAD10"),
+            "lsad": _get_field(attr, "LSAD", "LSAD20", "LSAD10"),
+            "funcstat": funcstat or "A",
             "centroid": centroid,
             "bbox": bbox,
         })
@@ -471,11 +572,13 @@ def download_mpos():
     )
 
     if not features:
-        # Fallback: try alternate URLs
+        # Fallback: try alternate URLs (BTS/USDOT reorganizes periodically)
         alt_urls = [
             "https://geo.dot.gov/server/rest/services/NTAD/Metropolitan_Planning_Organizations/FeatureServer/0/query",
             "https://geo.dot.gov/server/rest/services/Hosted/Metropolitan_Planning_Organizations/FeatureServer/0/query",
             "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/Metropolitan_Planning_Organizations/FeatureServer/0/query",
+            "https://geo.dot.gov/server/rest/services/NTAD/MPO_Boundaries/FeatureServer/0/query",
+            "https://geo.dot.gov/server/rest/services/NTAD/MPO_Boundaries/MapServer/0/query",
         ]
         for alt_url in alt_urls:
             print(f"  Trying alternate endpoint: {alt_url.split('/services/')[1].split('/query')[0]}...")
