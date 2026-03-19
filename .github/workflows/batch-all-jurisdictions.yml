@@ -770,7 +770,7 @@ jobs:
           | Skip Forecasts | ${{ github.event.inputs.skip_forecasts }} |
           | Data Changed | ${{ needs.download.outputs.data_changed }} |
 
-          **Pipeline:** R2 Download → Init Cache → Split Jurisdiction → Derive Ownership → Split Road Type → Aggregate → Upload → Forecasts → Manifest
+          **Pipeline:** R2 Download → Init Cache → Split Jurisdiction → Derive Ownership → Split Road Type → Ranking Validation → Aggregate → Upload → Forecasts → Manifest
           EOF
 
   # ============================================================

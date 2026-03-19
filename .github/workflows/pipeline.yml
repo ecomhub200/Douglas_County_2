@@ -5,7 +5,8 @@
 # Auto-triggered by state-specific download workflows.
 #
 # Stage order: Init Cache → Split Jurisdiction → Derive Ownership →
-#              Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest
+#              Split Road Type → Ranking Validation → Aggregate (CSV) →
+#              Upload → Predict → Manifest
 #
 # NOTE: Validation and Geocoding are handled separately on Cloudflare.
 #
@@ -342,6 +343,24 @@ jobs:
             --auto \
             --data-dir "$DATA_DIR" || {
             echo "WARNING: Road-type split had issues (non-fatal)"
+          }
+
+      # ── Stage 2.5: Ranking Validation & Enrichment ──
+      # Resolves FIPS from local Census geography data, enriches crash rows
+      # with 5 geographic columns, computes 20 ranking columns (4 scopes × 5 metrics).
+      - name: "Stage 2.5: Ranking validation & enrichment"
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+
+          echo "=========================================="
+          echo "Stage 2.5: Ranking Validation & Enrichment"
+          echo "=========================================="
+
+          python scripts/ranking_validation.py \
+            --state "$STATE" \
+            --data-dir "$DATA_DIR" || {
+            echo "::warning::Stage 2.5: Ranking validation had issues (non-fatal)"
           }
 
       # ── Stage 3: Aggregate by Scope (CSV) ──
@@ -706,4 +725,4 @@ jobs:
           echo "| Scope | $SCOPE ($SELECTION) |" >> $GITHUB_STEP_SUMMARY
           echo "| Jurisdictions | ${{ needs.prepare.outputs.jurisdiction_count }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Stages | Init Cache → Split Jurisdiction → Derive Ownership → Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stages | Init Cache → Split Jurisdiction → Derive Ownership → Split Road Type → Ranking Validation → Aggregate (CSV) → Upload → Predict → Manifest |" >> $GITHUB_STEP_SUMMARY
