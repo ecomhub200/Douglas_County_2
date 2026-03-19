@@ -450,11 +450,231 @@ def assign_counties_to_mpo(hierarchy, mpo_key, state_fips):
     return True
 
 
+# ─── Ownership column derivation ─────────────────────────────────────────────
+
+# Standard VDOT Ownership values
+OWNERSHIP_VALUES = {
+    "1. State Hwy Agency",
+    "2. County Hwy Agency",
+    "3. City or Town Hwy Agency",
+    "4. Federal Roads",
+    "5. Toll Roads Maintained by Others",
+    "6. Private/Unknown Roads",
+}
+
+# SYSTEM values that indicate state-maintained roads
+STATE_SYSTEM_VALUES = {
+    "VDOT Interstate", "VDOT Primary", "VDOT Secondary",
+    "Interstate", "Primary", "Secondary",
+}
+
+# SYSTEM values that indicate non-state roads (county/city/town)
+NONSTATE_SYSTEM_VALUES = {
+    "NonVDOT primary", "NonVDOT secondary",
+}
+
+# Physical Juris Name patterns that indicate city/town maintenance
+CITY_TOWN_PATTERNS = {
+    "City of ", "Town of ", "city of ", "town of ",
+}
+
+
+def derive_ownership(system_val, phys_juris, func_class=""):
+    """
+    Derive Ownership from SYSTEM + Physical Juris Name + Functional Class.
+
+    Logic mirrors VDOT's classification:
+      - Interstate/Primary/Secondary → State Hwy Agency
+      - NonVDOT + City/Town jurisdiction → City or Town Hwy Agency
+      - NonVDOT + County jurisdiction → County Hwy Agency
+      - Federal functional class indicators → Federal Roads
+      - Empty/unknown → Private/Unknown Roads
+    """
+    system = (system_val or "").strip()
+    juris = (phys_juris or "").strip()
+    fclass = (func_class or "").strip()
+
+    # State-maintained roads (interstates, primaries, secondaries)
+    if system in STATE_SYSTEM_VALUES:
+        return "1. State Hwy Agency"
+
+    # Non-state roads — check jurisdiction name
+    if system in NONSTATE_SYSTEM_VALUES or system == "":
+        # City/Town jurisdiction pattern
+        if any(juris.startswith(p) for p in CITY_TOWN_PATTERNS):
+            return "3. City or Town Hwy Agency"
+
+        # VDOT Physical Juris codes ≥100 are cities/towns
+        juris_parts = juris.split(".", 1)
+        if juris_parts[0].strip().isdigit():
+            code = int(juris_parts[0].strip())
+            if code >= 100:
+                return "3. City or Town Hwy Agency"
+            else:
+                return "2. County Hwy Agency"
+
+        # County-level jurisdiction (default for non-city/town)
+        if "county" in juris.lower():
+            return "2. County Hwy Agency"
+
+        # If jurisdiction looks like a city/town name (no "County" suffix)
+        if juris and "county" not in juris.lower():
+            # Could be a city — but default to county to be conservative
+            return "2. County Hwy Agency"
+
+    # Fallback
+    if not system and not juris:
+        return "6. Private/Unknown Roads"
+
+    return "6. Private/Unknown Roads"
+
+
+def check_ownership_column(csv_path, dry_run=False, verbose=True):
+    """
+    Check if a CSV has a populated Ownership column.
+    If missing or empty, derive it from SYSTEM + Physical Juris Name.
+
+    Returns (rows_fixed, total_rows).
+    """
+    import csv
+
+    if not csv_path.exists():
+        return 0, 0
+
+    with open(csv_path, "r", newline="", encoding="utf-8-sig") as f:
+        reader = csv.reader(f)
+        headers = next(reader, None)
+        if not headers:
+            return 0, 0
+        rows = list(reader)
+
+    # Find column indices
+    col = {h.strip(): i for i, h in enumerate(headers)}
+    own_idx = col.get("Ownership")
+    sys_idx = col.get("SYSTEM")
+    juris_idx = col.get("Physical Juris Name")
+    fc_idx = col.get("Functional Class")
+
+    if own_idx is None:
+        if verbose:
+            print(f"    ⚠ No Ownership column in {csv_path.name}")
+        return 0, len(rows)
+
+    if sys_idx is None:
+        if verbose:
+            print(f"    ⚠ No SYSTEM column in {csv_path.name} — cannot derive Ownership")
+        return 0, len(rows)
+
+    # Count rows needing Ownership
+    needs_fix = 0
+    for row in rows:
+        if len(row) <= own_idx:
+            continue
+        val = row[own_idx].strip()
+        if not val or val not in OWNERSHIP_VALUES:
+            needs_fix += 1
+
+    if needs_fix == 0:
+        if verbose:
+            print(f"    ✓ Ownership populated in {csv_path.name} ({len(rows)} rows)")
+        return 0, len(rows)
+
+    if verbose:
+        pct = needs_fix / len(rows) * 100 if rows else 0
+        print(f"    ⚠ {needs_fix}/{len(rows)} rows ({pct:.0f}%) missing Ownership in {csv_path.name}")
+
+    if dry_run:
+        return needs_fix, len(rows)
+
+    # Derive Ownership for empty rows
+    fixed = 0
+    for row in rows:
+        if len(row) <= own_idx:
+            continue
+        val = row[own_idx].strip()
+        if val and val in OWNERSHIP_VALUES:
+            continue
+
+        system_val = row[sys_idx].strip() if sys_idx is not None and len(row) > sys_idx else ""
+        juris_val = row[juris_idx].strip() if juris_idx is not None and len(row) > juris_idx else ""
+        fc_val = row[fc_idx].strip() if fc_idx is not None and len(row) > fc_idx else ""
+
+        derived = derive_ownership(system_val, juris_val, fc_val)
+        row[own_idx] = derived
+        fixed += 1
+
+    # Write back
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(headers)
+        writer.writerows(rows)
+
+    if verbose:
+        print(f"    ✓ Derived Ownership for {fixed} rows in {csv_path.name}")
+
+    return fixed, len(rows)
+
+
+def check_ownership_for_state(state_dir_name, data_dir=None, dry_run=False, verbose=True):
+    """
+    Check and fix Ownership column across all CSVs for a state.
+    Returns list of HierarchyIssues.
+    """
+    issues = []
+
+    # Find data directory
+    if data_dir:
+        ddir = Path(data_dir)
+    else:
+        # Try standard locations
+        for candidate in [
+            ROOT / "data" / state_dir_name,
+            ROOT / "data",
+        ]:
+            if candidate.exists():
+                ddir = candidate
+                break
+        else:
+            return issues
+
+    # Find all crash CSVs
+    csv_files = sorted(ddir.glob("*_all_roads.csv"))
+    if not csv_files:
+        return issues
+
+    total_needing_fix = 0
+    total_rows = 0
+
+    for csv_path in csv_files:
+        needs_fix, rows = check_ownership_column(csv_path, dry_run=dry_run, verbose=verbose)
+        total_needing_fix += needs_fix
+        total_rows += rows
+
+    if total_needing_fix > 0:
+        pct = total_needing_fix / total_rows * 100 if total_rows else 0
+
+        def make_fix(dd=ddir, sd=state_dir_name):
+            def fix(h):
+                for cp in sorted(dd.glob("*_all_roads.csv")):
+                    check_ownership_column(cp, dry_run=False, verbose=False)
+                return True
+            return fix
+
+        issues.append(HierarchyIssue(
+            "warning", "missing_ownership",
+            f"{total_needing_fix}/{total_rows} rows ({pct:.0f}%) missing Ownership across {len(csv_files)} CSVs",
+            fix_fn=make_fix() if not dry_run else None
+        ))
+
+    return issues
+
+
 # ─── Main validation orchestrator ────────────────────────────────────────────
 
-def validate_state(state_dir_name, dry_run=False, verbose=True):
+def validate_state(state_dir_name, dry_run=False, verbose=True, data_dir=None):
     """
     Validate and optionally auto-heal a single state's hierarchy.json.
+    Also checks Ownership column in crash CSVs if data_dir is provided.
     Returns (issues_found, issues_fixed, hierarchy_modified).
     """
     hierarchy_path = STATES_DIR / state_dir_name / "hierarchy.json"
@@ -480,6 +700,11 @@ def validate_state(state_dir_name, dry_run=False, verbose=True):
     all_issues.extend(check_empty_mpo_counties(hierarchy, state_fips))
     all_issues.extend(check_region_completeness(hierarchy))
     all_issues.extend(check_mpo_coverage(hierarchy))
+
+    # Check Ownership column in crash data CSVs
+    all_issues.extend(check_ownership_for_state(
+        state_dir_name, data_dir=data_dir, dry_run=dry_run, verbose=verbose
+    ))
 
     if not all_issues:
         if verbose:
@@ -535,6 +760,8 @@ def main():
     parser.add_argument("--strict", action="store_true",
                         help="Exit non-zero if any issues found (for CI gating)")
     parser.add_argument("--quiet", action="store_true", help="Only show errors/warnings")
+    parser.add_argument("--data-dir", type=str, default=None,
+                        help="Path to crash data CSVs (checks Ownership column)")
     args = parser.parse_args()
 
     if not args.state and not args.all:
@@ -554,7 +781,8 @@ def main():
         for fips in sorted(FIPS_TO_ABBR.keys()):
             state_dir = FIPS_TO_STATE_DIR[fips]
             issues, fixed, modified = validate_state(
-                state_dir, dry_run=args.dry_run, verbose=not args.quiet
+                state_dir, dry_run=args.dry_run, verbose=not args.quiet,
+                data_dir=args.data_dir
             )
             total_issues += issues
             total_fixed += fixed
@@ -562,7 +790,8 @@ def main():
                 total_modified += 1
     else:
         issues, fixed, modified = validate_state(
-            args.state, dry_run=args.dry_run, verbose=True
+            args.state, dry_run=args.dry_run, verbose=True,
+            data_dir=args.data_dir
         )
         total_issues = issues
         total_fixed = fixed

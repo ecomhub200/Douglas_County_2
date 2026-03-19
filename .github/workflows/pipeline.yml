@@ -324,6 +324,24 @@ jobs:
             echo "WARNING: Road-type split had issues (non-fatal)"
           }
 
+      # ── Stage 2.5: Derive missing Ownership column ──
+      # Non-VDOT states may have empty Ownership columns which breaks
+      # county/city road classification. Derives from SYSTEM + Physical Juris Name.
+      - name: "Stage 2.5: Derive Ownership column"
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+
+          echo "=========================================="
+          echo "Stage 2.5: Derive missing Ownership column"
+          echo "=========================================="
+
+          python scripts/validate_hierarchy.py \
+            --state "$STATE" \
+            --data-dir "$DATA_DIR" || {
+            echo "::warning::Stage 2.5: Ownership derivation had issues (non-fatal)"
+          }
+
       # ── Stage 3: Aggregate by Scope (CSV) ──
       - name: "Stage 3: Aggregate by scope (CSV)"
         if: github.event.inputs.dry_run != 'true'

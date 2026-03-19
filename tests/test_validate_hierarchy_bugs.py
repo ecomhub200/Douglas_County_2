@@ -18,14 +18,25 @@ Validates that:
  13. HierarchyIssue repr shows correct icons
  14. Duplicate FIPS in multiple regions doesn't crash
  15. Empty allCounties doesn't crash (edge case)
+ 16. Ownership derivation: State roads → State Hwy Agency
+ 17. Ownership derivation: City/Town jurisdiction → City or Town Hwy Agency
+ 18. Ownership derivation: County jurisdiction → County Hwy Agency
+ 19. Ownership derivation: VDOT numeric codes ≥100 → City/Town
+ 20. Ownership derivation: empty inputs → Private/Unknown
+ 21. Ownership CSV check detects missing values
+ 22. Ownership CSV check backfills empty rows correctly
+ 23. Ownership CSV check preserves existing valid values
+ 24. Pipeline Stage 2.5 exists for Ownership derivation
 
 Run with:
     python tests/test_validate_hierarchy_bugs.py
     python -m pytest tests/test_validate_hierarchy_bugs.py -v
 """
 
+import csv
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -43,6 +54,8 @@ from validate_hierarchy import (
     check_region_completeness,
     check_unresolvable_fips,
     assign_to_nearest_region,
+    check_ownership_column,
+    derive_ownership,
     haversine_km,
 )
 
@@ -463,6 +476,173 @@ def test_script_is_executable_python():
     spec.loader.exec_module(mod)
     assert hasattr(mod, "main")
     assert hasattr(mod, "validate_state")
+
+
+# ── Test 14: Ownership derivation ─────────────────────────────────────────────
+
+class TestDeriveOwnership:
+    """Test the derive_ownership() function that maps SYSTEM + Physical Juris → Ownership."""
+
+    def test_vdot_interstate_is_state_agency(self):
+        assert derive_ownership("VDOT Interstate", "") == "1. State Hwy Agency"
+
+    def test_vdot_primary_is_state_agency(self):
+        assert derive_ownership("VDOT Primary", "001. Accomack County") == "1. State Hwy Agency"
+
+    def test_vdot_secondary_is_state_agency(self):
+        assert derive_ownership("VDOT Secondary", "") == "1. State Hwy Agency"
+
+    def test_interstate_generic_is_state_agency(self):
+        """Non-VDOT states use plain 'Interstate' system value."""
+        assert derive_ownership("Interstate", "") == "1. State Hwy Agency"
+
+    def test_primary_generic_is_state_agency(self):
+        assert derive_ownership("Primary", "Montgomery County") == "1. State Hwy Agency"
+
+    def test_secondary_generic_is_state_agency(self):
+        assert derive_ownership("Secondary", "") == "1. State Hwy Agency"
+
+    def test_nonvdot_city_of_pattern(self):
+        """'City of X' jurisdiction → City or Town Hwy Agency."""
+        assert derive_ownership("NonVDOT secondary", "City of Norfolk") == "3. City or Town Hwy Agency"
+
+    def test_nonvdot_town_of_pattern(self):
+        """'Town of X' jurisdiction → City or Town Hwy Agency."""
+        assert derive_ownership("NonVDOT secondary", "Town of Blacksburg") == "3. City or Town Hwy Agency"
+
+    def test_nonvdot_numeric_code_city(self):
+        """VDOT Physical Juris code ≥100 indicates city/town."""
+        assert derive_ownership("NonVDOT secondary", "100. City of Alexandria") == "3. City or Town Hwy Agency"
+
+    def test_nonvdot_numeric_code_150_town(self):
+        assert derive_ownership("NonVDOT secondary", "150. Town of Blacksburg") == "3. City or Town Hwy Agency"
+
+    def test_nonvdot_numeric_code_county(self):
+        """VDOT Physical Juris code <100 indicates county."""
+        assert derive_ownership("NonVDOT secondary", "001. Accomack County") == "2. County Hwy Agency"
+
+    def test_nonvdot_county_text(self):
+        """'X County' jurisdiction → County Hwy Agency."""
+        assert derive_ownership("NonVDOT secondary", "Accomack County") == "2. County Hwy Agency"
+
+    def test_nonvdot_primary_county(self):
+        assert derive_ownership("NonVDOT primary", "050. King William County") == "2. County Hwy Agency"
+
+    def test_empty_system_empty_juris(self):
+        """Completely empty → Private/Unknown."""
+        assert derive_ownership("", "", "") == "6. Private/Unknown Roads"
+
+    def test_empty_system_with_county(self):
+        """Empty SYSTEM but County jurisdiction → County Hwy Agency."""
+        assert derive_ownership("", "Fairfax County") == "2. County Hwy Agency"
+
+
+# ── Test 15: Ownership CSV check ─────────────────────────────────────────────
+
+@pytest.fixture
+def ownership_test_csv(tmp_path):
+    """Create a test CSV with mixed Ownership values."""
+    csv_path = tmp_path / "test_all_roads.csv"
+    headers = ["Document Nbr", "Crash Severity", "SYSTEM", "Physical Juris Name", "Ownership", "RTE Name"]
+    rows = [
+        ["C001", "K", "VDOT Interstate", "051. Dickenson County", "", "I-81"],
+        ["C002", "A", "NonVDOT secondary", "100. City of Alexandria", "", "Main St"],
+        ["C003", "B", "NonVDOT secondary", "001. Accomack County", "", "County Rd 5"],
+        ["C004", "O", "NonVDOT secondary", "Town of Blacksburg", "", "College Ave"],
+        ["C005", "C", "VDOT Primary", "029. Fairfax County", "1. State Hwy Agency", "US-29"],
+    ]
+    with open(csv_path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(headers)
+        w.writerows(rows)
+    return csv_path
+
+
+def test_ownership_csv_detects_missing(ownership_test_csv):
+    """CSV check should detect rows with empty Ownership."""
+    fixed, total = check_ownership_column(ownership_test_csv, dry_run=True, verbose=False)
+    assert fixed == 4, f"Expected 4 rows needing fix, got {fixed}"
+    assert total == 5
+
+
+def test_ownership_csv_backfills_correctly(ownership_test_csv):
+    """CSV check should derive correct Ownership values."""
+    check_ownership_column(ownership_test_csv, dry_run=False, verbose=False)
+
+    with open(ownership_test_csv) as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    assert rows[0]["Ownership"] == "1. State Hwy Agency"  # Interstate
+    assert rows[1]["Ownership"] == "3. City or Town Hwy Agency"  # City code ≥100
+    assert rows[2]["Ownership"] == "2. County Hwy Agency"  # County code <100
+    assert rows[3]["Ownership"] == "3. City or Town Hwy Agency"  # "Town of"
+    assert rows[4]["Ownership"] == "1. State Hwy Agency"  # Already populated
+
+
+def test_ownership_csv_preserves_existing(ownership_test_csv):
+    """Existing valid Ownership values must not be overwritten."""
+    check_ownership_column(ownership_test_csv, dry_run=False, verbose=False)
+
+    with open(ownership_test_csv) as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    # C005 had valid Ownership — should be preserved
+    assert rows[4]["Ownership"] == "1. State Hwy Agency"
+
+
+def test_ownership_csv_fully_populated_no_changes(tmp_path):
+    """CSV with all Ownership values populated should report 0 fixes."""
+    csv_path = tmp_path / "full_all_roads.csv"
+    headers = ["Document Nbr", "SYSTEM", "Physical Juris Name", "Ownership"]
+    rows = [
+        ["C001", "VDOT Interstate", "County X", "1. State Hwy Agency"],
+        ["C002", "NonVDOT secondary", "County Y", "2. County Hwy Agency"],
+    ]
+    with open(csv_path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(headers)
+        w.writerows(rows)
+
+    fixed, total = check_ownership_column(csv_path, dry_run=False, verbose=False)
+    assert fixed == 0
+    assert total == 2
+
+
+def test_ownership_csv_no_system_column(tmp_path):
+    """CSV without SYSTEM column should gracefully skip."""
+    csv_path = tmp_path / "nosys_all_roads.csv"
+    headers = ["Document Nbr", "Ownership"]
+    rows = [["C001", ""]]
+    with open(csv_path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(headers)
+        w.writerows(rows)
+
+    fixed, total = check_ownership_column(csv_path, dry_run=False, verbose=False)
+    assert fixed == 0  # Can't derive without SYSTEM
+
+
+# ── Test 16: Pipeline Stage 2.5 ─────────────────────────────────────────────
+
+def test_pipeline_has_stage_25():
+    """pipeline.yml must include Stage 2.5 for Ownership derivation."""
+    pipeline_path = PROJECT_ROOT / ".github" / "workflows" / "pipeline.yml"
+    content = pipeline_path.read_text()
+    assert "Stage 2.5" in content, "pipeline.yml must have Stage 2.5"
+    assert "--data-dir" in content, "Stage 2.5 must pass --data-dir"
+
+
+def test_pipeline_stage_25_after_roadtype_before_aggregate():
+    """Stage 2.5 should appear after Stage 2 (road type) and before Stage 3 (aggregate)."""
+    pipeline_path = PROJECT_ROOT / ".github" / "workflows" / "pipeline.yml"
+    content = pipeline_path.read_text()
+    pos_roadtype = content.find("Stage 2: Split by road type")
+    pos_ownership = content.find("Stage 2.5")
+    pos_aggregate = content.find("Stage 3: Aggregate")
+    assert pos_roadtype < pos_ownership < pos_aggregate, \
+        "Stage order must be: 2 (road type) → 2.5 (ownership) → 3 (aggregate)"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
