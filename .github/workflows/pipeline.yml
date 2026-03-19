@@ -4,8 +4,8 @@
 # Processes Virginia-compatible CSVs through the generic pipeline.
 # Auto-triggered by state-specific download workflows.
 #
-# Stage order: Init Cache → Split Jurisdiction → Split Road Type →
-#              Aggregate (CSV) → Upload → Predict → Manifest
+# Stage order: Init Cache → Split Jurisdiction → Derive Ownership →
+#              Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest
 #
 # NOTE: Validation and Geocoding are handled separately on Cloudflare.
 #
@@ -304,6 +304,26 @@ jobs:
 
           python scripts/split_jurisdictions.py $ARGS
 
+      # ── Stage 1.5: Derive missing Ownership column ──
+      # Non-VDOT states may have empty Ownership columns which breaks
+      # county/city road classification in Stage 2. Must run BEFORE
+      # split_road_type so the Ownership column is populated when the
+      # road-type split filters on method: 'ownership'.
+      - name: "Stage 1.5: Derive Ownership column"
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+
+          echo "=========================================="
+          echo "Stage 1.5: Derive missing Ownership column"
+          echo "=========================================="
+
+          python scripts/validate_hierarchy.py \
+            --state "$STATE" \
+            --data-dir "$DATA_DIR" || {
+            echo "::warning::Stage 1.5: Ownership derivation had issues (non-fatal)"
+          }
+
       # ── Stage 2: Split by Road Type ──
       - name: "Stage 2: Split by road type"
         run: |
@@ -322,24 +342,6 @@ jobs:
             --auto \
             --data-dir "$DATA_DIR" || {
             echo "WARNING: Road-type split had issues (non-fatal)"
-          }
-
-      # ── Stage 2.5: Derive missing Ownership column ──
-      # Non-VDOT states may have empty Ownership columns which breaks
-      # county/city road classification. Derives from SYSTEM + Physical Juris Name.
-      - name: "Stage 2.5: Derive Ownership column"
-        run: |
-          STATE="${{ needs.prepare.outputs.state }}"
-          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
-
-          echo "=========================================="
-          echo "Stage 2.5: Derive missing Ownership column"
-          echo "=========================================="
-
-          python scripts/validate_hierarchy.py \
-            --state "$STATE" \
-            --data-dir "$DATA_DIR" || {
-            echo "::warning::Stage 2.5: Ownership derivation had issues (non-fatal)"
           }
 
       # ── Stage 3: Aggregate by Scope (CSV) ──
@@ -704,4 +706,4 @@ jobs:
           echo "| Scope | $SCOPE ($SELECTION) |" >> $GITHUB_STEP_SUMMARY
           echo "| Jurisdictions | ${{ needs.prepare.outputs.jurisdiction_count }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Stages | Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stages | Init Cache → Split Jurisdiction → Derive Ownership → Split Road Type → Aggregate (CSV) → Upload → Predict → Manifest |" >> $GITHUB_STEP_SUMMARY
