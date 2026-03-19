@@ -641,5 +641,5 @@ jobs:
           | Jurisdictions | ${JCOUNT:-N/A} |
           | Skip Forecasts | ${{ github.event.inputs.skip_forecasts }} |
 
-          **Pipeline:** R2 Download → Init Cache → Split Jurisdiction → Split Road Type → Aggregate → Upload → Forecasts → Manifest
+          **Pipeline:** R2 Download → Init Cache → Split Jurisdiction → Derive Ownership → Split Road Type → Aggregate → Upload → Forecasts → Manifest
           EOF
