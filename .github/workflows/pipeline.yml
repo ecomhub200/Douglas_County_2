@@ -181,6 +181,22 @@ jobs:
 
           python scripts/init_cache.py --state "$STATE"
 
+      # ── Stage 0.1: Validate & auto-heal hierarchy ──
+      # Detects orphaned counties, empty MPOs, missing Census counties,
+      # unresolvable FIPS codes. Auto-heals when Census reference data
+      # is available. Runs before downloads to ensure clean scope resolution.
+      - name: "Stage 0.1: Validate hierarchy"
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+
+          echo "=========================================="
+          echo "Stage 0.1: Validate & auto-heal hierarchy"
+          echo "=========================================="
+
+          python scripts/validate_hierarchy.py --state "$STATE" || {
+            echo "::warning::Stage 0.1: Hierarchy validation had issues (non-fatal)"
+          }
+
       # ── Stage 0.5: Download from R2 (if no local CSV) ──
       # When triggered by a state download workflow, the CSV only exists on
       # R2 (the download ran on a different runner). Fetch it here so the
