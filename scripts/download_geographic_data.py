@@ -32,13 +32,37 @@ from datetime import datetime, timezone
 
 # ─── ArcGIS REST API helpers ────────────────────────────────────────────────
 
-# Census TIGERweb (2020 vintage — stable, won't change)
-TIGER_BASE = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer"
-TIGER_LAYERS = {
-    "states": 54,           # States
-    "counties": 82,         # Counties (includes LA parishes, AK boroughs, VA independent cities)
-    "places": 28,           # Incorporated Places (cities, towns, villages, CDPs)
-    "county_subdivisions": 30,  # County Subdivisions (MCDs, townships, towns in NE)
+# Census TIGERweb endpoints (ordered by preference)
+# The Census Bureau periodically retires vintage services, so we try multiple.
+TIGER_SERVICES = [
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer",
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer",
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer",
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer",
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer",
+]
+TIGER_BASE = None  # Resolved dynamically at startup
+
+# Layer name → expected ArcGIS layer names (for dynamic lookup)
+# Census renames layers between vintages, so we try many variants
+TIGER_LAYER_NAMES = {
+    "states": ["States", "Census States", "Current States", "2020 Census States",
+               "ACS 2024 States", "ACS 2025 States"],
+    "counties": ["Counties", "Census Counties", "Current Counties", "2020 Census Counties",
+                 "ACS 2024 Counties", "ACS 2025 Counties"],
+    "places": ["Places", "Incorporated Places", "Census Places", "Current Places",
+               "2020 Census Places", "ACS 2024 Places", "ACS 2025 Places"],
+    "county_subdivisions": ["County Subdivisions", "Census County Subdivisions",
+                            "Current County Subdivisions", "2020 Census County Subdivisions",
+                            "ACS 2024 County Subdivisions", "ACS 2025 County Subdivisions"],
+}
+
+# Fallback layer IDs (last known good — used only if dynamic lookup fails)
+TIGER_LAYERS_FALLBACK = {
+    "states": [80, 54, 82, 84, 86, 88, 90],
+    "counties": [82, 86, 100, 102],
+    "places": [28, 30, 150, 152],
+    "county_subdivisions": [30, 32, 160, 162],
 }
 
 # BTS/USDOT National Transportation Atlas — MPO boundaries
@@ -66,6 +90,8 @@ def arcgis_query_all(url, where="1=1", out_fields="*", return_geometry=True,
 
     all_features = []
     offset = 0
+    supports_pagination = True  # assume yes, disable if server rejects it
+    error_retries = 0  # prevent infinite retry loops
 
     while True:
         params = {
@@ -74,9 +100,11 @@ def arcgis_query_all(url, where="1=1", out_fields="*", return_geometry=True,
             "returnGeometry": "true" if return_geometry else "false",
             "outSR": out_sr,
             "f": "json",
-            "resultOffset": offset,
-            "resultRecordCount": page_size,
         }
+        # Only add pagination params if server supports them
+        if supports_pagination:
+            params["resultOffset"] = offset
+            params["resultRecordCount"] = page_size
         if extra_params:
             params.update(extra_params)
 
@@ -98,28 +126,46 @@ def arcgis_query_all(url, where="1=1", out_fields="*", return_geometry=True,
                     return all_features
 
         if data is None:
-            print(f"  ✗ No response received")
-            return all_features
+            break
 
-        # Check for ArcGIS error response
+        # Check for ArcGIS error responses (returned with HTTP 200)
         if "error" in data:
             err = data["error"]
-            print(f"  ✗ ArcGIS error {err.get('code', '?')}: {err.get('message', 'Unknown error')}")
-            if err.get("details"):
-                for d in err["details"][:3]:
-                    print(f"    - {d}")
+            code = err.get("code", "?")
+            msg = err.get("message", "Unknown error")
+            details = err.get("details", [])
+
+            # Try automatic recovery strategies (max 3 retries to prevent loops)
+            if error_retries < 3 and offset == 0:
+                error_retries += 1
+
+                # Strategy 1: Remove pagination params
+                if supports_pagination:
+                    supports_pagination = False
+                    print(f"  ⚠ Query failed with pagination params, retrying without...")
+                    continue
+
+                # Strategy 2: Switch to wildcard fields
+                if out_fields != "*":
+                    print(f"  ⚠ Query failed with specific fields, retrying with outFields=*...")
+                    out_fields = "*"
+                    supports_pagination = True  # re-enable and try again
+                    continue
+
+            print(f"  ✗ ArcGIS API error (code {code}): {msg}")
+            if details:
+                for d in details[:3]:
+                    print(f"    → {d}")
             return all_features
 
         features = data.get("features", [])
         if not features:
-            # On first page with 0 results, log diagnostic info
+            # Print diagnostic info on first page returning empty
             if offset == 0:
-                print(f"  ⚠ API returned 0 features on first request")
-                print(f"    URL: {url}")
-                print(f"    Response keys: {list(data.keys())}")
-                # Print a snippet of the response for debugging
-                snippet = json.dumps(data, indent=None)[:500]
-                print(f"    Response snippet: {snippet}")
+                keys = list(data.keys())
+                print(f"  ⚠ API returned 0 features. Response keys: {keys}")
+                if len(str(data)) < 500:
+                    print(f"    Full response: {json.dumps(data, indent=None)[:400]}")
             break
 
         all_features.extend(features)
@@ -168,24 +214,205 @@ def compute_centroid_from_point(geometry):
     return None, None
 
 
+# ─── Field name resolution ───────────────────────────────────────────────────
+
+def _get_field(attr, *candidates, default=""):
+    """
+    Get a field value from ArcGIS attributes, trying multiple candidate names.
+    Census TIGERweb periodically renames fields between vintages (e.g., NAME vs NAME20,
+    STUSAB vs STUSPS, FUNCSTAT vs FUNCSTAT20).
+    """
+    for name in candidates:
+        val = attr.get(name)
+        if val is not None and val != "":
+            return val
+    return default
+
+
+# ─── Dynamic service discovery ───────────────────────────────────────────────
+
+def _discover_tiger_service():
+    """
+    Try each TIGERweb service URL until one responds with valid layer metadata.
+    Returns (base_url, {layer_name: layer_id}) or raises RuntimeError.
+    """
+    import requests
+    global TIGER_BASE
+
+    for service_url in TIGER_SERVICES:
+        service_name = service_url.split("/services/")[1].split("/MapServer")[0]
+        try:
+            resp = requests.get(service_url, params={"f": "json"}, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+
+            if "error" in data:
+                print(f"  ⚠ {service_name}: API error — {data['error'].get('message', '?')}")
+                continue
+
+            layers = data.get("layers", [])
+            if not layers:
+                print(f"  ⚠ {service_name}: No layers found")
+                continue
+
+            # Build lookup: layer name → layer id
+            layer_lookup = {layer["name"]: layer["id"] for layer in layers}
+
+            # Verify we can find our required layers (exact match first, then substring)
+            resolved = {}
+            for key, candidate_names in TIGER_LAYER_NAMES.items():
+                # Try exact match first
+                for name in candidate_names:
+                    if name in layer_lookup:
+                        resolved[key] = layer_lookup[name]
+                        break
+                # If no exact match, try case-insensitive substring match
+                if key not in resolved:
+                    # e.g., key="states" should match "Census 2020 States" or "States (Current)"
+                    search_term = key.replace("_", " ")  # "county_subdivisions" → "county subdivisions"
+                    for layer_name, layer_id in layer_lookup.items():
+                        if search_term in layer_name.lower():
+                            resolved[key] = layer_id
+                            print(f"    (fuzzy match: '{layer_name}' → {key})")
+                            break
+
+            if len(resolved) >= 2:  # At least states + counties
+                # Verify a query actually works on one of the discovered layers
+                test_layer_id = resolved.get("states") or list(resolved.values())[0]
+                test_url = f"{service_url}/{test_layer_id}/query"
+                try:
+                    test_resp = requests.get(test_url, params={
+                        "where": "1=1", "outFields": "*",
+                        "returnGeometry": "false", "f": "json",
+                        "resultRecordCount": 1
+                    }, timeout=15)
+                    test_data = test_resp.json()
+                    if "error" in test_data:
+                        # Try without pagination
+                        test_resp = requests.get(test_url, params={
+                            "where": "1=1", "outFields": "*",
+                            "returnGeometry": "false", "f": "json",
+                        }, timeout=15)
+                        test_data = test_resp.json()
+                    if "error" in test_data:
+                        print(f"  ⚠ {service_name}: Layers found but queries fail — {test_data['error'].get('message', '?')}")
+                        continue
+                    if test_data.get("features"):
+                        sample_fields = list(test_data["features"][0].get("attributes", {}).keys())
+                        print(f"  ✓ Query verified. Sample fields: {sample_fields[:8]}")
+                except Exception as e:
+                    print(f"  ⚠ {service_name}: Query verification failed — {e}")
+                    # Still use this service; the error might be transient
+                TIGER_BASE = service_url
+                print(f"  ✓ Using {service_name}")
+                for key, layer_id in resolved.items():
+                    print(f"    {key}: layer {layer_id}")
+                return service_url, resolved
+            else:
+                print(f"  ⚠ {service_name}: Only matched {len(resolved)}/{len(TIGER_LAYER_NAMES)} layers")
+
+        except requests.exceptions.RequestException as e:
+            print(f"  ⚠ {service_name}: {e}")
+            continue
+
+    # All services failed — use fallback layer IDs with first service URL
+    print("  ⚠ Dynamic layer discovery failed, will try fallback layer IDs")
+    TIGER_BASE = TIGER_SERVICES[0]
+    return TIGER_BASE, None
+
+
+def _resolve_layer_url(layer_key, discovered_layers):
+    """
+    Get the query URL for a layer, trying discovered IDs first,
+    then fallback IDs until one returns data.
+    """
+    if discovered_layers and layer_key in discovered_layers:
+        return f"{TIGER_BASE}/{discovered_layers[layer_key]}/query"
+
+    # Try fallback layer IDs
+    import requests
+    for layer_id in TIGER_LAYERS_FALLBACK.get(layer_key, []):
+        url = f"{TIGER_BASE}/{layer_id}/query"
+        try:
+            resp = requests.get(url, params={
+                "where": "1=1", "outFields": "GEOID",
+                "returnGeometry": "false", "f": "json",
+                "resultRecordCount": 1
+            }, timeout=15)
+            data = resp.json()
+            if data.get("features"):
+                print(f"  ✓ Found {layer_key} at layer {layer_id}")
+                return url
+            if "error" in data:
+                continue
+        except Exception:
+            continue
+
+    # Last resort: use first fallback ID
+    fallback_id = TIGER_LAYERS_FALLBACK.get(layer_key, [0])[0]
+    return f"{TIGER_BASE}/{fallback_id}/query"
+
+
+# Module-level state for discovered layers
+_discovered_layers = None
+
+
+def _ensure_service():
+    """Discover the TIGERweb service once per run."""
+    global _discovered_layers, TIGER_BASE
+    if TIGER_BASE is not None:
+        return
+    print("\n═══ Discovering Census TIGERweb Service ═══")
+    _, _discovered_layers = _discover_tiger_service()
+
+
+def _query_with_state_filter(url, state_fips, label):
+    """
+    Query an ArcGIS layer with optional state FIPS filter.
+    Tries multiple field name variants for the state filter since Census
+    renames fields between vintages (STATE vs STATEFP vs STATEFP20).
+    """
+    if not state_fips:
+        return arcgis_query_all(url, where="1=1", out_fields="*",
+                                return_geometry=True, label=label)
+
+    # Try each state field name variant
+    for field_name in ["STATE", "STATEFP", "STATEFP20", "STATEFP10"]:
+        where = f"{field_name}='{state_fips}'"
+        features = arcgis_query_all(url, where=where, out_fields="*",
+                                    return_geometry=True, label=label)
+        if features:
+            return features
+
+    # Fallback: download all and filter client-side
+    print(f"  ⚠ State filter failed, downloading all and filtering locally...")
+    return arcgis_query_all(url, where="1=1", out_fields="*",
+                            return_geometry=True, label=label)
+
+
 # ─── Layer download functions ────────────────────────────────────────────────
 
 def download_states():
     """Download all US states + DC from TIGERweb."""
     print("\n═══ Downloading States ═══")
-    url = f"{TIGER_BASE}/{TIGER_LAYERS['states']}/query"
+    _ensure_service()
+    url = _resolve_layer_url("states", _discovered_layers)
     features = arcgis_query_all(
         url,
         where="1=1",
-        out_fields="GEOID,NAME,STUSAB,FUNCSTAT,ALAND,AWATER",
+        out_fields="*",
         return_geometry=True,
         label="states"
     )
 
+    if features:
+        sample = features[0].get("attributes", {})
+        print(f"  Available fields: {list(sample.keys())}")
+
     states = []
     for f in features:
         attr = f.get("attributes", {})
-        geoid = attr.get("GEOID", "")
+        geoid = _get_field(attr, "GEOID", "GEOID20", "GEOID10", "GEO_ID")
         # Skip territories (only 50 states + DC)
         if geoid not in _VALID_STATE_FIPS:
             continue
@@ -193,12 +420,12 @@ def download_states():
         centroid, bbox = compute_centroid_from_rings(f.get("geometry", {}))
         states.append({
             "fips": geoid,
-            "name": attr.get("NAME", ""),
-            "abbreviation": attr.get("STUSAB", ""),
+            "name": _get_field(attr, "NAME", "NAME20", "NAME10", "STATE_NAME"),
+            "abbreviation": _get_field(attr, "STUSAB", "STUSPS", "STUSPS20", "STATE_ABBR"),
             "centroid": centroid,  # [lon, lat]
             "bbox": bbox,         # [west, south, east, north]
-            "landAreaSqM": attr.get("ALAND"),
-            "waterAreaSqM": attr.get("AWATER"),
+            "landAreaSqM": _get_field(attr, "ALAND", "ALAND20", "ALAND10", default=None),
+            "waterAreaSqM": _get_field(attr, "AWATER", "AWATER20", "AWATER10", default=None),
         })
 
     states.sort(key=lambda s: s["fips"])
@@ -209,34 +436,32 @@ def download_states():
 def download_counties(state_fips=None):
     """Download all US counties from TIGERweb."""
     print("\n═══ Downloading Counties ═══")
-    url = f"{TIGER_BASE}/{TIGER_LAYERS['counties']}/query"
+    _ensure_service()
+    url = _resolve_layer_url("counties", _discovered_layers)
 
-    where = f"STATE='{state_fips}'" if state_fips else "1=1"
-    features = arcgis_query_all(
-        url,
-        where=where,
-        out_fields="GEOID,STATE,COUNTY,NAME,LSAD,FUNCSTAT,ALAND,AWATER",
-        return_geometry=True,
-        label="counties"
-    )
+    features = _query_with_state_filter(url, state_fips, "counties")
+
+    if features:
+        sample = features[0].get("attributes", {})
+        print(f"  Available fields: {list(sample.keys())}")
 
     counties = []
     for f in features:
         attr = f.get("attributes", {})
-        state = attr.get("STATE", "")
+        state = _get_field(attr, "STATE", "STATEFP", "STATEFP20", "STATEFP10")
         if state not in _VALID_STATE_FIPS:
             continue
 
         centroid, bbox = compute_centroid_from_rings(f.get("geometry", {}))
         counties.append({
             "stateFips": state,
-            "countyFips": attr.get("COUNTY", ""),
-            "geoid": attr.get("GEOID", ""),
-            "name": attr.get("NAME", ""),
-            "lsad": attr.get("LSAD", ""),      # 06=County, 03=City/Borough, 04=Borough, 12=Parish, 15=city(VA), 25=city(MO/NV)
+            "countyFips": _get_field(attr, "COUNTY", "COUNTYFP", "COUNTYFP20", "COUNTYFP10"),
+            "geoid": _get_field(attr, "GEOID", "GEOID20", "GEOID10"),
+            "name": _get_field(attr, "NAME", "NAME20", "NAME10", "BASENAME"),
+            "lsad": _get_field(attr, "LSAD", "LSAD20", "LSAD10"),
             "centroid": centroid,
             "bbox": bbox,
-            "landAreaSqM": attr.get("ALAND"),
+            "landAreaSqM": _get_field(attr, "ALAND", "ALAND20", "ALAND10", default=None),
         })
 
     counties.sort(key=lambda c: c["geoid"])
@@ -247,43 +472,42 @@ def download_counties(state_fips=None):
 def download_places(state_fips=None):
     """Download all incorporated places (cities, towns, villages, CDPs) from TIGERweb."""
     print("\n═══ Downloading Incorporated Places ═══")
-    url = f"{TIGER_BASE}/{TIGER_LAYERS['places']}/query"
+    _ensure_service()
+    url = _resolve_layer_url("places", _discovered_layers)
 
-    where = f"STATE='{state_fips}'" if state_fips else "1=1"
-    features = arcgis_query_all(
-        url,
-        where=where,
-        out_fields="GEOID,STATE,PLACEFP,NAME,NAMELSAD,LSAD,FUNCSTAT,ALAND",
-        return_geometry=True,
-        label="places"
-    )
+    features = _query_with_state_filter(url, state_fips, "places")
+
+    if features:
+        sample = features[0].get("attributes", {})
+        print(f"  Available fields: {list(sample.keys())}")
 
     places = []
     for f in features:
         attr = f.get("attributes", {})
-        state = attr.get("STATE", "")
+        state = _get_field(attr, "STATE", "STATEFP", "STATEFP20", "STATEFP10")
         if state not in _VALID_STATE_FIPS:
             continue
 
-        funcstat = attr.get("FUNCSTAT", "")
+        funcstat = _get_field(attr, "FUNCSTAT", "FUNCSTAT20", "FUNCSTAT10")
         # A = Active, S = Statistical (CDP). Include both.
-        if funcstat not in ("A", "S"):
+        # If FUNCSTAT is not available, include the record anyway
+        if funcstat and funcstat not in ("A", "S"):
             continue
 
         centroid, bbox = compute_centroid_from_rings(f.get("geometry", {}))
-        lsad = attr.get("LSAD", "")
+        lsad = _get_field(attr, "LSAD", "LSAD20", "LSAD10")
         places.append({
             "stateFips": state,
-            "placeFips": attr.get("PLACEFP", ""),
-            "geoid": attr.get("GEOID", ""),
-            "name": attr.get("NAME", ""),
-            "fullName": attr.get("NAMELSAD", ""),
+            "placeFips": _get_field(attr, "PLACEFP", "PLACEFP20", "PLACEFP10"),
+            "geoid": _get_field(attr, "GEOID", "GEOID20", "GEOID10"),
+            "name": _get_field(attr, "NAME", "NAME20", "NAME10", "BASENAME"),
+            "fullName": _get_field(attr, "NAMELSAD", "NAMELSAD20", "NAMELSAD10"),
             "lsad": lsad,
             "type": _LSAD_PLACE_TYPE.get(lsad, "other"),
-            "funcstat": funcstat,  # A=incorporated, S=statistical/CDP
+            "funcstat": funcstat or "A",  # default to Active if field not available
             "centroid": centroid,
             "bbox": bbox,
-            "landAreaSqM": attr.get("ALAND"),
+            "landAreaSqM": _get_field(attr, "ALAND", "ALAND20", "ALAND10", default=None),
         })
 
     places.sort(key=lambda p: p["geoid"])
@@ -294,38 +518,37 @@ def download_places(state_fips=None):
 def download_county_subdivisions(state_fips=None):
     """Download county subdivisions (MCDs, townships, towns) from TIGERweb."""
     print("\n═══ Downloading County Subdivisions ═══")
-    url = f"{TIGER_BASE}/{TIGER_LAYERS['county_subdivisions']}/query"
+    _ensure_service()
+    url = _resolve_layer_url("county_subdivisions", _discovered_layers)
 
-    where = f"STATE='{state_fips}'" if state_fips else "1=1"
-    features = arcgis_query_all(
-        url,
-        where=where,
-        out_fields="GEOID,STATE,COUNTY,COUSUBFP,NAME,NAMELSAD,LSAD,FUNCSTAT",
-        return_geometry=True,
-        label="county subdivisions"
-    )
+    features = _query_with_state_filter(url, state_fips, "county subdivisions")
+
+    if features:
+        sample = features[0].get("attributes", {})
+        print(f"  Available fields: {list(sample.keys())}")
 
     subdivisions = []
     for f in features:
         attr = f.get("attributes", {})
-        state = attr.get("STATE", "")
+        state = _get_field(attr, "STATE", "STATEFP", "STATEFP20", "STATEFP10")
         if state not in _VALID_STATE_FIPS:
             continue
 
-        funcstat = attr.get("FUNCSTAT", "")
-        if funcstat not in ("A", "S"):
+        funcstat = _get_field(attr, "FUNCSTAT", "FUNCSTAT20", "FUNCSTAT10")
+        # If FUNCSTAT is not available, include the record anyway
+        if funcstat and funcstat not in ("A", "S"):
             continue
 
         centroid, bbox = compute_centroid_from_rings(f.get("geometry", {}))
         subdivisions.append({
             "stateFips": state,
-            "countyFips": attr.get("COUNTY", ""),
-            "cousubFips": attr.get("COUSUBFP", ""),
-            "geoid": attr.get("GEOID", ""),
-            "name": attr.get("NAME", ""),
-            "fullName": attr.get("NAMELSAD", ""),
-            "lsad": attr.get("LSAD", ""),
-            "funcstat": funcstat,
+            "countyFips": _get_field(attr, "COUNTY", "COUNTYFP", "COUNTYFP20", "COUNTYFP10"),
+            "cousubFips": _get_field(attr, "COUSUBFP", "COUSUBFP20", "COUSUBFP10"),
+            "geoid": _get_field(attr, "GEOID", "GEOID20", "GEOID10"),
+            "name": _get_field(attr, "NAME", "NAME20", "NAME10", "BASENAME"),
+            "fullName": _get_field(attr, "NAMELSAD", "NAMELSAD20", "NAMELSAD10"),
+            "lsad": _get_field(attr, "LSAD", "LSAD20", "LSAD10"),
+            "funcstat": funcstat or "A",
             "centroid": centroid,
             "bbox": bbox,
         })
@@ -349,16 +572,25 @@ def download_mpos():
     )
 
     if not features:
-        # Fallback: try alternate URL
-        alt_url = "https://geo.dot.gov/server/rest/services/NTAD/Metropolitan_Planning_Organizations/FeatureServer/0/query"
-        print("  Trying alternate BTS endpoint...")
-        features = arcgis_query_all(
-            alt_url,
-            where="1=1",
-            out_fields="*",
-            return_geometry=True,
-            label="MPOs"
-        )
+        # Fallback: try alternate URLs (BTS/USDOT reorganizes periodically)
+        alt_urls = [
+            "https://geo.dot.gov/server/rest/services/NTAD/Metropolitan_Planning_Organizations/FeatureServer/0/query",
+            "https://geo.dot.gov/server/rest/services/Hosted/Metropolitan_Planning_Organizations/FeatureServer/0/query",
+            "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/Metropolitan_Planning_Organizations/FeatureServer/0/query",
+            "https://geo.dot.gov/server/rest/services/NTAD/MPO_Boundaries/FeatureServer/0/query",
+            "https://geo.dot.gov/server/rest/services/NTAD/MPO_Boundaries/MapServer/0/query",
+        ]
+        for alt_url in alt_urls:
+            print(f"  Trying alternate endpoint: {alt_url.split('/services/')[1].split('/query')[0]}...")
+            features = arcgis_query_all(
+                alt_url,
+                where="1=1",
+                out_fields="*",
+                return_geometry=True,
+                label="MPOs"
+            )
+            if features:
+                break
 
     mpos = []
     for f in features:
@@ -548,10 +780,40 @@ def main():
             mpos = assign_counties_to_mpos(mpos, counties_data)
         save_json(mpos, "us_mpos.json")
 
+    # ── Validate results ──
     print("\n" + "=" * 60)
-    print("  ✓ Download complete!")
+    total_records = 0
+    failures = []
+    for json_file in sorted(OUTPUT_DIR.glob("*.json")):
+        try:
+            with open(json_file) as jf:
+                meta = json.load(jf).get("_metadata", {})
+                count = meta.get("recordCount", 0)
+                total_records += count
+                if count == 0:
+                    failures.append(json_file.name)
+        except Exception:
+            failures.append(json_file.name)
+
+    if total_records == 0:
+        print("  ✗ FAILED: All downloads returned 0 records!")
+        print("    This likely means the Census TIGERweb API has changed.")
+        print("    Check: https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb")
+        print("=" * 60)
+        sys.exit(1)
+    elif failures:
+        print(f"  ⚠ Partial success: {len(failures)} layer(s) returned 0 records:")
+        for f in failures:
+            print(f"    - {f}")
+        print(f"  Total records across other layers: {total_records}")
+    else:
+        print("  ✓ Download complete!")
+
     print(f"  Output directory: {OUTPUT_DIR}")
     print("=" * 60)
+
+    if failures:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
