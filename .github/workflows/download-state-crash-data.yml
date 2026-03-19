@@ -149,11 +149,11 @@ jobs:
       r2_data_key: ${{ steps.r2_upload.outputs.r2_data_key }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 

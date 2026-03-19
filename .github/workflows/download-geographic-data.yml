@@ -62,12 +62,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -129,7 +129,7 @@ jobs:
 
       - name: Upload as artifact
         if: ${{ inputs.upload_artifact != 'false' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: geographic-data-${{ github.run_number }}
           path: data/geographic/
