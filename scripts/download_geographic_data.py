@@ -32,13 +32,30 @@ from datetime import datetime, timezone
 
 # ─── ArcGIS REST API helpers ────────────────────────────────────────────────
 
-# Census TIGERweb (2020 vintage — stable, won't change)
-TIGER_BASE = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer"
-TIGER_LAYERS = {
-    "states": 54,           # States
-    "counties": 82,         # Counties (includes LA parishes, AK boroughs, VA independent cities)
-    "places": 28,           # Incorporated Places (cities, towns, villages, CDPs)
-    "county_subdivisions": 30,  # County Subdivisions (MCDs, townships, towns in NE)
+# Census TIGERweb endpoints (ordered by preference)
+# The Census Bureau periodically retires vintage services, so we try multiple.
+TIGER_SERVICES = [
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer",
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer",
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer",
+    "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer",
+]
+TIGER_BASE = None  # Resolved dynamically at startup
+
+# Layer name → expected ArcGIS layer names (for dynamic lookup)
+TIGER_LAYER_NAMES = {
+    "states": ["States", "Census States"],
+    "counties": ["Counties", "Census Counties"],
+    "places": ["Places", "Incorporated Places", "Census Places"],
+    "county_subdivisions": ["County Subdivisions", "Census County Subdivisions"],
+}
+
+# Fallback layer IDs (last known good — used only if dynamic lookup fails)
+TIGER_LAYERS_FALLBACK = {
+    "states": [80, 54, 82, 84, 86, 88, 90],
+    "counties": [82, 86, 100, 102],
+    "places": [28, 30, 150, 152],
+    "county_subdivisions": [30, 32, 160, 162],
 }
 
 # BTS/USDOT National Transportation Atlas — MPO boundaries
@@ -80,6 +97,7 @@ def arcgis_query_all(url, where="1=1", out_fields="*", return_geometry=True,
         if extra_params:
             params.update(extra_params)
 
+        data = None
         for attempt in range(MAX_RETRIES):
             try:
                 resp = requests.get(url, params=params, timeout=60)
@@ -96,8 +114,29 @@ def arcgis_query_all(url, where="1=1", out_fields="*", return_geometry=True,
                     print(f"  ✗ Giving up after {MAX_RETRIES} attempts")
                     return all_features
 
+        if data is None:
+            break
+
+        # Check for ArcGIS error responses (returned with HTTP 200)
+        if "error" in data:
+            err = data["error"]
+            code = err.get("code", "?")
+            msg = err.get("message", "Unknown error")
+            details = err.get("details", [])
+            print(f"  ✗ ArcGIS API error (code {code}): {msg}")
+            if details:
+                for d in details[:3]:
+                    print(f"    → {d}")
+            return all_features
+
         features = data.get("features", [])
         if not features:
+            # Print diagnostic info on first page returning empty
+            if offset == 0:
+                keys = list(data.keys())
+                print(f"  ⚠ API returned 0 features. Response keys: {keys}")
+                if len(str(data)) < 500:
+                    print(f"    Full response: {json.dumps(data, indent=None)[:400]}")
             break
 
         all_features.extend(features)
@@ -146,12 +185,114 @@ def compute_centroid_from_point(geometry):
     return None, None
 
 
+# ─── Dynamic service discovery ───────────────────────────────────────────────
+
+def _discover_tiger_service():
+    """
+    Try each TIGERweb service URL until one responds with valid layer metadata.
+    Returns (base_url, {layer_name: layer_id}) or raises RuntimeError.
+    """
+    import requests
+    global TIGER_BASE
+
+    for service_url in TIGER_SERVICES:
+        service_name = service_url.split("/services/")[1].split("/MapServer")[0]
+        try:
+            resp = requests.get(service_url, params={"f": "json"}, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+
+            if "error" in data:
+                print(f"  ⚠ {service_name}: API error — {data['error'].get('message', '?')}")
+                continue
+
+            layers = data.get("layers", [])
+            if not layers:
+                print(f"  ⚠ {service_name}: No layers found")
+                continue
+
+            # Build lookup: layer name → layer id
+            layer_lookup = {layer["name"]: layer["id"] for layer in layers}
+
+            # Verify we can find our required layers
+            resolved = {}
+            for key, candidate_names in TIGER_LAYER_NAMES.items():
+                for name in candidate_names:
+                    if name in layer_lookup:
+                        resolved[key] = layer_lookup[name]
+                        break
+
+            if len(resolved) >= 2:  # At least states + counties
+                TIGER_BASE = service_url
+                print(f"  ✓ Using {service_name}")
+                for key, layer_id in resolved.items():
+                    print(f"    {key}: layer {layer_id}")
+                return service_url, resolved
+            else:
+                print(f"  ⚠ {service_name}: Only matched {len(resolved)}/{len(TIGER_LAYER_NAMES)} layers")
+
+        except requests.exceptions.RequestException as e:
+            print(f"  ⚠ {service_name}: {e}")
+            continue
+
+    # All services failed — use fallback layer IDs with first service URL
+    print("  ⚠ Dynamic layer discovery failed, will try fallback layer IDs")
+    TIGER_BASE = TIGER_SERVICES[0]
+    return TIGER_BASE, None
+
+
+def _resolve_layer_url(layer_key, discovered_layers):
+    """
+    Get the query URL for a layer, trying discovered IDs first,
+    then fallback IDs until one returns data.
+    """
+    if discovered_layers and layer_key in discovered_layers:
+        return f"{TIGER_BASE}/{discovered_layers[layer_key]}/query"
+
+    # Try fallback layer IDs
+    import requests
+    for layer_id in TIGER_LAYERS_FALLBACK.get(layer_key, []):
+        url = f"{TIGER_BASE}/{layer_id}/query"
+        try:
+            resp = requests.get(url, params={
+                "where": "1=1", "outFields": "GEOID",
+                "returnGeometry": "false", "f": "json",
+                "resultRecordCount": 1
+            }, timeout=15)
+            data = resp.json()
+            if data.get("features"):
+                print(f"  ✓ Found {layer_key} at layer {layer_id}")
+                return url
+            if "error" in data:
+                continue
+        except Exception:
+            continue
+
+    # Last resort: use first fallback ID
+    fallback_id = TIGER_LAYERS_FALLBACK.get(layer_key, [0])[0]
+    return f"{TIGER_BASE}/{fallback_id}/query"
+
+
+# Module-level state for discovered layers
+_discovered_layers = None
+
+
+def _ensure_service():
+    """Discover the TIGERweb service once per run."""
+    global _discovered_layers, TIGER_BASE
+    if TIGER_BASE is not None:
+        return
+    print("\n═══ Discovering Census TIGERweb Service ═══")
+    _, _discovered_layers = _discover_tiger_service()
+
+
 # ─── Layer download functions ────────────────────────────────────────────────
 
 def download_states():
     """Download all US states + DC from TIGERweb."""
     print("\n═══ Downloading States ═══")
-    url = f"{TIGER_BASE}/{TIGER_LAYERS['states']}/query"
+    _ensure_service()
+    url = _resolve_layer_url("states", _discovered_layers)
     features = arcgis_query_all(
         url,
         where="1=1",
@@ -187,7 +328,8 @@ def download_states():
 def download_counties(state_fips=None):
     """Download all US counties from TIGERweb."""
     print("\n═══ Downloading Counties ═══")
-    url = f"{TIGER_BASE}/{TIGER_LAYERS['counties']}/query"
+    _ensure_service()
+    url = _resolve_layer_url("counties", _discovered_layers)
 
     where = f"STATE='{state_fips}'" if state_fips else "1=1"
     features = arcgis_query_all(
@@ -225,7 +367,8 @@ def download_counties(state_fips=None):
 def download_places(state_fips=None):
     """Download all incorporated places (cities, towns, villages, CDPs) from TIGERweb."""
     print("\n═══ Downloading Incorporated Places ═══")
-    url = f"{TIGER_BASE}/{TIGER_LAYERS['places']}/query"
+    _ensure_service()
+    url = _resolve_layer_url("places", _discovered_layers)
 
     where = f"STATE='{state_fips}'" if state_fips else "1=1"
     features = arcgis_query_all(
@@ -272,7 +415,8 @@ def download_places(state_fips=None):
 def download_county_subdivisions(state_fips=None):
     """Download county subdivisions (MCDs, townships, towns) from TIGERweb."""
     print("\n═══ Downloading County Subdivisions ═══")
-    url = f"{TIGER_BASE}/{TIGER_LAYERS['county_subdivisions']}/query"
+    _ensure_service()
+    url = _resolve_layer_url("county_subdivisions", _discovered_layers)
 
     where = f"STATE='{state_fips}'" if state_fips else "1=1"
     features = arcgis_query_all(
@@ -327,16 +471,23 @@ def download_mpos():
     )
 
     if not features:
-        # Fallback: try alternate URL
-        alt_url = "https://geo.dot.gov/server/rest/services/NTAD/Metropolitan_Planning_Organizations/FeatureServer/0/query"
-        print("  Trying alternate BTS endpoint...")
-        features = arcgis_query_all(
-            alt_url,
-            where="1=1",
-            out_fields="*",
-            return_geometry=True,
-            label="MPOs"
-        )
+        # Fallback: try alternate URLs
+        alt_urls = [
+            "https://geo.dot.gov/server/rest/services/NTAD/Metropolitan_Planning_Organizations/FeatureServer/0/query",
+            "https://geo.dot.gov/server/rest/services/Hosted/Metropolitan_Planning_Organizations/FeatureServer/0/query",
+            "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/Metropolitan_Planning_Organizations/FeatureServer/0/query",
+        ]
+        for alt_url in alt_urls:
+            print(f"  Trying alternate endpoint: {alt_url.split('/services/')[1].split('/query')[0]}...")
+            features = arcgis_query_all(
+                alt_url,
+                where="1=1",
+                out_fields="*",
+                return_geometry=True,
+                label="MPOs"
+            )
+            if features:
+                break
 
     mpos = []
     for f in features:
@@ -526,10 +677,40 @@ def main():
             mpos = assign_counties_to_mpos(mpos, counties_data)
         save_json(mpos, "us_mpos.json")
 
+    # ── Validate results ──
     print("\n" + "=" * 60)
-    print("  ✓ Download complete!")
+    total_records = 0
+    failures = []
+    for json_file in sorted(OUTPUT_DIR.glob("*.json")):
+        try:
+            with open(json_file) as jf:
+                meta = json.load(jf).get("_metadata", {})
+                count = meta.get("recordCount", 0)
+                total_records += count
+                if count == 0:
+                    failures.append(json_file.name)
+        except Exception:
+            failures.append(json_file.name)
+
+    if total_records == 0:
+        print("  ✗ FAILED: All downloads returned 0 records!")
+        print("    This likely means the Census TIGERweb API has changed.")
+        print("    Check: https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb")
+        print("=" * 60)
+        sys.exit(1)
+    elif failures:
+        print(f"  ⚠ Partial success: {len(failures)} layer(s) returned 0 records:")
+        for f in failures:
+            print(f"    - {f}")
+        print(f"  Total records across other layers: {total_records}")
+    else:
+        print("  ✓ Download complete!")
+
     print(f"  Output directory: {OUTPUT_DIR}")
     print("=" * 60)
+
+    if failures:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
