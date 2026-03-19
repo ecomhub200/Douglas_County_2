@@ -9,7 +9,8 @@
       -96.928917,
       35.565342
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 591
   },
   "regionType": {
     "label": "DOT District",
@@ -457,12 +458,27 @@
           -98.15
         ]
       }
+    },
+    "chisholm_trail_mpo": {
+      "name": "Chisholm Trail MPO",
+      "shortName": "Chisholm Trail",
+      "type": "mpo",
+      "btsMpoId": "40202300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -97.874737,
+        36.393025
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
     "001": "Adair",
     "003": "Alfalfa",
     "005": "Atoka",
+    "007": "Beaver",
     "009": "Beckham",
     "011": "Blaine",
     "013": "Bryan",
@@ -471,6 +487,7 @@
     "019": "Carter",
     "021": "Cherokee",
     "023": "Choctaw",
+    "025": "Cimarron",
     "027": "Cleveland",
     "029": "Coal",
     "031": "Comanche",
@@ -511,6 +528,7 @@
     "101": "Muskogee",
     "103": "Noble",
     "105": "Nowata",
+    "107": "Okfuskee",
     "109": "Oklahoma",
     "111": "Okmulgee",
     "113": "Osage",
@@ -526,11 +544,13 @@
     "133": "Seminole",
     "135": "Sequoyah",
     "137": "Stephens",
+    "139": "Texas",
     "141": "Tillman",
     "143": "Tulsa",
     "145": "Wagoner",
     "147": "Washington",
     "149": "Washita",
+    "151": "Woods",
     "153": "Woodward"
   }
 }

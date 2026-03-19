@@ -9,7 +9,8 @@
       -81.686783,
       27.766279
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 411
   },
   "regionType": {
     "label": "DOT District",
@@ -1089,6 +1090,174 @@
           -82.05
         ]
       }
+    },
+    "bay_county_transportation_planning_organization_mpo": {
+      "name": "Bay County Transportation Planning Organization",
+      "shortName": "Bay County Transportation Planning Organization",
+      "type": "mpo",
+      "btsMpoId": "12198002",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -85.603112,
+        30.309765
+      ],
+      "zoom": 10
+    },
+    "capital_region_transportation_planning_agency_mpo": {
+      "name": "Capital Region Transportation Planning Agency",
+      "shortName": "Capital Region Transportation Planning Agency",
+      "type": "mpo",
+      "btsMpoId": "12197706",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -84.285121,
+        30.251124
+      ],
+      "zoom": 10
+    },
+    "florida_alabama_transportation_planning_organization_mpo": {
+      "name": "Florida-Alabama Transportation Planning Organization",
+      "shortName": "Florida-Alabama Transportation Planning Organization",
+      "type": "mpo",
+      "btsMpoId": "12197000",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -87.159661,
+        30.615745
+      ],
+      "zoom": 10
+    },
+    "okaloosa_walton_transportation_planning_organization_mpo": {
+      "name": "Okaloosa-Walton Transportation Planning Organization",
+      "shortName": "Okaloosa-Walton Transportation Planning Organization",
+      "type": "mpo",
+      "btsMpoId": "12198001",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -86.465306,
+        30.678445
+      ],
+      "zoom": 10
+    },
+    "st_lucie_transportation_planning_organization_mpo": {
+      "name": "St. Lucie Transportation Planning Organization",
+      "shortName": "St. Lucie Transportation Planning Organization",
+      "type": "mpo",
+      "btsMpoId": "12198203",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.326431,
+        27.462807
+      ],
+      "zoom": 10
+    },
+    "north_florida_transportation_planning_organization_mpo": {
+      "name": "North Florida Transportation Planning Organization",
+      "shortName": "North Florida Transportation Planning Organization",
+      "type": "mpo",
+      "btsMpoId": "12197802",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -81.672508,
+        30.343357
+      ],
+      "zoom": 10
+    },
+    "ocalamarion_mpo": {
+      "name": "Ocala/Marion TPO",
+      "shortName": "Ocala/Marion TPO",
+      "type": "mpo",
+      "btsMpoId": "12198100",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -82.271097,
+        29.110292
+      ],
+      "zoom": 10
+    },
+    "martin_mpo": {
+      "name": "Martin MPO",
+      "shortName": "Martin",
+      "type": "mpo",
+      "btsMpoId": "12199301",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.225784,
+        27.131503
+      ],
+      "zoom": 10
+    },
+    "polk_county_transportation_planning_organization_mpo": {
+      "name": "Polk County Transportation Planning Organization",
+      "shortName": "Polk County Transportation Planning Organization",
+      "type": "mpo",
+      "btsMpoId": "12197805",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -81.503662,
+        27.997103
+      ],
+      "zoom": 10
+    },
+    "sarasotamanatee_mpo": {
+      "name": "Sarasota/Manatee MPO",
+      "shortName": "Sarasota/Manatee",
+      "type": "mpo",
+      "btsMpoId": "12197804",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -82.480492,
+        27.348185
+      ],
+      "zoom": 10
+    },
+    "space_coast_transportation_planning_organization_mpo": {
+      "name": "Space Coast Transportation Planning Organization",
+      "shortName": "Space Coast Transportation Planning Organization",
+      "type": "mpo",
+      "btsMpoId": "12198300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.756231,
+        28.404762
+      ],
+      "zoom": 10
+    },
+    "volusia_flagler_mpo": {
+      "name": "Volusia-Flagler TPO",
+      "shortName": "Volusia-Flagler TPO",
+      "type": "mpo",
+      "btsMpoId": "12197705",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -81.181019,
+        29.189241
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

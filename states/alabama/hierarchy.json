@@ -9,7 +9,8 @@
       -86.79113,
       32.806671
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 463
   },
   "regionType": {
     "label": "DOT District",
@@ -716,6 +717,76 @@
           -87.45
         ]
       }
+    },
+    "shoals_area_mpo": {
+      "name": "Shoals Area MPO",
+      "shortName": "Shoals",
+      "type": "mpo",
+      "btsMpoId": "01197402",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -87.615542,
+        34.771512
+      ],
+      "zoom": 10
+    },
+    "huntsville_mpo": {
+      "name": "Huntsville MPO",
+      "shortName": "Huntsville",
+      "type": "mpo",
+      "btsMpoId": "01197601",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -86.523452,
+        34.691636
+      ],
+      "zoom": 10
+    },
+    "decatur_area_mpo": {
+      "name": "Decatur Area MPO",
+      "shortName": "Decatur",
+      "type": "mpo",
+      "btsMpoId": "01198200",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -87.025912,
+        34.531337
+      ],
+      "zoom": 10
+    },
+    "calhoun_area_metropolitan_planning_organization_mpo": {
+      "name": "Calhoun Area Metropolitan Planning Organization",
+      "shortName": "Calhoun",
+      "type": "mpo",
+      "btsMpoId": "01197602",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -85.841465,
+        33.660379
+      ],
+      "zoom": 10
+    },
+    "auburn_opelika_mpo": {
+      "name": "Auburn - Opelika MPO",
+      "shortName": "Auburn - Opelika",
+      "type": "mpo",
+      "btsMpoId": "01197502",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -85.398352,
+        32.595005
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

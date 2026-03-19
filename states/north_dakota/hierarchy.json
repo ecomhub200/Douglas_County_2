@@ -9,7 +9,8 @@
       -99.784012,
       47.528912
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 355
   },
   "regionType": {
     "label": "DOT District",
@@ -421,6 +422,34 @@
           -101.05
         ]
       }
+    },
+    "bismarck_mandan_metropolitan_planning_organization_mpo": {
+      "name": "Bismarck Mandan Metropolitan Planning Organization",
+      "shortName": "Bismarck Mandan",
+      "type": "mpo",
+      "btsMpoId": "38198201",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -100.807463,
+        46.768807
+      ],
+      "zoom": 10
+    },
+    "central_dakota_mpo": {
+      "name": "Central Dakota MPO",
+      "shortName": "Central Dakota",
+      "type": "mpo",
+      "btsMpoId": "38202300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -101.285707,
+        48.250967
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

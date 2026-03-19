@@ -9,7 +9,8 @@
       -86.692345,
       35.747845
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 344
   },
   "regionType": {
     "label": "DOT District",
@@ -549,10 +550,95 @@
           -85.95
         ]
       }
+    },
+    "cleveland_area_mpo": {
+      "name": "Cleveland Area MPO",
+      "shortName": "Cleveland",
+      "type": "mpo",
+      "btsMpoId": "47200302",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -84.884058,
+        35.134804
+      ],
+      "zoom": 10
+    },
+    "knoxville_regional_transportation_planning_organization_mpo": {
+      "name": "Knoxville Regional Transportation Planning Organization",
+      "shortName": "Knoxville Regional Transportation Planning Organization",
+      "type": "mpo",
+      "btsMpoId": "47197801",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -84.09876,
+        35.881116
+      ],
+      "zoom": 10
+    },
+    "lakeway_mpo": {
+      "name": "Lakeway MPO",
+      "shortName": "Lakeway",
+      "type": "mpo",
+      "btsMpoId": "47200301",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -83.317992,
+        36.215015
+      ],
+      "zoom": 10
+    },
+    "johnson_city_metropolitan_transportation_planning_organization_mpo": {
+      "name": "Johnson City Metropolitan Transportation Planning Organization",
+      "shortName": "Johnson City Metropolitan Transportation Planning Organization",
+      "type": "mpo",
+      "btsMpoId": "47198201",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -82.387071,
+        36.328349
+      ],
+      "zoom": 10
+    },
+    "kingsport_mtpo_mpo": {
+      "name": "Kingsport MTPO",
+      "shortName": "Kingsport MTPO",
+      "type": "mpo",
+      "btsMpoId": "47197704",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -82.617774,
+        36.497895
+      ],
+      "zoom": 10
+    },
+    "chattanooga_hamilton_countynorth_georgia_metropolitan_planning_organization_mpo": {
+      "name": "Chattanooga-Hamilton County/North Georgia Metropolitan Planning Organization",
+      "shortName": "Chattanooga-Hamilton County/North Georgia",
+      "type": "mpo",
+      "btsMpoId": "47197703",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -85.225853,
+        35.149439
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
     "001": "Anderson",
+    "003": "Bedford",
     "005": "Benton",
     "007": "Bledsoe",
     "009": "Blount",
@@ -560,11 +646,13 @@
     "013": "Campbell",
     "015": "Cannon",
     "017": "Carroll",
+    "019": "Carter",
     "021": "Cheatham",
     "023": "Chester",
     "025": "Claiborne",
     "027": "Clay",
     "029": "Cocke",
+    "031": "Coffee",
     "033": "Crockett",
     "035": "Cumberland",
     "037": "Davidson",
@@ -574,13 +662,18 @@
     "045": "Dyer",
     "047": "Fayette",
     "049": "Fentress",
+    "051": "Franklin",
     "053": "Gibson",
     "055": "Giles",
     "057": "Grainger",
+    "059": "Greene",
+    "061": "Grundy",
     "063": "Hamblen",
     "065": "Hamilton",
+    "067": "Hancock",
     "069": "Hardeman",
     "071": "Hardin",
+    "073": "Hawkins",
     "075": "Haywood",
     "077": "Henderson",
     "079": "Henry",
@@ -589,6 +682,7 @@
     "085": "Humphreys",
     "087": "Jackson",
     "089": "Jefferson",
+    "091": "Johnson",
     "093": "Knox",
     "095": "Lake",
     "097": "Lauderdale",
@@ -628,6 +722,7 @@
     "165": "Sumner",
     "167": "Tipton",
     "169": "Trousdale",
+    "171": "Unicoi",
     "173": "Union",
     "175": "Van Buren",
     "177": "Warren",

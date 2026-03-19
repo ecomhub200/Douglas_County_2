@@ -9,7 +9,8 @@
       -93.210526,
       42.011539
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 940
   },
   "regionType": {
     "label": "DOT District",
@@ -584,6 +585,62 @@
           -93.35
         ]
       }
+    },
+    "corridor_metropolitan_planning_organization_mpo": {
+      "name": "Corridor Metropolitan Planning Organization",
+      "shortName": "Corridor",
+      "type": "mpo",
+      "btsMpoId": "19196400",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -91.74975,
+        42.022629
+      ],
+      "zoom": 10
+    },
+    "east_central_intergovernmental_association_mpo": {
+      "name": "East Central Intergovernmental Association",
+      "shortName": "East Central Intergovernmental Association",
+      "type": "mpo",
+      "btsMpoId": "19197400",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -90.665099,
+        42.49988
+      ],
+      "zoom": 10
+    },
+    "black_hawk_metropolitan_area_transportation_policy_board_mpo": {
+      "name": "Black Hawk Metropolitan Area Transportation Policy Board",
+      "shortName": "Black Hawk Metropolitan Transportation Policy Board",
+      "type": "mpo",
+      "btsMpoId": "19197300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -92.385852,
+        42.512319
+      ],
+      "zoom": 10
+    },
+    "metropolitan_planning_organization_of_johnson_mpo": {
+      "name": "Metropolitan Planning Organization of Johnson County",
+      "shortName": "Metropolitan Planning Organization of Johnson County",
+      "type": "mpo",
+      "btsMpoId": "19198000",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -91.56818,
+        41.717181
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

@@ -9,7 +9,8 @@
       -114.478828,
       44.240459
     ],
-    "zoom": 6
+    "zoom": 6,
+    "placesCount": 198
   },
   "regionType": {
     "label": "DOT District",
@@ -391,6 +392,34 @@
           -116.75
         ]
       }
+    },
+    "community_planning_association_of_southwest_idaho_mpo": {
+      "name": "Community Planning Association of Southwest Idaho",
+      "shortName": "Community Planning Association of Southwest Idaho",
+      "type": "mpo",
+      "btsMpoId": "16197700",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -116.582563,
+        43.520441
+      ],
+      "zoom": 10
+    },
+    "magic_valley_mpo": {
+      "name": "Magic Valley MPO",
+      "shortName": "Magic Valley",
+      "type": "mpo",
+      "btsMpoId": "16202300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -114.37791,
+        42.612748
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

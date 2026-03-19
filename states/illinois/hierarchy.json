@@ -9,7 +9,8 @@
       -88.986137,
       40.349457
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 1294
   },
   "regionType": {
     "label": "DOT District",
@@ -771,6 +772,76 @@
           -88.95
         ]
       }
+    },
+    "region_one_planning_council_r1pc_mpo": {
+      "name": "Region One Planning Council (R1PC)",
+      "shortName": "Region One Planning Council (R1PC)",
+      "type": "mpo",
+      "btsMpoId": "17196401",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -89.077164,
+        42.247348
+      ],
+      "zoom": 10
+    },
+    "dekalb_sycamore_area_transportation_study_mpo": {
+      "name": "DeKalb Sycamore Area Transportation Study",
+      "shortName": "DeKalb Sycamore Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "17200302",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -88.709847,
+        41.96466
+      ],
+      "zoom": 10
+    },
+    "mclean_county_regional_planning_commission_mpo": {
+      "name": "McLean County Regional Planning Commission",
+      "shortName": "McLean County Regional Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "17196700",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -88.968583,
+        40.478461
+      ],
+      "zoom": 10
+    },
+    "champaign_county_regional_planning_commission_mpo": {
+      "name": "Champaign County Regional Planning Commission",
+      "shortName": "Champaign County Regional Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "17196402",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -88.303151,
+        40.149609
+      ],
+      "zoom": 10
+    },
+    "kankakee_county_regional_planning_commission_mpo": {
+      "name": "Kankakee County Regional Planning Commission",
+      "shortName": "Kankakee County Regional Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "17198300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -87.828694,
+        41.14214
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

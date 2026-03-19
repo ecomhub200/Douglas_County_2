@@ -9,7 +9,8 @@
       -71.563896,
       43.452492
     ],
-    "zoom": 8
+    "zoom": 8,
+    "placesCount": 13
   },
   "regionType": {
     "label": "DOT District",
@@ -294,6 +295,34 @@
           -70.65
         ]
       }
+    },
+    "southern_new_hampshire_planning_commission_mpo": {
+      "name": "Southern New Hampshire Planning Commission",
+      "shortName": "Southern New Hampshire Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "33197301",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -71.400189,
+        42.982141
+      ],
+      "zoom": 10
+    },
+    "strafford_regional_planning_commission_mpo": {
+      "name": "Strafford Regional Planning Commission",
+      "shortName": "Strafford Regional Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "33198200",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -70.994627,
+        43.260889
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

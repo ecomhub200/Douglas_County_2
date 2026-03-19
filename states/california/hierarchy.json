@@ -9,7 +9,8 @@
       -119.417931,
       36.778259
     ],
-    "zoom": 6
+    "zoom": 6,
+    "placesCount": 482
   },
   "regionType": {
     "label": "DOT District",
@@ -927,6 +928,20 @@
           -120.3
         ]
       }
+    },
+    "fresno_council_of_governments_mpo": {
+      "name": "Fresno Council of Governments",
+      "shortName": "Fresno Council of Governments",
+      "type": "mpo",
+      "btsMpoId": "06197202",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -119.83441,
+        36.716553
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

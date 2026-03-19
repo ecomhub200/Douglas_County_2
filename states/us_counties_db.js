@@ -109,7 +109,10 @@ const USCountiesDB = (() => {
             'wade_hampton': {n:"Wade Hampton Census Area",t:'county',f:'270',c:[61.9953,-164.5866],z:7,p:["WADE HAMPTON", "Wade Hampton", "Wade Hampton Census Area"]},
             'wrangell': {n:"Wrangell City and Borough",t:'county',f:'275',c:[56.2433,-132.3266],z:7,p:["WRANGELL", "Wrangell", "Wrangell City and Borough"]},
             'yakutat': {n:"Yakutat City and Borough",t:'county',f:'282',c:[59.7249,-140.0378],z:7,p:["YAKUTAT", "Yakutat", "Yakutat City and Borough"]},
-            'yukon_koyukuk': {n:"Yukon-Koyukuk Census Area",t:'county',f:'290',c:[64.9503,-151.9015],z:7,p:["YUKON-KOYUKUK", "Yukon-Koyukuk", "Yukon-Koyukuk Census Area"]}
+            'yukon_koyukuk': {n:"Yukon-Koyukuk Census Area",t:'county',f:'290',c:[64.9503,-151.9015],z:7,p:["YUKON-KOYUKUK", "Yukon-Koyukuk", "Yukon-Koyukuk Census Area"]},
+            'chugach': {n:"Chugach Census Area",t:'municipality',f:'063',c:[60.488474,-146.203092],z:10,p:["CHUGACH", "Chugach", "Chugach Census Area"]},
+            'copper_river': {n:"Copper River Census Area",t:'municipality',f:'066',c:[62.034479,-143.922167],z:10,p:["COPPER RIVER", "Copper River", "Copper River Census Area"]},
+            'kusilvak': {n:"Kusilvak Census Area",t:'municipality',f:'158',c:[62.283588,-163.190171],z:10,p:["KUSILVAK", "Kusilvak", "Kusilvak Census Area"]}
         },
         '04': {
             'apache': {n:"Apache County",t:'county',f:'001',c:[35.6127,-109.3679],z:10,p:["APACHE", "Apache", "Apache County"]},
@@ -339,7 +342,16 @@ const USCountiesDB = (() => {
             'new_haven': {n:"New Haven County",t:'county',f:'009',c:[41.3155,-72.8326],z:10,p:["NEW HAVEN", "New Haven", "New Haven County"]},
             'new_london': {n:"New London County",t:'county',f:'011',c:[41.4122,-72.0836],z:10,p:["NEW LONDON", "New London", "New London County"]},
             'tolland': {n:"Tolland County",t:'county',f:'013',c:[41.9222,-72.302],z:10,p:["TOLLAND", "Tolland", "Tolland County"]},
-            'windham': {n:"Windham County",t:'county',f:'015',c:[41.8161,-72.0221],z:10,p:["WINDHAM", "Windham", "Windham County"]}
+            'windham': {n:"Windham County",t:'county',f:'015',c:[41.8161,-72.0221],z:10,p:["WINDHAM", "Windham", "Windham County"]},
+            'capitol_planning_region': {n:"Capitol Planning Region",t:'county',f:'110',c:[41.81697,-72.575886],z:10,p:["CAPITOL PLANNING REGION", "Capitol Planning Region", "Capitol Planning Region"]},
+            'greater_bridgeport_planning_region': {n:"Greater Bridgeport Planning Region",t:'county',f:'120',c:[41.184558,-73.209401],z:10,p:["GREATER BRIDGEPORT PLANNING REGION", "Greater Bridgeport Planning Region", "Greater Bridgeport Planning Region"]},
+            'lower_connecticut_river_valley_planning_region': {n:"Lower Connecticut River Valley Planning Region",t:'county',f:'130',c:[41.420307,-72.493525],z:10,p:["LOWER CONNECTICUT RIVER VALLEY PLANNING REGION", "Lower Connecticut River Valley Planning Region", "Lower Connecticut River Valley Planning Region"]},
+            'naugatuck_valley_planning_region': {n:"Naugatuck Valley Planning Region",t:'county',f:'140',c:[41.518931,-73.087906],z:10,p:["NAUGATUCK VALLEY PLANNING REGION", "Naugatuck Valley Planning Region", "Naugatuck Valley Planning Region"]},
+            'northeastern_connecticut_planning_region': {n:"Northeastern Connecticut Planning Region",t:'county',f:'150',c:[41.842375,-71.972655],z:10,p:["NORTHEASTERN CONNECTICUT PLANNING REGION", "Northeastern Connecticut Planning Region", "Northeastern Connecticut Planning Region"]},
+            'northwest_hills_planning_region': {n:"Northwest Hills Planning Region",t:'county',f:'160',c:[41.854809,-73.221494],z:10,p:["NORTHWEST HILLS PLANNING REGION", "Northwest Hills Planning Region", "Northwest Hills Planning Region"]},
+            'south_central_connecticut_planning_region': {n:"South Central Connecticut Planning Region",t:'county',f:'170',c:[41.290167,-72.837024],z:10,p:["SOUTH CENTRAL CONNECTICUT PLANNING REGION", "South Central Connecticut Planning Region", "South Central Connecticut Planning Region"]},
+            'southeastern_connecticut_planning_region': {n:"Southeastern Connecticut Planning Region",t:'county',f:'180',c:[41.484769,-72.101666],z:10,p:["SOUTHEASTERN CONNECTICUT PLANNING REGION", "Southeastern Connecticut Planning Region", "Southeastern Connecticut Planning Region"]},
+            'western_connecticut_planning_region': {n:"Western Connecticut Planning Region",t:'county',f:'190',c:[41.279055,-73.44655],z:10,p:["WESTERN CONNECTICUT PLANNING REGION", "Western Connecticut Planning Region", "Western Connecticut Planning Region"]}
         },
         '10': {
             'kent': {n:"Kent County",t:'county',f:'001',c:[39.1489,-75.4955],z:10,p:["KENT", "Kent", "Kent County"]},
@@ -2521,7 +2533,8 @@ const USCountiesDB = (() => {
             'union': {n:"Union County",t:'county',f:'127',c:[42.7109,-96.5879],z:10,p:["UNION", "Union", "Union County"]},
             'walworth': {n:"Walworth County",t:'county',f:'129',c:[45.423,-100.1504],z:10,p:["WALWORTH", "Walworth", "Walworth County"]},
             'yankton': {n:"Yankton County",t:'county',f:'135',c:[42.9408,-97.3592],z:10,p:["YANKTON", "Yankton", "Yankton County"]},
-            'ziebach': {n:"Ziebach County",t:'county',f:'137',c:[44.9117,-101.6181],z:10,p:["ZIEBACH", "Ziebach", "Ziebach County"]}
+            'ziebach': {n:"Ziebach County",t:'county',f:'137',c:[44.9117,-101.6181],z:10,p:["ZIEBACH", "Ziebach", "Ziebach County"]},
+            'oglala_lakota': {n:"Oglala Lakota County",t:'county',f:'102',c:[43.333393,-102.561486],z:10,p:["OGLALA LAKOTA", "Oglala Lakota", "Oglala Lakota County"]}
         },
         '47': {
             'anderson': {n:"Anderson County",t:'county',f:'001',c:[36.0908,-84.2269],z:10,p:["ANDERSON", "Anderson", "Anderson County"]},

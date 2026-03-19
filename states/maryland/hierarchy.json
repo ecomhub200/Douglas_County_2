@@ -9,7 +9,8 @@
       -76.802101,
       39.063946
     ],
-    "zoom": 8
+    "zoom": 8,
+    "placesCount": 157
   },
   "regionType": {
     "label": "DOT District",
@@ -422,6 +423,34 @@
           -78.5
         ]
       }
+    },
+    "calvert_st_maryrs_metropolitan_planning_organization_mpo": {
+      "name": "Calvert-St. Maryrs Metropolitan Planning Organization",
+      "shortName": "Calvert-St. Maryrs",
+      "type": "mpo",
+      "btsMpoId": "24201300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -76.476928,
+        38.300746
+      ],
+      "zoom": 10
+    },
+    "hagerstown_eastern_panhandle_mpo": {
+      "name": "Hagerstown-Eastern Panhandle MPO",
+      "shortName": "Hagerstown-Eastern Panhandle",
+      "type": "mpo",
+      "btsMpoId": "24198600",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -77.849975,
+        39.500222
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

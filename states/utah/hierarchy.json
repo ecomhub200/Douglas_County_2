@@ -9,7 +9,8 @@
       -111.093731,
       39.32198
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 255
   },
   "regionType": {
     "label": "DOT District",
@@ -290,8 +291,13 @@
     "001": "Beaver",
     "003": "Box Elder",
     "005": "Cache",
+    "007": "Carbon",
+    "009": "Daggett",
     "011": "Davis",
+    "013": "Duchesne",
+    "015": "Emery",
     "017": "Garfield",
+    "019": "Grand",
     "021": "Iron",
     "023": "Juab",
     "025": "Kane",
@@ -300,10 +306,12 @@
     "031": "Piute",
     "033": "Rich",
     "035": "Salt Lake",
+    "037": "San Juan",
     "039": "Sanpete",
     "041": "Sevier",
     "043": "Summit",
     "045": "Tooele",
+    "047": "Uintah",
     "049": "Utah",
     "051": "Wasatch",
     "053": "Washington",

@@ -9,7 +9,8 @@
       -92.373123,
       34.969704
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 500
   },
   "regionType": {
     "label": "DOT District",
@@ -652,6 +653,62 @@
           -93.75
         ]
       }
+    },
+    "central_arkansas_regional_transportation_study_mpo": {
+      "name": "Central Arkansas Regional Transportation Study",
+      "shortName": "Central Arkansas Regional Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "05197400",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -92.24171,
+        34.970388
+      ],
+      "zoom": 10
+    },
+    "northwest_arkansas_regional_planning_commission_mpo": {
+      "name": "Northwest Arkansas Regional Planning Commission",
+      "shortName": "Northwest Arkansas Regional Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "05198200",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -94.038031,
+        36.396226
+      ],
+      "zoom": 10
+    },
+    "west_memphis_marion_area_transportation_study_mpo": {
+      "name": "West Memphis-Marion Area Transportation Study",
+      "shortName": "West Memphis-Marion Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "05198300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -90.135621,
+        35.180041
+      ],
+      "zoom": 10
+    },
+    "northeast_arkansas_regional_transportation_planning_commission_mpo": {
+      "name": "Northeast Arkansas Regional Transportation Planning Commission",
+      "shortName": "Northeast Arkansas Regional Transportation Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "05200302",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -90.669189,
+        35.864121
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

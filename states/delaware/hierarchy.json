@@ -9,7 +9,8 @@
       -75.507141,
       39.318523
     ],
-    "zoom": 9
+    "zoom": 9,
+    "placesCount": 57
   },
   "regionType": {
     "label": "DOT District",
@@ -181,6 +182,20 @@
           -75.35
         ]
       }
+    },
+    "dover_kent_county_mpo": {
+      "name": "Dover / Kent County MPO",
+      "shortName": "Dover / Kent County",
+      "type": "mpo",
+      "btsMpoId": "10199000",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -75.493095,
+        39.109793
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

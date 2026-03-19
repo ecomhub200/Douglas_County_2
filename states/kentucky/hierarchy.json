@@ -9,7 +9,8 @@
       -84.670067,
       37.66814
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 417
   },
   "regionType": {
     "label": "DOT District",
@@ -776,6 +777,34 @@
           -87.35
         ]
       }
+    },
+    "paducah_mccracken_mpo": {
+      "name": "Paducah-McCracken MPO",
+      "shortName": "Paducah-McCracken",
+      "type": "mpo",
+      "btsMpoId": "21202300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -88.641105,
+        37.122471
+      ],
+      "zoom": 10
+    },
+    "louisvillejefferson_county_ky_in_mpo": {
+      "name": "Louisville/Jefferson County KY-IN MPO",
+      "shortName": "Louisville/Jefferson County KY-IN",
+      "type": "mpo",
+      "btsMpoId": "21197300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -85.687155,
+        38.172353
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
@@ -789,6 +818,7 @@
     "015": "Boone",
     "017": "Bourbon",
     "019": "Boyd",
+    "021": "Boyle",
     "023": "Bracken",
     "025": "Breathitt",
     "027": "Breckinridge",
@@ -853,6 +883,7 @@
     "145": "McCracken",
     "147": "McCreary",
     "149": "McLean",
+    "151": "Madison",
     "153": "Magoffin",
     "155": "Marion",
     "157": "Marshall",
