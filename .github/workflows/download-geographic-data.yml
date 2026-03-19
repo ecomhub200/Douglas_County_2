@@ -54,6 +54,10 @@ on:
   # schedule:
   #   - cron: '0 6 1 * *'   # 1st of each month at 6am UTC
 
+# Grant write access so the workflow can push to a data branch
+permissions:
+  contents: write
+
 jobs:
   download:
     name: Download Geographic Data
@@ -77,12 +81,66 @@ jobs:
       - name: Create output directory
         run: mkdir -p data/geographic
 
+      # Quick connectivity check — confirm APIs are reachable before long run
+      - name: Test API connectivity
+        run: |
+          echo "=== Testing Census TIGERweb API ==="
+          curl -s -o /tmp/tiger_test.json -w "HTTP %{http_code} (%{size_download} bytes)\n" \
+            "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/82/query?where=STATE%3D%2751%27&outFields=GEOID%2CNAME&returnGeometry=false&resultRecordCount=3&f=json"
+          echo "Response:"
+          python3 -c "
+          import json
+          with open('/tmp/tiger_test.json') as f:
+              data = json.load(f)
+          if 'error' in data:
+              print(f'  ERROR: {data[\"error\"]}')
+          elif 'features' in data:
+              print(f'  OK: {len(data[\"features\"])} features returned')
+              for feat in data['features'][:3]:
+                  print(f'    - {feat[\"attributes\"]}')
+          else:
+              print(f'  UNEXPECTED: keys={list(data.keys())}')
+              print(f'  Full response: {json.dumps(data)[:500]}')
+          "
+
+          echo ""
+          echo "=== Testing BTS MPO API ==="
+          curl -s -o /tmp/bts_test.json -w "HTTP %{http_code} (%{size_download} bytes)\n" \
+            "https://geo.dot.gov/server/rest/services/NTAD/Metropolitan_Planning_Organizations/MapServer/0/query?where=1%3D1&outFields=*&returnGeometry=false&resultRecordCount=3&f=json"
+          echo "Response:"
+          python3 -c "
+          import json
+          with open('/tmp/bts_test.json') as f:
+              data = json.load(f)
+          if 'error' in data:
+              print(f'  ERROR: {data[\"error\"]}')
+          elif 'features' in data:
+              print(f'  OK: {len(data[\"features\"])} features returned')
+              for feat in data['features'][:3]:
+                  attrs = feat['attributes']
+                  # Print first 5 fields to see what's available
+                  sample = dict(list(attrs.items())[:5])
+                  print(f'    - {sample}')
+              print(f'  All fields: {list(data[\"features\"][0][\"attributes\"].keys())}')
+          else:
+              print(f'  UNEXPECTED: keys={list(data.keys())}')
+              print(f'  Full response: {json.dumps(data)[:500]}')
+          "
+
       - name: Download geographic data
         run: |
           ARGS=""
 
           # Map scope input to --layer flag
           SCOPE="${{ inputs.scope || 'all' }}"
+
+          # Build state filter arg first (needed by counties-and-mpos case)
+          STATE_FIPS="${{ inputs.state_fips }}"
+          STATE_ARG=""
+          if [ -n "$STATE_FIPS" ]; then
+            STATE_ARG="--state $STATE_FIPS"
+          fi
+
           case "$SCOPE" in
             counties-and-mpos)
               # Run counties first, then MPOs (MPOs need counties for spatial join)
@@ -98,7 +156,6 @@ jobs:
           esac
 
           # Add state filter if specified
-          STATE_FIPS="${{ inputs.state_fips }}"
           if [ -n "$STATE_FIPS" ]; then
             ARGS="$ARGS --state $STATE_FIPS"
           fi

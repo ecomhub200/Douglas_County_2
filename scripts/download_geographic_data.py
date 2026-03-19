@@ -80,6 +80,7 @@ def arcgis_query_all(url, where="1=1", out_fields="*", return_geometry=True,
         if extra_params:
             params.update(extra_params)
 
+        data = None
         for attempt in range(MAX_RETRIES):
             try:
                 resp = requests.get(url, params=params, timeout=60)
@@ -96,8 +97,29 @@ def arcgis_query_all(url, where="1=1", out_fields="*", return_geometry=True,
                     print(f"  ✗ Giving up after {MAX_RETRIES} attempts")
                     return all_features
 
+        if data is None:
+            print(f"  ✗ No response received")
+            return all_features
+
+        # Check for ArcGIS error response
+        if "error" in data:
+            err = data["error"]
+            print(f"  ✗ ArcGIS error {err.get('code', '?')}: {err.get('message', 'Unknown error')}")
+            if err.get("details"):
+                for d in err["details"][:3]:
+                    print(f"    - {d}")
+            return all_features
+
         features = data.get("features", [])
         if not features:
+            # On first page with 0 results, log diagnostic info
+            if offset == 0:
+                print(f"  ⚠ API returned 0 features on first request")
+                print(f"    URL: {url}")
+                print(f"    Response keys: {list(data.keys())}")
+                # Print a snippet of the response for debugging
+                snippet = json.dumps(data, indent=None)[:500]
+                print(f"    Response snippet: {snippet}")
             break
 
         all_features.extend(features)
