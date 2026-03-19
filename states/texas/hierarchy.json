@@ -9,7 +9,8 @@
       -97.563461,
       31.054487
     ],
-    "zoom": 6
+    "zoom": 6,
+    "placesCount": 1224
   },
   "regionType": {
     "label": "DOT District",
@@ -1821,6 +1822,90 @@
           -97.7
         ]
       }
+    },
+    "lubbock_mpo": {
+      "name": "Lubbock MPO",
+      "shortName": "Lubbock",
+      "type": "mpo",
+      "btsMpoId": "48197600",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -101.933227,
+        33.522814
+      ],
+      "zoom": 10
+    },
+    "grayson_county_mpo": {
+      "name": "Grayson County MPO",
+      "shortName": "Grayson County",
+      "type": "mpo",
+      "btsMpoId": "48198000",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -96.6815,
+        33.761962
+      ],
+      "zoom": 10
+    },
+    "amarillo_mpo": {
+      "name": "Amarillo MPO",
+      "shortName": "Amarillo",
+      "type": "mpo",
+      "btsMpoId": "48197502",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -101.762933,
+        35.163693
+      ],
+      "zoom": 10
+    },
+    "laredo_webb_county_area_mpo": {
+      "name": "Laredo & Webb County Area MPO",
+      "shortName": "Laredo & Webb County",
+      "type": "mpo",
+      "btsMpoId": "48197304",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -99.551013,
+        27.548752
+      ],
+      "zoom": 10
+    },
+    "rio_grande_valley_mpo": {
+      "name": "Rio Grande Valley MPO",
+      "shortName": "Rio Grande Valley",
+      "type": "mpo",
+      "btsMpoId": "48201901",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -98.040154,
+        26.193166
+      ],
+      "zoom": 10
+    },
+    "eagle_pass_mpo": {
+      "name": "Eagle Pass MPO",
+      "shortName": "Eagle Pass",
+      "type": "mpo",
+      "btsMpoId": "48202400",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -100.480725,
+        28.695205
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
@@ -1951,6 +2036,7 @@
     "249": "Jim Wells",
     "251": "Johnson",
     "253": "Jones",
+    "255": "Karnes",
     "257": "Kaufman",
     "259": "Kendall",
     "261": "Kenedy",
@@ -1958,6 +2044,7 @@
     "265": "Kerr",
     "267": "Kimble",
     "269": "King",
+    "271": "Kinney",
     "273": "Kleberg",
     "275": "Knox",
     "277": "Lamar",
@@ -2045,6 +2132,7 @@
     "441": "Taylor",
     "443": "Terrell",
     "445": "Terry",
+    "447": "Throckmorton",
     "449": "Titus",
     "451": "Tom Green",
     "453": "Travis",

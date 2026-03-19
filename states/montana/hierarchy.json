@@ -9,7 +9,8 @@
       -110.454353,
       46.921925
     ],
-    "zoom": 6
+    "zoom": 6,
+    "placesCount": 126
   },
   "regionType": {
     "label": "DOT District",
@@ -359,6 +360,48 @@
           -113.75
         ]
       }
+    },
+    "great_falls_planning_and_community_development_department_mpo": {
+      "name": "Great Falls Planning and Community Development Department",
+      "shortName": "Great Falls Planning and Community Development Department",
+      "type": "mpo",
+      "btsMpoId": "30197100",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -111.248156,
+        47.477741
+      ],
+      "zoom": 10
+    },
+    "gallatin_valley_metropolitan_planning_organization_mpo": {
+      "name": "Gallatin Valley Metropolitan Planning Organization",
+      "shortName": "Gallatin Valley",
+      "type": "mpo",
+      "btsMpoId": "30202301",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -111.141436,
+        45.699139
+      ],
+      "zoom": 10
+    },
+    "greater_helena_area_mpo": {
+      "name": "Greater Helena Area MPO",
+      "shortName": "Greater Helena",
+      "type": "mpo",
+      "btsMpoId": "30202302",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -111.97638,
+        46.626988
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

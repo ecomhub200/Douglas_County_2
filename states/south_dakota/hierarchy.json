@@ -9,7 +9,8 @@
       -99.438828,
       44.299782
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 310
   },
   "regionType": {
     "label": "DOT District",
@@ -359,6 +360,7 @@
     "097": "Miner",
     "099": "Minnehaha",
     "101": "Moody",
+    "102": "Oglala Lakota",
     "103": "Pennington",
     "105": "Perkins",
     "107": "Potter",

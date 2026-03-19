@@ -9,7 +9,8 @@
       -106.248482,
       34.840515
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 105
   },
   "regionType": {
     "label": "DOT District",
@@ -365,6 +366,9 @@
     "005": "Chaves",
     "006": "Cibola",
     "007": "Colfax",
+    "009": "Curry",
+    "011": "De Baca",
+    "013": "Do\u00f1a Ana",
     "015": "Eddy",
     "017": "Grant",
     "019": "Guadalupe",
@@ -379,6 +383,7 @@
     "035": "Otero",
     "037": "Quay",
     "039": "Rio Arriba",
+    "041": "Roosevelt",
     "043": "Sandoval",
     "045": "San Juan",
     "047": "San Miguel",

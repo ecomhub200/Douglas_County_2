@@ -9,7 +9,8 @@
       -91.867805,
       31.169546
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 301
   },
   "regionType": {
     "label": "DOT District",
@@ -641,6 +642,48 @@
           -90.2
         ]
       }
+    },
+    "ouachata_council_of_governments_mpo": {
+      "name": "Ouachata Council of Governments",
+      "shortName": "Ouachata Council of Governments",
+      "type": "mpo",
+      "btsMpoId": "22197300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -92.114836,
+        32.52351
+      ],
+      "zoom": 10
+    },
+    "northwest_louisiana_cog_mpo": {
+      "name": "Northwest Louisiana COG",
+      "shortName": "Northwest Louisiana COG",
+      "type": "mpo",
+      "btsMpoId": "22196800",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -93.474373,
+        32.269403
+      ],
+      "zoom": 10
+    },
+    "imperial_calcasieu_regional_planning_development_commission_mpo": {
+      "name": "Imperial Calcasieu Regional Planning & Development Commission",
+      "shortName": "Imperial Calcasieu Regional Planning & Development Commission",
+      "type": "mpo",
+      "btsMpoId": "22198400",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -93.313388,
+        30.215777
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
@@ -670,6 +713,7 @@
     "047": "Iberville",
     "049": "Jackson",
     "051": "Jefferson",
+    "053": "Jefferson Davis",
     "055": "Lafayette",
     "057": "Lafourche",
     "059": "LaSalle",

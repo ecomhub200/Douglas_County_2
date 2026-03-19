@@ -9,7 +9,8 @@
       -86.258278,
       39.849426
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 565
   },
   "regionType": {
     "label": "DOT District",
@@ -725,6 +726,62 @@
           -85.7
         ]
       }
+    },
+    "madison_county_cog_mpo": {
+      "name": "Madison County COG",
+      "shortName": "Madison County COG",
+      "type": "mpo",
+      "btsMpoId": "18196900",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -85.731118,
+        40.063364
+      ],
+      "zoom": 10
+    },
+    "northwest_indiana_regional_planning_commission_mpo": {
+      "name": "Northwest Indiana Regional Planning Commission",
+      "shortName": "Northwest Indiana Regional Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "18197501",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -87.031695,
+        41.508151
+      ],
+      "zoom": 10
+    },
+    "kokomo_howard_county_governmental_coordinating_council_mpo": {
+      "name": "Kokomo & Howard County Governmental Coordinating Council",
+      "shortName": "Kokomo & Howard County Governmental Coordinating Council",
+      "type": "mpo",
+      "btsMpoId": "18198202",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -86.133093,
+        40.473984
+      ],
+      "zoom": 10
+    },
+    "northeastern_indiana_regional_coordinating_council_mpo": {
+      "name": "Northeastern Indiana Regional Coordinating Council",
+      "shortName": "Northeastern Indiana Regional Coordinating Council",
+      "type": "mpo",
+      "btsMpoId": "18197402",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -85.082865,
+        41.1246
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

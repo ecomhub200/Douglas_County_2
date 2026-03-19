@@ -9,7 +9,8 @@
       -80.945007,
       33.856892
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 271
   },
   "regionType": {
     "label": "DOT District",
@@ -562,10 +563,53 @@
           -79.5
         ]
       }
+    },
+    "grand_strand_area_transportation_study_mpo": {
+      "name": "Grand-Strand Area Transportation Study",
+      "shortName": "Grand-Strand Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "45199200",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -78.812013,
+        33.817826
+      ],
+      "zoom": 10
+    },
+    "rock_hill_fort_mill_area_transportation_study_mpo": {
+      "name": "Rock Hill-Fort Mill Area Transportation Study",
+      "shortName": "Rock Hill-Fort Mill Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "45198300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.956884,
+        34.939743
+      ],
+      "zoom": 10
+    },
+    "sumter_urban_area_transportation_study_mpo": {
+      "name": "Sumter Urban Area Transportation Study",
+      "shortName": "Sumter Urban Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "45199100",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.400485,
+        33.92185
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
     "001": "Abbeville",
+    "003": "Aiken",
     "005": "Allendale",
     "007": "Anderson",
     "009": "Bamberg",

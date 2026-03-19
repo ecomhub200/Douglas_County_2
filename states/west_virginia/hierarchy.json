@@ -9,7 +9,8 @@
       -80.954453,
       38.491226
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 230
   },
   "regionType": {
     "label": "DOT District",
@@ -554,6 +555,90 @@
           -80.45
         ]
       }
+    },
+    "kyova_interstate_planning_commission_mpo": {
+      "name": "KYOVA Interstate Planning Commission",
+      "shortName": "KYOVA Interstate Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "54197400",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -82.667543,
+        38.392754
+      ],
+      "zoom": 10
+    },
+    "regional_intergovernmental_council_mpo": {
+      "name": "Regional Intergovernmental Council",
+      "shortName": "Regional Intergovernmental Council",
+      "type": "mpo",
+      "btsMpoId": "54197501",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -81.62231,
+        38.194155
+      ],
+      "zoom": 10
+    },
+    "fayetteraleigh_frmpo_mpo": {
+      "name": "Fayette/Raleigh MPO (FRMPO)",
+      "shortName": "Fayette/Raleigh (FRMPO)",
+      "type": "mpo",
+      "btsMpoId": "54201300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -81.184074,
+        37.878248
+      ],
+      "zoom": 10
+    },
+    "wood_washington_wirt_interstate_planning_commission_mpo": {
+      "name": "Wood-Washington-Wirt Interstate Planning Commission",
+      "shortName": "Wood-Washington-Wirt Interstate Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "54197503",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -81.442977,
+        39.274561
+      ],
+      "zoom": 10
+    },
+    "morgantown_monongalia_mpo": {
+      "name": "Morgantown Monongalia MPO",
+      "shortName": "Morgantown Monongalia",
+      "type": "mpo",
+      "btsMpoId": "54200300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.152542,
+        39.616273
+      ],
+      "zoom": 10
+    },
+    "belmont_ohio_marshall_transportation_study_mpo": {
+      "name": "Belmont-Ohio-Marshall Transportation Study",
+      "shortName": "Belmont-Ohio-Marshall Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "54197502",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.860463,
+        39.998567
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

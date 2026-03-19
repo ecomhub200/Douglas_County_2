@@ -9,7 +9,8 @@
       -117.055374,
       38.313515
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 19
   },
   "regionType": {
     "label": "DOT District",
@@ -238,6 +239,34 @@
           -119.75
         ]
       }
+    },
+    "regional_transportation_commission_of_southern_nevada_mpo": {
+      "name": "Regional Transportation Commission of Southern Nevada",
+      "shortName": "Regional Transportation Commission of Southern Nevada",
+      "type": "mpo",
+      "btsMpoId": "32198300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -114.721335,
+        35.884187
+      ],
+      "zoom": 10
+    },
+    "regional_transportation_commission_of_washoe_mpo": {
+      "name": "Regional Transportation Commission of Washoe County",
+      "shortName": "Regional Transportation Commission of Washoe County",
+      "type": "mpo",
+      "btsMpoId": "32197900",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -119.690622,
+        39.82425
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

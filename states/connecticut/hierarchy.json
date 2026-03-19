@@ -9,7 +9,8 @@
       -72.755371,
       41.597782
     ],
-    "zoom": 9
+    "zoom": 9,
+    "placesCount": 29
   },
   "regionType": {
     "label": "DOT District",
@@ -376,6 +377,118 @@
           -71.75
         ]
       }
+    },
+    "south_western_mpo": {
+      "name": "South Western MPO",
+      "shortName": "South Western",
+      "type": "mpo",
+      "btsMpoId": "09198100",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -73.506115,
+        41.080263
+      ],
+      "zoom": 10
+    },
+    "housatonic_valley_mpo": {
+      "name": "Housatonic Valley MPO",
+      "shortName": "Housatonic Valley",
+      "type": "mpo",
+      "btsMpoId": "09197504",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -73.346346,
+        41.450547
+      ],
+      "zoom": 10
+    },
+    "capital_region_cog_mpo": {
+      "name": "Capital Region COG",
+      "shortName": "Capital Region COG",
+      "type": "mpo",
+      "btsMpoId": "09197501",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -72.562535,
+        41.763905
+      ],
+      "zoom": 10
+    },
+    "south_central_regional_council_of_governments_scrcog_mpo": {
+      "name": "South Central Regional Council of Governments (SCRCOG)",
+      "shortName": "South Central Regional Council of Governments (SCRCOG)",
+      "type": "mpo",
+      "btsMpoId": "09197401",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -72.791971,
+        41.315273
+      ],
+      "zoom": 10
+    },
+    "lower_connecticut_river_valley_cog_mpo": {
+      "name": "Lower Connecticut River Valley COG",
+      "shortName": "Lower Connecticut River Valley COG",
+      "type": "mpo",
+      "btsMpoId": "09201499",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -72.446388,
+        41.353911
+      ],
+      "zoom": 10
+    },
+    "greater_bridgeport_valley_mpo": {
+      "name": "Greater Bridgeport / Valley MPO",
+      "shortName": "Greater Bridgeport / Valley",
+      "type": "mpo",
+      "btsMpoId": "09198101",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -73.16615,
+        41.276215
+      ],
+      "zoom": 10
+    },
+    "naugatuck_valley_council_of_governments_mpo": {
+      "name": "Naugatuck Valley Council of Governments",
+      "shortName": "Naugatuck Valley Council of Governments",
+      "type": "mpo",
+      "btsMpoId": "09197502",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -73.089898,
+        41.547118
+      ],
+      "zoom": 10
+    },
+    "southeastern_connecticut_council_of_governments_secog_mpo": {
+      "name": "Southeastern Connecticut Council of Governments (SECOG)",
+      "shortName": "Southeastern Connecticut Council of Governments (SECOG)",
+      "type": "mpo",
+      "btsMpoId": "09197402",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -72.102344,
+        41.421136
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
@@ -385,6 +498,15 @@
     "007": "Middlesex",
     "009": "New Haven",
     "011": "New London",
-    "015": "Windham"
+    "015": "Windham",
+    "110": "Capitol Planning Region",
+    "120": "Greater Bridgeport Planning Region",
+    "130": "Lower Connecticut River Valley Planning Region",
+    "140": "Naugatuck Valley Planning Region",
+    "150": "Northeastern Connecticut Planning Region",
+    "160": "Northwest Hills Planning Region",
+    "170": "South Central Connecticut Planning Region",
+    "180": "Southeastern Connecticut Planning Region",
+    "190": "Western Connecticut Planning Region"
   }
 }

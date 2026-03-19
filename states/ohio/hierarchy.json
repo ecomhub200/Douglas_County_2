@@ -9,7 +9,8 @@
       -82.764915,
       40.388783
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 923
   },
   "regionType": {
     "label": "DOT District",
@@ -862,6 +863,90 @@
           -83.55
         ]
       }
+    },
+    "brook_hancock_jefferson_metropolitan_planning_commission_mpo": {
+      "name": "Brook-Hancock-Jefferson Metropolitan Planning Commission",
+      "shortName": "Brook-Hancock-Jefferson Metropolitan Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "39197304",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.695826,
+        40.416779
+      ],
+      "zoom": 10
+    },
+    "clark_county_springfield_transportation_study_mpo": {
+      "name": "Clark County-Springfield Transportation Study",
+      "shortName": "Clark County-Springfield Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "39196401",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -83.845294,
+        39.885014
+      ],
+      "zoom": 10
+    },
+    "licking_county_area_transportation_study_mpo": {
+      "name": "Licking County Area Transportation Study",
+      "shortName": "Licking County Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "39198200",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -82.524614,
+        40.050761
+      ],
+      "zoom": 10
+    },
+    "policy_committee_of_the_erie_regional_planning_commission_mpo": {
+      "name": "Policy Committee of the Erie Regional Planning Commission",
+      "shortName": "Policy Committee of the Erie Regional Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "39200300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -82.621284,
+        41.436645
+      ],
+      "zoom": 10
+    },
+    "lima_allen_county_regional_planning_commission_mpo": {
+      "name": "Lima-Allen County Regional Planning Commission",
+      "shortName": "Lima-Allen County Regional Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "39196402",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -84.12608,
+        40.801628
+      ],
+      "zoom": 10
+    },
+    "ohio_kentucky_indiana_regional_council_of_governments_mpo": {
+      "name": "Ohio-Kentucky-Indiana Regional Council of Governments",
+      "shortName": "Ohio-Kentucky-Indiana Regional Council of Governments",
+      "type": "mpo",
+      "btsMpoId": "39197400",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -84.649801,
+        39.150507
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

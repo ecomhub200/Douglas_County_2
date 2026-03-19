@@ -9,7 +9,8 @@
       -96.726486,
       38.5266
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 624
   },
   "regionType": {
     "label": "DOT District",
@@ -557,6 +558,20 @@
           -99.8
         ]
       }
+    },
+    "flint_hills_metropolitan_planning_organization_mpo": {
+      "name": "Flint Hills Metropolitan Planning Organization",
+      "shortName": "Flint Hills",
+      "type": "mpo",
+      "btsMpoId": "20201300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -96.655959,
+        39.144883
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {

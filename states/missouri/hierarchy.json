@@ -9,7 +9,8 @@
       -92.288368,
       38.456085
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 938
   },
   "regionType": {
     "label": "DOT District",
@@ -650,6 +651,34 @@
           -89.25
         ]
       }
+    },
+    "southeast_metropolitan_planning_organization_mpo": {
+      "name": "Southeast Metropolitan Planning Organization",
+      "shortName": "Southeast",
+      "type": "mpo",
+      "btsMpoId": "29201300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -89.584976,
+        37.306244
+      ],
+      "zoom": 10
+    },
+    "east_west_gateway_council_of_government_mpo": {
+      "name": "East-West Gateway Council of Government",
+      "shortName": "East-West Gateway Council of Government",
+      "type": "mpo",
+      "btsMpoId": "29197300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -89.948538,
+        38.671014
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
@@ -660,6 +689,7 @@
     "009": "Barry",
     "011": "Barton",
     "013": "Bates",
+    "015": "Benton",
     "017": "Bollinger",
     "019": "Boone",
     "021": "Buchanan",
@@ -736,6 +766,7 @@
     "163": "Pike",
     "165": "Platte",
     "167": "Polk",
+    "169": "Pulaski",
     "171": "Putnam",
     "173": "Ralls",
     "175": "Randolph",
@@ -764,6 +795,7 @@
     "223": "Wayne",
     "225": "Webster",
     "227": "Worth",
-    "229": "Wright"
+    "229": "Wright",
+    "510": "St. Louis"
   }
 }

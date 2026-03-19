@@ -9,7 +9,8 @@
       -89.616508,
       44.268543
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 607
   },
   "regionType": {
     "label": "DOT District",
@@ -585,6 +586,104 @@
           -88.75
         ]
       }
+    },
+    "southeastern_wisconsin_regional_planning_commission_mpo": {
+      "name": "Southeastern Wisconsin Regional Planning Commission",
+      "shortName": "Southeastern Wisconsin Regional Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "55196100",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -88.166678,
+        42.917036
+      ],
+      "zoom": 10
+    },
+    "wausau_metropolitan_planning_organization_mpo": {
+      "name": "Wausau Metropolitan Planning Organization",
+      "shortName": "Wausau",
+      "type": "mpo",
+      "btsMpoId": "55198300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -89.651543,
+        44.952048
+      ],
+      "zoom": 10
+    },
+    "sheboygan_mpo": {
+      "name": "Sheboygan MPO",
+      "shortName": "Sheboygan",
+      "type": "mpo",
+      "btsMpoId": "55198202",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -87.77643,
+        43.754891
+      ],
+      "zoom": 10
+    },
+    "madison_area_transportation_planning_board_mpo": {
+      "name": "Madison Area Transportation Planning Board",
+      "shortName": "Madison Transportation Planning Board",
+      "type": "mpo",
+      "btsMpoId": "55197100",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -89.395496,
+        43.104541
+      ],
+      "zoom": 10
+    },
+    "state_line_area_transportation_study_mpo": {
+      "name": "State Line Area Transportation Study",
+      "shortName": "State Line Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "55197499",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -89.029891,
+        42.49272
+      ],
+      "zoom": 10
+    },
+    "appletonfox_cities_mpo": {
+      "name": "Appleton/Fox Cities MPO",
+      "shortName": "Appleton/Fox Cities",
+      "type": "mpo",
+      "btsMpoId": "55197301",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -88.429176,
+        44.176433
+      ],
+      "zoom": 10
+    },
+    "oshkosh_mpo": {
+      "name": "Oshkosh MPO",
+      "shortName": "Oshkosh",
+      "type": "mpo",
+      "btsMpoId": "55197302",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -88.532651,
+        44.01233
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
@@ -598,8 +697,10 @@
     "015": "Calumet",
     "017": "Chippewa",
     "019": "Clark",
+    "021": "Columbia",
     "023": "Crawford",
     "025": "Dane",
+    "027": "Dodge",
     "029": "Door",
     "031": "Douglas",
     "033": "Dunn",
@@ -608,14 +709,17 @@
     "039": "Fond du Lac",
     "041": "Forest",
     "043": "Grant",
+    "045": "Green",
     "047": "Green Lake",
     "049": "Iowa",
     "051": "Iron",
     "053": "Jackson",
+    "055": "Jefferson",
     "057": "Juneau",
     "059": "Kenosha",
     "061": "Kewaunee",
     "063": "La Crosse",
+    "065": "Lafayette",
     "067": "Langlade",
     "069": "Lincoln",
     "071": "Manitowoc",

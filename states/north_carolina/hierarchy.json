@@ -9,7 +9,8 @@
       -79.806419,
       35.630066
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 549
   },
   "regionType": {
     "label": "DOT District",
@@ -1030,6 +1031,146 @@
           -80.3
         ]
       }
+    },
+    "cabarrus_rowan_mpo": {
+      "name": "Cabarrus Rowan MPO",
+      "shortName": "Cabarrus Rowan",
+      "type": "mpo",
+      "btsMpoId": "37198002",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.575264,
+        35.583506
+      ],
+      "zoom": 10
+    },
+    "capital_area_mpo": {
+      "name": "Capital Area MPO",
+      "shortName": "Capital",
+      "type": "mpo",
+      "btsMpoId": "37196400",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -78.570694,
+        35.737924
+      ],
+      "zoom": 10
+    },
+    "charlotte_regional_transportation_planning_organization_mpo": {
+      "name": "Charlotte Regional Transportation Planning Organization",
+      "shortName": "Charlotte Regional Transportation Planning Organization",
+      "type": "mpo",
+      "btsMpoId": "37197900",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.769057,
+        35.362422
+      ],
+      "zoom": 10
+    },
+    "durham_chapel_hill_carrboro_mpo": {
+      "name": "Durham Chapel Hill Carrboro MPO",
+      "shortName": "Durham Chapel Hill Carrboro",
+      "type": "mpo",
+      "btsMpoId": "37198001",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -78.989011,
+        35.982684
+      ],
+      "zoom": 10
+    },
+    "gaston_cleveland_lincoln_mpo": {
+      "name": "Gaston-Cleveland-Lincoln MPO",
+      "shortName": "Gaston-Cleveland-Lincoln",
+      "type": "mpo",
+      "btsMpoId": "37197403",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -81.312383,
+        35.442704
+      ],
+      "zoom": 10
+    },
+    "goldsboro_urban_area_mpo": {
+      "name": "Goldsboro Urban Area MPO",
+      "shortName": "Goldsboro Urban",
+      "type": "mpo",
+      "btsMpoId": "37198202",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -77.988852,
+        35.360554
+      ],
+      "zoom": 10
+    },
+    "greater_hickory_mpo": {
+      "name": "Greater Hickory MPO",
+      "shortName": "Greater Hickory",
+      "type": "mpo",
+      "btsMpoId": "37198201",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -81.458638,
+        35.831962
+      ],
+      "zoom": 10
+    },
+    "greensboro_urban_area_mpo": {
+      "name": "Greensboro Urban Area MPO",
+      "shortName": "Greensboro Urban",
+      "type": "mpo",
+      "btsMpoId": "37196000",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -79.753132,
+        36.097562
+      ],
+      "zoom": 10
+    },
+    "sandhills_mpo": {
+      "name": "Sandhills MPO",
+      "shortName": "Sandhills",
+      "type": "mpo",
+      "btsMpoId": "37202300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -79.466295,
+        35.138711
+      ],
+      "zoom": 10
+    },
+    "winston_salem_urban_area_mpo": {
+      "name": "Winston Salem Urban Area MPO",
+      "shortName": "Winston Salem Urban",
+      "type": "mpo",
+      "btsMpoId": "37197401",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.306007,
+        36.148078
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
@@ -1051,6 +1192,7 @@
     "031": "Carteret",
     "033": "Caswell",
     "035": "Catawba",
+    "037": "Chatham",
     "039": "Cherokee",
     "041": "Chowan",
     "043": "Clay",

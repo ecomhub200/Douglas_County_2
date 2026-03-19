@@ -9,7 +9,8 @@
       -84.536095,
       43.326618
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 533
   },
   "regionType": {
     "label": "DOT District",
@@ -667,11 +668,111 @@
           -84.15
         ]
       }
+    },
+    "macatawa_area_coordinating_council_mpo": {
+      "name": "Macatawa Area Coordinating Council",
+      "shortName": "Macatawa Coordinating Council",
+      "type": "mpo",
+      "btsMpoId": "26199100",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -86.136311,
+        42.809617
+      ],
+      "zoom": 10
+    },
+    "west_michigan_shoreline_regional_development_commission_mpo": {
+      "name": "West Michigan Shoreline Regional Development Commission",
+      "shortName": "West Michigan Shoreline Regional Development Commission",
+      "type": "mpo",
+      "btsMpoId": "26197302",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -86.280615,
+        43.274052
+      ],
+      "zoom": 10
+    },
+    "region_2_planning_commission_mpo": {
+      "name": "Region 2 Planning Commission",
+      "shortName": "Region 2 Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "26196800",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -84.426214,
+        42.224004
+      ],
+      "zoom": 10
+    },
+    "saginaw_metropolitan_area_transportation_study_mpo": {
+      "name": "Saginaw Metropolitan Area Transportation Study",
+      "shortName": "Saginaw Metropolitan Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "26196500",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -83.986985,
+        43.327589
+      ],
+      "zoom": 10
+    },
+    "midland_area_transportation_study_mpo": {
+      "name": "Midland Area Transportation Study",
+      "shortName": "Midland Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "26201300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -84.355757,
+        43.657239
+      ],
+      "zoom": 10
+    },
+    "bay_city_area_transportation_study_mpo": {
+      "name": "Bay City Area Transportation Study",
+      "shortName": "Bay City Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "26197404",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -83.830168,
+        43.634439
+      ],
+      "zoom": 10
+    },
+    "traverse_transportation_coordinating_initiative_mpo": {
+      "name": "Traverse Transportation Coordinating Initiative",
+      "shortName": "Traverse Transportation Coordinating Initiative",
+      "type": "mpo",
+      "btsMpoId": "26202300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -85.567679,
+        44.834748
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
+    "001": "Alcona",
     "003": "Alger",
     "005": "Allegan",
+    "007": "Alpena",
     "009": "Antrim",
     "011": "Arenac",
     "013": "Baraga",
@@ -683,6 +784,7 @@
     "025": "Calhoun",
     "027": "Cass",
     "029": "Charlevoix",
+    "031": "Cheboygan",
     "033": "Chippewa",
     "035": "Clare",
     "037": "Clinton",
@@ -726,6 +828,7 @@
     "113": "Missaukee",
     "115": "Monroe",
     "117": "Montcalm",
+    "119": "Montmorency",
     "121": "Muskegon",
     "123": "Newaygo",
     "125": "Oakland",
@@ -733,6 +836,7 @@
     "129": "Ogemaw",
     "131": "Ontonagon",
     "133": "Osceola",
+    "135": "Oscoda",
     "137": "Otsego",
     "139": "Ottawa",
     "141": "Presque Isle",

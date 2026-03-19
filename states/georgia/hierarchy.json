@@ -9,7 +9,8 @@
       -83.643074,
       33.040619
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 535
   },
   "regionType": {
     "label": "DOT District",
@@ -799,12 +800,83 @@
           -83.35
         ]
       }
+    },
+    "dougherty_area_regional_transportation_study_darts_mpo": {
+      "name": "Dougherty Area Regional Transportation Study (DARTS)",
+      "shortName": "Dougherty Regional Transportation Study (DARTS)",
+      "type": "mpo",
+      "btsMpoId": "13196500",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -84.231796,
+        31.602617
+      ],
+      "zoom": 10
+    },
+    "rome_floyd_county_metropolitan_planning_organization_mpo": {
+      "name": "Rome-Floyd County Metropolitan Planning Organization",
+      "shortName": "Rome-Floyd County",
+      "type": "mpo",
+      "btsMpoId": "13198302",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -85.166125,
+        34.368367
+      ],
+      "zoom": 10
+    },
+    "greater_dalton_mpo": {
+      "name": "Greater Dalton MPO",
+      "shortName": "Greater Dalton",
+      "type": "mpo",
+      "btsMpoId": "13200302",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -84.914292,
+        34.821824
+      ],
+      "zoom": 10
+    },
+    "madison_athens_clarke_oconee_regional_transportation_study_macorts_mpo": {
+      "name": "Madison Athens-Clarke Oconee Regional Transportation Study (MACORTS)",
+      "shortName": "Madison Athens-Clarke Oconee Regional Transportation Study (MACORTS)",
+      "type": "mpo",
+      "btsMpoId": "13196900",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -83.371981,
+        33.941464
+      ],
+      "zoom": 10
+    },
+    "cartersville_bartow_metropolitan_planning_organization_cb_mpo": {
+      "name": "Cartersville-Bartow Metropolitan Planning Organization (CB-MPO)",
+      "shortName": "Cartersville-Bartow (CB-MPO)",
+      "type": "mpo",
+      "btsMpoId": "13201300",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -84.828029,
+        34.228886
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
     "001": "Appling",
     "003": "Atkinson",
     "005": "Bacon",
+    "007": "Baker",
     "009": "Baldwin",
     "011": "Banks",
     "013": "Barrow",
@@ -818,15 +890,19 @@
     "029": "Bryan",
     "031": "Bulloch",
     "033": "Burke",
+    "035": "Butts",
+    "037": "Calhoun",
     "039": "Camden",
     "043": "Candler",
     "045": "Carroll",
     "047": "Catoosa",
     "049": "Charlton",
     "051": "Chatham",
+    "053": "Chattahoochee",
     "055": "Chattooga",
     "057": "Cherokee",
     "059": "Clarke",
+    "061": "Clay",
     "063": "Clayton",
     "065": "Clinch",
     "067": "Cobb",
@@ -839,11 +915,13 @@
     "081": "Crisp",
     "083": "Dade",
     "085": "Dawson",
+    "087": "Decatur",
     "089": "DeKalb",
     "091": "Dodge",
     "093": "Dooly",
     "095": "Dougherty",
     "097": "Douglas",
+    "099": "Early",
     "101": "Echols",
     "103": "Effingham",
     "105": "Elbert",
@@ -859,6 +937,8 @@
     "125": "Glascock",
     "127": "Glynn",
     "129": "Gordon",
+    "131": "Grady",
+    "133": "Greene",
     "135": "Gwinnett",
     "137": "Habersham",
     "139": "Hall",
@@ -871,6 +951,7 @@
     "153": "Houston",
     "155": "Irwin",
     "157": "Jackson",
+    "159": "Jasper",
     "161": "Jeff Davis",
     "163": "Jefferson",
     "165": "Jenkins",
@@ -889,9 +970,13 @@
     "191": "McIntosh",
     "193": "Macon",
     "195": "Madison",
+    "197": "Marion",
     "199": "Meriwether",
+    "201": "Miller",
+    "205": "Mitchell",
     "207": "Monroe",
     "209": "Montgomery",
+    "211": "Morgan",
     "213": "Murray",
     "215": "Muscogee",
     "217": "Newton",
@@ -905,19 +990,24 @@
     "233": "Polk",
     "235": "Pulaski",
     "237": "Putnam",
+    "239": "Quitman",
     "241": "Rabun",
+    "243": "Randolph",
     "245": "Richmond",
     "247": "Rockdale",
     "249": "Schley",
     "251": "Screven",
+    "253": "Seminole",
     "255": "Spalding",
     "257": "Stephens",
+    "259": "Stewart",
     "261": "Sumter",
     "263": "Talbot",
     "265": "Taliaferro",
     "267": "Tattnall",
     "269": "Taylor",
     "271": "Telfair",
+    "273": "Terrell",
     "275": "Thomas",
     "277": "Tift",
     "279": "Toombs",

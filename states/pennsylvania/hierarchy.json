@@ -9,7 +9,8 @@
       -77.209755,
       40.590752
     ],
-    "zoom": 7
+    "zoom": 7,
+    "placesCount": 1013
   },
   "regionType": {
     "label": "DOT District",
@@ -896,6 +897,132 @@
           -75.6
         ]
       }
+    },
+    "southwestern_pennsylvania_commission_mpo": {
+      "name": "Southwestern Pennsylvania Commission",
+      "shortName": "Southwestern Pennsylvania Commission",
+      "type": "mpo",
+      "btsMpoId": "42197400",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -79.530278,
+        40.489778
+      ],
+      "zoom": 10
+    },
+    "erie_mpo": {
+      "name": "Erie MPO",
+      "shortName": "Erie",
+      "type": "mpo",
+      "btsMpoId": "42196406",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -80.061815,
+        42.074737
+      ],
+      "zoom": 10
+    },
+    "lehigh_valley_transportation_study_mpo": {
+      "name": "Lehigh Valley Transportation Study",
+      "shortName": "Lehigh Valley Transportation Study",
+      "type": "mpo",
+      "btsMpoId": "42196401",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -75.224277,
+        40.737572
+      ],
+      "zoom": 10
+    },
+    "lackawannaluzerne_mpo": {
+      "name": "Lackawanna/Luzerne MPO",
+      "shortName": "Lackawanna/Luzerne",
+      "type": "mpo",
+      "btsMpoId": "42196402",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -75.630158,
+        41.246078
+      ],
+      "zoom": 10
+    },
+    "lancaster_county_mpo": {
+      "name": "Lancaster County MPO",
+      "shortName": "Lancaster County",
+      "type": "mpo",
+      "btsMpoId": "42196403",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -76.34022,
+        40.002909
+      ],
+      "zoom": 10
+    },
+    "susquehanna_economic_development_association_council_of_governments_mpo": {
+      "name": "Susquehanna Economic Development Association Council of Governments",
+      "shortName": "Susquehanna Economic Development Association Council of Governments",
+      "type": "mpo",
+      "btsMpoId": "42201312",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -77.308599,
+        40.88617
+      ],
+      "zoom": 10
+    },
+    "blair_county_planning_commission_mpo": {
+      "name": "Blair County Planning Commission",
+      "shortName": "Blair County Planning Commission",
+      "type": "mpo",
+      "btsMpoId": "42196504",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -78.323313,
+        40.506926
+      ],
+      "zoom": 10
+    },
+    "franklin_county_mpo": {
+      "name": "Franklin County MPO",
+      "shortName": "Franklin County",
+      "type": "mpo",
+      "btsMpoId": "42201313",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -77.623317,
+        40.025659
+      ],
+      "zoom": 10
+    },
+    "cambria_county_mpo": {
+      "name": "Cambria County MPO",
+      "shortName": "Cambria County",
+      "type": "mpo",
+      "btsMpoId": "42196503",
+      "source": "BTS/USDOT NTAD",
+      "counties": [],
+      "countyNames": {},
+      "center": [
+        -78.822886,
+        40.332388
+      ],
+      "zoom": 10
     }
   },
   "allCounties": {
