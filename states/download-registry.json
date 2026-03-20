@@ -135,8 +135,9 @@
     "forceFlag": "--force",
     "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
     "statewideOutputGzPattern": "{dotDir}/{state}_statewide_all_roads.csv.gz",
-    "needsStandardization": true,
-    "needsMerge": true,
+    "needsStandardization": false,
+    "needsMerge": false,
+    "pipelineWorkflow": "delaware-batch-pipeline.yml",
     "r2Prefix": "delaware"
   },
 
