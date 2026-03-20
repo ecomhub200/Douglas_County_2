@@ -1,0 +1,28 @@
+{
+  "state": {
+    "name": "Delaware",
+    "abbr": "DE",
+    "fips": "10",
+    "dot": "DelDOT"
+  },
+  "regions": {
+    "northern": {
+      "name": "Northern",
+      "planningDistrict": "Northern",
+      "mpo": "WILMAPCO",
+      "counties": ["003"]
+    },
+    "central": {
+      "name": "Central",
+      "planningDistrict": "Central",
+      "mpo": "Dover/Kent County MPO",
+      "counties": ["001"]
+    },
+    "southern": {
+      "name": "Southern",
+      "planningDistrict": "Southern",
+      "mpo": null,
+      "counties": ["005"]
+    }
+  }
+}
