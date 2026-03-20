@@ -10,13 +10,12 @@ Delaware uses a dedicated two-workflow pipeline that adds a normalization step t
 
 ```
 delaware-batch-all-jurisdictions.yml
-├── Download from data.delaware.gov (via download-registry.json)
-├── 🔄 NORMALIZE (de_normalize.py) ← Delaware-specific step
-├── Upload normalized CSV to R2
+├── 1. Resolve Registry (download-registry.json)
+├── 2. Download from data.delaware.gov (Socrata API)
+├── 3. 🔄 NORMALIZE (de_normalize.py) ← Delaware-specific step
+├── 4. Upload normalized CSV to R2
 └── Trigger delaware-batch-pipeline.yml
     ├── Stage 0: Init Cache
-    ├── Stage 0.25: 🔄 HTML Normalization Tool (headless Playwright) ← Delaware-specific
-    ├── Stage 0.5: 🔍 Validate Normalization ← Delaware-specific step
     ├── Stage 1: Split by Jurisdiction (3 counties)
     ├── Stage 2: Split by Road Type (4 CSVs per county)
     ├── Stage 3: Aggregate by Scope (CSV)
@@ -33,8 +32,7 @@ delaware-batch-all-jurisdictions.yml
 |------|---------|
 | `states/delaware/config.json` | Column mappings, EPDO weights, data source config |
 | `states/delaware/hierarchy.json` | Counties, regions (DOT Districts), MPOs, geography |
-| `states/delaware/de_normalize.py` | Raw → CrashLens 69-column normalizer (Python) |
-| `states/delaware/delware_normalization-rank-validation.html` | Interactive normalization + FIPS + EPDO + ranking tool (HTML/JS) |
+| `states/delaware/de_normalize.py` | Raw → CrashLens 69-column normalizer with FIPS, EPDO, ranking (Python) |
 | `.github/workflows/delaware-batch-all-jurisdictions.yml` | Download + normalize + upload workflow |
 | `.github/workflows/delaware-batch-pipeline.yml` | Processing pipeline (Stage 0-6) |
 
@@ -59,11 +57,7 @@ Delaware has 3 counties, 3 DOT districts, and 3 MPOs:
 
 ## Normalization Details
 
-Delaware uses a two-layer normalization approach:
-
-1. **`de_normalize.py`** (Python) — Runs in CI. Handles column mapping, severity mapping, crash ID generation, datetime parsing, and geography assignment. Produces a valid CrashLens 69-column CSV.
-
-2. **`delware_normalization-rank-validation.html`** (HTML/JS) — Runs headlessly via Playwright in Stage 0.25. Adds FIPS resolution, EPDO scoring, jurisdiction ranking, and enrichment that the Python script doesn't cover. Can also be opened in a browser for interactive validation.
+All normalization is handled by **`de_normalize.py`** (Python), which runs as Step 3 in `delaware-batch-all-jurisdictions.yml`. It performs column mapping, severity mapping, crash ID generation, datetime parsing, geography assignment (FIPS), EPDO scoring, and jurisdiction ranking in a single pass. The output is a fully normalized CrashLens 69-column CSV with enrichment and ranking columns.
 
 The `de_normalize.py` script transforms raw Delaware data:
 
