@@ -4623,7 +4623,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "alabama",
-      "appSubtitle": "Alabama Crash Analysis Tool"
+      "appSubtitle": "Alabama Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "alaska": {
       "fips": "02",
@@ -4633,7 +4640,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "alaska",
-      "appSubtitle": "Alaska Crash Analysis Tool"
+      "appSubtitle": "Alaska Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "arizona": {
       "fips": "04",
@@ -4643,7 +4657,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "arizona",
-      "appSubtitle": "Arizona Crash Analysis Tool"
+      "appSubtitle": "Arizona Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "arkansas": {
       "fips": "05",
@@ -4653,7 +4674,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "arkansas",
-      "appSubtitle": "Arkansas Crash Analysis Tool"
+      "appSubtitle": "Arkansas Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "california": {
       "fips": "06",
@@ -4663,7 +4691,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "california",
-      "appSubtitle": "California Crash Analysis Tool"
+      "appSubtitle": "California Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "colorado": {
       "fips": "08",
@@ -4673,7 +4708,14 @@
       "defaultJurisdiction": "douglas",
       "dataDir": "CDOT",
       "r2Prefix": "colorado",
-      "appSubtitle": "Colorado Crash Analysis Tool"
+      "appSubtitle": "Colorado Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "connecticut": {
       "fips": "09",
@@ -4683,7 +4725,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "connecticut",
-      "appSubtitle": "Connecticut Crash Analysis Tool"
+      "appSubtitle": "Connecticut Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "delaware": {
       "fips": "10",
@@ -4693,7 +4742,14 @@
       "defaultJurisdiction": "de_sussex",
       "dataDir": "DelawareDOT",
       "r2Prefix": "delaware",
-      "appSubtitle": "Delaware Crash Analysis Tool"
+      "appSubtitle": "Delaware Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "district_of_columbia": {
       "fips": "11",
@@ -4703,7 +4759,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "district_of_columbia",
-      "appSubtitle": "District of Columbia Crash Analysis Tool"
+      "appSubtitle": "District of Columbia Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "florida": {
       "fips": "12",
@@ -4713,7 +4776,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "florida",
-      "appSubtitle": "Florida Crash Analysis Tool"
+      "appSubtitle": "Florida Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "georgia": {
       "fips": "13",
@@ -4723,7 +4793,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "georgia",
-      "appSubtitle": "Georgia Crash Analysis Tool"
+      "appSubtitle": "Georgia Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "hawaii": {
       "fips": "15",
@@ -4733,7 +4810,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "hawaii",
-      "appSubtitle": "Hawaii Crash Analysis Tool"
+      "appSubtitle": "Hawaii Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "idaho": {
       "fips": "16",
@@ -4743,7 +4827,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "idaho",
-      "appSubtitle": "Idaho Crash Analysis Tool"
+      "appSubtitle": "Idaho Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "illinois": {
       "fips": "17",
@@ -4753,7 +4844,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "illinois",
-      "appSubtitle": "Illinois Crash Analysis Tool"
+      "appSubtitle": "Illinois Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "indiana": {
       "fips": "18",
@@ -4763,7 +4861,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "indiana",
-      "appSubtitle": "Indiana Crash Analysis Tool"
+      "appSubtitle": "Indiana Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "iowa": {
       "fips": "19",
@@ -4773,7 +4878,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "iowa",
-      "appSubtitle": "Iowa Crash Analysis Tool"
+      "appSubtitle": "Iowa Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "kansas": {
       "fips": "20",
@@ -4783,7 +4895,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "kansas",
-      "appSubtitle": "Kansas Crash Analysis Tool"
+      "appSubtitle": "Kansas Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "kentucky": {
       "fips": "21",
@@ -4793,7 +4912,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "kentucky",
-      "appSubtitle": "Kentucky Crash Analysis Tool"
+      "appSubtitle": "Kentucky Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "louisiana": {
       "fips": "22",
@@ -4803,7 +4929,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "louisiana",
-      "appSubtitle": "Louisiana Crash Analysis Tool"
+      "appSubtitle": "Louisiana Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "maine": {
       "fips": "23",
@@ -4813,7 +4946,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "maine",
-      "appSubtitle": "Maine Crash Analysis Tool"
+      "appSubtitle": "Maine Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "maryland": {
       "fips": "24",
@@ -4823,7 +4963,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "maryland",
-      "appSubtitle": "Maryland Crash Analysis Tool"
+      "appSubtitle": "Maryland Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "massachusetts": {
       "fips": "25",
@@ -4833,7 +4980,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "massachusetts",
-      "appSubtitle": "Massachusetts Crash Analysis Tool"
+      "appSubtitle": "Massachusetts Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "michigan": {
       "fips": "26",
@@ -4843,7 +4997,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "michigan",
-      "appSubtitle": "Michigan Crash Analysis Tool"
+      "appSubtitle": "Michigan Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "minnesota": {
       "fips": "27",
@@ -4853,7 +5014,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "minnesota",
-      "appSubtitle": "Minnesota Crash Analysis Tool"
+      "appSubtitle": "Minnesota Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "mississippi": {
       "fips": "28",
@@ -4863,7 +5031,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "mississippi",
-      "appSubtitle": "Mississippi Crash Analysis Tool"
+      "appSubtitle": "Mississippi Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "missouri": {
       "fips": "29",
@@ -4873,7 +5048,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "missouri",
-      "appSubtitle": "Missouri Crash Analysis Tool"
+      "appSubtitle": "Missouri Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "montana": {
       "fips": "30",
@@ -4883,7 +5065,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "montana",
-      "appSubtitle": "Montana Crash Analysis Tool"
+      "appSubtitle": "Montana Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "nebraska": {
       "fips": "31",
@@ -4893,7 +5082,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "nebraska",
-      "appSubtitle": "Nebraska Crash Analysis Tool"
+      "appSubtitle": "Nebraska Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "nevada": {
       "fips": "32",
@@ -4903,7 +5099,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "nevada",
-      "appSubtitle": "Nevada Crash Analysis Tool"
+      "appSubtitle": "Nevada Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "new_hampshire": {
       "fips": "33",
@@ -4913,7 +5116,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "new_hampshire",
-      "appSubtitle": "New Hampshire Crash Analysis Tool"
+      "appSubtitle": "New Hampshire Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "new_jersey": {
       "fips": "34",
@@ -4923,7 +5133,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "new_jersey",
-      "appSubtitle": "New Jersey Crash Analysis Tool"
+      "appSubtitle": "New Jersey Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "new_mexico": {
       "fips": "35",
@@ -4933,7 +5150,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "new_mexico",
-      "appSubtitle": "New Mexico Crash Analysis Tool"
+      "appSubtitle": "New Mexico Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "new_york": {
       "fips": "36",
@@ -4943,7 +5167,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "new_york",
-      "appSubtitle": "New York Crash Analysis Tool"
+      "appSubtitle": "New York Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "north_carolina": {
       "fips": "37",
@@ -4953,7 +5184,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "north_carolina",
-      "appSubtitle": "North Carolina Crash Analysis Tool"
+      "appSubtitle": "North Carolina Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "north_dakota": {
       "fips": "38",
@@ -4963,7 +5201,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "north_dakota",
-      "appSubtitle": "North Dakota Crash Analysis Tool"
+      "appSubtitle": "North Dakota Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "ohio": {
       "fips": "39",
@@ -4973,7 +5218,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "ohio",
-      "appSubtitle": "Ohio Crash Analysis Tool"
+      "appSubtitle": "Ohio Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "oklahoma": {
       "fips": "40",
@@ -4983,7 +5235,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "oklahoma",
-      "appSubtitle": "Oklahoma Crash Analysis Tool"
+      "appSubtitle": "Oklahoma Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "oregon": {
       "fips": "41",
@@ -4993,7 +5252,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "oregon",
-      "appSubtitle": "Oregon Crash Analysis Tool"
+      "appSubtitle": "Oregon Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "pennsylvania": {
       "fips": "42",
@@ -5003,7 +5269,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "pennsylvania",
-      "appSubtitle": "Pennsylvania Crash Analysis Tool"
+      "appSubtitle": "Pennsylvania Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "rhode_island": {
       "fips": "44",
@@ -5013,7 +5286,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "rhode_island",
-      "appSubtitle": "Rhode Island Crash Analysis Tool"
+      "appSubtitle": "Rhode Island Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "south_carolina": {
       "fips": "45",
@@ -5023,7 +5303,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "south_carolina",
-      "appSubtitle": "South Carolina Crash Analysis Tool"
+      "appSubtitle": "South Carolina Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "south_dakota": {
       "fips": "46",
@@ -5033,7 +5320,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "south_dakota",
-      "appSubtitle": "South Dakota Crash Analysis Tool"
+      "appSubtitle": "South Dakota Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "tennessee": {
       "fips": "47",
@@ -5043,7 +5337,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "tennessee",
-      "appSubtitle": "Tennessee Crash Analysis Tool"
+      "appSubtitle": "Tennessee Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "texas": {
       "fips": "48",
@@ -5053,7 +5354,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "texas",
-      "appSubtitle": "Texas Crash Analysis Tool"
+      "appSubtitle": "Texas Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "utah": {
       "fips": "49",
@@ -5063,7 +5371,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "utah",
-      "appSubtitle": "Utah Crash Analysis Tool"
+      "appSubtitle": "Utah Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "vermont": {
       "fips": "50",
@@ -5073,7 +5388,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "vermont",
-      "appSubtitle": "Vermont Crash Analysis Tool"
+      "appSubtitle": "Vermont Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "virginia": {
       "fips": "51",
@@ -5083,7 +5405,14 @@
       "defaultJurisdiction": "henrico",
       "dataDir": null,
       "r2Prefix": "virginia",
-      "appSubtitle": "Virginia Crash Analysis Tool"
+      "appSubtitle": "Virginia Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "washington": {
       "fips": "53",
@@ -5093,7 +5422,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "washington",
-      "appSubtitle": "Washington Crash Analysis Tool"
+      "appSubtitle": "Washington Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "west_virginia": {
       "fips": "54",
@@ -5103,7 +5439,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "west_virginia",
-      "appSubtitle": "West Virginia Crash Analysis Tool"
+      "appSubtitle": "West Virginia Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "wisconsin": {
       "fips": "55",
@@ -5113,7 +5456,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "wisconsin",
-      "appSubtitle": "Wisconsin Crash Analysis Tool"
+      "appSubtitle": "Wisconsin Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     },
     "wyoming": {
       "fips": "56",
@@ -5123,7 +5473,14 @@
       "defaultJurisdiction": null,
       "dataDir": null,
       "r2Prefix": "wyoming",
-      "appSubtitle": "Wyoming Crash Analysis Tool"
+      "appSubtitle": "Wyoming Crash Analysis Tool",
+      "tiers": [
+        "state",
+        "region",
+        "mpo",
+        "county",
+        "city"
+      ]
     }
   },
   "defaultState": "colorado",

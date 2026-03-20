@@ -231,6 +231,136 @@ def get_jurisdictions(state_prefix, project_root, hierarchy):
     return []
 
 
+# ─── Geography-based tier folder generation ─────────────────────────────────
+
+def _name_to_slug(name):
+    """Convert a place/entity name to a slug for R2 folder paths.
+
+    Examples:
+        "Dover/Kent County MPO" -> "dover_kent_county_mpo"
+        "Richmond city"         -> "richmond_city"
+        "St. Mary's"            -> "st_marys"
+    """
+    slug = name.lower()
+    slug = slug.replace("'", "").replace(".", "")
+    slug = re.sub(r'[^a-z0-9]+', '_', slug)
+    slug = re.sub(r'_+', '_', slug)
+    slug = slug.strip('_')
+    return slug
+
+
+def _build_state_fips_map(project_root):
+    """Build mapping from 2-digit FIPS code → R2 state prefix using us_states.json.
+
+    Also builds abbreviation → state prefix mapping for MPOs (which use 2-letter abbreviations).
+
+    Returns:
+        (fips_to_prefix, abbr_to_prefix): Two dicts for lookups.
+    """
+    geo_path = project_root / "states" / "geography" / "us_states.json"
+    if not geo_path.exists():
+        return {}, {}
+
+    try:
+        with open(geo_path) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {}, {}
+
+    records = data.get("records", data if isinstance(data, list) else [])
+
+    # Build name → state_prefix from STATE_MAP
+    name_to_prefix = {}
+    for prefix, cfg in STATE_MAP.items():
+        name_to_prefix[prefix.replace('_', ' ')] = prefix
+
+    fips_to_prefix = {}
+    abbr_to_prefix = {}
+    for rec in records:
+        fips = rec.get("STATE", rec.get("GEOID", ""))
+        name = rec.get("NAME", "")
+        abbr = rec.get("USPS", "")
+        name_lower = name.lower().replace(' ', '_')
+        if name_lower in STATE_MAP:
+            fips_to_prefix[fips] = name_lower
+            abbr_to_prefix[abbr] = name_lower
+
+    return fips_to_prefix, abbr_to_prefix
+
+
+def _load_geography_json(project_root, filename):
+    """Load a geography JSON file and return its records."""
+    geo_path = project_root / "states" / "geography" / filename
+    if not geo_path.exists():
+        return []
+    try:
+        with open(geo_path) as f:
+            data = json.load(f)
+        return data.get("records", data if isinstance(data, list) else [])
+    except (json.JSONDecodeError, IOError):
+        return []
+
+
+def get_city_folders(project_root, state_prefix, state_fips):
+    """Get city/town folder slugs from us_places.json for a state.
+
+    Filters to active (FUNCSTAT=A) incorporated places only.
+    """
+    records = _load_geography_json(project_root, "us_places.json")
+    # Filter by state FIPS, active status
+    cities = [
+        r for r in records
+        if r.get("STATE") == state_fips
+        and r.get("FUNCSTAT") == "A"
+    ]
+    return sorted(set(_name_to_slug(r["NAME"]) for r in cities if r.get("NAME")))
+
+
+def get_town_folders(project_root, state_prefix, state_fips):
+    """Get town/subdivision folder slugs from us_county_subdivisions.json for a state.
+
+    Filters to active (FUNCSTAT=A) subdivisions only.
+    """
+    records = _load_geography_json(project_root, "us_county_subdivisions.json")
+    towns = [
+        r for r in records
+        if r.get("STATE") == state_fips
+        and r.get("FUNCSTAT") == "A"
+    ]
+    return sorted(set(_name_to_slug(r["NAME"]) for r in towns if r.get("NAME")))
+
+
+def get_mpo_folders_from_geography(project_root, state_abbr):
+    """Get MPO folder slugs from us_mpos.json for a state.
+
+    Note: MPO file uses 2-letter state abbreviation, NOT FIPS codes.
+    """
+    records = _load_geography_json(project_root, "us_mpos.json")
+    mpos = [
+        r for r in records
+        if r.get("STATE") == state_abbr
+    ]
+    return sorted(set(_name_to_slug(r.get("MPO_NAME") or r.get("NAME", "")) for r in mpos if r.get("MPO_NAME") or r.get("NAME")))
+
+
+def get_planning_district_folders(hierarchy):
+    """Get planning district folder slugs from hierarchy.json.
+
+    Looks for 'planningDistricts' key first, then falls back to 'regions'.
+    """
+    if not hierarchy:
+        return []
+    pds = hierarchy.get("planningDistricts", {})
+    if pds:
+        return sorted(_name_to_slug(k) for k in pds.keys() if not k.startswith("_"))
+    # Some states store planning districts under regions
+    regions = hierarchy.get("regions", {})
+    # Only return as PDs if the hierarchy explicitly indicates they are PDs
+    if hierarchy.get("regionType") in ("planning_district", "pdc", "pd"):
+        return sorted(_name_to_slug(k) for k in regions.keys() if not k.startswith("_"))
+    return []
+
+
 def generate_all_folders(state_filter=None, top_level_only=False):
     """Generate the complete list of R2 folder paths to create."""
     project_root = get_project_root()
@@ -247,6 +377,12 @@ def generate_all_folders(state_filter=None, top_level_only=False):
         "states/",
         "states/geography/",
     ])
+
+    # Build FIPS and abbreviation lookup maps for geography-based tiers
+    fips_to_prefix, abbr_to_prefix = _build_state_fips_map(project_root)
+    # Reverse: state prefix → FIPS and abbreviation
+    prefix_to_fips = {v: k for k, v in fips_to_prefix.items()}
+    prefix_to_abbr = {v: k for k, v in abbr_to_prefix.items()}
 
     # ── Per-state folders ──
     states = STATE_MAP.keys()
@@ -267,6 +403,10 @@ def generate_all_folders(state_filter=None, top_level_only=False):
         # Load hierarchy
         hierarchy = load_hierarchy(state_prefix, project_root)
 
+        # Resolve state FIPS and abbreviation for geography lookups
+        state_fips = prefix_to_fips.get(state_prefix)
+        state_abbr = prefix_to_abbr.get(state_prefix)
+
         # ── Regions / DOT Districts ──
         region_keys = get_regions(hierarchy) if hierarchy else []
         if region_keys:
@@ -274,14 +414,44 @@ def generate_all_folders(state_filter=None, top_level_only=False):
             for r in sorted(region_keys):
                 folders.append(f"{state_prefix}/_region/{r}/")
 
-        # ── MPOs / TPRs ──
+        # ── Planning Districts ── (from hierarchy.json)
+        pd_keys = get_planning_district_folders(hierarchy)
+        if pd_keys:
+            print(f"    {len(pd_keys)} planning districts: {', '.join(sorted(pd_keys)[:5])}{'...' if len(pd_keys) > 5 else ''}")
+            for pd in sorted(pd_keys):
+                folders.append(f"{state_prefix}/_planning_district/{pd}/")
+
+        # ── MPOs / TPRs ── (from hierarchy + geography)
         mpo_keys = get_mpos(hierarchy) if hierarchy else []
-        if mpo_keys:
-            print(f"    {len(mpo_keys)} MPOs/TPRs: {', '.join(sorted(mpo_keys)[:5])}{'...' if len(mpo_keys) > 5 else ''}")
-            for m in sorted(mpo_keys):
+        # Also add MPOs from geography database (us_mpos.json)
+        if state_abbr:
+            geo_mpo_keys = get_mpo_folders_from_geography(project_root, state_abbr)
+            # Merge: hierarchy MPOs + geography MPOs (deduplicated)
+            all_mpo_keys = sorted(set(mpo_keys) | set(geo_mpo_keys))
+        else:
+            all_mpo_keys = sorted(set(mpo_keys))
+        if all_mpo_keys:
+            print(f"    {len(all_mpo_keys)} MPOs/TPRs: {', '.join(sorted(all_mpo_keys)[:5])}{'...' if len(all_mpo_keys) > 5 else ''}")
+            for m in all_mpo_keys:
                 folders.append(f"{state_prefix}/_mpo/{m}/")
 
-        # ── Jurisdictions ──
+        # ── Cities ── (from us_places.json — active incorporated places)
+        if not top_level_only and state_fips:
+            city_keys = get_city_folders(project_root, state_prefix, state_fips)
+            if city_keys:
+                print(f"    {len(city_keys)} cities/places: {', '.join(sorted(city_keys)[:5])}{'...' if len(city_keys) > 5 else ''}")
+                for c in city_keys:
+                    folders.append(f"{state_prefix}/_city/{c}/")
+
+        # ── Towns / Subdivisions ── (from us_county_subdivisions.json)
+        if not top_level_only and state_fips:
+            town_keys = get_town_folders(project_root, state_prefix, state_fips)
+            if town_keys:
+                print(f"    {len(town_keys)} towns/subdivisions: {', '.join(sorted(town_keys)[:5])}{'...' if len(town_keys) > 5 else ''}")
+                for t in town_keys:
+                    folders.append(f"{state_prefix}/_town/{t}/")
+
+        # ── Jurisdictions (counties) ──
         if not top_level_only:
             jurisdictions = get_jurisdictions(state_prefix, project_root, hierarchy)
             print(f"    {len(jurisdictions)} jurisdictions")
