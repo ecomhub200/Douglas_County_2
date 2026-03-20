@@ -388,7 +388,7 @@ CL.upload.pipeline = CL.upload.pipeline || {};
                 // Auto-select state in dropdown
                 var stateSelect = document.getElementById('pipelineStateSelect');
                 if (stateSelect && detectedState) {
-                    var stateKey = detectedState.toLowerCase().replace(/\s+/g, '');
+                    var stateKey = detectedState.toLowerCase().replace(/\s+/g, '_');
                     if (stateSelect.querySelector('option[value="' + stateKey + '"]')) {
                         stateSelect.value = stateKey;
                         handleStateChange();
@@ -646,11 +646,44 @@ CL.upload.pipeline = CL.upload.pipeline || {};
     }
 
     // ============================================================
+    // INITIALIZATION
+    // ============================================================
+
+    /**
+     * Populate pipelineStateSelect dropdown from appConfig.states.
+     * Called on DOMContentLoaded so the dropdown is ready before user interaction.
+     */
+    function _initStateDropdown() {
+        var stateSelect = document.getElementById('pipelineStateSelect');
+        if (!stateSelect) return;
+        if (typeof appConfig === 'undefined' || !appConfig || !appConfig.states) return;
+
+        Object.keys(appConfig.states).sort().forEach(function(key) {
+            if (key.startsWith('_')) return; // skip _comment etc.
+            var st = appConfig.states[key];
+            var label = st.name || key.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+            var opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = label;
+            stateSelect.appendChild(opt);
+        });
+        console.log('[Pipeline] State dropdown populated with', stateSelect.options.length - 1, 'states');
+    }
+
+    // Run init when DOM is ready (or immediately if already loaded)
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _initStateDropdown);
+    } else {
+        _initStateDropdown();
+    }
+
+    // ============================================================
     // PUBLIC API
     // ============================================================
 
     CL.upload.pipeline = {
         state: pipelineState,
+        init: _initStateDropdown,
         handleFileSelect: handleFileSelect,
         handleFileDrop: handleFileDrop,
         handleStateChange: handleStateChange,

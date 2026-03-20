@@ -622,7 +622,7 @@ const server = http.createServer((req, res) => {
             //   {state}/_city/{slug}/{filter}.csv           — city tier
             //   {state}/_town/{slug}/{filter}.csv           — town tier
             //   _national/{filter}.csv                      — federal tier
-            const keyPattern = /^(?:_national\/[a-z_]+\.csv|[a-z_]+\/(?:_(?:state|statewide|region|mpo|planning_district|city|town)\/(?:[a-z0-9_]+\/)?)?[a-z0-9_]+\.csv)$/;
+            const keyPattern = /^(?:_national\/[a-z0-9_]+\.csv|[a-z_]+\/(?:_(?:state|statewide|region|mpo|planning_district|city|town)\/(?:[a-z0-9_]+\/)?)?[a-z0-9_]+(?:\/[a-z0-9_]+)?\.csv)$/;
             if (!keyPattern.test(r2Key)) {
                 res.writeHead(400, corsHeaders);
                 res.end(JSON.stringify({
