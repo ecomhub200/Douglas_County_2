@@ -1579,28 +1579,42 @@ def backtest_forecast(df, call_endpoint, horizon=BACKTEST_HOLDOUT):
     return results
 
 
-def generate_single_forecast(csv_path, output_path, horizon, road_type_label=None):
-    """Generate forecast for a single crash data file."""
+def generate_single_forecast(csv_path, output_path, horizon, road_type_label=None,
+                             mode="sagemaker"):
+    """Generate forecast for a single crash data file.
+
+    Args:
+        csv_path: Path to crash CSV
+        output_path: Path for output JSON
+        horizon: Forecast horizon in months
+        road_type_label: Road type label for output metadata
+        mode: 'sagemaker' (real Chronos-2 endpoint) or 'synthetic' (Holt-Winters fallback)
+    """
     global TOP_CORRIDORS
     df = load_crash_data(csv_path)
 
     # Auto-detect top corridors from this jurisdiction's data
     TOP_CORRIDORS = auto_detect_top_corridors(df)
 
-    # Set up SageMaker endpoint caller (always real Chronos-2)
-    try:
-        import boto3
-    except ImportError:
-        print("ERROR: boto3 is required. Install with: pip install boto3")
-        sys.exit(1)
+    if mode == "synthetic":
+        # Use Holt-Winters synthetic forecasts (no AWS/SageMaker needed)
+        print("[Mode] Using synthetic Holt-Winters forecasts (no SageMaker)")
+        raw_endpoint = lambda series, h: generate_synthetic_forecast(series, h)
+    else:
+        # Use real SageMaker Chronos-2 endpoint
+        try:
+            import boto3
+        except ImportError:
+            print("ERROR: boto3 is required. Install with: pip install boto3")
+            sys.exit(1)
 
-    session = boto3.Session(
-        aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
-        region_name=os.environ.get("AWS_REGION", "us-east-1"),
-    )
-    check_sagemaker_endpoint(session)
-    raw_endpoint = lambda series, h: invoke_endpoint(session, series, h)
+        session = boto3.Session(
+            aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+            region_name=os.environ.get("AWS_REGION", "us-east-1"),
+        )
+        check_sagemaker_endpoint(session)
+        raw_endpoint = lambda series, h: invoke_endpoint(session, series, h)
 
     # Wrap with temporal embedding layer: seasonal decomposition for
     # high-count series, log1p for low-count series (K, A severity).
@@ -1649,9 +1663,10 @@ def generate_single_forecast(csv_path, output_path, horizon, road_type_label=Non
     backtesting = backtest_forecast(df, call_endpoint, horizon=BACKTEST_HOLDOUT)
 
     # Assemble final output
+    model_name = "holt-winters-synthetic" if mode == "synthetic" else "amazon/chronos-2"
     output = {
         "generated": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "model": "amazon/chronos-2",
+        "model": model_name,
         "horizon": horizon,
         "quantileLevels": QUANTILE_LEVELS,
         "epdoWeights": EPDO_WEIGHTS,
@@ -1726,6 +1741,9 @@ def main():
                         help="Jurisdiction name prefix for data files (required with --all-road-types)")
     parser.add_argument("--data-dir", default="data",
                         help="Directory containing road-type CSV files (default: data)")
+    parser.add_argument("--mode", choices=["sagemaker", "synthetic"], default="sagemaker",
+                        help="Forecast engine: 'sagemaker' uses Chronos-2 endpoint, "
+                             "'synthetic' uses Holt-Winters (no AWS needed). Default: sagemaker")
     args = parser.parse_args()
 
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1766,7 +1784,8 @@ def main():
             print(f"  Output: {out_file}")
             print(f"{'='*60}")
 
-            generate_single_forecast(csv_file, out_file, args.horizon, road_type)
+            generate_single_forecast(csv_file, out_file, args.horizon, road_type,
+                                     mode=args.mode)
             generated += 1
 
         print(f"\n{'='*60}")
@@ -1784,7 +1803,8 @@ def main():
                 road_type = rt
                 break
 
-        generate_single_forecast(csv_path, output_path, args.horizon, road_type)
+        generate_single_forecast(csv_path, output_path, args.horizon, road_type,
+                                 mode=args.mode)
 
     print("\nDone!")
 
