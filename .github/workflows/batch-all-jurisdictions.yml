@@ -454,6 +454,103 @@ jobs:
           echo "local_md5=$MD5" >> $GITHUB_OUTPUT
           echo "Checksum: $MD5"
 
+      # ── Step 7.5: Normalize to CrashLens Standard ──
+      - name: "Normalize to CrashLens standard"
+        id: normalize
+        run: |
+          STATE="${{ github.event.inputs.state }}"
+          CSV_PATH="${{ steps.finalize.outputs.csv_path }}"
+
+          echo "=========================================="
+          echo "Normalize to CrashLens Standard"
+          echo "State: $STATE"
+          echo "=========================================="
+
+          # Derive state abbreviation from hierarchy.json
+          HIERARCHY="states/$STATE/hierarchy.json"
+          if [ ! -f "$HIERARCHY" ]; then
+            echo "INFO: No hierarchy.json for $STATE — skipping normalization"
+            echo "normalized=false" >> $GITHUB_OUTPUT
+            echo "csv_path=$CSV_PATH" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          ABBR=$(python3 -c "
+          import json
+          with open('$HIERARCHY') as f:
+              h = json.load(f)
+          s = h.get('state', {})
+          print((s.get('abbreviation') or s.get('abbr') or '').lower())
+          ")
+
+          if [ -z "$ABBR" ]; then
+            echo "INFO: Could not resolve state abbreviation — skipping normalization"
+            echo "normalized=false" >> $GITHUB_OUTPUT
+            echo "csv_path=$CSV_PATH" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          NORMALIZER="states/$STATE/${ABBR}_normalize.py"
+          if [ ! -f "$NORMALIZER" ]; then
+            echo "INFO: No state normalizer at $NORMALIZER — skipping"
+            echo "normalized=false" >> $GITHUB_OUTPUT
+            echo "csv_path=$CSV_PATH" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          OUTPUT_CSV="${CSV_PATH%.csv}_normalized.csv"
+          REPORT_JSON="${CSV_PATH%.csv}_normalization_report.json"
+
+          echo "  Normalizer: $NORMALIZER"
+          echo "  Input:      $CSV_PATH"
+          echo "  Output:     $OUTPUT_CSV"
+
+          # Detect CLI convention: --input (existing normalizers) vs --csv (template-based)
+          INPUT_FLAG=$(python3 -c "
+          import re
+          with open('$NORMALIZER') as f:
+              text = f.read()
+          if \"'--input'\" in text or '\"--input\"' in text:
+              print('--input')
+          else:
+              print('--csv')
+          ")
+
+          python "$NORMALIZER" \
+            $INPUT_FLAG "$CSV_PATH" \
+            --output "$OUTPUT_CSV" \
+            --report "$REPORT_JSON" || {
+            echo "::warning::Normalization failed — uploading raw data"
+            echo "normalized=false" >> $GITHUB_OUTPUT
+            echo "csv_path=$CSV_PATH" >> $GITHUB_OUTPUT
+            exit 0
+          }
+
+          if [ -f "$OUTPUT_CSV" ]; then
+            NORM_COLS=$(head -1 "$OUTPUT_CSV" | tr ',' '\n' | wc -l)
+            NORM_ROWS=$(wc -l < "$OUTPUT_CSV" | tr -d ' ')
+            echo "  Normalized: $((NORM_ROWS - 1)) rows × $NORM_COLS columns"
+
+            # Replace original with normalized version
+            mv "$OUTPUT_CSV" "$CSV_PATH"
+            echo "  Replaced original CSV with normalized version"
+
+            # Recompute checksum after normalization
+            MD5=$(md5sum "$CSV_PATH" | awk '{print $1}')
+            echo "  New checksum: $MD5"
+
+            echo "normalized=true" >> $GITHUB_OUTPUT
+            echo "csv_path=$CSV_PATH" >> $GITHUB_OUTPUT
+          else
+            echo "normalized=false" >> $GITHUB_OUTPUT
+            echo "csv_path=$CSV_PATH" >> $GITHUB_OUTPUT
+          fi
+
+          if [ -f "$REPORT_JSON" ]; then
+            QUALITY=$(python3 -c "import json; print(json.load(open('$REPORT_JSON')).get('quality_score', 'N/A'))")
+            echo "  Quality score: $QUALITY%"
+          fi
+
       # ── Step 8: Upload statewide CSV to R2 (with incremental check) ──
       - name: "Upload statewide CSV to R2"
         id: r2_upload

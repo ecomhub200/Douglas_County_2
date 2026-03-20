@@ -281,6 +281,94 @@ jobs:
           TOTAL=$(wc -l < "$LOCAL_CSV" | tr -d ' ')
           echo "Ready: $LOCAL_CSV ($((TOTAL - 1)) records)"
 
+      # ── Stage 0.5: Normalize to CrashLens Standard ──
+      - name: "Stage 0.5: Normalize to CrashLens standard"
+        run: |
+          STATE="${{ needs.prepare.outputs.state }}"
+          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
+
+          echo "=========================================="
+          echo "Stage 0.5: Normalize to CrashLens Standard"
+          echo "State: $STATE"
+          echo "=========================================="
+
+          # Derive state abbreviation from hierarchy.json
+          HIERARCHY="states/$STATE/hierarchy.json"
+          if [ ! -f "$HIERARCHY" ]; then
+            echo "WARNING: No hierarchy.json for $STATE — skipping normalization"
+            exit 0
+          fi
+
+          ABBR=$(python3 -c "
+          import json
+          with open('$HIERARCHY') as f:
+              h = json.load(f)
+          s = h.get('state', {})
+          print((s.get('abbreviation') or s.get('abbr') or '').lower())
+          ")
+
+          if [ -z "$ABBR" ]; then
+            echo "WARNING: Could not resolve state abbreviation — skipping normalization"
+            exit 0
+          fi
+
+          NORMALIZER="states/$STATE/${ABBR}_normalize.py"
+          if [ ! -f "$NORMALIZER" ]; then
+            echo "INFO: No state normalizer found at $NORMALIZER — skipping normalization"
+            echo "To enable normalization, create $NORMALIZER from state_normalize_template.py"
+            exit 0
+          fi
+
+          # Find the statewide CSV (matches the download step naming convention)
+          INPUT_CSV="$DATA_DIR/${STATE}_statewide_all_roads.csv"
+          if [ ! -f "$INPUT_CSV" ]; then
+            echo "WARNING: Statewide CSV not found at $INPUT_CSV — skipping normalization"
+            exit 0
+          fi
+
+          OUTPUT_CSV="$DATA_DIR/${STATE}_statewide_all_roads_normalized.csv"
+          REPORT_JSON="$DATA_DIR/${STATE}_normalization_report.json"
+
+          echo "  Normalizer: $NORMALIZER"
+          echo "  Input:      $INPUT_CSV"
+          echo "  Output:     $OUTPUT_CSV"
+
+          # Run the state-specific normalizer
+          # Each normalizer imports geo_resolver from repo root via sys.path
+          # Detect CLI convention: --input (existing normalizers) vs --csv (template-based)
+          INPUT_FLAG=$(python3 -c "
+          import re
+          with open('$NORMALIZER') as f:
+              text = f.read()
+          if \"'--input'\" in text or '\"--input\"' in text:
+              print('--input')
+          else:
+              print('--csv')
+          ")
+
+          python "$NORMALIZER" \
+            $INPUT_FLAG "$INPUT_CSV" \
+            --output "$OUTPUT_CSV" \
+            --report "$REPORT_JSON" || {
+            echo "::warning::Normalization failed — falling back to raw data"
+            exit 0
+          }
+
+          # Replace original CSV with normalized version for downstream stages
+          if [ -f "$OUTPUT_CSV" ]; then
+            ORIG_COLS=$(head -1 "$INPUT_CSV" | tr ',' '\n' | wc -l)
+            NORM_COLS=$(head -1 "$OUTPUT_CSV" | tr ',' '\n' | wc -l)
+            NORM_ROWS=$(wc -l < "$OUTPUT_CSV" | tr -d ' ')
+            echo "  Normalized: $((NORM_ROWS - 1)) rows × $NORM_COLS columns (was $ORIG_COLS columns)"
+            mv "$OUTPUT_CSV" "$INPUT_CSV"
+            echo "  Replaced original CSV with normalized version"
+          fi
+
+          if [ -f "$REPORT_JSON" ]; then
+            QUALITY=$(python3 -c "import json; print(json.load(open('$REPORT_JSON')).get('quality_score', 'N/A'))")
+            echo "  Quality score: $QUALITY%"
+          fi
+
       # ── Stage 0: Initialize Cache ──
       - name: "Stage 0: Initialize cache"
         run: |
