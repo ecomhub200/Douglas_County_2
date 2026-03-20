@@ -320,13 +320,15 @@ def get_city_folders(project_root, state_prefix, state_fips):
 def get_town_folders(project_root, state_prefix, state_fips):
     """Get town/subdivision folder slugs from us_county_subdivisions.json for a state.
 
-    Filters to active (FUNCSTAT=A) subdivisions only.
+    Filters to active governmental entities (FUNCSTAT A/B/G).
+    These are merged into _city/ on R2 alongside places.
     """
     records = _load_geography_json(project_root, "us_county_subdivisions.json")
+    active_funcstat = {"A", "B", "G"}
     towns = [
         r for r in records
         if r.get("STATE") == state_fips
-        and r.get("FUNCSTAT") == "A"
+        and r.get("FUNCSTAT") in active_funcstat
     ]
     return sorted(set(_name_to_slug(r["NAME"]) for r in towns if r.get("NAME")))
 
@@ -436,21 +438,16 @@ def generate_all_folders(state_filter=None, top_level_only=False):
             for m in all_mpo_keys:
                 folders.append(f"{state_prefix}/_mpo/{m}/")
 
-        # ── Cities ── (from us_places.json — active incorporated places)
+        # ── Cities / Towns (merged) ── all under _city/ on R2
         if not top_level_only and state_fips:
-            city_keys = get_city_folders(project_root, state_prefix, state_fips)
-            if city_keys:
-                print(f"    {len(city_keys)} cities/places: {', '.join(sorted(city_keys)[:5])}{'...' if len(city_keys) > 5 else ''}")
-                for c in city_keys:
+            city_keys = set(get_city_folders(project_root, state_prefix, state_fips))
+            town_keys = set(get_town_folders(project_root, state_prefix, state_fips))
+            # Merge and deduplicate — both go under _city/
+            all_city_town_keys = sorted(city_keys | town_keys)
+            if all_city_town_keys:
+                print(f"    {len(all_city_town_keys)} cities/towns ({len(city_keys)} places + {len(town_keys)} subdivisions, deduped): {', '.join(all_city_town_keys[:5])}{'...' if len(all_city_town_keys) > 5 else ''}")
+                for c in all_city_town_keys:
                     folders.append(f"{state_prefix}/_city/{c}/")
-
-        # ── Towns / Subdivisions ── (from us_county_subdivisions.json)
-        if not top_level_only and state_fips:
-            town_keys = get_town_folders(project_root, state_prefix, state_fips)
-            if town_keys:
-                print(f"    {len(town_keys)} towns/subdivisions: {', '.join(sorted(town_keys)[:5])}{'...' if len(town_keys) > 5 else ''}")
-                for t in town_keys:
-                    folders.append(f"{state_prefix}/_town/{t}/")
 
         # ── Jurisdictions (counties) ──
         if not top_level_only:
