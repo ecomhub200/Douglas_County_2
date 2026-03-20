@@ -199,7 +199,7 @@ CL.upload.pipeline = CL.upload.pipeline || {};
         // Try to get hierarchy data
         var hierarchy = null;
         if (typeof HierarchyRegistry !== 'undefined') {
-            hierarchy = HierarchyRegistry.getCurrent() || HierarchyRegistry.getData();
+            hierarchy = HierarchyRegistry.getData();
         }
 
         if (!hierarchy) {
@@ -259,17 +259,20 @@ CL.upload.pipeline = CL.upload.pipeline || {};
             if (stInfo) stateFips = stInfo.fips || stateKey;
         }
 
-        var geoType = tier === 'city' ? 'places' : 'subdivisions';
-        if (typeof loadGeoData === 'function') {
-            loadGeoData(geoType).then(function(records) {
+        if (typeof loadGeoData !== 'function') {
+            entitySelect.innerHTML = '<option value="">Geography data not available</option>';
+            return;
+        }
+
+        if (tier === 'city') {
+            loadGeoData('places').then(function(records) {
                 var filtered = records.filter(function(r) {
                     return r.STATE === stateFips && r.FUNCSTAT === 'A';
                 });
-                filtered.sort(function(a, b) {
-                    return (a.NAME || '').localeCompare(b.NAME || '');
-                });
-
-                entitySelect.innerHTML = '<option value="">-- Select ' + tier + ' --</option>';
+                filtered.sort(function(a, b) { return (a.NAME || '').localeCompare(b.NAME || ''); });
+                entitySelect.innerHTML = filtered.length > 0
+                    ? '<option value="">-- Select city --</option>'
+                    : '<option value="">No cities available for this state</option>';
                 filtered.forEach(function(r) {
                     var slug = (r.NAME || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
                     var opt = document.createElement('option');
@@ -277,13 +280,48 @@ CL.upload.pipeline = CL.upload.pipeline || {};
                     opt.textContent = r.NAME || r.BASENAME;
                     entitySelect.appendChild(opt);
                 });
-                console.log('[Pipeline] Populated ' + filtered.length + ' ' + tier + ' entries');
+                console.log('[Pipeline] Populated ' + filtered.length + ' city entries');
             }).catch(function(err) {
-                console.warn('[Pipeline] Failed to load ' + tier + ' list:', err);
-                entitySelect.innerHTML = '<option value="">Failed to load ' + tier + ' list</option>';
+                console.warn('[Pipeline] Failed to load city list:', err);
+                entitySelect.innerHTML = '<option value="">Failed to load city list</option>';
             });
-        } else {
-            entitySelect.innerHTML = '<option value="">Geography data not available</option>';
+        } else if (tier === 'town') {
+            // Try subdivisions first (A/B/G = active governmental entities)
+            loadGeoData('subdivisions').then(function(records) {
+                var filtered = records.filter(function(r) {
+                    return r.STATE === stateFips && (r.FUNCSTAT === 'A' || r.FUNCSTAT === 'B' || r.FUNCSTAT === 'G');
+                });
+                if (filtered.length > 0) {
+                    return filtered;
+                }
+                // Fallback: towns from places dataset
+                return loadGeoData('places').then(function(places) {
+                    var towns = places.filter(function(p) {
+                        return p.STATE === stateFips && p.FUNCSTAT === 'A' &&
+                            (p.NAMELSAD || '').toLowerCase().indexOf('town') !== -1;
+                    });
+                    if (towns.length > 0) {
+                        console.log('[Pipeline] Using ' + towns.length + ' towns from places for FIPS ' + stateFips);
+                    }
+                    return towns;
+                });
+            }).then(function(filtered) {
+                filtered.sort(function(a, b) { return (a.NAME || '').localeCompare(b.NAME || ''); });
+                entitySelect.innerHTML = filtered.length > 0
+                    ? '<option value="">-- Select town --</option>'
+                    : '<option value="">No towns available for this state</option>';
+                filtered.forEach(function(r) {
+                    var slug = (r.NAME || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+                    var opt = document.createElement('option');
+                    opt.value = slug;
+                    opt.textContent = r.NAME || r.BASENAME;
+                    entitySelect.appendChild(opt);
+                });
+                console.log('[Pipeline] Populated ' + filtered.length + ' town entries');
+            }).catch(function(err) {
+                console.warn('[Pipeline] Failed to load town list:', err);
+                entitySelect.innerHTML = '<option value="">Failed to load town list</option>';
+            });
         }
     }
 
@@ -388,7 +426,7 @@ CL.upload.pipeline = CL.upload.pipeline || {};
                 // Auto-select state in dropdown
                 var stateSelect = document.getElementById('pipelineStateSelect');
                 if (stateSelect && detectedState) {
-                    var stateKey = detectedState.toLowerCase().replace(/\s+/g, '');
+                    var stateKey = detectedState.toLowerCase().replace(/\s+/g, '_');
                     if (stateSelect.querySelector('option[value="' + stateKey + '"]')) {
                         stateSelect.value = stateKey;
                         handleStateChange();
@@ -646,11 +684,44 @@ CL.upload.pipeline = CL.upload.pipeline || {};
     }
 
     // ============================================================
+    // INITIALIZATION
+    // ============================================================
+
+    /**
+     * Populate pipelineStateSelect dropdown from appConfig.states.
+     * Called on DOMContentLoaded so the dropdown is ready before user interaction.
+     */
+    function _initStateDropdown() {
+        var stateSelect = document.getElementById('pipelineStateSelect');
+        if (!stateSelect) return;
+        if (typeof appConfig === 'undefined' || !appConfig || !appConfig.states) return;
+
+        Object.keys(appConfig.states).sort().forEach(function(key) {
+            if (key.startsWith('_')) return; // skip _comment etc.
+            var st = appConfig.states[key];
+            var label = st.name || key.replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+            var opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = label;
+            stateSelect.appendChild(opt);
+        });
+        console.log('[Pipeline] State dropdown populated with', stateSelect.options.length - 1, 'states');
+    }
+
+    // Run init when DOM is ready (or immediately if already loaded)
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _initStateDropdown);
+    } else {
+        _initStateDropdown();
+    }
+
+    // ============================================================
     // PUBLIC API
     // ============================================================
 
     CL.upload.pipeline = {
         state: pipelineState,
+        init: _initStateDropdown,
         handleFileSelect: handleFileSelect,
         handleFileDrop: handleFileDrop,
         handleStateChange: handleStateChange,
