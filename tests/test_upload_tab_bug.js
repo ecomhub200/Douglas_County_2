@@ -220,6 +220,15 @@ const appConfig = {
             defaultJurisdiction: 'douglas',
             dataDir: 'CDOT',
             r2Prefix: 'colorado'
+        },
+        delaware: {
+            fips: '10',
+            name: 'Delaware',
+            abbreviation: 'DE',
+            dotName: 'DelDOT',
+            defaultJurisdiction: 'de_sussex',
+            dataDir: 'DelawareDOT',
+            r2Prefix: 'delaware'
         }
     },
     jurisdictions: {
@@ -243,7 +252,7 @@ let _activeStateKey = 'virginia';
 let _activeJurisdiction = 'henrico';
 let _selectedFilterProfile = 'countyOnly';
 
-const jurisdictionContext = { viewTier: 'county' };
+const jurisdictionContext = { viewTier: 'county', tierPlanningDistrict: null, tierCity: null, tierTown: null };
 const appSettings = { selectedJurisdiction: 'henrico' };
 
 // ─── Helper Functions (matching index.html) ───
@@ -299,6 +308,21 @@ function getDataFilePath() {
     if (tier === 'mpo') {
         const mpoId = jurisdictionContext.tierMpo?.id;
         if (mpoId) return `${r2Prefix}/_mpo/${mpoId}/${roadType}.csv`;
+    }
+
+    if (tier === 'planning_district') {
+        const pdId = jurisdictionContext.tierPlanningDistrict?.id;
+        if (pdId) return `${r2Prefix}/_planning_district/${pdId.toLowerCase()}/${roadType}.csv`;
+    }
+
+    if (tier === 'city') {
+        const cityId = jurisdictionContext.tierCity?.id;
+        if (cityId) return `${r2Prefix}/_city/${cityId.toLowerCase()}/${roadType}.csv`;
+    }
+
+    if (tier === 'town') {
+        const townId = jurisdictionContext.tierTown?.id;
+        if (townId) return `${r2Prefix}/_town/${townId.toLowerCase()}/${roadType}.csv`;
     }
 
     const jurisdiction = getActiveJurisdictionId();
@@ -372,7 +396,7 @@ function resolveDataUrl(localPath) {
     }
 
     // Strategy 3: R2-native paths
-    const tierPrefixes = ['_state/', '_statewide/', '_region/', '_mpo/', '_federal/', '_national/'];
+    const tierPrefixes = ['_state/', '_statewide/', '_region/', '_planning_district/', '_mpo/', '_city/', '_town/', '_federal/', '_national/'];
     const isR2NativePath = !normalizedPath.startsWith('data/') &&
         normalizedPath.includes('/') &&
         (normalizedPath.endsWith('.csv') || normalizedPath.endsWith('.json') || normalizedPath.endsWith('.csv.gz'));
@@ -814,6 +838,121 @@ assert(cityFallbacks.some(p => p.includes('henrico_city_roads.csv')),
     '69. City roads fallback includes henrico_city_roads.csv');
 assert(cityFallbacks.some(p => p.includes('henrico_all_roads.csv')),
     '70. City roads fallback includes all_roads variant');
+
+// ═══════════════════════════════════════
+// NEW TIER PATH CONSTRUCTION TESTS
+// (planning_district, city, town)
+// ═══════════════════════════════════════
+
+console.log('\n--- New tier path construction (planning_district, city, town) ---\n');
+
+// Reset to county first
+_activeStateKey = 'virginia';
+_setMockRadio('roadTypeFilter', 'allRoads');
+
+// Planning District tier
+jurisdictionContext.viewTier = 'planning_district';
+jurisdictionContext.tierPlanningDistrict = { id: 'hampton_roads', name: 'Hampton Roads' };
+assertEq(
+    getDataFilePath(),
+    'virginia/_planning_district/hampton_roads/all_roads.csv',
+    '71. Planning district tier builds correct R2 path'
+);
+
+// City tier
+jurisdictionContext.viewTier = 'city';
+jurisdictionContext.tierCity = { id: 'richmond_city', name: 'Richmond city' };
+assertEq(
+    getDataFilePath(),
+    'virginia/_city/richmond_city/all_roads.csv',
+    '72. City tier builds correct R2 path'
+);
+
+// Town tier
+jurisdictionContext.viewTier = 'town';
+jurisdictionContext.tierTown = { id: 'wilmington', name: 'Wilmington' };
+_activeStateKey = 'delaware';
+assertEq(
+    getDataFilePath(),
+    'delaware/_town/wilmington/all_roads.csv',
+    '73. Town tier builds correct R2 path'
+);
+
+// Reset to Virginia for remaining tests
+_activeStateKey = 'virginia';
+
+// City tier with county_roads road type
+jurisdictionContext.viewTier = 'city';
+jurisdictionContext.tierCity = { id: 'norfolk_city', name: 'Norfolk city' };
+_setMockRadio('roadTypeFilter', 'countyOnly');
+assertEq(
+    getDataFilePath(),
+    'virginia/_city/norfolk_city/county_roads.csv',
+    '74. City tier with county_roads road type'
+);
+
+// Planning district tier — lowercase enforcement
+jurisdictionContext.viewTier = 'planning_district';
+jurisdictionContext.tierPlanningDistrict = { id: 'Greater_Denver', name: 'Greater Denver' };
+_activeStateKey = 'colorado';
+_setMockRadio('roadTypeFilter', 'allRoads');
+assertEq(
+    getDataFilePath(),
+    'colorado/_planning_district/greater_denver/all_roads.csv',
+    '75. Planning district ID lowercased in R2 path'
+);
+
+// resolveDataUrl for new tier paths
+jurisdictionContext.viewTier = 'city';
+_activeStateKey = 'virginia';
+const cityR2Path = 'virginia/_city/richmond_city/all_roads.csv';
+assertIncludes(
+    resolveDataUrl(cityR2Path),
+    'data.aicreatesai.com/virginia/_city/richmond_city/all_roads.csv',
+    '76. resolveDataUrl resolves city tier R2-native path'
+);
+
+const pdR2Path = 'virginia/_planning_district/hampton_roads/all_roads.csv';
+assertIncludes(
+    resolveDataUrl(pdR2Path),
+    'data.aicreatesai.com/virginia/_planning_district/hampton_roads/all_roads.csv',
+    '77. resolveDataUrl resolves planning_district R2-native path'
+);
+
+const townR2Path = 'delaware/_town/wilmington/all_roads.csv';
+assertIncludes(
+    resolveDataUrl(townR2Path),
+    'data.aicreatesai.com/delaware/_town/wilmington/all_roads.csv',
+    '78. resolveDataUrl resolves town tier R2-native path'
+);
+
+// Forecast paths for new tiers
+jurisdictionContext.viewTier = 'city';
+jurisdictionContext.tierCity = { id: 'richmond_city', name: 'Richmond city' };
+_activeStateKey = 'virginia';
+_setMockRadio('roadTypeFilter', 'allRoads');
+const cityForecastPath = 'virginia/_city/richmond_city/forecasts_all_roads.json';
+assertIncludes(
+    resolveDataUrl(cityForecastPath),
+    'data.aicreatesai.com/virginia/_city/richmond_city/forecasts_all_roads.json',
+    '79. resolveDataUrl resolves city tier forecast path'
+);
+
+// Reset to county tier for clean state
+jurisdictionContext.viewTier = 'county';
+jurisdictionContext.tierPlanningDistrict = null;
+jurisdictionContext.tierCity = null;
+jurisdictionContext.tierTown = null;
+_activeStateKey = 'virginia';
+_activeJurisdiction = 'henrico';
+_setMockRadio('roadTypeFilter', 'countyOnly');
+
+// Verify county tier still works after all tier switching
+assertEq(
+    getDataFilePath(),
+    'virginia/henrico/county_roads.csv',
+    '80. County tier still works correctly after tier switching'
+);
 
 // ─── Summary ───
 

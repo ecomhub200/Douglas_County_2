@@ -77,6 +77,21 @@ CL.upload = CL.upload || {};
             if (mpoId) return r2Prefix + '/_mpo/' + mpoId + '/' + roadType + '.csv';
         }
 
+        if (tier === 'planning_district') {
+            var pdId = jurisdictionContext.tierPlanningDistrict && jurisdictionContext.tierPlanningDistrict.id;
+            if (pdId) return r2Prefix + '/_planning_district/' + pdId.toLowerCase() + '/' + roadType + '.csv';
+        }
+
+        if (tier === 'city') {
+            var cityId = jurisdictionContext.tierCity && jurisdictionContext.tierCity.id;
+            if (cityId) return r2Prefix + '/_city/' + cityId.toLowerCase() + '/' + roadType + '.csv';
+        }
+
+        if (tier === 'town') {
+            var townId = jurisdictionContext.tierTown && jurisdictionContext.tierTown.id;
+            if (townId) return r2Prefix + '/_town/' + townId.toLowerCase() + '/' + roadType + '.csv';
+        }
+
         // County tier (default)
         var jurisdiction = (typeof getActiveJurisdictionId === 'function') ? getActiveJurisdictionId() : 'douglas';
         var r2Jurisdiction = jurisdiction;
@@ -145,7 +160,7 @@ CL.upload = CL.upload || {};
         }
 
         // Strategy 3: R2-native paths (direct R2 keys)
-        var tierPrefixes = ['_state/', '_statewide/', '_region/', '_mpo/', '_federal/', '_national/'];
+        var tierPrefixes = ['_state/', '_statewide/', '_region/', '_planning_district/', '_mpo/', '_city/', '_town/', '_federal/', '_national/'];
         var isR2NativePath = normalizedPath.indexOf('data/') !== 0 &&
             normalizedPath.indexOf('/') !== -1 &&
             (normalizedPath.indexOf('.csv', normalizedPath.length - 4) !== -1 ||
@@ -246,8 +261,8 @@ CL.upload = CL.upload || {};
 
     /**
      * Check if crash data is available in R2 for a given state/jurisdiction.
-     * Jurisdiction-agnostic: always returns available=true so the frontend
-     * connects to the R2 folder regardless of manifest state.
+     * Tier-aware: constructs the correct path prefix based on the current view tier.
+     * Always returns available=true so the frontend connects regardless of manifest state.
      *
      * @param {string} stateKey - State key (e.g., 'virginia')
      * @param {string} jurisdictionId - Jurisdiction ID (e.g., 'henrico')
@@ -255,7 +270,25 @@ CL.upload = CL.upload || {};
      */
     function checkR2DataAvailability(stateKey, jurisdictionId) {
         var prefix = (appConfig && appConfig.states && appConfig.states[stateKey] && appConfig.states[stateKey].r2Prefix) || stateKey;
-        var pathPrefix = prefix + '/' + jurisdictionId.toLowerCase() + '/';
+        var tier = (typeof jurisdictionContext !== 'undefined') ? jurisdictionContext.viewTier : 'county';
+
+        // Build path prefix based on tier
+        var pathPrefix;
+        if (tier === 'state') {
+            pathPrefix = prefix + '/_state/';
+        } else if (tier === 'region' && jurisdictionContext.tierRegion) {
+            pathPrefix = prefix + '/_region/' + jurisdictionContext.tierRegion.id + '/';
+        } else if (tier === 'planning_district' && jurisdictionContext.tierPlanningDistrict) {
+            pathPrefix = prefix + '/_planning_district/' + jurisdictionContext.tierPlanningDistrict.id + '/';
+        } else if (tier === 'mpo' && jurisdictionContext.tierMpo) {
+            pathPrefix = prefix + '/_mpo/' + jurisdictionContext.tierMpo.id + '/';
+        } else if (tier === 'city' && jurisdictionContext.tierCity) {
+            pathPrefix = prefix + '/_city/' + jurisdictionContext.tierCity.id + '/';
+        } else if (tier === 'town' && jurisdictionContext.tierTown) {
+            pathPrefix = prefix + '/_town/' + jurisdictionContext.tierTown.id + '/';
+        } else {
+            pathPrefix = prefix + '/' + jurisdictionId.toLowerCase() + '/';
+        }
 
         if (!r2State.manifest || !r2State.manifest.files) {
             return { available: true, inManifest: false, reason: 'No manifest — will attempt direct R2 fetch' };
@@ -472,6 +505,7 @@ CL.upload = CL.upload || {};
 
     /**
      * Update the current selection display (jurisdiction + filter).
+     * Now tier-aware: shows the active tier's selected entity.
      */
     function updateCurrentSelectionDisplay() {
         var display = document.getElementById('currentJurisdictionDisplay');
@@ -480,15 +514,45 @@ CL.upload = CL.upload || {};
 
         if (!display || !nameSpan || !filterSpan) return;
 
-        var jurisdictionId = (typeof getActiveJurisdictionId === 'function') ? getActiveJurisdictionId() : null;
-        var jurisdiction = jurisdictionId && appConfig && appConfig.jurisdictions ? appConfig.jurisdictions[jurisdictionId] : null;
+        var tier = (typeof jurisdictionContext !== 'undefined') ? jurisdictionContext.viewTier : 'county';
 
         var selectedFilterEl = document.querySelector('input[name="roadTypeFilter"]:checked');
         var profileId = selectedFilterEl ? selectedFilterEl.value : (localStorage.getItem('selectedFilterProfile') || 'countyOnly');
         var filterProfile = appConfig && appConfig.filterProfiles ? appConfig.filterProfiles[profileId] : null;
 
-        if (jurisdiction && filterProfile) {
-            nameSpan.textContent = jurisdiction.name;
+        var tierLabels = {
+            state: 'Statewide',
+            region: 'Region',
+            planning_district: 'Planning District',
+            mpo: 'MPO',
+            county: '',
+            city: 'City',
+            town: 'Town',
+            federal: 'Federal'
+        };
+
+        var entityName = null;
+        if (tier === 'county' || tier === 'federal') {
+            var jurisdictionId = (typeof getActiveJurisdictionId === 'function') ? getActiveJurisdictionId() : null;
+            var jurisdiction = jurisdictionId && appConfig && appConfig.jurisdictions ? appConfig.jurisdictions[jurisdictionId] : null;
+            entityName = jurisdiction ? jurisdiction.name : null;
+        } else if (tier === 'state') {
+            entityName = (typeof jurisdictionContext !== 'undefined' && jurisdictionContext.tierState) ? jurisdictionContext.tierState.name : 'Statewide';
+        } else if (tier === 'region') {
+            entityName = (typeof jurisdictionContext !== 'undefined' && jurisdictionContext.tierRegion) ? jurisdictionContext.tierRegion.name : null;
+        } else if (tier === 'planning_district') {
+            entityName = (typeof jurisdictionContext !== 'undefined' && jurisdictionContext.tierPlanningDistrict) ? jurisdictionContext.tierPlanningDistrict.name : null;
+        } else if (tier === 'mpo') {
+            entityName = (typeof jurisdictionContext !== 'undefined' && jurisdictionContext.tierMpo) ? jurisdictionContext.tierMpo.name : null;
+        } else if (tier === 'city') {
+            entityName = (typeof jurisdictionContext !== 'undefined' && jurisdictionContext.tierCity) ? jurisdictionContext.tierCity.name : null;
+        } else if (tier === 'town') {
+            entityName = (typeof jurisdictionContext !== 'undefined' && jurisdictionContext.tierTown) ? jurisdictionContext.tierTown.name : null;
+        }
+
+        if (entityName && filterProfile) {
+            var prefix = tierLabels[tier] ? tierLabels[tier] + ': ' : '';
+            nameSpan.textContent = prefix + entityName;
             filterSpan.textContent = filterProfile.name;
             display.style.display = 'block';
         }

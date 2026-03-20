@@ -8,16 +8,22 @@
 # Reads from:
 #   - config.json (Virginia jurisdictions)
 #   - data/{State}DOT/source_manifest.json (other state jurisdictions)
-#   - states/{state}/hierarchy.json (DOT regions + MPOs/TPRs for all 50 states)
+#   - states/{state}/hierarchy.json (DOT regions + MPOs/TPRs + planning districts for all 50 states)
+#   - states/geography/us_places.json (cities/towns for _city/ folders)
+#   - states/geography/us_county_subdivisions.json (towns for _town/ folders)
+#   - states/geography/us_mpos.json (MPOs for _mpo/ folders)
 #   - Fallback known lists for states without populated manifests
 #
 # Folder structure per state:
-#   {state}/_state/             — Statewide raw data
-#   {state}/_statewide/         — Statewide aggregates
-#   {state}/_region/{id}/       — DOT district/region aggregates
-#   {state}/_mpo/{id}/          — MPO/TPR aggregates
-#   {state}/{jurisdiction}/     — Per-jurisdiction crash data
-#   {state}/{jurisdiction}/raw/ — Raw annual source data
+#   {state}/_state/                         — Statewide raw data
+#   {state}/_statewide/                     — Statewide aggregates
+#   {state}/_region/{id}/                   — DOT district/region aggregates
+#   {state}/_planning_district/{id}/        — Planning district data
+#   {state}/_mpo/{id}/                      — MPO/TPR aggregates
+#   {state}/_city/{slug}/                   — City/place data (from us_places.json)
+#   {state}/_town/{slug}/                   — Town/subdivision data (from us_county_subdivisions.json)
+#   {state}/{jurisdiction}/                 — Per-jurisdiction crash data
+#   {state}/{jurisdiction}/raw/             — Raw annual source data
 #
 # Safe to re-run — creating an existing folder marker is a no-op.
 # ============================================================================

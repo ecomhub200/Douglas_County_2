@@ -1,8 +1,16 @@
 {
-  "version": 3,
-  "_comment": "Version 3: Added gzip support (contentEncoding, uncompressedSize) for state-level datasets. Statewide CSVs stored at {state}/_state/. Aggregate JSONs at {state}/_statewide/, _region/, _mpo/, _federal/.",
-  "r2BaseUrl": "https://data.aicreatesai.com\r\n",
-  "updated": "2026-03-16T11:48:43.301442+00:00",
+  "version": 4,
+  "_comment": "Version 4: Added planning_district, city, town tiers. Geography JSON references added. All R2 paths lowercase.",
+  "r2BaseUrl": "https://data.aicreatesai.com",
+  "updated": "2026-03-20T00:00:00.000000+00:00",
+  "tiers": ["federal", "state", "region", "planning_district", "mpo", "county", "city", "town"],
+  "geography": {
+    "states": "states/geography/us_states.json",
+    "counties": "states/geography/us_counties.json",
+    "places": "states/geography/us_places.json",
+    "mpos": "states/geography/us_mpos.json",
+    "subdivisions": "states/geography/us_county_subdivisions.json"
+  },
   "files": {
     "colorado/douglas/standardized.csv": {
       "size": 18447410,
