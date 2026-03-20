@@ -613,13 +613,21 @@ const server = http.createServer((req, res) => {
                 return;
             }
 
-            // Validate r2Key format: {state}/{jurisdiction}/{filter}.csv
-            const keyPattern = /^[a-z_-]+\/[a-z_-]+\/[a-z_]+\.csv$/;
+            // Validate r2Key format — supports all R2 folder tiers:
+            //   {state}/{jurisdiction}/{filter}.csv         — county tier
+            //   {state}/_state/{filter}.csv                 — state tier
+            //   {state}/_region/{id}/{filter}.csv           — region tier
+            //   {state}/_mpo/{id}/{filter}.csv              — MPO tier
+            //   {state}/_planning_district/{id}/{filter}.csv — planning district
+            //   {state}/_city/{slug}/{filter}.csv           — city tier
+            //   {state}/_town/{slug}/{filter}.csv           — town tier
+            //   _national/{filter}.csv                      — federal tier
+            const keyPattern = /^(?:_national\/[a-z_]+\.csv|[a-z_]+\/(?:_(?:state|statewide|region|mpo|planning_district|city|town)\/(?:[a-z0-9_]+\/)?)?[a-z0-9_]+\.csv)$/;
             if (!keyPattern.test(r2Key)) {
                 res.writeHead(400, corsHeaders);
                 res.end(JSON.stringify({
                     error: 'Invalid r2Key format',
-                    message: 'Expected pattern: {state}/{jurisdiction}/{filter}.csv (e.g., colorado/douglas/all_roads.csv)'
+                    message: 'Expected pattern: {state}/{tier_prefix}/{id}/{filter}.csv (e.g., colorado/douglas/all_roads.csv, colorado/_region/region_1/all_roads.csv)'
                 }));
                 return;
             }
