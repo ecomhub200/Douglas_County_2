@@ -479,7 +479,8 @@ jobs:
           import json
           with open('$HIERARCHY') as f:
               h = json.load(f)
-          print(h.get('state', {}).get('abbr', '').lower())
+          s = h.get('state', {})
+          print((s.get('abbreviation') or s.get('abbr') or '').lower())
           ")
 
           if [ -z "$ABBR" ]; then
