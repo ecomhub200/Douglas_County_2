@@ -80,8 +80,8 @@
     },
     "ID": {
       "method": "composite_key",
-      "sources": ["crash_datetime", "latitude", "longitude"],
-      "_note": "No crash ID in dataset. Format: DE-{YYYYMMDD}-{HHMM}-{lat}-{lon}"
+      "sources": ["crash_datetime", "row_index"],
+      "_note": "No crash ID in dataset. Format: DE-{YYYYMMDD}-{HHMM}-{NNNNNNN} (sequential row number)"
     },
     "YEAR": {
       "method": "extract_year",

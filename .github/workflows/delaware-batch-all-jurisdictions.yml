@@ -315,7 +315,7 @@ jobs:
 
           # Use the Delaware normalizer script from states/delaware/
           if [ -f "states/delaware/de_normalize.py" ]; then
-            python states/delaware/de_normalize.py "$RAW_CSV" "$NORMALIZED_CSV"
+            python states/delaware/de_normalize.py --input "$RAW_CSV" --output "$NORMALIZED_CSV"
           else
             echo "::error::states/delaware/de_normalize.py not found"
             exit 1

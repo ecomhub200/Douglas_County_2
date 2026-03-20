@@ -68,25 +68,25 @@ Delaware uses a two-layer normalization approach:
 The `de_normalize.py` script transforms raw Delaware data:
 
 **Severity Mapping** (Delaware → KABCO):
-- "Fatality Crash" → K
-- "Personal Injury Crash" → B (DE doesn't distinguish A/B/C)
+- "Fatality Crash" / "Fatal Crash" → K
+- "Personal Injury Crash" / "Injury Crash" → A (DE doesn't distinguish A/B/C; mapped to A per FHWA guidance)
 - "Property Damage Only" → O
 - "Non-Reportable" → O
 
 **Crash ID Generation:**
-Format: `DE-{YYYY}-{NNNNNN}` (e.g., `DE-2023-000001`)
+Format: `DE-{YYYYMMDD}-{HHMM}-{NNNNNNN}` (e.g., `DE-20230715-1515-0000001`)
 
 **Datetime Parsing:**
 - Input: `2015 Jul 17 03:15:00 PM`
-- Crash Date: `07/17/2015`
+- Crash Date: `7/17/2015`
 - Crash Military Time: `1515`
 - Crash Year: `2015`
 
 **Jurisdiction Names:**
-Formatted as `{FIPS}. {County Name}` (e.g., `001. Kent County`)
+County name only (e.g., `Kent`, `New Castle`, `Sussex`)
 
 **Known Limitations:**
-- No A/B/C injury severity distinction (all injuries mapped to B)
+- No A/B/C injury severity distinction (all injuries mapped to A per FHWA guidance)
 - Functional Class not in source data (empty — affects road-type filters)
 - Ownership not in source data (empty — affects county/city road filters)
 - No route/road name fields available
