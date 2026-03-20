@@ -27,6 +27,7 @@ import time
 import argparse
 import subprocess
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BUCKET = os.environ.get("R2_BUCKET", "crash-lens-data")
 ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID", "")
@@ -464,8 +465,45 @@ def generate_all_folders(state_filter=None, top_level_only=False):
     return folders
 
 
+def _get_s3_client():
+    """Create a boto3 S3 client configured for Cloudflare R2."""
+    import boto3
+    from botocore.config import Config
+
+    return boto3.client(
+        "s3",
+        endpoint_url=ENDPOINT,
+        aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID", ""),
+        aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY", ""),
+        region_name="auto",
+        config=Config(
+            retries={"max_attempts": 3, "mode": "adaptive"},
+            max_pool_connections=MAX_WORKERS,
+        ),
+    )
+
+
+# Number of parallel upload threads
+MAX_WORKERS = 50
+
+
+def create_folder_via_boto3(s3_client, folder_key):
+    """Create a single folder marker in R2 using boto3 (no subprocess overhead)."""
+    for attempt in range(3):
+        try:
+            s3_client.put_object(Bucket=BUCKET, Key=folder_key, Body=b"")
+            return True
+        except Exception as exc:
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+            else:
+                print(f"  [ERROR] Failed to create {folder_key}: {exc}")
+                return False
+    return False
+
+
 def create_folder_via_cli(folder_key, dry_run=False):
-    """Create a single folder marker in R2 using AWS CLI."""
+    """Create a single folder marker in R2 using AWS CLI (fallback)."""
     if dry_run:
         print(f"  [DRY-RUN] Would create: {folder_key}")
         return True
@@ -496,7 +534,7 @@ def create_folder_via_cli(folder_key, dry_run=False):
 
 
 def create_folders_batch(folders, dry_run=False):
-    """Create all folders, reporting progress."""
+    """Create all folders in parallel using boto3 + ThreadPoolExecutor."""
     total = len(folders)
     created = 0
     failed = 0
@@ -504,19 +542,43 @@ def create_folders_batch(folders, dry_run=False):
     print(f"\n{'='*60}")
     print(f"Creating {total} folders in R2 bucket: {BUCKET}")
     print(f"Endpoint: {ENDPOINT}")
+    print(f"Concurrency: {MAX_WORKERS} threads")
     print(f"{'='*60}\n")
 
-    for i, folder in enumerate(folders, 1):
-        if i % 100 == 0 or i == total:
-            print(f"  Progress: {i}/{total} ({i*100//total}%)")
+    if dry_run:
+        for folder in folders:
+            print(f"  [DRY-RUN] Would create: {folder}")
+        print(f"\n{'='*60}")
+        print(f"RESULTS: {total} would be created (dry-run), 0 failed, {total} total")
+        print(f"{'='*60}")
+        return True
 
-        if create_folder_via_cli(folder, dry_run=dry_run):
-            created += 1
-        else:
-            failed += 1
+    s3_client = _get_s3_client()
+    completed = 0
+    start_time = time.time()
 
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {
+            executor.submit(create_folder_via_boto3, s3_client, folder): folder
+            for folder in folders
+        }
+        for future in as_completed(futures):
+            completed += 1
+            if future.result():
+                created += 1
+            else:
+                failed += 1
+            if completed % 500 == 0 or completed == total:
+                elapsed = time.time() - start_time
+                rate = completed / elapsed if elapsed > 0 else 0
+                eta = (total - completed) / rate if rate > 0 else 0
+                print(f"  Progress: {completed}/{total} ({completed*100//total}%) — "
+                      f"{rate:.0f} folders/sec — ETA {eta:.0f}s")
+
+    elapsed = time.time() - start_time
     print(f"\n{'='*60}")
     print(f"RESULTS: {created} created, {failed} failed, {total} total")
+    print(f"Elapsed: {elapsed:.1f}s ({total/elapsed:.0f} folders/sec)")
     print(f"{'='*60}")
 
     return failed == 0
