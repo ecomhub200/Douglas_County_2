@@ -69,7 +69,7 @@ jobs:
   create-folders:
     name: Create R2 Folders
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     steps:
       # ── Checkout ──
@@ -81,6 +81,10 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+
+      # ── Install Python dependencies ──
+      - name: Install boto3
+        run: pip install boto3
 
       # ── Configure AWS CLI for R2 ──
       - name: Configure AWS CLI for Cloudflare R2
