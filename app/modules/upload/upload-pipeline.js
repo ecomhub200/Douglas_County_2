@@ -279,11 +279,17 @@ CL.upload.pipeline = CL.upload.pipeline || {};
             var seen = {};
             var merged = [];
 
+            // Slug helper — must match Python _name_to_slug() in create_r2_folders.py
+            function toSlug(name) {
+                if (!name) return '';
+                return name.toLowerCase().replace(/['.]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+            }
+
             activePlaces.forEach(function(p) {
                 var key = (p.NAME || '').toLowerCase();
                 seen[key] = true;
                 merged.push({
-                    slug: key.replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''),
+                    slug: toSlug(p.NAME || p.BASENAME),
                     displayName: p.NAMELSAD || p.NAME || p.BASENAME
                 });
             });
@@ -293,7 +299,7 @@ CL.upload.pipeline = CL.upload.pipeline || {};
                 if (!seen[key]) {
                     seen[key] = true;
                     merged.push({
-                        slug: key.replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''),
+                        slug: toSlug(s.NAME || s.BASENAME),
                         displayName: s.NAMELSAD || s.NAME || s.BASENAME
                     });
                 }
