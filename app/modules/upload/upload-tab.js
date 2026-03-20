@@ -23,7 +23,7 @@ CL.upload = CL.upload || {};
 
     /**
      * Get the R2 file suffix for the currently selected road type filter.
-     * State/Federal/Region tiers use DOT/Non-DOT naming; County/MPO use local road naming.
+     * State/Region tiers use DOT/County naming; Federal uses DOT/Non-DOT; County/MPO use local road naming.
      *
      * @param {string} [tier] - View tier override (defaults to jurisdictionContext.viewTier)
      * @returns {string} File suffix like 'county_roads', 'dot_roads', 'statewide_all_roads', etc.
@@ -568,7 +568,7 @@ CL.upload = CL.upload || {};
             state: {
                 countyOnly:      '<strong>DOT Roads Only</strong> - State DOT-maintained roads',
                 cityOnly:        '<strong>City Roads Only</strong> - City/town agency roads',
-                countyPlusVDOT:  '<strong>Non-DOT Roads</strong> - Local and non-state roads',
+                countyPlusVDOT:  '<strong>County Roads Only</strong> - County-maintained roads',
                 allRoads:        '<strong>Statewide All Roads</strong> - DOT + Non-DOT combined'
             },
             federal: {
@@ -580,7 +580,7 @@ CL.upload = CL.upload || {};
             region: {
                 countyOnly:      '<strong>DOT Roads Only</strong> - State DOT-maintained roads',
                 cityOnly:        '<strong>City Roads Only</strong> - City/town agency roads',
-                countyPlusVDOT:  '<strong>Non-DOT Roads</strong> - Local and non-state roads',
+                countyPlusVDOT:  '<strong>County Roads Only</strong> - County-maintained roads',
                 allRoads:        '<strong>All Roads</strong> - DOT + Non-DOT combined'
             },
             _default: {
