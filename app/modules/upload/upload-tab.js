@@ -87,11 +87,6 @@ CL.upload = CL.upload || {};
             if (cityId) return r2Prefix + '/_city/' + cityId.toLowerCase() + '/' + roadType + '.csv';
         }
 
-        if (tier === 'town') {
-            var townId = jurisdictionContext.tierTown && jurisdictionContext.tierTown.id;
-            if (townId) return r2Prefix + '/_town/' + townId.toLowerCase() + '/' + roadType + '.csv';
-        }
-
         // County tier (default)
         var jurisdiction = (typeof getActiveJurisdictionId === 'function') ? getActiveJurisdictionId() : 'douglas';
         var r2Jurisdiction = jurisdiction;
@@ -160,7 +155,7 @@ CL.upload = CL.upload || {};
         }
 
         // Strategy 3: R2-native paths (direct R2 keys)
-        var tierPrefixes = ['_state/', '_statewide/', '_region/', '_planning_district/', '_mpo/', '_city/', '_town/', '_federal/', '_national/'];
+        var tierPrefixes = ['_state/', '_statewide/', '_region/', '_planning_district/', '_mpo/', '_city/', '_federal/', '_national/'];
         var isR2NativePath = normalizedPath.indexOf('data/') !== 0 &&
             normalizedPath.indexOf('/') !== -1 &&
             (normalizedPath.indexOf('.csv', normalizedPath.length - 4) !== -1 ||
@@ -284,8 +279,6 @@ CL.upload = CL.upload || {};
             pathPrefix = prefix + '/_mpo/' + jurisdictionContext.tierMpo.id + '/';
         } else if (tier === 'city' && jurisdictionContext.tierCity) {
             pathPrefix = prefix + '/_city/' + jurisdictionContext.tierCity.id + '/';
-        } else if (tier === 'town' && jurisdictionContext.tierTown) {
-            pathPrefix = prefix + '/_town/' + jurisdictionContext.tierTown.id + '/';
         } else {
             pathPrefix = prefix + '/' + jurisdictionId.toLowerCase() + '/';
         }
@@ -546,8 +539,6 @@ CL.upload = CL.upload || {};
             entityName = (typeof jurisdictionContext !== 'undefined' && jurisdictionContext.tierMpo) ? jurisdictionContext.tierMpo.name : null;
         } else if (tier === 'city') {
             entityName = (typeof jurisdictionContext !== 'undefined' && jurisdictionContext.tierCity) ? jurisdictionContext.tierCity.name : null;
-        } else if (tier === 'town') {
-            entityName = (typeof jurisdictionContext !== 'undefined' && jurisdictionContext.tierTown) ? jurisdictionContext.tierTown.name : null;
         }
 
         if (entityName && filterProfile) {

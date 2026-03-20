@@ -5,7 +5,7 @@
  *
  * This module manages the manual upload flow when users upload raw state crash
  * data CSV files through the pipeline UI. Supports all R2 folder tiers:
- * county, state, region, MPO, planning district, city, town, and federal.
+ * county, state, region, MPO, planning district, city/town, and federal.
  *
  * Dependencies: StateAdapter, Papa (PapaParse), CL.upload, HierarchyRegistry
  * Globals accessed: crashState, appConfig
@@ -79,9 +79,6 @@ CL.upload.pipeline = CL.upload.pipeline || {};
         if (tier === 'city' && entityId) {
             return statePrefix + '/_city/' + entityId + '/' + roadType + '.csv';
         }
-        if (tier === 'town' && entityId) {
-            return statePrefix + '/_town/' + entityId + '/' + roadType + '.csv';
-        }
         // County tier (default)
         if (entityId) {
             return statePrefix + '/' + entityId.toLowerCase() + '/' + roadType + '.csv';
@@ -124,8 +121,7 @@ CL.upload.pipeline = CL.upload.pipeline || {};
             region: 'Select Region',
             mpo: 'Select MPO',
             planning_district: 'Select Planning District',
-            city: 'Select City',
-            town: 'Select Town/Subdivision',
+            city: 'Select City / Town',
             federal: 'Federal (no selection needed)'
         };
         if (labelEl) labelEl.textContent = tierLabels[tier] || 'Select Destination';
@@ -155,9 +151,9 @@ CL.upload.pipeline = CL.upload.pipeline || {};
         } else if (tier === 'region' || tier === 'mpo' || tier === 'planning_district') {
             // Populate from hierarchy.json
             _populateHierarchyDropdown(selectedState, tier);
-        } else if (tier === 'city' || tier === 'town') {
-            // Populate from geography JSON
-            _populateGeoDropdown(selectedState, tier);
+        } else if (tier === 'city') {
+            // Populate merged city/town from geography JSON
+            _populateGeoDropdown(selectedState);
         }
 
         updateR2PathPreview();
@@ -245,16 +241,16 @@ CL.upload.pipeline = CL.upload.pipeline || {};
     }
 
     /**
-     * Populate city/town dropdown from geography JSON on R2.
+     * Populate merged city/town dropdown from geography JSON on R2.
+     * Combines places (cities, towns, villages) + active subdivisions (townships).
      */
-    function _populateGeoDropdown(stateKey, tier) {
+    function _populateGeoDropdown(stateKey) {
         var entitySelect = document.getElementById('pipelineJurisdictionSelect');
-        entitySelect.innerHTML = '<option value="">Loading ' + tier + ' list...</option>';
+        entitySelect.innerHTML = '<option value="">Loading city/town list...</option>';
 
         // Get state FIPS from FIPSDatabase or stateSelect value
         var stateFips = stateKey;
         if (typeof FIPSDatabase !== 'undefined') {
-            // stateKey might be a FIPS code already if coming from stateSelect.value
             var stInfo = FIPSDatabase.getState(stateKey);
             if (stInfo) stateFips = stInfo.fips || stateKey;
         }
@@ -264,65 +260,61 @@ CL.upload.pipeline = CL.upload.pipeline || {};
             return;
         }
 
-        if (tier === 'city') {
-            loadGeoData('places').then(function(records) {
-                var filtered = records.filter(function(r) {
-                    return r.STATE === stateFips && r.FUNCSTAT === 'A';
-                });
-                filtered.sort(function(a, b) { return (a.NAME || '').localeCompare(b.NAME || ''); });
-                entitySelect.innerHTML = filtered.length > 0
-                    ? '<option value="">-- Select city --</option>'
-                    : '<option value="">No cities available for this state</option>';
-                filtered.forEach(function(r) {
-                    var slug = (r.NAME || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-                    var opt = document.createElement('option');
-                    opt.value = slug;
-                    opt.textContent = r.NAME || r.BASENAME;
-                    entitySelect.appendChild(opt);
-                });
-                console.log('[Pipeline] Populated ' + filtered.length + ' city entries');
-            }).catch(function(err) {
-                console.warn('[Pipeline] Failed to load city list:', err);
-                entitySelect.innerHTML = '<option value="">Failed to load city list</option>';
+        // Load both sources in parallel, merge with dedup
+        Promise.all([
+            loadGeoData('places'),
+            loadGeoData('subdivisions')
+        ]).then(function(results) {
+            var places = results[0];
+            var subs = results[1];
+
+            var activePlaces = places.filter(function(r) {
+                return r.STATE === stateFips && r.FUNCSTAT === 'A';
             });
-        } else if (tier === 'town') {
-            // Try subdivisions first (A/B/G = active governmental entities)
-            loadGeoData('subdivisions').then(function(records) {
-                var filtered = records.filter(function(r) {
-                    return r.STATE === stateFips && (r.FUNCSTAT === 'A' || r.FUNCSTAT === 'B' || r.FUNCSTAT === 'G');
+            var activeSubdivisions = subs.filter(function(r) {
+                return r.STATE === stateFips && (r.FUNCSTAT === 'A' || r.FUNCSTAT === 'B' || r.FUNCSTAT === 'G');
+            });
+
+            // Merge with dedup — places win over subdivisions
+            var seen = {};
+            var merged = [];
+
+            activePlaces.forEach(function(p) {
+                var key = (p.NAME || '').toLowerCase();
+                seen[key] = true;
+                merged.push({
+                    slug: key.replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''),
+                    displayName: p.NAMELSAD || p.NAME || p.BASENAME
                 });
-                if (filtered.length > 0) {
-                    return filtered;
-                }
-                // Fallback: towns from places dataset
-                return loadGeoData('places').then(function(places) {
-                    var towns = places.filter(function(p) {
-                        return p.STATE === stateFips && p.FUNCSTAT === 'A' &&
-                            (p.NAMELSAD || '').toLowerCase().indexOf('town') !== -1;
+            });
+
+            activeSubdivisions.forEach(function(s) {
+                var key = (s.NAME || '').toLowerCase();
+                if (!seen[key]) {
+                    seen[key] = true;
+                    merged.push({
+                        slug: key.replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''),
+                        displayName: s.NAMELSAD || s.NAME || s.BASENAME
                     });
-                    if (towns.length > 0) {
-                        console.log('[Pipeline] Using ' + towns.length + ' towns from places for FIPS ' + stateFips);
-                    }
-                    return towns;
-                });
-            }).then(function(filtered) {
-                filtered.sort(function(a, b) { return (a.NAME || '').localeCompare(b.NAME || ''); });
-                entitySelect.innerHTML = filtered.length > 0
-                    ? '<option value="">-- Select town --</option>'
-                    : '<option value="">No towns available for this state</option>';
-                filtered.forEach(function(r) {
-                    var slug = (r.NAME || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-                    var opt = document.createElement('option');
-                    opt.value = slug;
-                    opt.textContent = r.NAME || r.BASENAME;
-                    entitySelect.appendChild(opt);
-                });
-                console.log('[Pipeline] Populated ' + filtered.length + ' town entries');
-            }).catch(function(err) {
-                console.warn('[Pipeline] Failed to load town list:', err);
-                entitySelect.innerHTML = '<option value="">Failed to load town list</option>';
+                }
             });
-        }
+
+            merged.sort(function(a, b) { return a.displayName.localeCompare(b.displayName); });
+
+            entitySelect.innerHTML = merged.length > 0
+                ? '<option value="">-- Select city / town --</option>'
+                : '<option value="">No cities/towns available for this state</option>';
+            merged.forEach(function(item) {
+                var opt = document.createElement('option');
+                opt.value = item.slug;
+                opt.textContent = item.displayName;
+                entitySelect.appendChild(opt);
+            });
+            console.log('[Pipeline] Populated ' + merged.length + ' city/town entries (' + activePlaces.length + ' places + ' + activeSubdivisions.length + ' subdivisions, deduped)');
+        }).catch(function(err) {
+            console.warn('[Pipeline] Failed to load city/town list:', err);
+            entitySelect.innerHTML = '<option value="">Failed to load city/town list</option>';
+        });
     }
 
     // ============================================================

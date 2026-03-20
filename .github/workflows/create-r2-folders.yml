@@ -9,8 +9,8 @@
 #   - config.json (Virginia jurisdictions)
 #   - data/{State}DOT/source_manifest.json (other state jurisdictions)
 #   - states/{state}/hierarchy.json (DOT regions + MPOs/TPRs + planning districts for all 50 states)
-#   - states/geography/us_places.json (cities/towns for _city/ folders)
-#   - states/geography/us_county_subdivisions.json (towns for _town/ folders)
+#   - states/geography/us_places.json (cities for _city/ folders)
+#   - states/geography/us_county_subdivisions.json (towns/townships merged into _city/ folders)
 #   - states/geography/us_mpos.json (MPOs for _mpo/ folders)
 #   - Fallback known lists for states without populated manifests
 #
@@ -20,8 +20,7 @@
 #   {state}/_region/{id}/                   — DOT district/region aggregates
 #   {state}/_planning_district/{id}/        — Planning district data
 #   {state}/_mpo/{id}/                      — MPO/TPR aggregates
-#   {state}/_city/{slug}/                   — City/place data (from us_places.json)
-#   {state}/_town/{slug}/                   — Town/subdivision data (from us_county_subdivisions.json)
+#   {state}/_city/{slug}/                   — City/town/place data (merged from us_places.json + us_county_subdivisions.json)
 #   {state}/{jurisdiction}/                 — Per-jurisdiction crash data
 #   {state}/{jurisdiction}/raw/             — Raw annual source data
 #
