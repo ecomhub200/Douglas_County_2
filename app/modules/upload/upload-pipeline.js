@@ -199,7 +199,7 @@ CL.upload.pipeline = CL.upload.pipeline || {};
         // Try to get hierarchy data
         var hierarchy = null;
         if (typeof HierarchyRegistry !== 'undefined') {
-            hierarchy = HierarchyRegistry.getCurrent() || HierarchyRegistry.getData();
+            hierarchy = HierarchyRegistry.getData();
         }
 
         if (!hierarchy) {
