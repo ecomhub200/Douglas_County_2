@@ -1,8 +1,12 @@
 # ==============================================================================
 # Test SageMaker Chronos-2 Endpoint
 # ==============================================================================
-# Manual workflow to verify the SageMaker endpoint is reachable and working.
-# Tests: connectivity, endpoint status, and a sample prediction.
+# Manual workflow to manage and test the SageMaker endpoint.
+#
+# COST WARNING:
+#   - "serverless" mode scales to zero when idle — NO charges when not in use
+#   - "realtime" mode charges ~$0.23/hr (~$166/month) EVEN WHEN IDLE
+#   - Default is "serverless" to avoid unexpected charges
 # ==============================================================================
 
 name: "Test: SageMaker Endpoint"
@@ -19,6 +23,14 @@ on:
           - deploy
           - delete
         default: status
+      mode:
+        description: 'Deploy mode (only used with deploy action)'
+        required: false
+        type: choice
+        options:
+          - serverless
+          - realtime
+        default: serverless
 
 jobs:
   test-endpoint:
@@ -67,7 +79,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-        run: python scripts/deploy_chronos_endpoint.py --action ${{ github.event.inputs.action }}
+        run: python scripts/deploy_chronos_endpoint.py --action ${{ github.event.inputs.action }} --mode ${{ github.event.inputs.mode || 'serverless' }}
 
       - name: Test sample prediction
         if: github.event.inputs.action == 'status' || github.event.inputs.action == 'deploy'
@@ -132,5 +144,6 @@ jobs:
           echo "## SageMaker Endpoint Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Action**: ${{ github.event.inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode**: ${{ github.event.inputs.mode || 'serverless' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Region**: ${{ secrets.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Endpoint**: crashlens-chronos2-endpoint" >> $GITHUB_STEP_SUMMARY

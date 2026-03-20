@@ -6,8 +6,15 @@ This script creates a SageMaker endpoint running the Chronos-2 time series
 forecasting model. The endpoint accepts JSON payloads with historical crash
 time series and returns probabilistic forecasts.
 
+Supports two deployment modes:
+  - **serverless** (default): Scales to zero when idle — no charges when not
+    in use. Pay only per-request. Recommended for batch/periodic forecast runs.
+  - **realtime**: Always-on instance — charges ~$0.23/hr even when idle.
+    Use only when continuous low-latency inference is needed.
+
 Usage:
-    python scripts/deploy_chronos_endpoint.py --action deploy
+    python scripts/deploy_chronos_endpoint.py --action deploy                    # serverless (default)
+    python scripts/deploy_chronos_endpoint.py --action deploy --mode realtime    # always-on instance
     python scripts/deploy_chronos_endpoint.py --action status
     python scripts/deploy_chronos_endpoint.py --action delete
 
@@ -54,6 +61,10 @@ INITIAL_INSTANCE_COUNT = 1
 # Chronos-2 model from HuggingFace via SageMaker JumpStart
 MODEL_ID = "pytorch-forecasting-chronos-2"
 
+# Serverless inference configuration (scales to zero when idle)
+SERVERLESS_MEMORY_SIZE_MB = 4096  # 4 GB — sufficient for Chronos-2
+SERVERLESS_MAX_CONCURRENCY = 5    # Max concurrent invocations
+
 # Timeout settings
 DEPLOY_WAIT_MINUTES = 15
 POLL_INTERVAL_SECONDS = 30
@@ -77,15 +88,22 @@ def get_boto_session():
     )
 
 
-def deploy_endpoint(session):
-    """Deploy Chronos-2 model to SageMaker endpoint."""
+def deploy_endpoint(session, mode="serverless"):
+    """Deploy Chronos-2 model to SageMaker endpoint.
+
+    Args:
+        session: boto3 Session
+        mode: 'serverless' (scales to zero, pay-per-request) or
+              'realtime' (always-on instance, charges ~$0.23/hr idle)
+    """
     region = session.region_name
     sm_client = session.client("sagemaker")
+    mode_label = "SERVERLESS (scales to zero)" if mode == "serverless" else f"REALTIME ({INSTANCE_TYPE})"
     print(f"\n{'='*60}")
     print(f"  Deploying Chronos-2 to SageMaker")
     print(f"  Region: {region}")
     print(f"  Endpoint: {ENDPOINT_NAME}")
-    print(f"  Instance: {INSTANCE_TYPE}")
+    print(f"  Mode: {mode_label}")
     print(f"{'='*60}\n")
 
     # Check if endpoint already exists
@@ -130,8 +148,77 @@ def deploy_endpoint(session):
     role_arn = get_or_create_sagemaker_role(iam_client)
     print(f"  Using execution role: {role_arn}")
 
+    # ── Serverless deployment (scales to zero — no idle charges) ──
+    if mode == "serverless":
+        return _deploy_serverless(sm_client, sm_session, role_arn)
+
+    # ── Realtime deployment (always-on instance) ──
+    return _deploy_realtime(sm_client, sm_session, role_arn)
+
+
+def _deploy_serverless(sm_client, sm_session, role_arn):
+    """Deploy Chronos-2 as a serverless endpoint (scales to zero)."""
+    from sagemaker.jumpstart.model import JumpStartModel
+    from sagemaker.serverless import ServerlessInferenceConfig
+
+    print(f"\n[1/3] Loading JumpStart model: {MODEL_ID} (serverless)...")
+    print(f"  Memory: {SERVERLESS_MEMORY_SIZE_MB} MB")
+    print(f"  Max concurrency: {SERVERLESS_MAX_CONCURRENCY}")
+
+    serverless_config = ServerlessInferenceConfig(
+        memory_size_in_mb=SERVERLESS_MEMORY_SIZE_MB,
+        max_concurrency=SERVERLESS_MAX_CONCURRENCY,
+    )
+
+    try:
+        model = JumpStartModel(
+            model_id=MODEL_ID,
+            role=role_arn,
+            sagemaker_session=sm_session,
+        )
+
+        print(f"[2/3] Deploying serverless endpoint: {ENDPOINT_NAME}...")
+        predictor = model.deploy(
+            endpoint_name=ENDPOINT_NAME,
+            serverless_inference_config=serverless_config,
+            wait=False,
+        )
+
+        print(f"[3/3] Serverless deployment initiated. Waiting for InService...")
+        return wait_for_endpoint(sm_client)
+
+    except Exception as e:
+        error_msg = str(e)
+        if "Cannot create already existing" in error_msg:
+            print(f"  Stale resource detected. Cleaning up and retrying...")
+            _cleanup_partial_deploy(sm_client)
+            time.sleep(5)
+            try:
+                model = JumpStartModel(
+                    model_id=MODEL_ID,
+                    role=role_arn,
+                    sagemaker_session=sm_session,
+                )
+                predictor = model.deploy(
+                    endpoint_name=ENDPOINT_NAME,
+                    serverless_inference_config=serverless_config,
+                    wait=False,
+                )
+                print(f"[3/3] Serverless deployment initiated. Waiting for InService...")
+                return wait_for_endpoint(sm_client)
+            except Exception as retry_e:
+                print(f"  Retry also failed: {retry_e}")
+                return False
+        else:
+            print(f"  Serverless deployment failed: {e}")
+            return False
+
+
+def _deploy_realtime(sm_client, sm_session, role_arn):
+    """Deploy Chronos-2 as a realtime endpoint (always-on instance)."""
+    from sagemaker.jumpstart.model import JumpStartModel
+
     # Build list of instance types to try
-    # If SAGEMAKER_INSTANCE_TYPE env var is set, try only that one
     if os.environ.get("SAGEMAKER_INSTANCE_TYPE"):
         instance_types_to_try = [os.environ["SAGEMAKER_INSTANCE_TYPE"]]
     else:
@@ -152,7 +239,7 @@ def deploy_endpoint(session):
             predictor = model.deploy(
                 endpoint_name=ENDPOINT_NAME,
                 initial_instance_count=INITIAL_INSTANCE_COUNT,
-                wait=False,  # Don't block — we'll poll ourselves
+                wait=False,
             )
 
             print(f"[3/3] Deployment initiated with {instance_type}. Waiting for InService...")
@@ -180,7 +267,6 @@ def deploy_endpoint(session):
                 print(f"  Stale resource detected. Cleaning up and retrying...")
                 _cleanup_partial_deploy(sm_client)
                 time.sleep(5)
-                # Retry same instance type after cleanup
                 try:
                     model = JumpStartModel(
                         model_id=MODEL_ID,
@@ -486,12 +572,19 @@ def main():
         required=True,
         help="Action to perform",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["serverless", "realtime"],
+        default="serverless",
+        help="Deployment mode: 'serverless' scales to zero (no idle charges), "
+             "'realtime' keeps an always-on instance (default: serverless)",
+    )
     args = parser.parse_args()
 
     session = get_boto_session()
 
     if args.action == "deploy":
-        success = deploy_endpoint(session)
+        success = deploy_endpoint(session, mode=args.mode)
         sys.exit(0 if success else 1)
     elif args.action == "status":
         check_status(session)
