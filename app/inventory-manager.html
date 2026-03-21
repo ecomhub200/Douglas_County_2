@@ -463,19 +463,24 @@ function updateCountyDropdown(state){
   Object.entries(imJurisdictions).forEach(([key,j])=>{
     if(j.state===state){const o=document.createElement('option');o.value=key;o.textContent=j.name||key;coSel.appendChild(o)}
   });
-  coSel.onchange=()=>{$('r2Path').textContent=$('stSel').value+'/'+$('coSel').value};
+  coSel.onchange=()=>{imR2BasePath=$('stSel').value+'/'+$('coSel').value;$('r2Path').textContent=imR2BasePath};
 }
+
+// Tier-aware R2 base path — set by parent via postMessage, falls back to state/county
+let imR2BasePath='';
 
 // Listen for messages from parent (jurisdiction sync)
 window.addEventListener('message',function(evt){
   if(!evt.data)return;
   if(evt.data.type==='im-set-jurisdictions'){populateJurisdictions(evt.data.jurisdictions)}
   if(evt.data.type==='im-set-jurisdiction'){
-    const prevKey=$('stSel').value+'/'+$('coSel').value;
+    const prevKey=imR2BasePath||($('stSel').value+'/'+$('coSel').value);
     $('stSel').value=evt.data.state;
     updateCountyDropdown(evt.data.state);
     $('coSel').value=evt.data.jurisdictionKey;
-    $('r2Path').textContent=evt.data.state+'/'+evt.data.jurisdictionKey;
+    // Use tier-aware R2 path from parent if available, else fall back to state/county
+    imR2BasePath=evt.data.r2BasePath||(evt.data.state+'/'+evt.data.jurisdictionKey);
+    $('r2Path').textContent=imR2BasePath;
     saveCfg(); // Persist parent's selection to localStorage so it overrides stale defaults
     // Update map center to jurisdiction
     if(evt.data.mapCenter&&map){
@@ -486,7 +491,7 @@ window.addEventListener('message',function(evt){
       imLoadBoundary(evt.data.fips,evt.data.stateKey||null);
     }
     // Auto-load data if jurisdiction actually changed (or first load)
-    const newKey=evt.data.state+'/'+evt.data.jurisdictionKey;
+    const newKey=imR2BasePath;
     if(newKey!==prevKey||!assets.length){loadData()}
   }
   if(evt.data.type==='im-config'){
@@ -497,10 +502,10 @@ window.addEventListener('message',function(evt){
 // ═══════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════
-function getR2Key(){return $('stSel').value+'/'+$('coSel').value+'/traffic-inventory.csv'}
-function getLedgerKey(){return $('stSel').value+'/'+$('coSel').value+'/traffic-inventory-edits.json'}
-function saveCfg(){localStorage.setItem('aim3_cfg',JSON.stringify({pub:$('pubUrl').value,state:$('stSel').value,county:$('coSel').value}))}
-function loadCfg(){try{const c=JSON.parse(localStorage.getItem('aim3_cfg')||'{}');if(c.pub){$('pubUrl').value=c.pub;r2Cfg.publicUrl=c.pub}var isEmbedded=false;try{isEmbedded=window.self!==window.top}catch(e2){isEmbedded=true}if(!isEmbedded){if(c.state)$('stSel').value=c.state;if(c.county)$('coSel').value=c.county}}catch(e){}$('r2Path').textContent=$('stSel').value+'/'+$('coSel').value}
+function getR2Key(){var base=imR2BasePath||($('stSel').value+'/'+$('coSel').value);return base+'/traffic-inventory.csv'}
+function getLedgerKey(){var base=imR2BasePath||($('stSel').value+'/'+$('coSel').value);return base+'/traffic-inventory-edits.json'}
+function saveCfg(){localStorage.setItem('aim3_cfg',JSON.stringify({pub:$('pubUrl').value,state:$('stSel').value,county:$('coSel').value,r2BasePath:imR2BasePath||''}))}
+function loadCfg(){try{const c=JSON.parse(localStorage.getItem('aim3_cfg')||'{}');if(c.pub){$('pubUrl').value=c.pub;r2Cfg.publicUrl=c.pub}var isEmbedded=false;try{isEmbedded=window.self!==window.top}catch(e2){isEmbedded=true}if(!isEmbedded){if(c.state)$('stSel').value=c.state;if(c.county)$('coSel').value=c.county;if(c.r2BasePath)imR2BasePath=c.r2BasePath}}catch(e){}if(!imR2BasePath)imR2BasePath=$('stSel').value+'/'+$('coSel').value;$('r2Path').textContent=imR2BasePath}
 
 // ═══════════════════════════════════════════════
 // LOAD DATA
