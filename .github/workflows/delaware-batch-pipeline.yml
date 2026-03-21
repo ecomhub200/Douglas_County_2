@@ -11,7 +11,7 @@
 #
 # Stage order: Download from R2 → Init Cache →
 #              Split Jurisdiction → Split Road Type → Aggregate (CSV) →
-#              Upload → Validate → Predict → Aggregate Forecasts → Manifest
+#              Upload → Predict → Aggregate Forecasts → Manifest
 #
 # This is a DUPLICATE of batch-pipeline.yml. The original is NOT modified.
 # ==============================================================================
@@ -619,4 +619,4 @@ jobs:
           echo "| Jurisdictions | ${{ needs.prepare.outputs.jurisdiction_count }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Data Source | R2: ${{ github.event.inputs.r2_data_key }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Stages | R2 Download → Init Cache → Split Jurisdiction → Split Road Type → Aggregate → Upload → Validate → Predict → Aggregate Forecasts → Manifest |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stages | R2 Download → Init Cache → Split Jurisdiction → Split Road Type → Aggregate → Upload → Predict → Aggregate Forecasts → Manifest |" >> $GITHUB_STEP_SUMMARY
