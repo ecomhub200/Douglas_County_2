@@ -53,6 +53,54 @@ CL.upload = CL.upload || {};
     }
 
     /**
+     * Build the tier-aware R2 base path (folder only, no filename).
+     * Used by iframe sync functions so child modules receive the correct
+     * R2 folder path from the parent — single source of truth.
+     *
+     * @returns {string} R2 folder path like 'virginia/henrico', 'colorado/_mpo/drcog', '_national'
+     */
+    function getR2BasePath() {
+        var tier = typeof jurisdictionContext !== 'undefined' ? jurisdictionContext.viewTier : 'county';
+        var stateKey = (typeof _getActiveStateKey === 'function') ? _getActiveStateKey() : ((typeof appConfig !== 'undefined' && appConfig && appConfig.defaultState) || 'colorado');
+        var r2Prefix = (appConfig && appConfig.states && appConfig.states[stateKey] && appConfig.states[stateKey].r2Prefix) || stateKey;
+
+        if (tier === 'federal') return '_national';
+        if (tier === 'state') return r2Prefix + '/_state';
+
+        if (tier === 'region') {
+            var regionId = jurisdictionContext.tierRegion && jurisdictionContext.tierRegion.id;
+            if (regionId) return r2Prefix + '/_region/' + regionId;
+        }
+
+        if (tier === 'mpo') {
+            var mpoId = jurisdictionContext.tierMpo && jurisdictionContext.tierMpo.id;
+            if (mpoId) return r2Prefix + '/_mpo/' + mpoId;
+        }
+
+        if (tier === 'planning_district') {
+            var pdId = jurisdictionContext.tierPlanningDistrict && jurisdictionContext.tierPlanningDistrict.id;
+            if (pdId) return r2Prefix + '/_planning_district/' + pdId.toLowerCase();
+        }
+
+        if (tier === 'city') {
+            var cityId = jurisdictionContext.tierCity && jurisdictionContext.tierCity.id;
+            if (cityId) return r2Prefix + '/_city/' + cityId.toLowerCase();
+        }
+
+        // County tier (default)
+        var jurisdiction = (typeof getActiveJurisdictionId === 'function') ? getActiveJurisdictionId() : 'douglas';
+        var r2Jurisdiction = jurisdiction;
+        var stateAbbr = appConfig && appConfig.states && appConfig.states[stateKey] && appConfig.states[stateKey].abbreviation;
+        if (stateAbbr) stateAbbr = stateAbbr.toLowerCase();
+        if (stateAbbr && jurisdiction.startsWith(stateAbbr + '_')) {
+            r2Jurisdiction = jurisdiction.substring(stateAbbr.length + 1);
+        }
+        r2Jurisdiction = r2Jurisdiction.toLowerCase();
+
+        return r2Prefix + '/' + r2Jurisdiction;
+    }
+
+    /**
      * Build the R2 data file path based on current selection (tier-aware).
      * Normalizes jurisdiction to lowercase for R2 case-sensitive paths.
      *
@@ -713,6 +761,7 @@ CL.upload = CL.upload || {};
     CL.upload = {
         // R2 Data Path Utilities
         getActiveRoadTypeSuffix: getActiveRoadTypeSuffix,
+        getR2BasePath: getR2BasePath,
         getDataFilePath: getDataFilePath,
         resolveDataUrl: resolveDataUrl,
         buildLocalFallbackPaths: buildLocalFallbackPaths,

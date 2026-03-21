@@ -3122,8 +3122,8 @@ function applyJurisdictionPreset() {
   document.getElementById('jurisdState').value = j.state;
   document.getElementById('jurisdCounty').value = j.county;
   
-  // Update R2 path
-  const path = `/${j.state}/${j.county}/`;
+  // Update R2 path — use tier-aware path from parent if available, else fall back to state/county
+  const path = j.r2BasePath ? ('/' + j.r2BasePath + '/') : `/${j.state}/${j.county}/`;
   APP.config.r2Path = path;
   document.getElementById('r2Path').value = path;
   
@@ -3304,7 +3304,9 @@ window.addEventListener('message', function(evt) {
         state: fb.state,
         county: fb.county,
         label: displayLabel,
-        bounds: fb.bounds || null
+        bounds: fb.bounds || null,
+        r2BasePath: fb.r2BasePath || null,
+        viewTier: fb.viewTier || 'county'
       };
       // Add option to dropdown if not already present
       const preset = document.getElementById('jurisdictionPreset');
@@ -3333,7 +3335,8 @@ window.addEventListener('message', function(evt) {
     if (fb && fb.state && fb.county) {
       document.getElementById('jurisdState').value = fb.state;
       document.getElementById('jurisdCounty').value = fb.county;
-      APP.config.r2Path = '/' + fb.state + '/' + fb.county + '/';
+      // Use tier-aware path from parent if available, else fall back to state/county
+      APP.config.r2Path = fb.r2BasePath ? ('/' + fb.r2BasePath + '/') : ('/' + fb.state + '/' + fb.county + '/');
       document.getElementById('r2Path').value = APP.config.r2Path;
 
       // Apply bounds if provided (optional — some jurisdictions lack bbox data)

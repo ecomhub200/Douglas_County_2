@@ -206,26 +206,22 @@ All 4 iframe modules communicate with parent via `postMessage` API. The parent s
 | Corrections Ledger | `/api/r2/worker-upload` | `{state}/{county}/corrections_ledger_{fileKey}.json` |
 | Validation Report | `/api/r2/worker-upload` | `{state}/{county}/validation_report_{fileKey}.json` |
 
-**R2 Path Construction (line 1296, 3336):**
-```javascript
-APP.config.r2Path = '/' + state + '/' + county + '/';
-```
+**R2 Path Construction:**
+- Uses `r2BasePath` from parent's `validator-set-jurisdiction` fallback when available
+- Falls back to `'/' + state + '/' + county + '/'` for legacy/standalone use
 
-**Current Tier Support:** County-only
+**Tier Support:** All tiers (via parent-provided `r2BasePath`)
 
 ### 2. Traffic Inventory (Mapillary Downloader)
 **File:** `app/traffic-inventory.html`
 **Iframe ID:** `trafficInventoryFrame`
 **Parent sync message:** `ti-set-jurisdiction`, `ti-set-jurisdictions`
 
-**R2 Key Pattern:** `{state}/{folder}/traffic-inventory.csv`
+**R2 Path Construction:**
+- Uses `getTiR2Key(jur)` helper which prefers `tiR2BasePath` from parent
+- Falls back to `{state}/{folder}/traffic-inventory.csv` for statewide batch downloads
 
-**R2 Path Construction (line 619):**
-```javascript
-const key = `${currentJurisdiction.state}/${currentJurisdiction.folder}/traffic-inventory.csv`;
-```
-
-**Current Tier Support:** County-only (`folder` is always county-level)
+**Tier Support:** All tiers (via parent-provided `r2BasePath`)
 
 ### 3. Asset Inventory Manager
 **File:** `app/inventory-manager.html`
@@ -239,12 +235,11 @@ const key = `${currentJurisdiction.state}/${currentJurisdiction.folder}/traffic-
 | Edits Ledger | `/api/r2/worker-upload` | `{state}/{county}/traffic-inventory-edits.json` |
 | Consolidation | `/api/r2/consolidate-inventory` | Statewide merge (fire-and-forget) |
 
-**R2 Path Construction (lines 466, 500-501):**
-```javascript
-function getR2Key() { return $('stSel').value + '/' + $('coSel').value + '/traffic-inventory.csv' }
-```
+**R2 Path Construction:**
+- `getR2Key()` and `getLedgerKey()` use `imR2BasePath` from parent when available
+- Falls back to `{stSel}/{coSel}/` for standalone/manual use
 
-**Current Tier Support:** County-only
+**Tier Support:** All tiers (via parent-provided `r2BasePath`)
 
 ### 4. Asset Deficiency (MUTCD Screening)
 **File:** `app/asset-deficiency.html`
@@ -257,48 +252,38 @@ function getR2Key() { return $('stSel').value + '/' + $('coSel').value + '/traff
 | Crash CSV | `{r2BaseUrl}/{r2Path}/all_roads.csv` |
 | Inventory CSV | `{r2BaseUrl}/{r2Path}/traffic-inventory.csv` |
 
-**R2 Path received from parent (index.html line 57736):**
-```javascript
-const r2Path = r2Prefix + '/' + jurisdictionId;  // Always county-level
-```
+**R2 Path received from parent:** `cfg.r2Path` from `sendConfigToAssetDeficiency()` which now calls `CL.upload.getR2BasePath()`
 
-**Current Tier Support:** Accepts whatever path parent sends (currently county-only from parent)
+**Tier Support:** All tiers (parent sends tier-aware path)
 
 ---
 
-## CRITICAL FINDING: Tier Support Gap
+## Architecture: Parent-Driven R2 Paths (Single Source of Truth)
 
-### Parent App vs Child Iframes
+### How It Works
 
-| Component | Federal | State | Region | MPO | Planning District | City | County |
-|-----------|---------|-------|--------|-----|-------------------|------|--------|
-| **Parent (upload-tab.js)** | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| **Parent (upload-pipeline.js)** | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| **Crash Validator** | No | No | No | No | No | No | **Yes** |
-| **Traffic Inventory** | No | No | No | No | No | No | **Yes** |
-| **Inventory Manager** | No | No | No | No | No | No | **Yes** |
-| **Asset Deficiency** | No | No | No | No | No | No | **Yes** |
+The parent app's `CL.upload.getR2BasePath()` (in `upload-tab.js`) is the **single source of truth** for R2 folder paths. All 4 iframe sync functions now send this tier-aware path via `r2BasePath` in their postMessage payloads.
 
-### Root Cause
+| Component | Tier Support | Mechanism |
+|-----------|-------------|-----------|
+| **Parent (upload-tab.js)** | All 7 tiers | `getR2BasePath()` reads `jurisdictionContext.viewTier` |
+| **Crash Validator** | All 7 tiers | Receives `fallback.r2BasePath` from parent, stores in `JURISDICTIONS[key].r2BasePath` |
+| **Traffic Inventory** | All 7 tiers | Receives `r2BasePath` in `ti-set-jurisdiction`, stored in `tiR2BasePath` |
+| **Inventory Manager** | All 7 tiers | Receives `r2BasePath` in `im-set-jurisdiction`, stored in `imR2BasePath` |
+| **Asset Deficiency** | All 7 tiers | Receives `r2Path` from `sendConfigToAssetDeficiency()` which calls `getR2BasePath()` |
 
-The parent app's iframe sync functions (`sendConfigToAssetDeficiency()`, `syncJurisdictionToTrafficInventory()`, `syncJurisdictionToInventoryManager()`) always send **county-level** jurisdiction info to child iframes, ignoring `jurisdictionContext.viewTier`.
+### Fallback Behavior
 
-The parent app's own data loading (`getDataFilePath()`) is fully tier-aware, but this tier awareness does NOT propagate to iframe children.
+All child modules fall back to county-level `{state}/{county}/` paths when `r2BasePath` is not provided (e.g., standalone use outside the parent app). This ensures backward compatibility.
 
-### To Fix (Future Work)
+### Key Functions
 
-1. **Parent app** — Modify iframe sync functions to include `viewTier` and construct tier-aware `r2Path` using `getDataFilePath()` logic
-2. **Each child iframe** — Accept `tier` in message payload, implement tier-aware path construction
-3. **All 4 modules** need to build paths matching:
-   ```
-   federal:            _national/
-   state:              {r2Prefix}/_state/
-   region:             {r2Prefix}/_region/{regionId}/
-   mpo:                {r2Prefix}/_mpo/{mpoId}/
-   planning_district:  {r2Prefix}/_planning_district/{pdId}/
-   city:               {r2Prefix}/_city/{cityId}/
-   county:             {r2Prefix}/{jurisdictionId}/
-   ```
+| Function | File | Purpose |
+|----------|------|---------|
+| `CL.upload.getR2BasePath()` | `app/modules/upload/upload-tab.js` | Single source of truth — returns tier-aware R2 folder path |
+| `CL.upload.getDataFilePath()` | `app/modules/upload/upload-tab.js` | Full file path (base + road type suffix + `.csv`) |
+| `getTiR2Key(jur)` | `app/traffic-inventory.html` | Uses `tiR2BasePath` or falls back to `{state}/{folder}` |
+| `getR2Key()` / `getLedgerKey()` | `app/inventory-manager.html` | Uses `imR2BasePath` or falls back to `{stSel}/{coSel}` |
 
 ---
 
