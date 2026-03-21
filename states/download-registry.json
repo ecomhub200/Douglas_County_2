@@ -128,9 +128,9 @@
     "dotDir": "data/DelawareDOT",
     "script": "data/DelawareDOT/download_delaware_crash_data.py",
     "tier": 3,
-    "requiresPlaywright": false,
+    "requiresPlaywright": true,
     "defaultJurisdiction": "statewide",
-    "scriptArgs": "--data-dir data/DelawareDOT",
+    "scriptArgs": "--data-dir data/DelawareDOT --strategy auto",
     "statewideFlagArgs": "--gzip",
     "forceFlag": "--force",
     "statewideOutputPattern": "{dotDir}/{state}_statewide_all_roads.csv",
@@ -138,7 +138,10 @@
     "needsStandardization": false,
     "needsMerge": false,
     "pipelineWorkflow": "delaware-batch-pipeline.yml",
-    "r2Prefix": "delaware"
+    "r2Prefix": "delaware",
+    "arcgisHubUrl": "https://de-firstmap-delaware.hub.arcgis.com/datasets/delaware::delaware-public-crash-data-2-0/explore",
+    "downloadStrategy": "auto",
+    "downloadStrategyNote": "Socrata API primary, Playwright ArcGIS Hub fallback (Socrata blocks from server IPs)"
   },
 
   "florida": {

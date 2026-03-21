@@ -229,7 +229,7 @@ jobs:
 
           if [ "${{ steps.registry.outputs.requires_playwright }}" = "true" ]; then
             pip install playwright
-            playwright install chromium
+            playwright install chromium --with-deps
           fi
 
       # ── Step 4: Download statewide data ──
