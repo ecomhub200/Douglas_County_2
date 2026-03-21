@@ -431,6 +431,7 @@ Skills are specialized prompt modules located in `skills/` and `.claude/skills/`
 | **supabase-cli** | `skills/supabase-cli/` | Supabase CLI for local development, database migrations, Edge Functions, auth, storage, secrets, preview branches, and project management. Based on [supabase/cli](https://github.com/supabase/cli). |
 | **stripe-cli** | `skills/stripe-cli/` | Stripe CLI for webhook testing, API request tailing, event triggering, resource CRUD, and payment flow debugging. Based on [stripe/stripe-cli](https://github.com/stripe/stripe-cli). |
 | **firebase-tools** | `skills/firebase-tools/` | Firebase CLI for deploying, emulating, and managing Firebase services (Hosting, Functions, Firestore, Auth, Database, Storage, Remote Config, Extensions). Based on [firebase/firebase-tools](https://github.com/firebase/firebase-tools). |
+| **cloudflare-r2** | `skills/cloudflare-r2/` | Cloudflare R2 object storage — Wrangler CLI commands (bucket/object CRUD, CORS, lifecycles, domains, notifications) and Workers API (R2Bucket bindings, get/put/delete/list/head, multipart uploads, conditional operations). Includes Workers API reference guide. |
 
 ### Skill File Structure
 
@@ -457,6 +458,10 @@ skills/
 │   └── SKILL.md                    # Skill definition + command reference
 ├── firebase-tools/
 │   └── SKILL.md                    # Skill definition + command reference
+├── cloudflare-r2/
+│   ├── SKILL.md                    # Skill definition + CLI + Workers API reference
+│   └── references/
+│       └── workers-api.md          # Full R2 Workers API reference with examples
 ├── excalidraw-diagram/
 │   └── SKILL.md
 └── ui-ux-pro-max/
