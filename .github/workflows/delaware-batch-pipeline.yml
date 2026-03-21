@@ -11,7 +11,7 @@
 #
 # Stage order: Download from R2 → Init Cache →
 #              Split Jurisdiction → Split Road Type → Aggregate (CSV) →
-#              Upload → Validate → Predict → Aggregate Forecasts → Manifest
+#              Upload → Predict → Aggregate Forecasts → Manifest
 #
 # This is a DUPLICATE of batch-pipeline.yml. The original is NOT modified.
 # ==============================================================================
@@ -46,12 +46,6 @@ on:
 
       skip_forecasts:
         description: 'Skip forecast generation'
-        required: false
-        default: 'false'
-        type: string
-
-      skip_validation:
-        description: 'Skip headless validation (Stage 4.5)'
         required: false
         default: 'false'
         type: string
@@ -446,76 +440,10 @@ jobs:
             done
           fi
 
-      # ── Stage 4.5: Validate & Auto-Correct (Headless) ──
-      - name: "Stage 4.5: Validate & auto-correct (headless)"
-        if: github.event.inputs.skip_validation != 'true' && github.event.inputs.dry_run != 'true'
-        timeout-minutes: 30
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-        run: |
-          STATE="${{ needs.prepare.outputs.state }}"
-          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
-          R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
-          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
-          R2_BUCKET="crash-lens-data"
-
-          echo "=========================================="
-          echo "Stage 4.5: Headless validation & auto-correct"
-          echo "=========================================="
-
-          pip install playwright --quiet 2>/dev/null
-          playwright install chromium --with-deps 2>/dev/null
-
-          python scripts/run-validator-headless.py \
-            --state "$STATE" \
-            --auto \
-            --data-dir "$DATA_DIR" \
-            --timeout 300 || {
-            echo "::warning::Stage 4.5: Validation had issues (non-fatal)"
-          }
-
-          # Re-upload corrected CSVs to R2
-          CORRECTED_COUNT=0
-          for csv_file in "$DATA_DIR"/*_all_roads.csv "$DATA_DIR"/*_county_roads.csv \
-                          "$DATA_DIR"/*_city_roads.csv "$DATA_DIR"/*_no_interstate.csv; do
-            [ -f "$csv_file" ] || continue
-            BASENAME=$(basename "$csv_file")
-            JURIS=$(echo "$BASENAME" | sed -E 's/_(all_roads|county_roads|city_roads|no_interstate)\.csv$//')
-            R2_KEY="${R2_PREFIX}/${JURIS}/${BASENAME#${JURIS}_}"
-            GZ_FILE="${csv_file}.gz"
-            gzip -c "$csv_file" > "$GZ_FILE"
-            aws s3 cp "$GZ_FILE" "s3://$R2_BUCKET/$R2_KEY" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --content-type "text/csv" \
-              --content-encoding "gzip" \
-              --only-show-errors || true
-            rm -f "$GZ_FILE"
-            CORRECTED_COUNT=$((CORRECTED_COUNT + 1))
-          done
-
-          # Upload validation reports
-          for report in "$DATA_DIR"/validation_report_*.json; do
-            [ -f "$report" ] || continue
-            BASENAME=$(basename "$report")
-            JURIS=$(echo "$BASENAME" | sed -E 's/^validation_report_//; s/_(all_roads|county_roads|city_roads|no_interstate)\.json$//')
-            R2_KEY="${R2_PREFIX}/${JURIS}/${BASENAME}"
-            aws s3 cp "$report" "s3://$R2_BUCKET/$R2_KEY" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --content-type "application/json" \
-              --only-show-errors || true
-          done
-
-          if [ -f "$DATA_DIR/validation_summary.json" ]; then
-            aws s3 cp "$DATA_DIR/validation_summary.json" \
-              "s3://$R2_BUCKET/${R2_PREFIX}/validation_summary.json" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --content-type "application/json" \
-              --only-show-errors || true
-          fi
-
-          echo "Stage 4.5 complete: re-uploaded $CORRECTED_COUNT corrected CSVs"
+      # ── Stage 4.5: REMOVED ──
+      # Headless validation (Playwright) removed from automated pipeline.
+      # Validation is available manually via the Upload Data tab in the app
+      # (crash-data-validator-v13.html). Users can trigger it on-demand.
 
       # ── Stage 5: Predict (Forecasts) ──
       - name: "Stage 5: Generate forecasts"
@@ -691,4 +619,4 @@ jobs:
           echo "| Jurisdictions | ${{ needs.prepare.outputs.jurisdiction_count }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Data Source | R2: ${{ github.event.inputs.r2_data_key }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry Run | ${{ github.event.inputs.dry_run }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Stages | R2 Download → Init Cache → Split Jurisdiction → Split Road Type → Aggregate → Upload → Validate → Predict → Aggregate Forecasts → Manifest |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stages | R2 Download → Init Cache → Split Jurisdiction → Split Road Type → Aggregate → Upload → Predict → Aggregate Forecasts → Manifest |" >> $GITHUB_STEP_SUMMARY
