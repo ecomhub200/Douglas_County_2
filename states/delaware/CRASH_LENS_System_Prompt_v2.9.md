@@ -4,9 +4,9 @@ Full Normalization, Enrichment, Ranking & Validation Pipeline
 
 Changelog v2.8 → v2.9:
 Change	Section	What
-DateTime parser fix	Phase 2 + New Section	parse_delaware_datetime() now handles 4 formats: named-month, named-month-no-time, US date (MM/DD/YYYY HH:MM:SS AM/PM), ISO 8601 — fixes 'invalid literal for int(): PM' crash
-Frontend format spec	New Section	Explicit Crash Date = M/D/YYYY, Crash Military Time = HHMM (4-digit, no colon), boolean flags = Yes/No
-Socrata CSV format	DateTime Section	Documents that Socrata CSV export returns US date format, not named-month Excel format
+Universal datetime parser	Phase 2 + New Section	parse_crash_datetime() handles 7 formats (US date, ISO 8601, named month +/- time, date-only) — state-agnostic, reusable across ALL normalizers. Fixes 'int(PM)' crash.
+Frontend format spec	New Section	Explicit Crash Date = M/D/YYYY, Crash Military Time = HHMM (4-digit, no colon), boolean flags = Yes/No — applies to ALL states
+State portal reference	DateTime Section	Documents known datetime formats per portal type (Socrata CSV/JSON/Excel, ArcGIS, CKAN, flat files)
 ---
 Changelog v2.5 → v2.6:
 Change	Section	What
@@ -148,22 +148,32 @@ The normalizer output MUST match these — any deviation breaks the frontend.
     Format: decimal float strings
 
 ═══════════════════════════════════════════════════════════════
- DATETIME PARSING (CRITICAL BUG FIX — v2.9)
+ UNIVERSAL DATETIME PARSING (CRITICAL — v2.9)
 ═══════════════════════════════════════════════════════════════
 
-PROBLEM (v2.8 and earlier):
-  The Socrata CSV export (rows.csv?accessType=DOWNLOAD) returns CRASH DATETIME in
-  US date format: "07/17/2015 03:15:00 PM" (3 space-separated tokens).
+Every state normalizer ({abbreviation}_normalize.py) MUST include a robust
+parse_crash_datetime() function that handles ALL common datetime formats
+found across US state crash data portals. This is NOT state-specific —
+the same parser works for every state.
 
-  The old parse_delaware_datetime() only handled named-month Excel format:
-  "2015 Jul 17 03:15:00 PM" (6 space-separated tokens).
+COMMON DATETIME FORMATS ACROSS STATE DOT DATA SOURCES:
+  Format 1: Named month + time     '2015 Jul 17 03:15:00 PM'    (Socrata Excel export)
+  Format 2: Named month, no time   '2015 Jul 17 PM'             (partial records)
+  Format 3: Named month, bare      '2015 Jul 17'                (no time at all)
+  Format 4: US date + time         '07/17/2015 03:15:00 PM'     (Socrata CSV export, ArcGIS)
+  Format 5: US date, no time       '07/17/2015'                 (some state portals)
+  Format 6: ISO 8601               '2015-07-17T15:15:00.000'    (CKAN, Socrata JSON API)
+  Format 7: ISO 8601, no time      '2015-07-17'                 (date-only exports)
 
-  When some rows have "2015 Jul 17 PM" (4 tokens, no time), parts[3]="PM"
-  and int("PM") crashed the entire pipeline with:
+KNOWN BUG (v2.8 and earlier):
+  Parsers that only handled Format 1 crashed on Formats 2-7.
+  Example: "2015 Jul 17 PM" → parts[3]="PM" → int("PM") → crash:
     "invalid literal for int() with base 10: 'PM'"
 
-SOLUTION (v2.9):
-  parse_delaware_datetime() MUST auto-detect and handle ALL four known formats:
+SOLUTION — UNIVERSAL PARSER (use in ALL state normalizers):
+
+  Name the function: parse_crash_datetime(raw) — state-agnostic name.
+  State-specific aliases allowed: parse_delaware_datetime = parse_crash_datetime
 
 ```python
 _MONTHS = {
@@ -172,18 +182,22 @@ _MONTHS = {
     "sep": "09", "oct": "10", "nov": "11", "dec": "12",
 }
 
-def parse_delaware_datetime(raw: str) -> tuple[str, str, str]:
-    """Parse DelDOT datetime in multiple known formats.
+def parse_crash_datetime(raw: str) -> tuple[str, str, str]:
+    """Universal crash datetime parser for all US state DOT data sources.
 
-    Supported formats (auto-detected):
-      1. Named month:   '2015 Jul 17 03:15:00 PM'  (5-6 parts)
-      2. Named month (no time): '2015 Jul 17 PM' or '2015 Jul 17' (3-4 parts)
-      3. US date:       '07/17/2015 03:15:00 PM'    (slash-separated)
-      4. ISO 8601:      '2015-07-17T15:15:00.000'   (T separator)
+    Auto-detects format and returns CrashLens frontend-compatible output.
+
+    Supported formats:
+      1. Named month + time:     '2015 Jul 17 03:15:00 PM'
+      2. Named month, no time:   '2015 Jul 17 PM' or '2015 Jul 17'
+      3. US date + time:         '07/17/2015 03:15:00 PM'
+      4. US date, no time:       '07/17/2015'
+      5. ISO 8601 + time:        '2015-07-17T15:15:00.000'
+      6. ISO 8601, date only:    '2015-07-17'
 
     Returns: (date_str, mil_time, year)
-      date_str:  "M/D/YYYY" format for frontend
-      mil_time:  "HHMM" 4-digit 24-hour for frontend
+      date_str:  "M/D/YYYY" format (frontend expected)
+      mil_time:  "HHMM" 4-digit 24-hour string (frontend expected)
       year:      "YYYY" string
     """
     if not raw or not raw.strip():
@@ -191,21 +205,26 @@ def parse_delaware_datetime(raw: str) -> tuple[str, str, str]:
 
     s = raw.strip()
 
-    # ── Format 4: ISO 8601  '2015-07-17T15:15:00.000' ──
-    if "T" in s and "-" in s.split("T")[0]:
+    # ── ISO 8601:  '2015-07-17T15:15:00.000' or '2015-07-17' ──
+    if "-" in s and (len(s) >= 10 and s[4] == "-" and s[7] == "-"):
         try:
-            date_part, time_part = s.split("T", 1)
-            yy, mm, dd = date_part.split("-")
-            t_tok = time_part.replace(".", ":").split(":")
-            hour = int(t_tok[0]) if t_tok else 0
-            minute = t_tok[1] if len(t_tok) > 1 else "00"
+            if "T" in s:
+                date_part, time_part = s.split("T", 1)
+            else:
+                date_part, time_part = s, ""
+            yy, mm, dd = date_part.split("-")[:3]
+            hour, minute = 0, "00"
+            if time_part:
+                t_tok = time_part.replace(".", ":").split(":")
+                hour = int(t_tok[0]) if t_tok else 0
+                minute = t_tok[1] if len(t_tok) > 1 else "00"
             return f"{int(mm)}/{int(dd)}/{yy}", f"{hour:02d}{minute}", yy
         except (ValueError, IndexError):
             pass
 
     parts = s.split()
 
-    # ── Format 3: US date  '07/17/2015 03:15:00 PM' ──
+    # ── US date:  '07/17/2015 03:15:00 PM' or '07/17/2015' ──
     if parts and "/" in parts[0]:
         try:
             date_tok = parts[0].split("/")
@@ -224,7 +243,7 @@ def parse_delaware_datetime(raw: str) -> tuple[str, str, str]:
         except (ValueError, IndexError):
             pass
 
-    # ── Formats 1 & 2: Named month  '2015 Jul 17 03:15:00 PM' ──
+    # ── Named month:  '2015 Jul 17 03:15:00 PM' or '2015 Jul 17' ──
     if len(parts) < 3:
         return s, "", ""
 
@@ -235,7 +254,7 @@ def parse_delaware_datetime(raw: str) -> tuple[str, str, str]:
     hour, minute, ampm = 0, "00", ""
 
     if len(parts) >= 4 and ":" in parts[3]:
-        # Format 1: has time component  '2015 Jul 17 03:15:00 PM'
+        # Has time component:  '2015 Jul 17 03:15:00 PM'
         t_parts = parts[3].split(":")
         try:
             hour = int(t_parts[0])
@@ -244,7 +263,7 @@ def parse_delaware_datetime(raw: str) -> tuple[str, str, str]:
         minute = t_parts[1] if len(t_parts) > 1 else "00"
         ampm = parts[4].upper() if len(parts) > 4 else ""
     elif len(parts) >= 4 and parts[3].upper() in ("AM", "PM"):
-        # Format 2: no time, just AM/PM marker  '2015 Jul 17 PM'
+        # No time, just AM/PM marker:  '2015 Jul 17 PM'
         ampm = parts[3].upper()
 
     if ampm == "PM" and hour < 12:
@@ -257,34 +276,39 @@ def parse_delaware_datetime(raw: str) -> tuple[str, str, str]:
     return date_str, mil_time, year
 ```
 
+USAGE IN STATE NORMALIZERS:
+  Every {abbreviation}_normalize.py should use this parser in Phase 2:
+```python
+# In apply_value_transforms():
+if "Crash Date" in df.columns:
+    parsed = df["Crash Date"].fillna("").apply(parse_crash_datetime)
+    df["Crash Date"]          = parsed.apply(lambda t: t[0])
+    df["Crash Military Time"] = parsed.apply(lambda t: t[1])
+    year_from_dt = parsed.apply(lambda t: t[2])
+    mask_no_year = df["Crash Year"].fillna("").str.strip() == ""
+    df.loc[mask_no_year, "Crash Year"] = year_from_dt[mask_no_year]
+```
+
 TEST CASES (all must pass — include in any regenerated normalizer):
   ('2015 Jul 17 03:15:00 PM', ('7/17/2015', '1515', '2015'))  ← Named month + time
   ('2015 Jul 17 PM',          ('7/17/2015', '1200', '2015'))  ← Named month, no time
   ('2015 Jul 17',             ('7/17/2015', '0000', '2015'))  ← Named month, no AM/PM
-  ('07/17/2015 03:15:00 PM',  ('7/17/2015', '1515', '2015'))  ← US date (Socrata CSV)
+  ('07/17/2015 03:15:00 PM',  ('7/17/2015', '1515', '2015'))  ← US date (Socrata/ArcGIS)
   ('07/17/2015 12:00:00 AM',  ('7/17/2015', '0000', '2015'))  ← US date midnight
-  ('2015-07-17T15:15:00.000', ('7/17/2015', '1515', '2015'))  ← ISO 8601
+  ('07/17/2015',              ('7/17/2015', '0000', '2015'))  ← US date only
+  ('2015-07-17T15:15:00.000', ('7/17/2015', '1515', '2015'))  ← ISO 8601 with time
+  ('2015-07-17',              ('7/17/2015', '0000', '2015'))  ← ISO 8601 date only
   ('',                        ('', '', ''))                    ← Empty
   ('2012 Apr 29 05:32:00 PM', ('4/29/2012', '1732', '2012'))  ← Another named month
   ('01/15/2023 08:30:00 AM',  ('1/15/2023', '0830', '2023'))  ← US date morning
 
-DELAWARE SOCRATA SOURCE COLUMNS (40 columns from CSV export):
-  CRASH DATETIME, DAY OF WEEK CODE, DAY OF WEEK DESCRIPTION,
-  CRASH CLASSIFICATION CODE, CRASH CLASSIFICATION DESCRIPTION,
-  COLLISION ON PRIVATE PROPERTY, PEDESTRIAN INVOLVED,
-  MANNER OF IMPACT CODE, MANNER OF IMPACT DESCRIPTION,
-  ALCOHOL INVOLVED, DRUG INVOLVED,
-  ROAD SURFACE CODE, ROAD SURFACE DESCRIPTION,
-  LIGHTING CONDITION CODE, LIGHTING CONDITION DESCRIPTION,
-  WEATHER 1 CODE, WEATHER 1 DESCRIPTION, WEATHER 2 CODE, WEATHER 2 DESCRIPTION,
-  SEATBELT USED, MOTORCYCLE INVOLVED, MOTORCYCLE HELMET USED,
-  BICYCLED INVOLVED, BICYCLE HELMET USED,
-  LATITUDE, LONGITUDE,
-  PRIMARY CONTRIBUTING CIRCUMSTANCE CODE, PRIMARY CONTRIBUTING CIRCUMSTANCE DESCRIPTION,
-  SCHOOL BUS INVOLVED CODE, SCHOOL BUS INVOLVED DESCRIPTION,
-  WORK ZONE, WORK ZONE LOCATION CODE, WORK ZONE LOCATION DESCRIPTION,
-  WORK ZONE TYPE CODE, WORK ZONE TYPE DESCRIPTION, WORKERS PRESENT,
-  the_geom, COUNTY CODE, COUNTY NAME, YEAR
+STATE DATA SOURCE REFERENCE (known datetime formats per portal type):
+  Socrata CSV export:   US date format — "07/17/2015 03:15:00 PM"
+  Socrata JSON API:     ISO 8601 — "2015-07-17T15:15:00.000"
+  Socrata Excel export: Named month — "2015 Jul 17 03:15:00 PM"
+  ArcGIS FeatureServer: US date or epoch milliseconds
+  CKAN API:             ISO 8601
+  State DOT flat files: Varies widely — check sample data
 
 ═══════════════════════════════════════════════════════════════
  LOCAL SETUP & RUNNING GUIDE (Include with EVERY delivery)
