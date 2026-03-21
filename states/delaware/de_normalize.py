@@ -340,21 +340,74 @@ _MONTHS = {
 
 
 def parse_delaware_datetime(raw: str) -> tuple[str, str, str]:
-    """Parse DelDOT datetime: '2015 Jul 17 03:15:00 PM'"""
+    """Parse DelDOT datetime in multiple known formats.
+
+    Supported formats (auto-detected):
+      1. Named month:   '2015 Jul 17 03:15:00 PM'  (5-6 parts)
+      2. Named month (no time): '2015 Jul 17 PM' or '2015 Jul 17' (3-4 parts)
+      3. US date:       '07/17/2015 03:15:00 PM'    (slash-separated)
+      4. ISO 8601:      '2015-07-17T15:15:00.000'   (T separator)
+    """
     if not raw or not raw.strip():
         return "", "", ""
 
-    parts = raw.strip().split()
-    if len(parts) < 4:
-        return raw, "", ""
+    s = raw.strip()
 
-    year    = parts[0]
-    mon     = _MONTHS.get(parts[1].lower(), "01")
-    day     = parts[2]
-    t_parts = parts[3].split(":")
-    hour    = int(t_parts[0]) if t_parts else 0
-    minute  = t_parts[1] if len(t_parts) > 1 else "00"
-    ampm    = parts[4].upper() if len(parts) > 4 else ""
+    # ── Format 4: ISO 8601  '2015-07-17T15:15:00.000' ──
+    if "T" in s and "-" in s.split("T")[0]:
+        try:
+            date_part, time_part = s.split("T", 1)
+            yy, mm, dd = date_part.split("-")
+            t_tok = time_part.replace(".", ":").split(":")
+            hour = int(t_tok[0]) if t_tok else 0
+            minute = t_tok[1] if len(t_tok) > 1 else "00"
+            return f"{int(mm)}/{int(dd)}/{yy}", f"{hour:02d}{minute}", yy
+        except (ValueError, IndexError):
+            pass
+
+    parts = s.split()
+
+    # ── Format 3: US date  '07/17/2015 03:15:00 PM' ──
+    if parts and "/" in parts[0]:
+        try:
+            date_tok = parts[0].split("/")
+            mm, dd, yy = date_tok[0], date_tok[1], date_tok[2]
+            hour, minute = 0, "00"
+            if len(parts) >= 2 and ":" in parts[1]:
+                t_tok = parts[1].split(":")
+                hour = int(t_tok[0])
+                minute = t_tok[1] if len(t_tok) > 1 else "00"
+                ampm = parts[2].upper() if len(parts) > 2 else ""
+                if ampm == "PM" and hour < 12:
+                    hour += 12
+                elif ampm == "AM" and hour == 12:
+                    hour = 0
+            return f"{int(mm)}/{int(dd)}/{yy}", f"{hour:02d}{minute}", yy
+        except (ValueError, IndexError):
+            pass
+
+    # ── Formats 1 & 2: Named month  '2015 Jul 17 03:15:00 PM' ──
+    if len(parts) < 3:
+        return s, "", ""
+
+    year = parts[0]
+    mon  = _MONTHS.get(parts[1].lower(), "01")
+    day  = parts[2]
+
+    hour, minute, ampm = 0, "00", ""
+
+    if len(parts) >= 4 and ":" in parts[3]:
+        # Format 1: has time component  '2015 Jul 17 03:15:00 PM'
+        t_parts = parts[3].split(":")
+        try:
+            hour = int(t_parts[0])
+        except ValueError:
+            hour = 0
+        minute = t_parts[1] if len(t_parts) > 1 else "00"
+        ampm = parts[4].upper() if len(parts) > 4 else ""
+    elif len(parts) >= 4 and parts[3].upper() in ("AM", "PM"):
+        # Format 2: no time, just AM/PM marker  '2015 Jul 17 PM'
+        ampm = parts[3].upper()
 
     if ampm == "PM" and hour < 12:
         hour += 12
