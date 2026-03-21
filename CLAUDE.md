@@ -412,3 +412,71 @@ When adding a new state:
 | Delaware | `data/DelawareDOT/delaware_dot_data_config_and_onboarding.md` |
 
 Update this table as new states are onboarded.
+
+---
+
+## Available Skills
+
+Skills are specialized prompt modules located in `skills/` and `.claude/skills/` that provide domain-specific guidance and command references. Each skill contains a `SKILL.md` with YAML frontmatter (`name`, `description`) and detailed instructions.
+
+### Skill Registry
+
+| Skill | Location | Purpose |
+|-------|----------|---------|
+| **state-data-onboarding** | `.claude/skills/state-data-onboarding/` | CrashLens state crash data normalization, onboarding, and validation engine. The primary skill for adding new U.S. state crash data. |
+| **excalidraw-diagram** | `skills/excalidraw-diagram/` | Generate Excalidraw diagram JSON files for system architecture and workflow visualizations. |
+| **ui-ux-pro-max** | `skills/ui-ux-pro-max/` | UI/UX design intelligence with 50+ styles, 97 color palettes, 57 font pairings, and 9 tech stacks. |
+| **playwright-cli** | `skills/playwright-cli/` | Browser automation via [microsoft/playwright-cli](https://github.com/microsoft/playwright-cli). 60+ commands for navigation, interaction, screenshots, network mocking, tracing, and session management. Includes 7 reference guides. |
+| **opencli** | `skills/opencli/` | Universal CLI for websites and Electron apps via [jackwener/opencli](https://github.com/jackwener/opencli). 150+ commands across 30+ platforms (Twitter, Reddit, Bilibili, YouTube, etc.). Supports YAML/TS adapters with 5-tier authentication. Includes CLI-ONESHOT and CLI-EXPLORER reference guides. |
+| **supabase-cli** | `skills/supabase-cli/` | Supabase CLI for local development, database migrations, Edge Functions, auth, storage, secrets, preview branches, and project management. Based on [supabase/cli](https://github.com/supabase/cli). |
+| **stripe-cli** | `skills/stripe-cli/` | Stripe CLI for webhook testing, API request tailing, event triggering, resource CRUD, and payment flow debugging. Based on [stripe/stripe-cli](https://github.com/stripe/stripe-cli). |
+| **firebase-tools** | `skills/firebase-tools/` | Firebase CLI for deploying, emulating, and managing Firebase services (Hosting, Functions, Firestore, Auth, Database, Storage, Remote Config, Extensions). Based on [firebase/firebase-tools](https://github.com/firebase/firebase-tools). |
+
+### Skill File Structure
+
+```
+skills/
+├── playwright-cli/
+│   ├── SKILL.md                    # Skill definition + full command reference
+│   └── references/                 # Detailed guides
+│       ├── request-mocking.md
+│       ├── running-code.md
+│       ├── session-management.md
+│       ├── storage-state.md
+│       ├── test-generation.md
+│       ├── tracing.md
+│       └── video-recording.md
+├── opencli/
+│   ├── SKILL.md                    # Skill definition + command reference
+│   └── references/
+│       ├── CLI-ONESHOT.md          # Quick single-command adapter generation
+│       └── CLI-EXPLORER.md         # Full adapter exploration guide
+├── supabase-cli/
+│   └── SKILL.md                    # Skill definition + command reference
+├── stripe-cli/
+│   └── SKILL.md                    # Skill definition + command reference
+├── firebase-tools/
+│   └── SKILL.md                    # Skill definition + command reference
+├── excalidraw-diagram/
+│   └── SKILL.md
+└── ui-ux-pro-max/
+    └── SKILL.md
+
+.claude/skills/
+└── state-data-onboarding/
+    └── SKILL.md                    # Registered Claude Code skill (active)
+```
+
+### Adding New Skills
+
+1. Create a directory under `skills/<skill-name>/`
+2. Add a `SKILL.md` with YAML frontmatter:
+   ```yaml
+   ---
+   name: skill-name
+   description: "Concise description. Actions: X, Y, Z. Triggers: keyword1, keyword2..."
+   ---
+   ```
+3. Add detailed instructions and command references in the markdown body
+4. Optionally add a `references/` directory for supplementary guides
+5. To register with Claude Code, copy or symlink to `.claude/skills/<skill-name>/`
