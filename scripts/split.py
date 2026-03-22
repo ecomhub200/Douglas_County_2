@@ -17,7 +17,7 @@ It is UNIVERSAL — the same split.py works for every state because:
   1. Every state's normalize.py maps to the same 69-column standard schema
   2. Functional Class always uses the same 7 standard values post-normalization
   3. Ownership always uses the same 6 standard values post-normalization
-  4. Jurisdiction columns (VDOT District, MPO Name, Planning District) are
+  4. Jurisdiction columns (DOT District, MPO Name, Planning District) are
      populated by normalize.py / geo_resolver.py for all states
 
 R2 OUTPUT STRUCTURE (mirrors create_r2_folders.py exactly)
@@ -71,9 +71,9 @@ TWO ROAD TYPE SETS — matching frontend getActiveRoadTypeSuffix()
 
 TWO JURISDICTION SPLIT STRATEGIES — auto-detected per tier
 -----------------------------------------------------------
-  STRATEGY A (column): groupby on existing VDOT District / MPO Name /
+  STRATEGY A (column): groupby on existing DOT District / MPO Name /
                        Planning District column. Used when column is
-                       >= 10% populated. Works for VDOT + enriched states.
+                       >= 10% populated. Works for DOT + enriched states.
 
   STRATEGY B (hierarchy): filter by county membership from hierarchy.json.
                           Used when jurisdiction columns are empty. Works
@@ -424,19 +424,19 @@ def split_region_level(
     """
     Write _region/{region_id}/ files. Uses ROAD_TYPES_STATE_REGION (SET A).
 
-    Strategy A (column): groups by "VDOT District" column values.
+    Strategy A (column): groups by "DOT District" column values.
       - Virginia: "1. Bristol", "2. Salem", ..., "9. Northern Virginia"
       - Other enriched states: DOT district names from geo_resolver
 
     Strategy B (hierarchy): reads hierarchy["regions"], maps region FIPS
       lists to county names, filters df by Physical Juris Name membership.
     """
-    strategy = detect_strategy(df, "VDOT District")
+    strategy = detect_strategy(df, "DOT District")
     print(f"\n  [REGION] Strategy: {strategy.upper()}")
     all_counts: Dict[str, Dict[str, int]] = {}
 
     if strategy == "column":
-        groups = df[df["VDOT District"].fillna("").str.strip() != ""].groupby("VDOT District")
+        groups = df[df["DOT District"].fillna("").str.strip() != ""].groupby("DOT District")
         for region_name, region_df in groups:
             region_key = name_to_r2_key(str(region_name))
             if not region_key:
@@ -907,7 +907,7 @@ def split(
 
     # Detect strategies upfront (for manifest and logging)
     strategies = {
-        "region":            detect_strategy(df, "VDOT District"),
+        "region":            detect_strategy(df, "DOT District"),
         "mpo":               detect_strategy(df, "MPO Name"),
         "planning_district": detect_strategy(df, "Planning District"),
     }
@@ -979,7 +979,7 @@ Road type sets produced:
   Local tiers:  all_roads | county_roads | city_roads | no_interstate
 
 Split strategy per tier (auto-detected):
-  COLUMN    - direct groupby on VDOT District / MPO Name / Planning District
+  COLUMN    - direct groupby on DOT District / MPO Name / Planning District
   HIERARCHY - fallback using hierarchy.json county membership maps
 
 Examples:

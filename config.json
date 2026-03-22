@@ -4566,18 +4566,16 @@
       "name": "County Roads Only",
       "description": "County-maintained roads only",
       "systemValues": [
-        "NonVDOT secondary",
-        "NONVDOT",
-        "Non-VDOT"
+        "Non-DOT secondary",
+        "Non-DOT"
       ]
     },
     "countyPlusVDOT": {
       "name": "All Roads (No Interstate)",
-      "description": "Local roads plus VDOT primary/secondary, excluding interstates",
+      "description": "Local roads plus DOT primary/secondary, excluding interstates",
       "systemValues": [
-        "NonVDOT secondary",
-        "NONVDOT",
-        "Non-VDOT",
+        "Non-DOT secondary",
+        "Non-DOT",
         "Primary",
         "Secondary"
       ],
@@ -4597,9 +4595,8 @@
       "name": "All Roads (Including Interstate)",
       "description": "All road types including interstates",
       "systemValues": [
-        "NonVDOT secondary",
-        "NONVDOT",
-        "Non-VDOT",
+        "Non-DOT secondary",
+        "Non-DOT",
         "Primary",
         "Secondary",
         "Interstate"

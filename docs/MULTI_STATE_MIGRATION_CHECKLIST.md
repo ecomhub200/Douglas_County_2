@@ -40,7 +40,7 @@ const COL = {
   NODE: 'Node',                 // Virginia node ID system
   MP: 'RNS MP',                 // Virginia milepost reference
   JURISDICTION: 'Physical Juris Name',
-  ROAD_SYSTEM: 'SYSTEM',        // VDOT/NonVDOT
+  ROAD_SYSTEM: 'SYSTEM',        // DOT/Non-DOT
   LAT: 'LATITUDE',
   LON: 'LONGITUDE',
   // ... 40+ total columns
@@ -209,8 +209,8 @@ const COL = {
 **Virginia System:**
 ```json
 "roadSystems": {
-  "NonVDOT secondary": { "includeInCountyFilter": true },
-  "NONVDOT": { "includeInCountyFilter": true },
+  "Non-DOT secondary": { "includeInCountyFilter": true },
+  "Non-DOT": { "includeInCountyFilter": true },
   "Primary": { "isVDOT": true },
   "Secondary": { "isVDOT": true },
   "Interstate": { "isInterstate": true }
@@ -229,9 +229,9 @@ const COL = {
 **Colorado Example:**
 | Virginia | Colorado Equivalent |
 |----------|---------------------|
-| VDOT Primary | CDOT State Highway |
-| VDOT Secondary | CDOT Secondary |
-| NonVDOT | Local/County Roads |
+| DOT Primary | CDOT State Highway |
+| DOT Secondary | CDOT Secondary |
+| Non-DOT | Local/County Roads |
 | Interstate | Interstate (same) |
 
 ---
@@ -705,8 +705,8 @@ Consider:
 
 | Virginia Value | Colorado Value | Filter Category |
 |---------------|----------------|-----------------|
-| NonVDOT secondary | City Street | Local (countyOnly) |
-| NONVDOT | County Road | Local (countyOnly) |
+| Non-DOT secondary | City Street | Local (countyOnly) |
+| Non-DOT | County Road | Local (countyOnly) |
 | Primary | State Highway | State (countyPlusState) |
 | Secondary | Frontage Road | State (countyPlusState) |
 | Interstate | Interstate Highway | Interstate (allRoads) |

@@ -74,7 +74,7 @@ GOLDEN_COLUMNS = [
     "Drug Related?", "Guardrail Related?", "Hitrun?", "Lgtruck?", "Motorcycle?", "Pedestrian?",
     "Speed?", "Max Speed Diff", "RoadDeparture Type", "Intersection Analysis",
     "Senior?", "Young?", "Mainline?", "Night?",
-    "VDOT District", "Juris Code", "Physical Juris Name", "Functional Class",
+    "DOT District", "Juris Code", "Physical Juris Name", "Functional Class",
     "Facility Type", "Area Type", "SYSTEM", "VSP", "Ownership",
     "Planning District", "MPO Name", "RTE Name", "RNS MP", "Node", "Node Offset (ft)",
     "x", "y",
@@ -494,7 +494,7 @@ def resolve_fips(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         geo = DE_COUNTIES.get(juris, {})
         row["FIPS"]              = geo.get("fips", "")
         row["Place FIPS"]        = ""
-        row["VDOT District"]     = geo.get("district", "")
+        row["DOT District"]      = geo.get("district", "")
         row["Planning District"] = geo.get("district", "")
         row["MPO Name"]          = geo.get("mpo", "")
         row["Area Type"]         = geo.get("area_type", "Rural")   # Phase 3 hardcoded — not Tier 2
@@ -569,7 +569,7 @@ def compute_rankings(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         if key not in metrics:
             metrics[key] = {
                 "juris":  juris, "fips": fips,
-                "district": str(row.get("VDOT District", "") or ""),
+                "district": str(row.get("DOT District", "") or ""),
                 "mpo":    str(row.get("MPO Name", "") or ""),
                 "pd":     str(row.get("Planning District", "") or ""),
                 "total_crash": 0, "total_ped_crash": 0, "total_bike_crash": 0,

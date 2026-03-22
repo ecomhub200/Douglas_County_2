@@ -114,7 +114,7 @@ COUNTY CODE, COUNTY NAME, YEAR
 | 50 | Young? | — | MISSING | `"No"` |
 | 51 | Mainline? | — | MISSING | `"No"` |
 | 52 | Night? | LIGHTING CONDITION CODE | COMPUTED | Codes 04,05,06 → `"Yes"`, else `"No"` |
-| 53 | VDOT District | — | COMPUTED | → `"DelDOT"` (state has no district equiv) |
+| 53 | DOT District | — | COMPUTED | → `"DelDOT"` (state has no district equiv) |
 | 54 | Juris Code | COUNTY CODE | VALUE_MAP | See §4 jurisdiction map |
 | 55 | Physical Juris Name | COUNTY CODE + COUNTY NAME | VALUE_MAP | See §4 jurisdiction map |
 | 56 | Functional Class | — | MISSING | `"7-Local (J,6)"` (default; **CRITICAL GAP**) |

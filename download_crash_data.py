@@ -712,8 +712,8 @@ def standardize_columns(df):
         'Planning_District': 'Planning District',
         'MPO_NAME': 'MPO Name',
         'MPO_Name': 'MPO Name',
-        'VDOT_DISTRICT': 'VDOT District',
-        'VDOT_District': 'VDOT District',
+        'VDOT_DISTRICT': 'DOT District',
+        'VDOT_District': 'DOT District',
 
         # Route/location
         'RTE_NM': 'RTE Name',
@@ -822,12 +822,12 @@ def standardize_columns(df):
 
     # ── SYSTEM ──
     _decode_column('SYSTEM', {
-        '1': 'VDOT Interstate',
-        '2': 'VDOT Primary',
-        '3': 'VDOT Secondary',
-        '4': 'NonVDOT primary',
-        '5': 'NonVDOT secondary',
-    }, skip_if_contains='VDOT')
+        '1': 'DOT Interstate',
+        '2': 'DOT Primary',
+        '3': 'DOT Secondary',
+        '4': 'Non-DOT primary',
+        '5': 'Non-DOT secondary',
+    }, skip_if_contains='DOT')
 
     # ── Functional Class ──
     _decode_column('Functional Class', {
@@ -1109,8 +1109,8 @@ def standardize_columns(df):
         '99': 'Not Applicable',
     }, skip_if_contains='On Roadway')
 
-    # ── VDOT District ──
-    _decode_column('VDOT District', {
+    # ── DOT District ──
+    _decode_column('DOT District', {
         '1': '1. Bristol',
         '2': '2. Salem',
         '3': '3. Lynchburg',
@@ -1361,7 +1361,7 @@ def standardize_columns(df):
     _decode_column('Intersection Analysis', {
         '0': 'Not Intersection',
         '1': 'Urban Intersection',
-        '2': 'VDOT Intersection',
+        '2': 'DOT Intersection',
     }, skip_if_contains='Intersection')
 
     # ── Work Zone Location ──

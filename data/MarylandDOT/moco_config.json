@@ -145,10 +145,10 @@
     "US (State)": "Primary",
     "Maryland (State)": "Primary",
     "State Route": "Primary",
-    "County": "NonVDOT secondary",
-    "Municipality": "NonVDOT secondary",
-    "Other Public Roadway": "NonVDOT secondary",
-    "Government": "NonVDOT secondary",
+    "County": "Non-DOT secondary",
+    "Municipality": "Non-DOT secondary",
+    "Other Public Roadway": "Non-DOT secondary",
+    "Government": "Non-DOT secondary",
     "Service Road": "Secondary",
     "Ramp": "Secondary"
   }

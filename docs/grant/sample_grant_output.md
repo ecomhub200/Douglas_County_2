@@ -142,7 +142,7 @@ When compared to similar signalized intersections within Henrico County and stat
 **Cross Street:** Glenside Drive (Route 1540)  
 **GPS Coordinates:** 37.6215° N, 77.5089° W  
 **Congressional District:** Virginia 1st  
-**VDOT District:** Richmond  
+**DOT District:** Richmond  
 **MPO:** Richmond Regional Transportation Planning Organization (RRTPO)
 
 [MAP: Location map showing intersection with crash locations plotted]

@@ -20,7 +20,7 @@ Filtering logic per state:
     no_interstate  -> _co_system_code != "Interstate Highway" OR SYSTEM != "Interstate"
 
   Virginia (standardized):
-    county_roads   -> SYSTEM in {NonVDOT secondary, NONVDOT, Non-VDOT}
+    county_roads   -> SYSTEM in {Non-DOT secondary, Non-DOT}
     no_interstate  -> SYSTEM != "Interstate"
 
 Usage:
@@ -47,7 +47,7 @@ COUNTY_AGENCY_MAP = {
 }
 
 # Virginia county road system values
-VIRGINIA_COUNTY_SYSTEMS = {'NonVDOT secondary', 'NONVDOT', 'Non-VDOT'}
+VIRGINIA_COUNTY_SYSTEMS = {'Non-DOT secondary', 'Non-DOT'}
 
 
 def detect_format(headers):

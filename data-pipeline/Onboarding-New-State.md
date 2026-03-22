@@ -107,7 +107,7 @@ This is the most critical file. Every pipeline script reads it. Copy the structu
         "isStateDOT": false,
         "isInterstate": false,
         "displayName": "Local Road",
-        "standardizedSystem": "NonVDOT secondary | Primary | Secondary | Interstate"
+        "standardizedSystem": "Non-DOT secondary | Primary | Secondary | Interstate"
       }
     },
     "splitConfig": {
@@ -184,14 +184,14 @@ This is the most critical file. Every pipeline script reads it. Copy the structu
 - `"injury_hierarchy"` — Colorado pattern: multiple injury count columns (Injury 04=K, Injury 03=A, etc.), derive highest severity
 - `"report_type_map"` — Maryland pattern: map report types like "Fatal Crash" → K, "Injury Crash" → B, "Property Damage Crash" → O
 
-**Road systems**: Look at the raw data's road classification columns. Map each unique value to one of the 3 standardized categories: `"NonVDOT secondary"` (local), `"Primary"` or `"Secondary"` (state), `"Interstate"`.
+**Road systems**: Look at the raw data's road classification columns. Map each unique value to one of the 3 standardized categories: `"Non-DOT secondary"` (local), `"Primary"` or `"Secondary"` (state), `"Interstate"`.
 
 **splitConfig** (CRITICAL — determines how `county_roads.csv` and `no_interstate.csv` are produced):
 
 1. Open a sample CSV in a spreadsheet. Filter to one jurisdiction. Confirm you see ALL road types (Interstate, State, County, City).
 2. **For county_roads**: Find the column that best identifies county/locally-owned roads:
    - **Ownership column** (e.g., "2. County Hwy Agency") → use `method: "ownership"`. This is the most accurate when available (Virginia pattern).
-   - **SYSTEM column** (e.g., "NonVDOT secondary") → use `method: "system_column"`. Simpler but may not perfectly match ownership semantics.
+   - **SYSTEM column** (e.g., "Non-DOT secondary") → use `method: "system_column"`. Simpler but may not perfectly match ownership semantics.
    - **Agency ID column** (e.g., "DSO" for Douglas Sheriff's Office) → use `method: "agency_id"` with an `agencyMap` (Colorado pattern).
 3. **For interstate exclusion**: Find the column that identifies Interstate roads:
    - **Functional Class column** (e.g., "1-Interstate (A,1)") → use `method: "functional_class"`. Most precise for excluding interstates (Virginia pattern).
@@ -218,7 +218,7 @@ This is the most critical file. Every pipeline script reads it. Copy the structu
 |---------|---------------|--------------------|-----------------------------|
 | Ownership + Functional Class | Virginia (`states/virginia/config.json`) | `ownership` on `Ownership` column, value `"2. County Hwy Agency"` | `functional_class` on `Functional Class` column, exclude `"1-Interstate (A,1)"` |
 | Agency ID + System Code | Colorado (`states/colorado/config.json`) | `agency_id` on `_co_agency_id` column with `agencyMap` per jurisdiction | `column_value` on `_co_system_code` column, exclude `"Interstate Highway"` |
-| SYSTEM column (simple) | Default fallback | `system_column` on `SYSTEM` column, include `["NonVDOT secondary"]` | `system_column` on `SYSTEM` column, exclude `["Interstate"]` |
+| SYSTEM column (simple) | Default fallback | `system_column` on `SYSTEM` column, include `["Non-DOT secondary"]` | `system_column` on `SYSTEM` column, exclude `["Interstate"]` |
 
 **When in doubt**: Use the Ownership-based approach if the state's data has an Ownership column. It is the most semantically accurate for identifying county-owned roads. If not available, use the SYSTEM column approach but **always validate against manually filtered reference data**.
 
@@ -368,7 +368,7 @@ class {State}Normalizer(BaseNormalizer):
         # --- Route & Location ---
         n['RTE Name'] = row.get('{route_column}', '').strip()
         n['SYSTEM'] = self.ROAD_SYSTEM_MAP.get(
-            row.get('{system_column}', '').strip(), 'NonVDOT secondary')
+            row.get('{system_column}', '').strip(), 'Non-DOT secondary')
         n['Node'] = ''  # Build intersection node ID if data supports it
 
         # --- Coordinates (CRITICAL: x=longitude, y=latitude) ---

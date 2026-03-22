@@ -535,7 +535,7 @@ crash-lens-data/
   virginia/                                    # 133 jurisdictions
     _state/
       dot_roads.csv                            #   VDOT-maintained roads statewide
-      non_dot_roads.csv                        #   Non-VDOT roads statewide
+      non_dot_roads.csv                        #   Non-DOT roads statewide
       statewide_all_roads.csv                  #   All roads combined
       forecasts_dot_roads.json
       forecasts_non_dot_roads.json

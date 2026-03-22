@@ -84,7 +84,7 @@ Example: "Enhancing Pedestrian Safety at Broad Street and Glenside Drive through
 - Cross Street(s): [Names]
 - GPS Coordinates: [Lat, Long]
 - Congressional District: [Number]
-- VDOT District: [Name]
+- DOT District: [Name]
 - MPO/PDC: [Name]
 ```
 

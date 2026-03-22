@@ -276,7 +276,7 @@ def normalize_delaware(input_path, output_path):
         "Senior?": "No",
         "Young?": "No",
         "Mainline?": "No",
-        "VDOT District": "",
+        "DOT District": "",
         "Functional Class": "",     # CRITICAL GAP - must be filled externally
         "Facility Type": "",
         "Area Type": "",
@@ -308,7 +308,7 @@ def normalize_delaware(input_path, output_path):
         "Drug Related?", "Guardrail Related?", "Hitrun?", "Lgtruck?", "Motorcycle?", "Pedestrian?",
         "Speed?", "Max Speed Diff", "RoadDeparture Type", "Intersection Analysis",
         "Senior?", "Young?", "Mainline?", "Night?",
-        "VDOT District", "Juris Code", "Physical Juris Name",
+        "DOT District", "Juris Code", "Physical Juris Name",
         "Functional Class", "Facility Type", "Area Type", "SYSTEM", "VSP", "Ownership",
         "Planning District", "MPO Name", "RTE Name", "RNS MP", "Node", "Node Offset (ft)",
         "x", "y",

@@ -144,7 +144,7 @@ These 20 jurisdictions are NOT assigned to any VDOT Construction District region
 - 775 Salem City → Salem
 - 840 Winchester City → Staunton
 
-**Cross-reference with uploaded VDOT reference data** to verify each assignment. The file has a `VDOT District` column for every jurisdiction.
+**Cross-reference with uploaded VDOT reference data** to verify each assignment. The file has a `DOT District` column for every jurisdiction.
 
 #### 1D. Add Towns to Virginia (Nested Under Parent County)
 

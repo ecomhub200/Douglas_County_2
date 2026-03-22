@@ -438,7 +438,7 @@ Using the clean lookup table from Phase 0, add **5 columns** to each crash row.
 | `Place FIPS` | TIGERweb place_fips (5-digit, if inside city/town) | `"35000"` or blank |
 
 The `{DOT} District` column name is dynamic per state:
-- Virginia → `VDOT District`
+- Virginia → `DOT District`
 - Colorado → `CDOT Region`
 - Texas → `TxDOT District`
 - Generic → read from `hierarchy.state.dot` + " District"
@@ -459,7 +459,7 @@ def enrich_row(row, lookup_table, dot_abbrev):
 
     For district/PD/MPO columns:
     - Only fill if column is missing, empty, or NaN
-    - If source data already has "VDOT District" populated, keep it
+    - If source data already has "DOT District" populated, keep it
     """
 ```
 
@@ -653,7 +653,7 @@ State: Virginia (VDOT) | FIPS: 51
   Processing 133 jurisdictions × 4 road types...
   FIPS column: 133 jurisdictions assigned (NEW column)
   Place FIPS column: 42 populated, 91 blank (counties without place boundaries)
-  VDOT District: 113 already populated, 20 filled from lookup
+  DOT District: 113 already populated, 20 filled from lookup
   Planning District: skipped (not in hierarchy)
   MPO Name: 98 filled, 35 blank (not in MPO)
 

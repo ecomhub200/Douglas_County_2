@@ -517,18 +517,18 @@ class TestMarylandNormalizer_MoCoFormat:
     def test_road_system_county(self, md_normalizer):
         row = make_moco_row(route_type='County')
         result = md_normalizer.normalize_row(row)
-        assert result['SYSTEM'] == 'NonVDOT secondary'
+        assert result['SYSTEM'] == 'Non-DOT secondary'
 
     def test_road_system_municipality(self, md_normalizer):
         row = make_moco_row(route_type='Municipality')
         result = md_normalizer.normalize_row(row)
-        assert result['SYSTEM'] == 'NonVDOT secondary'
+        assert result['SYSTEM'] == 'Non-DOT secondary'
 
     def test_road_system_unknown_defaults(self, md_normalizer):
-        """Unknown route types should default to 'NonVDOT secondary'."""
+        """Unknown route types should default to 'Non-DOT secondary'."""
         row = make_moco_row(route_type='Private Road')
         result = md_normalizer.normalize_row(row)
-        assert result['SYSTEM'] == 'NonVDOT secondary'
+        assert result['SYSTEM'] == 'Non-DOT secondary'
 
     # --- Node (intersection name) ---
 
@@ -1320,7 +1320,7 @@ class TestStateConfig:
         for key, val in self.config['roadSystems']['values'].items():
             assert 'standardizedSystem' in val, f"roadSystems.{key} missing standardizedSystem"
             assert val['standardizedSystem'] in (
-                'Interstate', 'Primary', 'Secondary', 'NonVDOT secondary'
+                'Interstate', 'Primary', 'Secondary', 'Non-DOT secondary'
             ), f"roadSystems.{key}.standardizedSystem = '{val['standardizedSystem']}' is not recognized"
 
     def test_epdo_weights_standard(self):

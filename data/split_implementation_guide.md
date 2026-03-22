@@ -100,12 +100,12 @@ FILTER IMPLEMENTATION:
 Different states are at different stages of enrichment:
 
   VIRGINIA: Fully normalized + Tier 2 enriched.
-    VDOT District, MPO Name, Planning District columns are populated
+    DOT District, MPO Name, Planning District columns are populated
     by the source data directly (Virginia already has these in their
     crash export). detect_strategy() returns "column" for all three.
 
   DELAWARE: Normalized, Tier 1 enriched, Tier 2 NOT yet run.
-    VDOT District is populated (geo_resolver fills this as "North District",
+    DOT District is populated (geo_resolver fills this as "North District",
     "Central District", "South District" from hierarchy.json in Phase 3).
     MPO Name is populated ("Dover/Kent County MPO", "WILMAPCO").
     Planning District is populated.
@@ -370,7 +370,7 @@ Example for Delaware:
   "total_input_rows": 566762,
   "dry_run": false,
   "strategies": {
-    "region": "column",         ← VDOT District was populated
+    "region": "column",         ← DOT District was populated
     "mpo": "column",            ← MPO Name was populated
     "planning_district": "hierarchy"  ← Planning District was empty
   },

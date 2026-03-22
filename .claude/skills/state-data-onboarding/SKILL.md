@@ -78,7 +78,7 @@ Bike?, Distracted?, Drowsy?, Drug Related?, Guardrail Related?,
 Hitrun?, Lgtruck?, Motorcycle?, Pedestrian?, Speed?,
 Max Speed Diff, RoadDeparture Type, Intersection Analysis,
 Senior?, Young?, Mainline?, Night?,
-VDOT District, Juris Code, Physical Juris Name (NNN. Name format),
+DOT District, Juris Code, Physical Juris Name (NNN. Name format),
 Functional Class, Facility Type, Area Type,
 SYSTEM, VSP, Ownership, Planning District, MPO Name,
 RTE Name, RNS MP, Node, Node Offset (ft), Local Case CD,
@@ -136,11 +136,11 @@ collision_type_map = {
 **SYSTEM mapping** (Virginia-specific, codes differ from what you'd expect):
 ```python
 system_map = {
-    '1': 'NonVDOT primary',
-    '2': 'NonVDOT secondary',
-    '3': 'VDOT Interstate',
-    '4': 'VDOT Primary',
-    '5': 'VDOT Secondary',
+    '1': 'Non-DOT primary',
+    '2': 'Non-DOT secondary',
+    '3': 'DOT Interstate',
+    '4': 'DOT Primary',
+    '5': 'DOT Secondary',
 }
 ```
 
@@ -289,7 +289,7 @@ assert df['Crash Date'].str.match(pattern).all()
 
 ## Common Pitfalls
 
-1. **SYSTEM codes are NOT intuitive**: 1=NonVDOT primary, NOT VDOT Interstate
+1. **SYSTEM codes are NOT intuitive**: 1=Non-DOT primary, NOT DOT Interstate
 2. **Physical Juris Name uses "City of" prefix**: `"100. City of Alexandria"` not `"100. Alexandria City"`
 3. **Collision Type 7 is Train, not Parked Vehicle**: The numbered list doesn't match what you'd expect
 4. **Weather code 2 doesn't exist**: Values jump from 1 to 3

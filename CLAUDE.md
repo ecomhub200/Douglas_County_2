@@ -365,6 +365,28 @@ const EPDO_WEIGHTS = { K: 883, A: 94, B: 21, C: 11, O: 1 };  // FHWA 2025 (FHWA-
 
 Always use `calcEPDO(severityObject)` for consistent calculations.
 
+### DOT-Neutral Column Naming Convention (IMPORTANT)
+
+The data schema was originally built for Virginia (VDOT) but is now **state-agnostic**. All column names and values use **DOT-neutral** equivalents:
+
+| Column/Value | Notes |
+|-------------|-------|
+| `DOT District` | Column name (position 53 in GOLDEN_COLUMNS). Was "VDOT District" |
+| `DOT Interstate` | SYSTEM value for code `1`. Was "VDOT Interstate" |
+| `DOT Primary` | SYSTEM value for code `2`. Was "VDOT Primary" |
+| `DOT Secondary` | SYSTEM value for code `3`. Was "VDOT Secondary" |
+| `Non-DOT primary` | SYSTEM value for code `4`. Was "NonVDOT primary" |
+| `Non-DOT secondary` | SYSTEM value for code `5`. Was "NonVDOT secondary" |
+| `Non-DOT` | Generic non-state-DOT value. Was "NONVDOT" / "Non-VDOT" |
+| `DOT Intersection` | Intersection Analysis value for code `2`. Was "VDOT Intersection" |
+
+**Rules:**
+- **NEVER** use "VDOT District", "VDOT Interstate", "NonVDOT secondary", etc. as column names or data values in new code
+- **ALWAYS** use the DOT-neutral equivalents above
+- The `VSP` column (position 60) is **NOT** affected — it stands for Virginia State Police and is intentionally Virginia-specific
+- The JS property key `countyPlusVDOT` is kept as a legacy identifier — do not rename JS variable names
+- VDOT references to the **organization** (e.g., "VDOT 2024 EPDO weights", "VDOT Road & Bridge Standards") are fine and should NOT be changed
+
 ---
 
 ## Multi-State Data Onboarding

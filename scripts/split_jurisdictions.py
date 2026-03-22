@@ -129,11 +129,11 @@ def get_filter_profiles(config):
     return config.get('filterProfiles', {
         'countyOnly': {
             'name': 'County Roads Only',
-            'systemValues': ['NonVDOT secondary', 'NONVDOT', 'Non-VDOT']
+            'systemValues': ['Non-DOT secondary', 'Non-DOT']
         },
         'countyPlusVDOT': {
             'name': 'All Roads (No Interstate)',
-            'systemValues': ['NonVDOT secondary', 'NONVDOT', 'Non-VDOT', 'Primary', 'Secondary'],
+            'systemValues': ['Non-DOT secondary', 'Non-DOT', 'Primary', 'Secondary'],
             'excludeRoutePatterns': ['^I-\\d', '^IS \\d', '^Interstate']
         },
         'allRoads': {
@@ -423,11 +423,11 @@ def standardize_columns_virginia(df):
         # Decode SYSTEM codes
         if 'SYSTEM' in df.columns:
             system_map = {
-                '1': 'NonVDOT primary', '2': 'NonVDOT secondary',
-                '3': 'VDOT Interstate', '4': 'VDOT Primary', '5': 'VDOT Secondary',
+                '1': 'Non-DOT primary', '2': 'Non-DOT secondary',
+                '3': 'DOT Interstate', '4': 'DOT Primary', '5': 'DOT Secondary',
             }
             raw = df['SYSTEM'].astype(str).str.strip()
-            if raw.isin(system_map.keys()).any() and not raw.str.contains('VDOT', na=False).any():
+            if raw.isin(system_map.keys()).any() and not raw.str.contains('DOT', na=False).any():
                 df['SYSTEM'] = raw.map(system_map).fillna(df['SYSTEM'])
 
         # Decode Functional Class codes
