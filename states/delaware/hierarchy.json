@@ -169,7 +169,7 @@
         "005"
       ],
       "countyNames": {
-        "005": "Sussex (partial)"
+        "005": "Sussex"
       },
       "btsAcronym": "SM",
       "mapBounds": {
@@ -201,6 +201,6 @@
   "allCounties": {
     "001": "Kent",
     "003": "New Castle",
-    "005": "Sussex (partial)"
+    "005": "Sussex"
   }
 }
