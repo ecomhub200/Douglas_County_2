@@ -342,21 +342,79 @@ _MONTHS = {
 
 
 def parse_delaware_datetime(raw: str) -> tuple[str, str, str]:
-    """Parse DelDOT datetime: '2015 Jul 17 03:15:00 PM'"""
+    """
+    Parse DelDOT datetime.  Handles multiple formats returned by Socrata:
+      Format A:  '2015 Jul 17 03:15:00 PM'   (legacy text export)
+      Format B:  '2015-07-17T15:15:00.000'    (ISO / SODA JSON)
+      Format C:  '07/17/2015 03:15:00 PM'     (US locale CSV)
+      Format D:  '2015 Jul 17 PM'             (missing time, AM/PM at pos 3)
+    """
     if not raw or not raw.strip():
         return "", "", ""
 
-    parts = raw.strip().split()
-    if len(parts) < 4:
-        return raw, "", ""
+    s = raw.strip()
 
-    year    = parts[0]
-    mon     = _MONTHS.get(parts[1].lower(), "01")
-    day     = parts[2]
-    t_parts = parts[3].split(":")
-    hour    = int(t_parts[0]) if t_parts else 0
-    minute  = t_parts[1] if len(t_parts) > 1 else "00"
-    ampm    = parts[4].upper() if len(parts) > 4 else ""
+    # ── Format B: ISO datetime (2015-07-17T15:15:00.000) ──
+    if "T" in s and "-" in s[:10]:
+        try:
+            date_part, time_part = s.split("T", 1)
+            ymd = date_part.split("-")
+            year, mon, day = ymd[0], ymd[1], ymd[2]
+            hms = time_part.split(".")[0].split(":")
+            hour = int(hms[0]) if hms else 0
+            minute = hms[1] if len(hms) > 1 else "00"
+            mil_time = f"{hour:02d}{minute}"
+            date_str = f"{int(mon)}/{int(day)}/{year}"
+            return date_str, mil_time, year
+        except (ValueError, IndexError):
+            pass
+
+    # ── Format C: '07/17/2015 03:15:00 PM' or '3/22/2026 3:15 PM' ──
+    if "/" in s.split()[0]:
+        try:
+            date_token = s.split()[0]
+            mdy = date_token.split("/")
+            mon, day, year = mdy[0], mdy[1], mdy[2]
+            rest = s.split(None, 1)
+            hour, minute, ampm = 0, "00", ""
+            if len(rest) > 1:
+                time_and_ampm = rest[1].split()
+                t_parts = time_and_ampm[0].split(":")
+                hour = int(t_parts[0])
+                minute = t_parts[1] if len(t_parts) > 1 else "00"
+                ampm = time_and_ampm[1].upper() if len(time_and_ampm) > 1 else ""
+            if ampm == "PM" and hour < 12:
+                hour += 12
+            elif ampm == "AM" and hour == 12:
+                hour = 0
+            mil_time = f"{hour:02d}{minute}"
+            date_str = f"{int(mon)}/{int(day)}/{year}"
+            return date_str, mil_time, year
+        except (ValueError, IndexError):
+            pass
+
+    # ── Format A/D: '2015 Jul 17 03:15:00 PM' or '2015 Jul 17 PM' ──
+    parts = s.split()
+    if len(parts) < 3:
+        return s, "", ""
+
+    year = parts[0]
+    mon  = _MONTHS.get(parts[1].lower(), "01")
+    day  = parts[2]
+
+    hour, minute, ampm = 0, "00", ""
+    if len(parts) >= 4:
+        # Check if parts[3] is AM/PM (Format D: time missing)
+        if parts[3].upper() in ("AM", "PM"):
+            ampm = parts[3].upper()
+        else:
+            t_parts = parts[3].split(":")
+            try:
+                hour = int(t_parts[0])
+            except ValueError:
+                hour = 0
+            minute = t_parts[1] if len(t_parts) > 1 else "00"
+            ampm = parts[4].upper() if len(parts) > 4 else ""
 
     if ampm == "PM" and hour < 12:
         hour += 12
