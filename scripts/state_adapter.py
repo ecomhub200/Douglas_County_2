@@ -1981,56 +1981,90 @@ class DelawareNormalizer(BaseNormalizer):
         """Check if a Delaware boolean field value is truthy (Y/N or Yes/No)."""
         return value.upper() in ('YES', 'TRUE', 'Y', '1') if value else False
 
+    _MONTH_ABBR = {
+        'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
+        'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
+        'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12',
+    }
+
     def _parse_datetime(self, raw_datetime: str) -> tuple:
         """Parse Delaware datetime into (date_part, time_part, year_part).
 
-        Handles multiple formats:
-        - ISO: 2023-01-15T14:30:00.000 (Socrata JSON API)
-        - Named month: 2012 Apr 29 05:32:00 PM (Excel/CSV export)
-        - Fallback: space-separated or slash-separated dates
+        Handles multiple formats returned by Socrata/CSV exports:
+          Format A: '2015 Jul 17 03:15:00 PM'  (legacy text export)
+          Format B: '2015-07-17T15:15:00.000'   (ISO / SODA JSON)
+          Format C: '07/17/2015 03:15:00 PM'    (US locale CSV)
+                    '3/22/2026 3:15 PM'         (short month/day, no seconds)
+          Format D: '2015 Jul 17 PM'            (missing time, bare AM/PM)
         """
-        from datetime import datetime as dt
-
         date_part = ''
         time_part = ''
         year_part = ''
 
-        if not raw_datetime:
+        if not raw_datetime or not raw_datetime.strip():
             return date_part, time_part, year_part
 
-        # Format 1: ISO (from Socrata JSON API)
-        if 'T' in raw_datetime:
-            parts = raw_datetime.split('T')
-            date_part = parts[0]
-            time_str = parts[1].split('.')[0] if len(parts) > 1 else ''
-            time_part = time_str.replace(':', '')[:4]
-            year_part = date_part[:4] if len(date_part) >= 4 else ''
-            return date_part, time_part, year_part
+        s = raw_datetime.strip()
 
-        # Format 2: Named month with AM/PM (from Excel/CSV export)
-        # "2012 Apr 29 05:32:00 PM"
         try:
-            parsed = dt.strptime(raw_datetime, '%Y %b %d %I:%M:%S %p')
-            date_part = parsed.strftime('%Y-%m-%d')
-            time_part = parsed.strftime('%H%M')
-            year_part = str(parsed.year)
-            return date_part, time_part, year_part
-        except (ValueError, TypeError):
+            # ── Format B: ISO datetime (2015-07-17T15:15:00.000) ──
+            if 'T' in s and '-' in s[:10]:
+                dt_part, tm_part = s.split('T', 1)
+                ymd = dt_part.split('-')
+                year, mon, day = ymd[0], ymd[1], ymd[2]
+                hms = tm_part.split('.')[0].split(':')
+                hour = int(hms[0]) if hms else 0
+                minute = hms[1] if len(hms) > 1 else '00'
+                return f'{year}-{mon}-{day}', f'{hour:02d}{minute}', year
+
+            # ── Format C: '07/17/2015 03:15:00 PM' or '3/22/2026 3:15 PM' ──
+            tokens = s.split()
+            if '/' in tokens[0]:
+                mdy = tokens[0].split('/')
+                mon, day, year = mdy[0], mdy[1], mdy[2]
+                hour, minute, ampm = 0, '00', ''
+                if len(tokens) > 1:
+                    t_parts = tokens[1].split(':')
+                    hour = int(t_parts[0])
+                    minute = t_parts[1] if len(t_parts) > 1 else '00'
+                    ampm = tokens[2].upper() if len(tokens) > 2 else ''
+                if ampm == 'PM' and hour < 12:
+                    hour += 12
+                elif ampm == 'AM' and hour == 12:
+                    hour = 0
+                date_part = f'{year}-{int(mon):02d}-{int(day):02d}'
+                return date_part, f'{hour:02d}{minute}', year
+
+            # ── Format A/D: '2015 Jul 17 03:15:00 PM' or '2015 Jul 17 PM' ──
+            if len(tokens) >= 3:
+                year = tokens[0]
+                mon = self._MONTH_ABBR.get(tokens[1].lower(), '')
+                if mon:
+                    day = tokens[2]
+                    hour, minute, ampm = 0, '00', ''
+                    if len(tokens) >= 4:
+                        if tokens[3].upper() in ('AM', 'PM'):
+                            # Format D: bare AM/PM, no time
+                            ampm = tokens[3].upper()
+                            hour = 12 if ampm == 'PM' else 0
+                        else:
+                            t_parts = tokens[3].split(':')
+                            raw_h = t_parts[0] if t_parts else '0'
+                            hour = int(raw_h) if raw_h.isdigit() else 0
+                            minute = t_parts[1] if len(t_parts) > 1 else '00'
+                            ampm = tokens[4].upper() if len(tokens) > 4 else ''
+                    if ampm == 'PM' and hour < 12:
+                        hour += 12
+                    elif ampm == 'AM' and hour == 12:
+                        hour = 0
+                    date_part = f'{year}-{mon}-{int(day):02d}'
+                    return date_part, f'{hour:02d}{minute}', year
+
+        except (ValueError, IndexError):
             pass
 
-        # Format 3: Other named month variants
-        for fmt in ('%Y %B %d %I:%M:%S %p', '%m/%d/%Y %H:%M:%S', '%m/%d/%Y %I:%M:%S %p'):
-            try:
-                parsed = dt.strptime(raw_datetime, fmt)
-                date_part = parsed.strftime('%Y-%m-%d')
-                time_part = parsed.strftime('%H%M')
-                year_part = str(parsed.year)
-                return date_part, time_part, year_part
-            except (ValueError, TypeError):
-                continue
-
         # Fallback: try to extract what we can
-        tokens = raw_datetime.split()
+        tokens = s.split()
         if tokens:
             first = tokens[0]
             if '-' in first:
@@ -2043,8 +2077,7 @@ class DelawareNormalizer(BaseNormalizer):
                     year_part = dparts[2][:4]
             elif first.isdigit() and len(first) == 4:
                 year_part = first
-                date_part = raw_datetime.split(' ')[0:3]
-                date_part = ' '.join(date_part) if len(date_part) >= 3 else first
+                date_part = ' '.join(tokens[:3]) if len(tokens) >= 3 else first
 
         return date_part, time_part, year_part
 
