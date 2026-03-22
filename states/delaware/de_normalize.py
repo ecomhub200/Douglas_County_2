@@ -175,6 +175,8 @@ DE_CITIES = {
     "Town of Elsmere":        {"bbox": (39.7350, -75.6050, 39.7530, -75.5830), "fips": "003", "place_fips": "23560"},
     "Town of Newport":        {"bbox": (39.7100, -75.6180, 39.7250, -75.5900), "fips": "003", "place_fips": "51220"},
     "Town of Smyrna":         {"bbox": (39.2800, -75.6200, 39.3150, -75.5900), "fips": "003", "place_fips": "66790"},
+    "Town of Townsend":       {"bbox": (39.3800, -75.7050, 39.4100, -75.6750), "fips": "003", "place_fips": "71860"},
+    "Town of Clayton":        {"bbox": (39.2600, -75.6500, 39.2900, -75.6150), "fips": "003", "place_fips": "14100"},
     # ── Kent County (FIPS 001) ──
     "City of Dover":          {"bbox": (39.1250, -75.5700, 39.1950, -75.4800), "fips": "001", "place_fips": "21200"},
     "Town of Camden":         {"bbox": (39.1050, -75.5500, 39.1270, -75.5200), "fips": "001", "place_fips": "10720"},
@@ -189,6 +191,7 @@ DE_CITIES = {
     "Town of Rehoboth Beach": {"bbox": (38.7100, -75.0900, 38.7300, -75.0650), "fips": "005", "place_fips": "60170"},
     "Town of Bridgeville":    {"bbox": (38.7350, -75.6150, 38.7500, -75.5900), "fips": "005", "place_fips": "08210"},
     "Town of Selbyville":     {"bbox": (38.4550, -75.2350, 38.4750, -75.2050), "fips": "005", "place_fips": "65200"},
+    "Town of Millsboro":      {"bbox": (38.5750, -75.3100, 38.6050, -75.2700), "fips": "005", "place_fips": "47390"},
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

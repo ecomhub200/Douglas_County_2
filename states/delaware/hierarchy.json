@@ -374,6 +374,33 @@
       "placeFips": "65200",
       "center": [-75.2207, 38.4615],
       "zoom": 14
+    },
+    "town_of_millsboro": {
+      "name": "Town of Millsboro",
+      "shortName": "Millsboro",
+      "type": "town",
+      "county": "005",
+      "placeFips": "47390",
+      "center": [-75.2913, 38.5916],
+      "zoom": 14
+    },
+    "town_of_townsend": {
+      "name": "Town of Townsend",
+      "shortName": "Townsend",
+      "type": "town",
+      "county": "003",
+      "placeFips": "71860",
+      "center": [-75.6916, 39.3943],
+      "zoom": 14
+    },
+    "town_of_clayton": {
+      "name": "Town of Clayton",
+      "shortName": "Clayton",
+      "type": "town",
+      "county": "003",
+      "placeFips": "14100",
+      "center": [-75.6310, 39.2745],
+      "zoom": 14
     }
   }
 }
