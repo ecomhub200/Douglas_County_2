@@ -157,9 +157,22 @@
      * Determine the best default road type for a jurisdiction.
      *
      * @param {string} [jurisdictionId] - Jurisdiction key. Auto-detected if omitted.
+     * @param {Object} [options] - Options
+     * @param {number} [options.minRowsFallback] - If currentRowCount is below this threshold, return 'allRoads'
+     * @param {number} [options.currentRowCount] - Current number of loaded rows (requires minRowsFallback)
      * @returns {string} One of: 'countyOnly', 'cityOnly', 'countyPlusVDOT', 'allRoads'
      */
-    function getDefaultRoadType(jurisdictionId) {
+    function getDefaultRoadType(jurisdictionId, options) {
+        var opts = options || {};
+
+        // ── Low-data fallback: if loaded row count is below threshold, use allRoads ──
+        if (typeof opts.minRowsFallback === 'number' && typeof opts.currentRowCount === 'number') {
+            if (opts.currentRowCount < opts.minRowsFallback) {
+                console.log('[RoadDefaults] Row count', opts.currentRowCount,
+                    'is below threshold', opts.minRowsFallback, '— defaulting to allRoads');
+                return 'allRoads';
+            }
+        }
         // Resolve jurisdiction
         var jId = jurisdictionId;
         if (!jId && typeof getActiveJurisdictionId === 'function') {
@@ -218,11 +231,16 @@
      * @param {string} [jurisdictionId] - Jurisdiction key. Auto-detected if omitted.
      * @param {Object} [options] - Options
      * @param {boolean} [options.force] - Force apply even if user has manually overridden
+     * @param {number} [options.minRowsFallback] - If currentRowCount is below this, switch to 'allRoads'
+     * @param {number} [options.currentRowCount] - Current number of loaded rows
      * @returns {string} The road type that was applied
      */
     function applyDefaultRoadType(jurisdictionId, options) {
         var opts = options || {};
-        var defaultType = getDefaultRoadType(jurisdictionId);
+        var defaultType = getDefaultRoadType(jurisdictionId, {
+            minRowsFallback: opts.minRowsFallback,
+            currentRowCount: opts.currentRowCount
+        });
 
         // Map road type values to radio button IDs
         var radioMap = {
@@ -264,7 +282,10 @@
         var jConfig = getJurisdictionConfig(jurisdictionId);
         var reason = 'fallback';
 
-        if (jConfig && (jConfig.type === 'city' || jConfig.type === 'town')) {
+        if (typeof opts.minRowsFallback === 'number' && typeof opts.currentRowCount === 'number' &&
+            opts.currentRowCount < opts.minRowsFallback) {
+            reason = 'low data (' + opts.currentRowCount + ' rows < ' + opts.minRowsFallback + ' threshold)';
+        } else if (jConfig && (jConfig.type === 'city' || jConfig.type === 'town')) {
             reason = 'jurisdiction type=' + jConfig.type;
         } else if (jConfig && jConfig.maintainsOwnRoads === true) {
             reason = 'jurisdiction maintainsOwnRoads=true';
