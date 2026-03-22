@@ -36,7 +36,7 @@ CL.upload = CL.upload || {};
         if (activeTier === 'state' || activeTier === 'federal' || activeTier === 'region') {
             var dotMap = {
                 'countyOnly':      'dot_roads',
-                'cityOnly':        'city_roads',
+                'cityOnly':        'primary_roads',
                 'countyPlusVDOT':  'non_dot_roads',
                 'allRoads':        activeTier === 'state' ? 'statewide_all_roads' : 'all_roads'
             };

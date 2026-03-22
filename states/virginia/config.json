@@ -149,6 +149,27 @@
         "column": "Functional Class",
         "columnAliases": ["FUN"],
         "excludeValues": ["1-Interstate (A,1)", "INT"]
+      },
+      "dotRoads": {
+        "_description": "State DOT-maintained roads only (VDOT Interstate + Primary + Secondary)",
+        "method": "ownership",
+        "column": "Ownership",
+        "columnAliases": ["OWNERSHIP"],
+        "includeValues": ["1. State Hwy Agency", "1"]
+      },
+      "primaryRoads": {
+        "_description": "Interstate and Freeway only (Functional Class 1 + 2)",
+        "method": "functional_class",
+        "column": "Functional Class",
+        "columnAliases": ["FUN"],
+        "includeValues": ["1-Interstate (A,1)", "INT", "2-Principal Arterial - Other Freeways and Expressways (B)", "OFE"]
+      },
+      "nonDotRoads": {
+        "_description": "All locally maintained roads (county, city, town, private, etc.)",
+        "method": "ownership",
+        "column": "Ownership",
+        "columnAliases": ["OWNERSHIP"],
+        "includeValues": ["2. County Hwy Agency", "2", "3. City or Town Hwy Agency", "3", "5. Toll Roads Maintained by Others", "5", "6. Private/Unknown Roads", "6"]
       }
     },
 

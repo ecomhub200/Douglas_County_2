@@ -491,11 +491,13 @@ jobs:
           # Re-upload corrected CSVs to R2 (overwrite originals with validated versions)
           CORRECTED_COUNT=0
           for csv_file in "$DATA_DIR"/*_all_roads.csv "$DATA_DIR"/*_county_roads.csv \
-                          "$DATA_DIR"/*_city_roads.csv "$DATA_DIR"/*_no_interstate.csv; do
+                          "$DATA_DIR"/*_city_roads.csv "$DATA_DIR"/*_no_interstate.csv \
+                          "$DATA_DIR"/*_dot_roads.csv "$DATA_DIR"/*_primary_roads.csv \
+                          "$DATA_DIR"/*_non_dot_roads.csv; do
             [ -f "$csv_file" ] || continue
             BASENAME=$(basename "$csv_file")
             # Extract jurisdiction from filename (everything before _roadtype.csv)
-            JURIS=$(echo "$BASENAME" | sed -E 's/_(all_roads|county_roads|city_roads|no_interstate)\.csv$//')
+            JURIS=$(echo "$BASENAME" | sed -E 's/_(all_roads|county_roads|city_roads|no_interstate|dot_roads|primary_roads|non_dot_roads)\.csv$//')
             R2_KEY="${R2_PREFIX}/${JURIS}/${BASENAME#${JURIS}_}"
             GZ_FILE="${csv_file}.gz"
             gzip -c "$csv_file" > "$GZ_FILE"
@@ -513,7 +515,7 @@ jobs:
             [ -f "$report" ] || continue
             BASENAME=$(basename "$report")
             # Extract jurisdiction: validation_report_{jurisdiction}_{roadtype}.json
-            JURIS=$(echo "$BASENAME" | sed -E 's/^validation_report_//; s/_(all_roads|county_roads|city_roads|no_interstate)\.json$//')
+            JURIS=$(echo "$BASENAME" | sed -E 's/^validation_report_//; s/_(all_roads|county_roads|city_roads|no_interstate|dot_roads|primary_roads|non_dot_roads)\.json$//')
             R2_KEY="${R2_PREFIX}/${JURIS}/${BASENAME}"
             aws s3 cp "$report" "s3://$R2_BUCKET/$R2_KEY" \
               --endpoint-url "$R2_ENDPOINT" \
@@ -602,7 +604,7 @@ jobs:
           saved_bytes = 0
 
           for j in jurisdictions:
-              for rt in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
+              for rt in ['county_roads', 'city_roads', 'no_interstate', 'all_roads', 'dot_roads', 'primary_roads', 'non_dot_roads']:
                   local_path = os.path.join(data_dir, f'forecasts_{rt}.json')
                   # Also check jurisdiction-prefixed path
                   if not os.path.exists(local_path):

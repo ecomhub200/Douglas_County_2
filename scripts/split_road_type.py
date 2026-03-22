@@ -6,6 +6,9 @@ For each jurisdiction's all_roads.csv, produces:
   - {jurisdiction}_county_roads.csv  (county-maintained roads only)
   - {jurisdiction}_city_roads.csv    (city/town-maintained roads only — if cityRoads config exists)
   - {jurisdiction}_no_interstate.csv (everything except interstates)
+  - {jurisdiction}_dot_roads.csv     (state DOT-maintained roads only)
+  - {jurisdiction}_primary_roads.csv (interstate + freeway only)
+  - {jurisdiction}_non_dot_roads.csv (all locally maintained: county, city, town, etc.)
   - {jurisdiction}_all_roads.csv     (already exists, copied/kept as-is)
 
 Road system filtering is config-driven from states/{state}/config.json → roadSystems.splitConfig.
@@ -294,6 +297,67 @@ def filter_no_interstate(rows, headers, split_config):
     return rows
 
 
+def filter_dot_roads(rows, headers, split_config):
+    """Filter to state DOT-maintained roads only.
+
+    Uses splitConfig.dotRoads — supports ownership, system_column, agency_id methods.
+    Returns None if no dotRoads config exists (signals: skip dot_roads output).
+    """
+    dot_config = split_config.get('dotRoads', {})
+    if not dot_config:
+        return None
+    return _filter_by_config(rows, headers, dot_config, 'DOT roads')
+
+
+def filter_primary_roads(rows, headers, split_config):
+    """Filter to primary roads only (interstate + freeway).
+
+    Uses splitConfig.primaryRoads — supports functional_class, system_column,
+    column_value methods.  Include-based: keeps only rows matching include values.
+    Returns None if no primaryRoads config exists (signals: skip primary_roads output).
+    """
+    primary_config = split_config.get('primaryRoads', {})
+    if not primary_config:
+        return None
+
+    method = primary_config.get('method', 'functional_class')
+    col_idx = {h: i for i, h in enumerate(headers)}
+
+    if method == 'functional_class':
+        col = _resolve_column(col_idx, primary_config, 'Functional Class')
+        include_values = primary_config.get('includeValues', [])
+        if col is None:
+            logger.warning("  Column not found for primary roads filter — returning empty")
+            return []
+        idx = col_idx[col]
+        include_upper = {v.upper() for v in include_values}
+        return [r for r in rows if r[idx].strip().upper() in include_upper]
+
+    elif method in ('system_column', 'column_value'):
+        col = _resolve_column(col_idx, primary_config, primary_config.get('column', 'SYSTEM'))
+        include_values = primary_config.get('includeValues', [])
+        if col is None:
+            logger.warning("  Column not found for primary roads filter — returning empty")
+            return []
+        idx = col_idx[col]
+        include_upper = {v.upper() for v in include_values}
+        return [r for r in rows if r[idx].strip().upper() in include_upper]
+
+    return rows
+
+
+def filter_non_dot_roads(rows, headers, split_config):
+    """Filter to non-DOT roads (county, city, town, anything locally maintained).
+
+    Uses splitConfig.nonDotRoads — supports ownership, system_column, agency_id methods.
+    Returns None if no nonDotRoads config exists (signals: skip non_dot_roads output).
+    """
+    non_dot_config = split_config.get('nonDotRoads', {})
+    if not non_dot_config:
+        return None
+    return _filter_by_config(rows, headers, non_dot_config, 'non-DOT roads')
+
+
 def split_jurisdiction(jurisdiction, data_dir, split_config):
     """Split a single jurisdiction's all_roads.csv into road-type CSVs."""
     data_dir = Path(data_dir)
@@ -341,7 +405,40 @@ def split_jurisdiction(jurisdiction, data_dir, split_config):
         writer.writerow(headers)
         writer.writerows(no_interstate_rows)
 
-    logger.info(f"  {jurisdiction}: all={total:,}, county_roads={len(county_rows):,}{city_count_str}, no_interstate={len(no_interstate_rows):,}")
+    # dot_roads (state DOT-maintained only — if dotRoads config exists)
+    dot_rows = filter_dot_roads(all_rows, headers, split_config)
+    dot_count_str = ''
+    if dot_rows is not None:
+        dot_path = data_dir / f"{jurisdiction}_dot_roads.csv"
+        with open(dot_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(dot_rows)
+        dot_count_str = f', dot_roads={len(dot_rows):,}'
+
+    # primary_roads (interstate + freeway only — if primaryRoads config exists)
+    primary_rows = filter_primary_roads(all_rows, headers, split_config)
+    primary_count_str = ''
+    if primary_rows is not None:
+        primary_path = data_dir / f"{jurisdiction}_primary_roads.csv"
+        with open(primary_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(primary_rows)
+        primary_count_str = f', primary_roads={len(primary_rows):,}'
+
+    # non_dot_roads (all locally maintained — if nonDotRoads config exists)
+    non_dot_rows = filter_non_dot_roads(all_rows, headers, split_config)
+    non_dot_count_str = ''
+    if non_dot_rows is not None:
+        non_dot_path = data_dir / f"{jurisdiction}_non_dot_roads.csv"
+        with open(non_dot_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(non_dot_rows)
+        non_dot_count_str = f', non_dot_roads={len(non_dot_rows):,}'
+
+    logger.info(f"  {jurisdiction}: all={total:,}, county_roads={len(county_rows):,}{city_count_str}, no_interstate={len(no_interstate_rows):,}{dot_count_str}{primary_count_str}{non_dot_count_str}")
     return True
 
 

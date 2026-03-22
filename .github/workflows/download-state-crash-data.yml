@@ -26,9 +26,10 @@
 #     city_roads.csv         — city/town-maintained roads (Ownership = City or Town Hwy Agency)
 #     no_interstate.csv      — all roads minus interstates
 #     all_roads.csv          — everything
-#   State/Region/MPO scope → 3 CSVs:
+#   State/Region/MPO scope → 4 CSVs:
 #     dot_roads.csv          — state DOT-maintained roads
-#     non_dot_roads.csv      — local/non-state roads
+#     primary_roads.csv      — interstate and freeway only
+#     non_dot_roads.csv      — local/non-state roads (county, city, town, etc.)
 #     statewide_all_roads.csv — DOT + non-DOT combined
 #
 # No road type filter input is needed — the scope determines which CSVs

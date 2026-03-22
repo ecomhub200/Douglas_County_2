@@ -121,6 +121,24 @@
         "method": "column_value",
         "column": "_co_system_code",
         "excludeValues": ["Interstate Highway"]
+      },
+      "dotRoads": {
+        "_description": "State DOT-maintained roads only (State Highway + Interstate + Frontage Road)",
+        "method": "column_value",
+        "column": "_co_system_code",
+        "includeValues": ["State Highway", "Interstate Highway", "Frontage Road"]
+      },
+      "primaryRoads": {
+        "_description": "Interstate and Freeway only",
+        "method": "column_value",
+        "column": "_co_system_code",
+        "includeValues": ["Interstate Highway"]
+      },
+      "nonDotRoads": {
+        "_description": "All locally maintained roads (county, city, town, etc.)",
+        "method": "column_value",
+        "column": "_co_system_code",
+        "includeValues": ["City Street", "County Road"]
       }
     },
 

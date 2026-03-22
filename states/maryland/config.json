@@ -133,6 +133,24 @@
         "method": "column_value",
         "column": "SYSTEM",
         "excludeValues": ["Interstate"]
+      },
+      "dotRoads": {
+        "_description": "State DOT-maintained roads only (Interstate + State/US Routes)",
+        "method": "column_value",
+        "column": "SYSTEM",
+        "includeValues": ["Interstate", "Primary", "Secondary"]
+      },
+      "primaryRoads": {
+        "_description": "Interstate and Freeway only",
+        "method": "column_value",
+        "column": "SYSTEM",
+        "includeValues": ["Interstate"]
+      },
+      "nonDotRoads": {
+        "_description": "All locally maintained roads (county, municipal, other public)",
+        "method": "column_value",
+        "column": "SYSTEM",
+        "includeValues": ["NonVDOT secondary"]
       }
     },
 
