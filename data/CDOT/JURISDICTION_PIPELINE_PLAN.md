@@ -621,7 +621,7 @@ All use ArcGIS, so the query pattern is consistent: `/query?where=1=1&outFields=
 {
   "state": "virginia",
   "dotDistricts": {
-    "name": "VDOT Districts",
+    "name": "DOT Districts",
     "term": "District",
     "count": 9,
     "source": "arcgis_rest",

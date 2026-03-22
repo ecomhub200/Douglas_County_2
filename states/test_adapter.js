@@ -218,7 +218,7 @@ console.log('');
 console.log('--- Test 4: Road System Mapping ---');
 
 const systemCounts = {};
-const validSystems = ['NonVDOT secondary', 'Primary', 'Secondary', 'Interstate'];
+const validSystems = ['Non-DOT secondary', 'Primary', 'Secondary', 'Interstate'];
 
 for (const row of rows) {
     const norm = StateAdapter.normalizeRow(row);
@@ -235,13 +235,13 @@ for (const [sys, count] of Object.entries(systemCounts)) {
 // Verify specific mappings
 const cityStreetRow = rows.find(r => r['System Code'] === 'City Street');
 if (cityStreetRow) {
-    assertEqual(StateAdapter.normalizeRow(cityStreetRow)['SYSTEM'], 'NonVDOT secondary',
-        'City Street should map to NonVDOT secondary');
+    assertEqual(StateAdapter.normalizeRow(cityStreetRow)['SYSTEM'], 'Non-DOT secondary',
+        'City Street should map to Non-DOT secondary');
 }
 const countyRoadRow = rows.find(r => r['System Code'] === 'County Road');
 if (countyRoadRow) {
-    assertEqual(StateAdapter.normalizeRow(countyRoadRow)['SYSTEM'], 'NonVDOT secondary',
-        'County Road should map to NonVDOT secondary');
+    assertEqual(StateAdapter.normalizeRow(countyRoadRow)['SYSTEM'], 'Non-DOT secondary',
+        'County Road should map to Non-DOT secondary');
 }
 const stateHwyRow = rows.find(r => r['System Code'] === 'State Highway');
 if (stateHwyRow) {
@@ -598,9 +598,9 @@ console.log('--- Test 14: Filter Profile Compatibility ---');
 // Simulate the filter logic that exists in the app
 function filterByProfile(normalizedRows, profile) {
     const profiles = {
-        countyOnly: ['NonVDOT secondary'],
-        countyPlusVDOT: ['NonVDOT secondary', 'Primary', 'Secondary'],
-        allRoads: ['NonVDOT secondary', 'Primary', 'Secondary', 'Interstate']
+        countyOnly: ['Non-DOT secondary'],
+        countyPlusVDOT: ['Non-DOT secondary', 'Primary', 'Secondary'],
+        allRoads: ['Non-DOT secondary', 'Primary', 'Secondary', 'Interstate']
     };
     const allowedSystems = profiles[profile];
     return normalizedRows.filter(r => allowedSystems.includes(r['SYSTEM']));

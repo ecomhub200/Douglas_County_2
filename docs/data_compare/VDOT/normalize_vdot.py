@@ -48,7 +48,7 @@ TARGET_COLUMN_ORDER = [
     "Drug Related?", "Guardrail Related?", "Hitrun?", "Lgtruck?", "Motorcycle?", "Pedestrian?",
     "Speed?", "Max Speed Diff", "RoadDeparture Type", "Intersection Analysis",
     "Senior?", "Young?", "Mainline?", "Night?",
-    "VDOT District", "Juris Code", "Physical Juris Name", "Functional Class",
+    "DOT District", "Juris Code", "Physical Juris Name", "Functional Class",
     "Facility Type", "Area Type", "SYSTEM", "VSP", "Ownership",
     "Planning District", "MPO Name", "RTE Name", "RNS MP", "Node", "Node Offset (ft)",
     "x", "y",
@@ -205,8 +205,8 @@ FACILITY_TYPE = {
 AREA_TYPE = {"0": "Rural", "1": "Urban"}
 
 SYSTEM_MAP = {
-    "1": "VDOT Interstate", "2": "VDOT Primary", "3": "VDOT Secondary",
-    "4": "NonVDOT primary", "5": "NonVDOT secondary",
+    "1": "DOT Interstate", "2": "DOT Primary", "3": "DOT Secondary",
+    "4": "Non-DOT primary", "5": "Non-DOT secondary",
 }
 
 OWNERSHIP = {
@@ -219,7 +219,7 @@ BOOL_YES_NO = {"0": "No", "1": "Yes"}
 UNBELTED_MAP = {"0": "Belted", "1": "Unbelted"}
 
 ROAD_DEPARTURE = {"0": "NOT_RD", "1": "RD_LEFT", "2": "RD_RIGHT", "3": "RD_UNKNOWN"}
-INTERSECTION_ANALYSIS = {"0": "Not Intersection", "1": "Urban Intersection", "2": "VDOT Intersection"}
+INTERSECTION_ANALYSIS = {"0": "Not Intersection", "1": "Urban Intersection", "2": "DOT Intersection"}
 
 PLANNING_DISTRICT = {
     "1": "Lenowisco", "2": "Cumberland Plateau", "3": "Mount Rogers",
@@ -406,7 +406,7 @@ VALUE_MAP_RULES = {
     "Work Zone Type": WORK_ZONE_TYPE,
     "School Zone": SCHOOL_ZONE,
     "First Harmful Event Loc": FIRST_HARMFUL_EVENT_LOC,
-    "VDOT District": VDOT_DISTRICT,
+    "DOT District": VDOT_DISTRICT,
     "Functional Class": FUNCTIONAL_CLASS,
     "Facility Type": FACILITY_TYPE,
     "Area Type": AREA_TYPE,

@@ -33,7 +33,7 @@ Implement an interactive Crash Tree Diagram feature that enables Virginia transp
 | Stakeholder | Value Delivered |
 |-------------|-----------------|
 | VDOT Central Office | Statewide safety trend identification, SHSP monitoring |
-| VDOT Districts | Regional priority setting, resource allocation |
+| DOT Districts | Regional priority setting, resource allocation |
 | Counties/Cities | HSIP grant applications, Local Road Safety Plans |
 | MPOs/PDCs | Regional safety planning, TIP project justification |
 
@@ -446,7 +446,7 @@ function exportDataAsCSV(treeData) { }
 | `CRASH_SEVERITY` | Severity filter | All | K, A, B, C, O |
 | `CRASH_DATE` | Date filter | All | 2023-05-15 |
 | `COUNTY_FIPS` | Jurisdiction | All | 51087 |
-| `VDOT_DISTRICT` | Jurisdiction | All | Richmond |
+| `DOT_DISTRICT` | Jurisdiction | All | Richmond |
 | `URBAN_RURAL_CD` | Tree split | Level 2 | U, R |
 | `INTERSECTION_TYPE` | Tree split | Level 3 | Intersection, Segment |
 | `TRAFFIC_CONTROL` | Tree split | Level 4 | Signal, Stop, None |

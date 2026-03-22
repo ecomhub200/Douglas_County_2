@@ -586,7 +586,7 @@ Map the state's road system values to the standardized SYSTEM categories:
 | `Interstate` | Interstate highways | `Interstate Highway` |
 | `Primary` | State routes | `State Highway` |
 | `Secondary` | Frontage roads | `Frontage Road` |
-| `NonVDOT secondary` | Local roads | `County Road`, `City Street` |
+| `Non-DOT secondary` | Local roads | `County Road`, `City Street` |
 
 ---
 
@@ -680,12 +680,12 @@ Three output files per jurisdiction, filtered from the standardized source:
 | File | Filter Column | Colorado Include Values | Virginia Filter |
 |------|--------------|------------------------|-----------------|
 | `*_all_roads.csv` | `_co_system_code` | All valid system codes | No filter |
-| `*_county_roads.csv` | `_co_system_code` | `City Street`, `County Road` | `SYSTEM` in NonVDOT |
+| `*_county_roads.csv` | `_co_system_code` | `City Street`, `County Road` | `SYSTEM` in Non-DOT |
 | `*_no_interstate.csv` | `_co_system_code` | `City Street`, `County Road`, `State Highway`, `Frontage Road` | `SYSTEM` != "Interstate" |
 
 ### CRITICAL: Filter on Original State Column, NOT Normalized Column
 
-**Always filter on `_co_system_code` (the original Colorado value), NOT on `SYSTEM` (the Virginia-normalized value).** The `SYSTEM` column maps multiple CO values to the same VA value (e.g., both "City Street" and "County Road" map to "NonVDOT secondary"), making it impossible to do precise filtering.
+**Always filter on `_co_system_code` (the original Colorado value), NOT on `SYSTEM` (the Virginia-normalized value).** The `SYSTEM` column maps multiple CO values to the same VA value (e.g., both "City Street" and "County Road" map to "Non-DOT secondary"), making it impossible to do precise filtering.
 
 ### Data Quality Rules During Split
 
@@ -2267,8 +2267,8 @@ These are the exact values used in the Henrico reference dataset. Your converted
 ### SYSTEM (5 values)
 
 ```
-VDOT Interstate, VDOT Primary, VDOT Secondary,
-NonVDOT primary, NonVDOT secondary
+DOT Interstate, DOT Primary, DOT Secondary,
+Non-DOT primary, Non-DOT secondary
 ```
 
 ---
@@ -2397,7 +2397,7 @@ print(f'State: {state}, Rows: {total}, GPS: {gps}')
 
 ### Bug 2: HIGH — Road Type CSV Filter Used Wrong Column
 
-**What happened:** The split script filtered `county_roads.csv` on the Virginia-normalized `SYSTEM` column or on `_co_agency_id` instead of `_co_system_code`. Since both "City Street" and "County Road" normalize to `NonVDOT secondary`, the filter included some State Highway rows (which also normalize to `Primary`) that leaked through.
+**What happened:** The split script filtered `county_roads.csv` on the Virginia-normalized `SYSTEM` column or on `_co_agency_id` instead of `_co_system_code`. Since both "City Street" and "County Road" normalize to `Non-DOT secondary`, the filter included some State Highway rows (which also normalize to `Primary`) that leaked through.
 
 **Visible symptom:** `county_roads.csv` had 201 non-county rows (162 State Highway, 35 Interstate, 4 Frontage Road). Conversely, it was MISSING most City Street rows (only 164 of 6,870).
 
@@ -2439,7 +2439,7 @@ Run these checks AFTER processing a new state's data, BEFORE deploying:
 - [ ] Dashboard KPI percentages are < 100% (sanity check: K% should be < 5% for most jurisdictions)
 - [ ] All 3 road type radio buttons load the correct CSV file
 - [ ] Fallback path points to `{jurisdiction}_all_roads.csv`, not `crashes.csv`
-- [ ] Road type filter labels use state-neutral language (not "VDOT" or "NonVDOT")
+- [ ] Road type filter labels use state-neutral language (not "DOT" or "Non-DOT")
 - [ ] StateAdapter correctly detects the state from CSV headers
 - [ ] `config.json` `roadSystems.filterProfiles` match actual SYSTEM column values
 

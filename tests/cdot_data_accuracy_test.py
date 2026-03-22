@@ -49,14 +49,14 @@ REQUIRED_COLUMNS = [
 EPDO_WEIGHTS = {'K': 462, 'A': 62, 'B': 12, 'C': 5, 'O': 1}
 
 # Valid SYSTEM values (Virginia-normalized)
-VALID_SYSTEM_VALUES = {'NonVDOT secondary', 'Primary', 'Secondary', 'Interstate', 'NonVDOT primary'}
+VALID_SYSTEM_VALUES = {'Non-DOT secondary', 'Primary', 'Secondary', 'Interstate', 'Non-DOT primary'}
 
 # Road type filter profiles (what SYSTEM values each filter should include)
 FILTER_PROFILES = {
-    'countyOnly': {'NonVDOT secondary'},  # County Road → NonVDOT secondary
+    'countyOnly': {'Non-DOT secondary'},  # County Road → Non-DOT secondary
     'cityOnly': set(),  # City/town agency roads (ownership-based, no SYSTEM mapping)
-    'countyPlusVDOT': {'NonVDOT secondary', 'Primary', 'Secondary'},
-    'allRoads': {'NonVDOT secondary', 'Primary', 'Secondary', 'Interstate'},
+    'countyPlusVDOT': {'Non-DOT secondary', 'Primary', 'Secondary'},
+    'allRoads': {'Non-DOT secondary', 'Primary', 'Secondary', 'Interstate'},
 }
 
 # Corresponding Colorado system codes for each filter
@@ -328,8 +328,8 @@ def test_road_type_filter_accuracy(suite):
         sys_counts[sys_val] += 1
         co_sys_counts[co_sys] += 1
 
-        # County roads should only have NonVDOT secondary
-        if sys_val != 'NonVDOT secondary':
+        # County roads should only have Non-DOT secondary
+        if sys_val != 'Non-DOT secondary':
             wrong_system_rows.append({
                 'doc': row.get('Document Nbr', ''),
                 'system': sys_val,
@@ -345,7 +345,7 @@ def test_road_type_filter_accuracy(suite):
         f'BUG: county_roads filter leakage ({wrong_count} non-county rows)',
         wrong_count == 0,
         f'{wrong_count} rows ({pct_wrong:.1f}%) have wrong SYSTEM value:\n'
-        f'  Expected: only NonVDOT secondary\n'
+        f'  Expected: only Non-DOT secondary\n'
         f'  Found: {dict(sys_counts)}\n'
         f'  Original CO codes: {dict(co_sys_counts)}\n'
         f'  Leaked: {wrong_count} rows with State Hwy ({sys_counts.get("Primary",0)}), '
@@ -795,7 +795,7 @@ def test_config_json_consistency(suite):
     config_county_systems = filter_profiles.get('countyOnly', {}).get('systemValues', [])
 
     uses_co_values = any(v in ['City Street', 'County Road'] for v in config_county_systems)
-    uses_va_values = any(v in ['NonVDOT secondary', 'Primary'] for v in config_county_systems)
+    uses_va_values = any(v in ['Non-DOT secondary', 'Primary'] for v in config_county_systems)
 
     suite.add(
         'config.json roadSystem filter documents source values',

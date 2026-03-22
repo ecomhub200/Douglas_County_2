@@ -558,7 +558,7 @@ The filter logic varies by state — configure in `data/{DOT_NAME}/config.json` 
 "countyRoads": {
   "method": "system_column",
   "column": "SYSTEM",
-  "includeValues": ["NonVDOT secondary", "NONVDOT", "Non-VDOT"]
+  "includeValues": ["Non-DOT secondary", "Non-DOT", "Non-DOT"]
 }
 ```
 

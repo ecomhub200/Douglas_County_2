@@ -343,14 +343,14 @@ const StateAdapter = (() => {
         _mapRoadSystem(systemCode) {
             const sc = (systemCode || '').trim();
             const mapping = {
-                'City Street': 'NonVDOT secondary',
-                'County Road': 'NonVDOT secondary',
+                'City Street': 'Non-DOT secondary',
+                'County Road': 'Non-DOT secondary',
                 'State Highway': 'Primary',
                 'Interstate Highway': 'Interstate',
                 'Frontage Road': 'Secondary',
-                'Non Crash': 'NonVDOT secondary'
+                'Non Crash': 'Non-DOT secondary'
             };
-            return mapping[sc] || 'NonVDOT secondary';
+            return mapping[sc] || 'Non-DOT secondary';
         },
 
         // ── Helper: Build node ID from intersection data ──
@@ -650,7 +650,7 @@ const StateAdapter = (() => {
                 return {
                     countyOnly: {
                         name: "County Roads Only",
-                        systemValues: ["NonVDOT secondary"]
+                        systemValues: ["Non-DOT secondary"]
                     },
                     cityOnly: {
                         name: "City Roads Only",
@@ -658,11 +658,11 @@ const StateAdapter = (() => {
                     },
                     countyPlusVDOT: {
                         name: "All Roads (No Interstate)",
-                        systemValues: ["NonVDOT secondary", "Primary", "Secondary"]
+                        systemValues: ["Non-DOT secondary", "Primary", "Secondary"]
                     },
                     allRoads: {
                         name: "All Roads (Including Interstate)",
-                        systemValues: ["NonVDOT secondary", "Primary", "Secondary", "Interstate"]
+                        systemValues: ["Non-DOT secondary", "Primary", "Secondary", "Interstate"]
                     }
                 };
             }

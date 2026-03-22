@@ -376,7 +376,7 @@ TWO ways to use the pipeline:
 
 File 1: `geo_resolver.py` (1,315 lines)
   Resolves 9 derived columns: Physical Juris Name, Juris Code, FIPS,
-  Place FIPS, VDOT District, Planning District, MPO Name, Ownership, Area Type.
+  Place FIPS, DOT District, Planning District, MPO Name, Ownership, Area Type.
   Key: GeoResolver(state_fips, state_abbreviation, geo_dir, hierarchy_path)
   resolver.resolve_all(rows)
   Ownership 4-tier: SYSTEM → FC+juris → juris-only → route name pattern.
@@ -1043,7 +1043,7 @@ Output column order:
  Deliverable 4: Gap Analysis & Fill Strategy
 ───────────────────────────────────────────────────────────────
 Auto-filled by geo_resolver:
-  Physical Juris Name, Juris Code, FIPS, Place FIPS, VDOT District,
+  Physical Juris Name, Juris Code, FIPS, Place FIPS, DOT District,
   Planning District, MPO Name, Ownership, Area Type.
 
 Auto-filled by crash_enricher Tier 1:
@@ -1094,7 +1094,7 @@ Alcohol?, Animal Related?, Unrestrained?, Bike?, Distracted?, Drowsy?,
 Drug Related?, Guardrail Related?, Hitrun?, Lgtruck?, Motorcycle?, Pedestrian?,
 Speed?, Max Speed Diff, RoadDeparture Type, Intersection Analysis,
 Senior?, Young?, Mainline?, Night?,
-VDOT District, Juris Code, Physical Juris Name, Functional Class,
+DOT District, Juris Code, Physical Juris Name, Functional Class,
 Facility Type, Area Type, SYSTEM, VSP, Ownership,
 Planning District, MPO Name, RTE Name, RNS MP, Node, Node Offset (ft),
 x, y

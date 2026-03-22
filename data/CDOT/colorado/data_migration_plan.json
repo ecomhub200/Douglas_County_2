@@ -99,7 +99,7 @@
             "noInterstate": "_co_system_code != 'Interstate Highway'"
           },
           "virginia": {
-            "countyRoads": "SYSTEM in {NonVDOT secondary, NONVDOT, Non-VDOT}",
+            "countyRoads": "SYSTEM in {Non-DOT secondary, Non-DOT}",
             "noInterstate": "SYSTEM != 'Interstate'"
           }
         }

@@ -105,21 +105,21 @@
         "isStateDOT": false,
         "isInterstate": false,
         "displayName": "County Road",
-        "standardizedSystem": "NonVDOT secondary"
+        "standardizedSystem": "Non-DOT secondary"
       },
       "Municipality": {
         "category": "local",
         "isStateDOT": false,
         "isInterstate": false,
         "displayName": "Municipal Road",
-        "standardizedSystem": "NonVDOT secondary"
+        "standardizedSystem": "Non-DOT secondary"
       },
       "Other Public Roadway": {
         "category": "local",
         "isStateDOT": false,
         "isInterstate": false,
         "displayName": "Other Public",
-        "standardizedSystem": "NonVDOT secondary"
+        "standardizedSystem": "Non-DOT secondary"
       }
     },
 
@@ -127,7 +127,7 @@
       "countyRoads": {
         "method": "column_value",
         "column": "SYSTEM",
-        "includeValues": ["NonVDOT secondary"]
+        "includeValues": ["Non-DOT secondary"]
       },
       "interstateExclusion": {
         "method": "column_value",
@@ -140,7 +140,7 @@
       "countyOnly": {
         "name": "County Roads Only",
         "description": "County-maintained roads only",
-        "systemValues": ["NonVDOT secondary"]
+        "systemValues": ["Non-DOT secondary"]
       },
       "cityOnly": {
         "name": "City Roads Only",
@@ -149,12 +149,12 @@
       "countyPlusVDOT": {
         "name": "All Roads (No Interstate)",
         "description": "Local + state roads, excluding interstates",
-        "systemValues": ["NonVDOT secondary", "Primary", "Secondary"]
+        "systemValues": ["Non-DOT secondary", "Primary", "Secondary"]
       },
       "allRoads": {
         "name": "All Roads (Including Interstate)",
         "description": "All road types",
-        "systemValues": ["NonVDOT secondary", "Primary", "Secondary", "Interstate"]
+        "systemValues": ["Non-DOT secondary", "Primary", "Secondary", "Interstate"]
       }
     }
   },

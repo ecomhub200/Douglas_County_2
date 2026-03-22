@@ -166,8 +166,8 @@ Colorado's `System Code` is mapped to Virginia's `SYSTEM` values so existing fil
 
 | Colorado System Code | Mapped To | Filter Profile |
 |---------------------|-----------|----------------|
-| City Street | NonVDOT secondary | countyOnly ✓ |
-| County Road | NonVDOT secondary | countyOnly ✓ |
+| City Street | Non-DOT secondary | countyOnly ✓ |
+| County Road | Non-DOT secondary | countyOnly ✓ |
 | State Highway | Primary | countyPlusState ✓ |
 | Frontage Road | Secondary | countyPlusState ✓ |
 | Interstate Highway | Interstate | allRoads only ✓ |

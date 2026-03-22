@@ -183,7 +183,7 @@ Name: ${locationData.name}
 Route: ${locationData.route || 'N/A'}
 Coordinates: ${locationData.lat}, ${locationData.lng}
 Congressional District: ${locationData.congressionalDistrict || 'VA-XX'}
-VDOT District: ${locationData.vdotDistrict || 'Richmond'}
+DOT District: ${locationData.vdotDistrict || 'Richmond'}
 
 ## CRASH DATA (${locationData.dataYears || '5-Year Period'})
 ${formatCrashTable(locationData.crashes)}

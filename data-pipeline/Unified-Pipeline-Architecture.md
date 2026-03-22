@@ -233,7 +233,7 @@ The output CSV from `state_adapter.py` uses these exact column names. The first 
 | 16 | `Intersection Type` | string | VDOT approach format (e.g., "4. Four Approaches") |
 | 17 | `Relation To Roadway` | string | VDOT relation (e.g., "9. Within Intersection") |
 | 18 | `RTE Name` | string | Route/road name (e.g., "I-64", "Main St") |
-| 19 | `SYSTEM` | string | Road system: Interstate / Primary / Secondary / NonVDOT secondary |
+| 19 | `SYSTEM` | string | Road system: Interstate / Primary / Secondary / Non-DOT secondary |
 | 20 | `Node` | string | Intersection node ID (e.g., "Main St & Broad St") |
 | 21 | `RNS MP` | string | Route milepost |
 | 22 | `x` | float | Longitude (Virginia convention: x=lon) |
@@ -283,7 +283,7 @@ The output CSV from `state_adapter.py` uses these exact column names. The first 
 | 61 | `RoadDeparture Type` | string | Road departure classification |
 | 62 | `Intersection Analysis` | string | Intersection analysis result |
 | 63 | `Mainline?` | Yes/No | Mainline roadway |
-| 64 | `VDOT District` | string | VDOT district name |
+| 64 | `DOT District` | string | DOT District name |
 | 65 | `Juris Code` | string | Jurisdiction FIPS code |
 | 66 | `VSP` | string | Virginia State Police division |
 | 67 | `Planning District` | string | Planning district |
@@ -935,7 +935,7 @@ Each state defines its own `splitConfig` in `states/{state}/config.json` → `ro
 2. **Identify the jurisdiction column** (e.g., Physical Juris Name, County) — filter to one jurisdiction and confirm you get ALL road types
 3. **For county_roads filter**: Find the column that distinguishes county-owned roads from state/federal roads:
    - If there's an **Ownership** column → use `ownership` method
-   - If there's a **SYSTEM** column with values like "NonVDOT", "Local" → use `system_column` method
+   - If there's a **SYSTEM** column with values like "Non-DOT", "Local" → use `system_column` method
    - If there's an **agency ID** column → use `agency_id` method
 4. **For interstate exclusion**: Find the column that identifies Interstate roads:
    - If there's a **Functional Class** column with an Interstate value → use `functional_class` method

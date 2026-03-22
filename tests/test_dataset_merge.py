@@ -103,7 +103,7 @@ def make_crash_row(doc_nbr, year=2024, date='01/15/2024', severity='O',
         'A_People': '0',
         'B_People': '0',
         'C_People': '0',
-        'SYSTEM': 'NonVDOT secondary',
+        'SYSTEM': 'Non-DOT secondary',
     }
     row.update(overrides)
     return row

@@ -564,7 +564,7 @@ def split_road_types(df, jurisdiction, data_dir):
 
     if sys_col:
         logger.info(f"  System '{sys_col}': {df[sys_col].value_counts().head(8).to_dict()}")
-        county_vals = {'NonVDOT secondary', 'NONVDOT', 'Non-VDOT', 'SECONDARY', 'Secondary'}
+        county_vals = {'Non-DOT secondary', 'Non-DOT', 'SECONDARY', 'Secondary'}
         county = df[df[sys_col].astype(str).str.strip().isin(county_vals)]
         if len(county) > 0:
             county.to_csv(str(data_dir / f'{jurisdiction}_county_roads.csv'), index=False)

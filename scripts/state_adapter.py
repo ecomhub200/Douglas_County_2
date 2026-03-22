@@ -235,7 +235,7 @@ class VirginiaNormalizer(BaseNormalizer):
         'OWNERSHIP': 'Ownership',
         'PLAN_DISTRICT': 'Planning District', 'Planning_District': 'Planning District',
         'MPO_NAME': 'MPO Name', 'MPO_Name': 'MPO Name',
-        'VDOT_DISTRICT': 'VDOT District', 'VDOT_District': 'VDOT District',
+        'VDOT_DISTRICT': 'DOT District', 'VDOT_District': 'DOT District',
         'RTE_NM': 'RTE Name', 'RTE_NAME': 'RTE Name', 'RTE_Name': 'RTE Name',
         'NODE': 'Node', 'OFFSET': 'Node Offset (ft)', 'Node_Offset': 'Node Offset (ft)',
         'ALCOHOL_NOTALCOHOL': 'Alcohol?', 'BIKE_NONBIKE': 'Bike?',
@@ -391,7 +391,7 @@ class VirginiaNormalizer(BaseNormalizer):
             '8': '8. Off Roadway, Location Unknown', '9': '9. Outside Right-of-Way',
             '99': 'Not Applicable',
         },
-        'VDOT District': {
+        'DOT District': {
             '1': '1. Bristol', '2': '2. Salem', '3': '3. Lynchburg',
             '4': '4. Richmond', '5': '5. Hampton Roads', '6': '6. Fredericksburg',
             '7': '7. Culpeper', '8': '8. Staunton', '9': '9. Northern Virginia',
@@ -402,8 +402,8 @@ class VirginiaNormalizer(BaseNormalizer):
             '5': '5. Toll Roads Maintained by Others', '6': '6. Private/Unknown Roads',
         },
         'SYSTEM': {
-            '1': 'VDOT Interstate', '2': 'VDOT Primary', '3': 'VDOT Secondary',
-            '4': 'NonVDOT primary', '5': 'NonVDOT secondary',
+            '1': 'DOT Interstate', '2': 'DOT Primary', '3': 'DOT Secondary',
+            '4': 'Non-DOT primary', '5': 'Non-DOT secondary',
         },
         'Functional Class': {
             'INT': '1-Interstate (A,1)',
@@ -424,7 +424,7 @@ class VirginiaNormalizer(BaseNormalizer):
             '0': 'NOT_RD', '1': 'RD_LEFT', '2': 'RD_RIGHT', '3': 'RD_UNKNOWN',
         },
         'Intersection Analysis': {
-            '0': 'Not Intersection', '1': 'Urban Intersection', '2': 'VDOT Intersection',
+            '0': 'Not Intersection', '1': 'Urban Intersection', '2': 'DOT Intersection',
         },
     }
 
@@ -646,7 +646,7 @@ class VirginiaNormalizer(BaseNormalizer):
         'School Zone': 'Yes',
         'First Harmful Event': 'Bank Or Ledge',
         'First Harmful Event Loc': 'On Roadway',
-        'VDOT District': 'Bristol',
+        'DOT District': 'Bristol',
         'Ownership': 'Hwy Agency',
         'SYSTEM': 'VDOT',
         'Functional Class': 'Interstate',
@@ -1044,12 +1044,12 @@ class ColoradoNormalizer(BaseNormalizer):
     }
 
     ROAD_SYSTEM_MAP = {
-        'City Street': 'NonVDOT secondary',
-        'County Road': 'NonVDOT secondary',
+        'City Street': 'Non-DOT secondary',
+        'County Road': 'Non-DOT secondary',
         'State Highway': 'Primary',
         'Interstate Highway': 'Interstate',
         'Frontage Road': 'Secondary',
-        'Non Crash': 'NonVDOT secondary',
+        'Non Crash': 'Non-DOT secondary',
     }
 
     SPEED_ACTIONS = {
@@ -1218,7 +1218,7 @@ class ColoradoNormalizer(BaseNormalizer):
 
         # --- Route & Location ---
         n['RTE Name'] = self._build_route_name(row)
-        n['SYSTEM'] = self.ROAD_SYSTEM_MAP.get(system, 'NonVDOT secondary')
+        n['SYSTEM'] = self.ROAD_SYSTEM_MAP.get(system, 'Non-DOT secondary')
         n['Node'] = self._build_node_id(row)
         n['RNS MP'] = row.get('Rd_Section', '').strip() if system in (
             'State Highway', 'Interstate Highway'
@@ -1617,10 +1617,10 @@ class MarylandNormalizer(BaseNormalizer):
         'US (State)': 'Primary',
         'Maryland (State)': 'Primary',
         'State Route': 'Primary',
-        'County': 'NonVDOT secondary',
-        'Municipality': 'NonVDOT secondary',
-        'Other Public Roadway': 'NonVDOT secondary',
-        'Government': 'NonVDOT secondary',
+        'County': 'Non-DOT secondary',
+        'Municipality': 'Non-DOT secondary',
+        'Other Public Roadway': 'Non-DOT secondary',
+        'Government': 'Non-DOT secondary',
         'Service Road': 'Secondary',
         'Ramp': 'Secondary',
     }
@@ -1734,7 +1734,7 @@ class MarylandNormalizer(BaseNormalizer):
         # --- Route & Location ---
         n['RTE Name'] = self._get(row, 'road_name', '')
         route_type = self._get(row, 'route_type', 'route_type_desc')
-        n['SYSTEM'] = self.ROAD_SYSTEM_MAP.get(route_type, 'NonVDOT secondary')
+        n['SYSTEM'] = self.ROAD_SYSTEM_MAP.get(route_type, 'Non-DOT secondary')
 
         # Node: intersection name
         road = self._get(row, 'road_name', '')

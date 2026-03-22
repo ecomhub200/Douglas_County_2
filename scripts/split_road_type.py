@@ -68,11 +68,11 @@ VALUE_DECODE_MAP = {
         '6': '6. Private/Unknown Roads',
     },
     'SYSTEM': {
-        '1': 'VDOT Interstate',
-        '2': 'VDOT Primary',
-        '3': 'VDOT Secondary',
-        '4': 'NonVDOT primary',
-        '5': 'NonVDOT secondary',
+        '1': 'DOT Interstate',
+        '2': 'DOT Primary',
+        '3': 'DOT Secondary',
+        '4': 'Non-DOT primary',
+        '5': 'Non-DOT secondary',
     },
     'Functional Class': {
         'INT': '1-Interstate (A,1)',
@@ -191,7 +191,7 @@ def _filter_by_config(rows, headers, config_section, label):
         col = _resolve_column(col_idx, config_section, 'SYSTEM')
         include_values = config_section.get('includeValues', [])
         if not include_values:
-            include_values = ['NonVDOT secondary', 'NONVDOT', 'Non-VDOT']
+            include_values = ['Non-DOT secondary', 'Non-DOT']
 
         if col is None:
             logger.warning(f"  Column not found for {label} filter — returning empty")
@@ -272,7 +272,7 @@ def filter_no_interstate(rows, headers, split_config):
 
     elif method == 'system_column':
         col = _resolve_column(col_idx, interstate_config, 'SYSTEM')
-        exclude_values = interstate_config.get('excludeValues', ['Interstate', 'VDOT Interstate'])
+        exclude_values = interstate_config.get('excludeValues', ['Interstate', 'DOT Interstate'])
         if col is None:
             logger.warning(f"  Column not found for interstate exclusion")
             return rows
@@ -364,12 +364,12 @@ def main():
             'countyRoads': {
                 'method': 'system_column',
                 'column': 'SYSTEM',
-                'includeValues': ['NonVDOT secondary', 'NONVDOT', 'Non-VDOT']
+                'includeValues': ['Non-DOT secondary', 'Non-DOT']
             },
             'interstateExclusion': {
                 'method': 'system_column',
                 'column': 'SYSTEM',
-                'excludeValues': ['Interstate', 'VDOT Interstate']
+                'excludeValues': ['Interstate', 'DOT Interstate']
             }
         }
 

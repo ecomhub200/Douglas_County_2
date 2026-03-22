@@ -74,7 +74,7 @@ GOLDEN_COLUMNS = [
     'Drug Related?', 'Guardrail Related?', 'Hitrun?', 'Lgtruck?', 'Motorcycle?', 'Pedestrian?',
     'Speed?', 'Max Speed Diff', 'RoadDeparture Type', 'Intersection Analysis',
     'Senior?', 'Young?', 'Mainline?', 'Night?',
-    'VDOT District', 'Juris Code', 'Physical Juris Name', 'Functional Class',
+    'DOT District', 'Juris Code', 'Physical Juris Name', 'Functional Class',
     'Facility Type', 'Area Type', 'SYSTEM', 'VSP', 'Ownership',
     'Planning District', 'MPO Name', 'RTE Name', 'RNS MP', 'Node', 'Node Offset (ft)',
     'x', 'y',
@@ -983,7 +983,7 @@ def compute_rankings(rows: List[Dict[str, str]]) -> List[Dict[str, str]]:
             metrics[key] = {
                 'total_crash': 0, 'total_ped_crash': 0, 'total_bike_crash': 0,
                 'total_fatal': 0, 'total_fatal_serious_injury': 0, 'total_epdo': 0,
-                'district': row.get('VDOT District', ''),
+                'district': row.get('DOT District', ''),
                 'mpo': row.get('MPO Name', ''),
                 'pd': row.get('Planning District', ''),
             }

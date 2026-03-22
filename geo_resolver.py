@@ -38,7 +38,7 @@ Usage in a state normalize.py:
   row['Juris Code']          = result['juris_code']
   row['FIPS']                = result['fips']
   row['Place FIPS']          = result['place_fips']
-  row['VDOT District']       = result['dot_district']
+  row['DOT District']        = result['dot_district']
   row['Planning District']   = result['planning_district']
   row['MPO Name']            = result['mpo_name']
   row['Ownership']           = result['ownership']
@@ -315,7 +315,7 @@ class OwnershipDeriver:
 
         Args:
             juris_type:       'county', 'city', 'town', 'village', 'cdp', 'unknown'
-            system:           Raw SYSTEM column value (e.g. "VDOT Interstate", "NonVDOT secondary")
+            system:           Raw SYSTEM column value (e.g. "DOT Interstate", "Non-DOT secondary")
             functional_class: Normalized FC string (e.g. "1-Interstate (A,1)") or raw FC code
             route_name:       Route name (e.g. "I-95", "SR-7", "CR-123")
             ownership_hint:   If source data has a raw ownership/maintainer field
@@ -345,7 +345,7 @@ class OwnershipDeriver:
             is_state_system = any(kw in sys_lower for kw in cls.STATE_SYSTEM_KEYWORDS)
             is_non_state = any(kw in sys_lower for kw in cls.NON_STATE_KEYWORDS)
 
-            # Also handle VDOT-style: "VDOT Interstate" / "NonVDOT secondary"
+            # Also handle DOT-style: "DOT Interstate" / "Non-DOT secondary"
             if sys_lower.startswith('vdot') or sys_lower.startswith('cdot') or \
                sys_lower.startswith('mdot') or sys_lower.startswith('deldot') or \
                sys_lower.endswith('dot interstate') or sys_lower.endswith('dot primary') or \
@@ -1151,8 +1151,8 @@ class GeoResolver:
                 row['FIPS'] = result['fips']
             if not row.get('Place FIPS'):
                 row['Place FIPS'] = result['place_fips']
-            if not row.get('VDOT District'):
-                row['VDOT District'] = result['dot_district']
+            if not row.get('DOT District'):
+                row['DOT District'] = result['dot_district']
             if not row.get('Planning District'):
                 row['Planning District'] = result['planning_district']
             if not row.get('MPO Name'):

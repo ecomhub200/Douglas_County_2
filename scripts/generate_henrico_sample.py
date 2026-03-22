@@ -95,7 +95,7 @@ LIGHT = {
 
 # Road system
 SYSTEMS = {
-    "county_roads": "NonVDOT secondary",
+    "county_roads": "Non-DOT secondary",
     "state_roads": "Primary",
     "interstates": "Interstate",
 }

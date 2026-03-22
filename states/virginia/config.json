@@ -92,41 +92,41 @@
 
   "roadSystems": {
     "values": {
-      "NonVDOT secondary": {
+      "Non-DOT secondary": {
         "category": "local",
         "isStateDOT": false,
         "isInterstate": false,
-        "displayName": "NonVDOT Secondary"
+        "displayName": "Non-DOT Secondary"
       },
-      "NonVDOT primary": {
+      "Non-DOT primary": {
         "category": "local",
         "isStateDOT": false,
         "isInterstate": false,
-        "displayName": "NonVDOT Primary"
+        "displayName": "Non-DOT Primary"
       },
-      "Non-VDOT": {
+      "Non-DOT": {
         "category": "local",
         "isStateDOT": false,
         "isInterstate": false,
-        "displayName": "Non-VDOT"
+        "displayName": "Non-DOT"
       },
-      "VDOT Primary": {
+      "DOT Primary": {
         "category": "state",
         "isStateDOT": true,
         "isInterstate": false,
-        "displayName": "VDOT Primary"
+        "displayName": "DOT Primary"
       },
-      "VDOT Secondary": {
+      "DOT Secondary": {
         "category": "state",
         "isStateDOT": true,
         "isInterstate": false,
-        "displayName": "VDOT Secondary"
+        "displayName": "DOT Secondary"
       },
-      "VDOT Interstate": {
+      "DOT Interstate": {
         "category": "interstate",
         "isStateDOT": true,
         "isInterstate": true,
-        "displayName": "VDOT Interstate"
+        "displayName": "DOT Interstate"
       }
     },
 
@@ -156,7 +156,7 @@
       "countyOnly": {
         "name": "County Roads Only",
         "description": "County-maintained roads only (County Hwy Agency)",
-        "systemValues": ["NonVDOT secondary", "NonVDOT primary", "Non-VDOT"]
+        "systemValues": ["Non-DOT secondary", "Non-DOT primary", "Non-DOT"]
       },
       "cityOnly": {
         "name": "City Roads Only",
@@ -165,14 +165,14 @@
       },
       "countyPlusVDOT": {
         "name": "All Roads (No Interstate)",
-        "description": "Local roads plus VDOT primary/secondary, excluding interstates",
-        "systemValues": ["NonVDOT secondary", "NonVDOT primary", "Non-VDOT", "VDOT Primary", "VDOT Secondary"],
+        "description": "Local roads plus DOT primary/secondary, excluding interstates",
+        "systemValues": ["Non-DOT secondary", "Non-DOT primary", "Non-DOT", "DOT Primary", "DOT Secondary"],
         "excludeRoutePatterns": ["^I-\\d+"]
       },
       "allRoads": {
         "name": "All Roads (Including Interstate)",
         "description": "All road types including interstates",
-        "systemValues": ["NonVDOT secondary", "NonVDOT primary", "Non-VDOT", "VDOT Primary", "VDOT Secondary", "VDOT Interstate"]
+        "systemValues": ["Non-DOT secondary", "Non-DOT primary", "Non-DOT", "DOT Primary", "DOT Secondary", "DOT Interstate"]
       }
     }
   },

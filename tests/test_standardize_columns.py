@@ -15,7 +15,7 @@ Covers:
   7. Ownership decode (correct labels for codes 5, 6)
   8. Functional Class decode
   9. Facility Type decode with numbered prefixes
-  10. VDOT District decode
+  10. DOT District decode
   11. Area Type decode (0→Rural, 1→Urban)
   12. Physical Juris Name decode
   13. Planning District decode
@@ -133,7 +133,7 @@ class TestHeaderRenaming(unittest.TestCase):
             'Collision Type', 'Weather Condition', 'Light Condition',
             'Roadway Surface Condition', 'Intersection Type',
             'Traffic Control Type', 'Traffic Control Status',
-            'VDOT District', 'Juris Code', 'Physical Juris Name',
+            'DOT District', 'Juris Code', 'Physical Juris Name',
             'Functional Class', 'Facility Type', 'Area Type',
             'SYSTEM', 'Ownership', 'Planning District', 'MPO Name',
             'RTE Name', 'RNS MP', 'Node', 'Node Offset (ft)',
@@ -284,23 +284,23 @@ class TestSystemDecode(unittest.TestCase):
 
     def test_vdot_interstate(self):
         df = standardize_columns(_make_df({'SYSTEM': '1'}))
-        self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Interstate')
+        self.assertEqual(df['SYSTEM'].iloc[0], 'DOT Interstate')
 
     def test_vdot_primary(self):
         df = standardize_columns(_make_df({'SYSTEM': '2'}))
-        self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Primary')
+        self.assertEqual(df['SYSTEM'].iloc[0], 'DOT Primary')
 
     def test_vdot_secondary(self):
         df = standardize_columns(_make_df({'SYSTEM': '3'}))
-        self.assertEqual(df['SYSTEM'].iloc[0], 'VDOT Secondary')
+        self.assertEqual(df['SYSTEM'].iloc[0], 'DOT Secondary')
 
     def test_nonvdot_primary(self):
         df = standardize_columns(_make_df({'SYSTEM': '4'}))
-        self.assertEqual(df['SYSTEM'].iloc[0], 'NonVDOT primary')
+        self.assertEqual(df['SYSTEM'].iloc[0], 'Non-DOT primary')
 
     def test_nonvdot_secondary(self):
         df = standardize_columns(_make_df({'SYSTEM': '5'}))
-        self.assertEqual(df['SYSTEM'].iloc[0], 'NonVDOT secondary')
+        self.assertEqual(df['SYSTEM'].iloc[0], 'Non-DOT secondary')
 
 
 class TestOwnershipDecode(unittest.TestCase):
@@ -360,19 +360,19 @@ class TestVDOTDistrictDecode(unittest.TestCase):
 
     def test_hampton_roads(self):
         df = standardize_columns(_make_df({'VDOT_DISTRICT': '5'}))
-        self.assertEqual(df['VDOT District'].iloc[0], '5. Hampton Roads')
+        self.assertEqual(df['DOT District'].iloc[0], '5. Hampton Roads')
 
     def test_northern_virginia(self):
         df = standardize_columns(_make_df({'VDOT_DISTRICT': '9'}))
-        self.assertEqual(df['VDOT District'].iloc[0], '9. Northern Virginia')
+        self.assertEqual(df['DOT District'].iloc[0], '9. Northern Virginia')
 
     def test_bristol(self):
         df = standardize_columns(_make_df({'VDOT_DISTRICT': '1'}))
-        self.assertEqual(df['VDOT District'].iloc[0], '1. Bristol')
+        self.assertEqual(df['DOT District'].iloc[0], '1. Bristol')
 
     def test_richmond(self):
         df = standardize_columns(_make_df({'VDOT_DISTRICT': '4'}))
-        self.assertEqual(df['VDOT District'].iloc[0], '4. Richmond')
+        self.assertEqual(df['DOT District'].iloc[0], '4. Richmond')
 
 
 class TestAreaTypeDecode(unittest.TestCase):
@@ -432,7 +432,7 @@ class TestIntersectionAnalysisDecode(unittest.TestCase):
 
     def test_vdot_intersection(self):
         df = standardize_columns(_make_df({'INTERSECTION_ANALYSIS': '2'}))
-        self.assertEqual(df['Intersection Analysis'].iloc[0], 'VDOT Intersection')
+        self.assertEqual(df['Intersection Analysis'].iloc[0], 'DOT Intersection')
 
 
 class TestRoadDepartureTypeDecode(unittest.TestCase):
@@ -534,32 +534,32 @@ class TestColumnAliases(unittest.TestCase):
     """Verify VDOT website download column renames."""
 
     def test_hit_and_run_renamed(self):
-        df = pd.DataFrame([{'Hit & Run?': '1', 'SYSTEM': 'VDOT Primary'}])
+        df = pd.DataFrame([{'Hit & Run?': '1', 'SYSTEM': 'DOT Primary'}])
         df = standardize_columns(df)
         self.assertIn('Hitrun?', df.columns)
         self.assertNotIn('Hit & Run?', df.columns)
         self.assertEqual(df['Hitrun?'].iloc[0], 'Yes')
 
     def test_large_vehicle_renamed(self):
-        df = pd.DataFrame([{'Large Vehicle?': '0', 'SYSTEM': 'VDOT Primary'}])
+        df = pd.DataFrame([{'Large Vehicle?': '0', 'SYSTEM': 'DOT Primary'}])
         df = standardize_columns(df)
         self.assertIn('Lgtruck?', df.columns)
         self.assertEqual(df['Lgtruck?'].iloc[0], 'No')
 
     def test_unbelted_renamed(self):
-        df = pd.DataFrame([{'UnBelted?': '1', 'SYSTEM': 'VDOT Primary'}])
+        df = pd.DataFrame([{'UnBelted?': '1', 'SYSTEM': 'DOT Primary'}])
         df = standardize_columns(df)
         self.assertIn('Unrestrained?', df.columns)
         self.assertEqual(df['Unrestrained?'].iloc[0], 'Unbelted')
 
     def test_senior_driver_renamed(self):
-        df = pd.DataFrame([{'Senior Driver?': '1', 'SYSTEM': 'VDOT Primary'}])
+        df = pd.DataFrame([{'Senior Driver?': '1', 'SYSTEM': 'DOT Primary'}])
         df = standardize_columns(df)
         self.assertIn('Senior?', df.columns)
         self.assertEqual(df['Senior?'].iloc[0], 'Yes')
 
     def test_young_driver_renamed(self):
-        df = pd.DataFrame([{'Young Driver?': '0', 'SYSTEM': 'VDOT Primary'}])
+        df = pd.DataFrame([{'Young Driver?': '0', 'SYSTEM': 'DOT Primary'}])
         df = standardize_columns(df)
         self.assertIn('Young?', df.columns)
         self.assertEqual(df['Young?'].iloc[0], 'No')
@@ -782,17 +782,17 @@ class TestIdempotency(unittest.TestCase):
             'Crash Severity': 'O',
             'Collision Type': '4. Sideswipe - Same Direction',
             'Weather Condition': '1. No Adverse Condition (Clear/Cloudy)',
-            'SYSTEM': 'NonVDOT secondary',
+            'SYSTEM': 'Non-DOT secondary',
             'Ownership': '3. City or Town Hwy Agency',
             'Functional Class': '7-Local (J,6)',
             'Facility Type': '3-Two-Way Undivided',
             'Alcohol?': 'No',
             'Unrestrained?': 'Belted',
-            'VDOT District': '5. Hampton Roads',
+            'DOT District': '5. Hampton Roads',
             'Area Type': 'Urban',
             'Physical Juris Name': '121. City of Newport News',
             'Planning District': 'Hampton Roads',
-            'Intersection Analysis': 'VDOT Intersection',
+            'Intersection Analysis': 'DOT Intersection',
             'RoadDeparture Type': 'NOT_RD',
         }
         df = pd.DataFrame([decoded])
@@ -849,18 +849,18 @@ class TestFullRowIntegration(unittest.TestCase):
             'Pedestrian?': 'No',
             'Speed?': 'No',
             'RoadDeparture Type': 'NOT_RD',
-            'Intersection Analysis': 'VDOT Intersection',
+            'Intersection Analysis': 'DOT Intersection',
             'Senior?': 'Yes',
             'Young?': 'No',
             'Mainline?': 'Yes',
             'Night?': 'No',
-            'VDOT District': '5. Hampton Roads',
+            'DOT District': '5. Hampton Roads',
             'Juris Code': '121',
             'Physical Juris Name': '121. City of Newport News',
             'Functional Class': '7-Local (J,6)',
             'Facility Type': '3-Two-Way Undivided',
             'Area Type': 'Urban',
-            'SYSTEM': 'NonVDOT secondary',
+            'SYSTEM': 'Non-DOT secondary',
             'Ownership': '3. City or Town Hwy Agency',
             'Planning District': 'Hampton Roads',
             'MPO Name': 'HAMP',
