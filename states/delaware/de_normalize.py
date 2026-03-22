@@ -873,17 +873,39 @@ def build_column_mapping_record(source_cols: list[str]) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _ensure_osm_cache() -> bool:
-    """Check/download OSM road network cache for Tier 2 enrichment."""
+    """Check/download OSM road network cache for Tier 2 enrichment.
+
+    Returns True if Tier 2 should run (cache exists OR osmnx is available
+    so crash_enricher.enrich_tier2 can download on the fly).
+    """
     cache_file = _CACHE_DIR / f"{STATE_ABBREVIATION}_roads.parquet"
     if cache_file.exists():
+        print(f"        OSM cache found: {cache_file}")
         return True
+
+    # Cache missing — try to pre-download via crash_enricher helper
     try:
-        import osm_road_enricher
+        from crash_enricher import _load_or_download_road_network
         _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        if hasattr(osm_road_enricher, "download_state_roads"):
-            osm_road_enricher.download_state_roads(STATE_NAME, STATE_ABBREVIATION, str(_CACHE_DIR))
-        return cache_file.exists()
+        print(f"        OSM cache not found at {cache_file}, downloading...")
+        road_df = _load_or_download_road_network(STATE_NAME, STATE_ABBREVIATION, str(_CACHE_DIR))
+        if road_df is not None and cache_file.exists():
+            print(f"        OSM cache created: {cache_file}")
+            return True
     except ImportError:
+        pass
+    except Exception as e:
+        print(f"        OSM pre-download failed: {e}")
+
+    # Fallback: if osmnx + scipy importable, enrich_tier2() can download itself
+    try:
+        import osmnx  # noqa: F401
+        import scipy  # noqa: F401
+        print(f"        osmnx {osmnx.__version__} + scipy {scipy.__version__} available — Tier 2 will download on the fly")
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        return True
+    except ImportError as e:
+        print(f"        Tier 2 deps missing: {e}")
         return False
 
 
@@ -899,7 +921,7 @@ def run_enrichment(df: pd.DataFrame, skip_enrichment: bool = False) -> pd.DataFr
     try:
         from crash_enricher import CrashEnricher
         osm_ready = _ensure_osm_cache()
-        print(f"  [8/8] Phase 8: Enrichment (Tier 1 always, Tier 2 {'ready' if osm_ready else 'SKIPPED — install osmnx+scipy'})...")
+        print(f"  [8/8] Phase 8: Enrichment (Tier 1 always, Tier 2 {'ready' if osm_ready else 'SKIPPED — osmnx+scipy not importable'})...")
         enricher = CrashEnricher(
             STATE_FIPS, STATE_ABBREVIATION, STATE_NAME,
             cache_dir=str(_CACHE_DIR),
