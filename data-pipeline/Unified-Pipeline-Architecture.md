@@ -1,8 +1,8 @@
 # Crash Lens — Unified Pipeline Architecture
 
-**Version:** 6.0
+**Version:** 7.0
 **Last Updated:** March 2026
-**Purpose:** Replace 40+ separate workflows with a two-workflow system: state-specific download/convert workflows (with scope dropdowns) that automatically trigger a single unified processing pipeline. The conversion step produces a Virginia-compatible CSV with standardized columns plus any unmapped state-specific columns appended at the end with a `_{state}_` prefix. Validation and auto-correction run automatically in Stage 4.5 via headless Playwright against the existing `crash-data-validator-v13.html` engine.
+**Purpose:** Replace 40+ separate workflows with a two-workflow system: state-specific download/convert workflows (with scope dropdowns) that automatically trigger a single unified processing pipeline. The conversion step produces a Virginia-compatible CSV with standardized columns plus any unmapped state-specific columns appended at the end with a `_{state}_` prefix. Stages 1-3 (jurisdiction split, road type split, scope aggregation) are unified into a single `scripts/split.py` call that outputs to `data/{state}/`. Validation is triggered from the frontend, not from the pipeline.
 
 **Design Decision:** State-specific download + merge + convert workflows (with state/scope/jurisdiction dropdowns) → auto-trigger unified `pipeline.yml` starting at Init Cache.
 
@@ -21,15 +21,13 @@
 5. [State-Specific Workflow Template](#5-state-specific-workflow-template)
 6. [Layer 2: Scope Resolver](#6-layer-2-scope-resolver)
 7. [Layer 3: Unified Processing Pipeline](#7-layer-3-unified-processing)
-8. [Validation and Auto-Correction (Stage 4.5)](#8-validation-and-auto-correction)
+8. [Validation (Frontend-Triggered)](#8-validation)
 9. [Unified Stage 0: Init Cache](#9-stage-0-init-cache)
-10. [Unified Stage 1: Split by Jurisdiction](#10-stage-1-split-by-jurisdiction)
-11. [Unified Stage 2: Split by Road Type](#11-stage-2-split-by-road-type)
-12. [Unified Stage 3: Aggregate by Scope (CSV)](#12-stage-3-aggregate-by-scope)
-13. [Unified Stage 4: Upload to R2](#13-stage-4-upload-to-r2)
-14. [Unified Stage 5: Predict (Forecast)](#14-stage-5-predict)
-14b. [Unified Stage 5b: Upload Forecast JSONs](#14b-stage-5b-upload-forecasts)
-15. [Unified Stage 6: Manifest Update & Git Commit](#15-stage-6-manifest-update)
+10. [Unified Stages 1-3: Split (scripts/split.py)](#10-stages-1-3-split)
+11. [Unified Stage 4: Upload to R2](#11-stage-4-upload-to-r2)
+12. [Unified Stage 5: Predict (Forecast)](#12-stage-5-predict)
+12b. [Unified Stage 5b: Upload Forecast JSONs](#12b-stage-5b-upload-forecasts)
+13. [Unified Stage 6: Manifest Update & Git Commit](#13-stage-6-manifest-update)
 16. [Unified Workflow YAML (pipeline.yml)](#16-unified-workflow-yaml)
 17. [Scope Resolver Script](#17-scope-resolver-script)
 18. [Configuration Per State](#18-configuration-per-state)
@@ -116,15 +114,16 @@ When the processing pipeline changes (add a stage, fix upload logic, change a fl
 │  │  Input: Virginia-compatible CSV + scope metadata             │    │
 │  │                                                              │    │
 │  │                                                              │    │
-│  │  Stage 0: INIT CACHE (state-isolated cache setup)            │    │
-│  │  Stage 1: SPLIT BY JURISDICTION (if batch mode)              │    │
-│  │  Stage 2: SPLIT BY ROAD TYPE (4 CSVs per jurisdiction)       │    │
-│  │  Stage 3: AGGREGATE BY SCOPE (CSV — region/MPO/statewide)    │    │
-│  │  Stage 4: UPLOAD all CSVs to R2                              │    │
-│  │  Stage 4.5: VALIDATE & AUTO-CORRECT (headless Playwright)    │    │
-│  │  Stage 5: PREDICT (SageMaker Chronos-2 — optional)           │    │
-│  │  Stage 5b: UPLOAD forecast JSONs to R2                       │    │
-│  │  Stage 6: MANIFEST UPDATE + GIT COMMIT                       │    │
+│  │  Stage 0:    INIT CACHE (state-isolated cache setup)          │    │
+│  │  Stages 1-3: SPLIT (scripts/split.py — unified)              │    │
+│  │              jurisdiction + road type + aggregate in 1 pass   │    │
+│  │              Output: data/{state}/ (mirrors R2 structure)     │    │
+│  │  Stage 4:    UPLOAD all CSVs to R2                            │    │
+│  │  Stage 5:    PREDICT (SageMaker Chronos-2 — optional)         │    │
+│  │  Stage 5b:   UPLOAD forecast JSONs to R2                      │    │
+│  │  Stage 6:    MANIFEST UPDATE + GIT COMMIT                     │    │
+│  │                                                               │    │
+│  │  NOTE: Validation triggered from frontend, not pipeline       │    │
 │  └──────────────────────────────────────────────────────────────┘    │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
@@ -133,21 +132,13 @@ When the processing pipeline changes (add a stage, fix upload logic, change a fl
 ### The Key Boundary
 
 **State-specific workflow** = Download + Merge + Convert → produce Virginia-compatible CSV → auto-trigger pipeline.yml.
-**Unified pipeline.yml** = Init Cache → Split Jurisdiction → Split Road Type → Aggregate (CSV) → Upload → Validate & Auto-Correct → Predict → Upload Forecasts → Manifest.
+**Unified pipeline.yml** = Init Cache → Split (unified) → Upload → Predict → Upload Forecasts → Manifest.
 
-### Validation and Auto-Correction (Stage 4.5)
+### Validation
 
-Validation and auto-correction run **inside the pipeline** as Stage 4.5, after CSVs are uploaded to R2. The headless runner (`scripts/run-validator-headless.py`) drives the same `crash-data-validator-v13.html` engine used in the Upload tab — via Playwright headless Chromium. This ensures a **single validation engine** for both manual (UI) and autonomous (pipeline) triggers.
+Validation is triggered **from the frontend** (Upload tab), not from the pipeline. The `crash-data-validator-v13.html` engine runs in the browser when the user opens the Upload tab, performing interactive review, auto-correction, and push to R2.
 
-**Dual-trigger model:**
-| Trigger | When | What Runs | Output |
-|---------|------|-----------|--------|
-| **Manual** | User opens Upload tab | `crash-data-validator-v13.html` iframe | Interactive review + auto-correct + push to R2 |
-| **Autonomous** | Pipeline Stage 4.5 (monthly data update) | `run-validator-headless.py` → same HTML engine | Corrected CSVs + `validation_report_*.json` uploaded to R2 |
-
-**Road types validated:** `all_roads`, `county_roads`, `city_roads` (if configured), `no_interstate` — all 4 split variants per jurisdiction.
-
-**Non-blocking:** Stage 4.5 uses `continue-on-error` semantics — issues are reported via GitHub Actions `::warning::` annotations but do not fail the pipeline. Forecasts (Stage 5) proceed against the auto-corrected data.
+**Stage 4.5 was removed** from both `pipeline.yml` and `batch-pipeline.yml` to keep the pipeline focused on data processing and uploading. Validation happens after data is available in R2, triggered by the user from the frontend.
 
 ### Two Processing Modes
 
@@ -155,7 +146,7 @@ Validation and auto-correction run **inside the pipeline** as Stage 4.5, after C
 User picks one county from the dropdown. The state workflow downloads and converts data for that county. Pipeline initializes cache → splits by road type → uploads.
 
 **Mode B: Batch (Region / MPO / Statewide)**
-User picks a region, MPO, or "statewide." The state workflow downloads the full statewide dataset, merges and converts to Virginia format. Pipeline initializes cache → splits into jurisdictions → splits by road type → aggregates → uploads.
+User picks a region, MPO, or "statewide." The state workflow downloads the full statewide dataset, merges and converts to Virginia format. Pipeline initializes cache → splits (all tiers in one pass via `scripts/split.py`) → uploads to R2.
 
 ---
 
@@ -766,135 +757,66 @@ Output: {
 
 ### 7.1 Stage Sequence
 
-The unified pipeline has **7 stages** (0-6, plus 5b). It receives Virginia-compatible CSVs from the state-specific workflow and handles all generic processing.
+The unified pipeline has **5 stages** (0, 1-3 unified, 4, 5/5b, 6). It receives Virginia-compatible CSVs from the state-specific workflow and handles all generic processing.
 
-**New in v6:** Validate and Geocode moved to Stage 4.5 (headless Playwright running `crash-data-validator-v13.html`). Stage 0 (Init Cache) added for state-isolated cache setup. Statewide gzip upload removed. Forecast JSON upload split into its own step (5b). Split by road type now uses dedicated `scripts/split_road_type.py`. City roads (`city_roads.csv`) added as 4th road-type split variant.
+**New in v7:** Stages 1-3 (jurisdiction split, road type split, scope aggregation) merged into a single `scripts/split.py` call. Stage 4.5 (validation) removed — validation is now triggered from the frontend. Split output goes to `data/{state}/` which mirrors the R2 folder structure directly.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│          UNIFIED PROCESSING PIPELINE v6 (pipeline.yml)              │
+│          UNIFIED PROCESSING PIPELINE v7 (pipeline.yml)              │
 │          Input: Virginia-compatible CSV from state workflow          │
 │          Triggered automatically by state workflow                   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  Stage 0:  INIT CACHE (state-isolated cache directory setup)        │
+│  Stage 0:    INIT CACHE (state-isolated cache directory setup)      │
 │       ↓                                                             │
-│  Stage 1:  SPLIT BY JURISDICTION (if batch mode)                    │
-│       ↓    (scripts/split_jurisdictions.py)                         │
+│  Stages 1-3: SPLIT (scripts/split.py — unified)                    │
+│       ├─ Jurisdiction split (counties + cities)                     │
+│       ├─ Road type split (SET A & SET B per tier)                   │
+│       ├─ Scope aggregation (state, region, MPO, planning district)  │
+│       └─ Output: data/{state}/ (mirrors R2 folder structure)        │
+│       ↓                                                             │
+│  Stage 4:    UPLOAD ALL CSVs to R2 (gzip-compressed)                │
+│       ↓                                                             │
+│  Stage 5:    PREDICT (SageMaker Chronos-2 forecasts — optional)     │
+│       ↓                                                             │
+│  Stage 5b:   UPLOAD FORECAST JSONs to R2                            │
+│       ↓                                                             │
+│  Stage 6:    MANIFEST UPDATE + GIT COMMIT                           │
 │                                                                     │
-│  ┌─── FOR EACH JURISDICTION ───────────────────────────────────┐    │
-│  │  Stage 2:  SPLIT BY ROAD TYPE (4 CSVs per jurisdiction)     │    │
-│  │            (scripts/split_road_type.py)                      │    │
-│  │            → all_roads, county_roads, city_roads, no_interstate  │
-│  └─────────────────────────────────────────────────────────────┘    │
-│       ↓                                                             │
-│  Stage 3:  AGGREGATE BY SCOPE (CSV — concat county rows)           │
-│       ├─ State-level aggregates (scripts/aggregate_by_scope.py)    │
-│       └─ Federal cross-state aggregates (statewide scope only)     │
-│       ↓                                                             │
-│  Stage 4:  UPLOAD ALL CSVs to R2                                    │
-│       ├─ 4a: County CSVs (4 per jurisdiction)                      │
-│       ├─ 4b: Region/MPO aggregate CSVs (4 per group)              │
-│       └─ 4c: Federal aggregate CSVs (statewide scope only)        │
-│       ↓                                                             │
-│  Stage 4.5: VALIDATE & AUTO-CORRECT (headless Playwright)          │
-│       ├─ scripts/run-validator-headless.py                         │
-│       ├─ Reads CSVs from R2 → validates → auto-corrects           │
-│       └─ Re-uploads corrected CSVs + validation reports to R2     │
-│       ↓                                                             │
-│  Stage 5:  PREDICT (SageMaker Chronos-2 forecasts — optional)       │
-│       ↓                                                             │
-│  Stage 5b: UPLOAD FORECAST JSONs to R2                              │
-│       ↓                                                             │
-│  Stage 6:  MANIFEST UPDATE + GIT COMMIT                             │
+│  NOTE: Validation triggered from frontend, not pipeline             │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 7.2 What Changed From v5 → v6
+### 7.2 What Changed From v6 → v7
 
-| v5 (8 stages) | v6 (8 stages — validation in Stage 4.5 via headless Playwright) |
+| v6 (8 stages) | v7 (5 stages — unified split, no pipeline validation) |
 |----------------|---------------------------|
-| Stage 1: Validate | Stage 4.5: Validate & Auto-Correct (headless Playwright) |
-| Stage 2: Geocode | — (moved to Cloudflare Workers) |
-| ── SAVE statewide CSV ── | — (removed) |
-| Stage 3: Split by Jurisdiction | Stage 0: Init Cache (NEW) |
-| Stage 4: Split by Road Type | Stage 1: Split by Jurisdiction |
-| Stage 5: Aggregate by Scope | Stage 2: Split by Road Type |
-| Stage 6: Upload ALL CSVs to R2 | Stage 3: Aggregate by Scope (CSV) |
-| Stage 7: Predict | Stage 4: Upload CSVs to R2 |
-| Stage 8: Manifest | Stage 5: Predict (SageMaker Chronos-2) |
-| | Stage 5b: Upload Forecast JSONs (NEW) |
-| | Stage 6: Manifest Update + Git Commit |
+| Stage 0: Init Cache | Stage 0: Init Cache (unchanged) |
+| Stage 1: Split by Jurisdiction | Stages 1-3: Unified split.py |
+| Stage 2: Split by Road Type | (merged into single pass) |
+| Stage 3: Aggregate by Scope | (merged into single pass) |
+| Stage 4: Upload CSVs to R2 | Stage 4: Upload CSVs to R2 (unchanged) |
+| Stage 4.5: Validate & Auto-Correct | — (removed, triggered from frontend) |
+| Stage 5: Predict | Stage 5: Predict (unchanged) |
+| Stage 5b: Upload Forecast JSONs | Stage 5b: Upload Forecast JSONs (unchanged) |
+| Stage 6: Manifest + Git Commit | Stage 6: Manifest + Git Commit (unchanged) |
 
-**Key changes in v6:** Validate and auto-correct run as Stage 4.5 via headless Playwright against `crash-data-validator-v13.html`. Stage 0 (Init Cache) added. Statewide gzip upload removed. Forecast JSON upload split into its own step (5b). Split by road type now uses dedicated `scripts/split_road_type.py` with city roads as 4th variant. `skip_validation` input added to all pipeline YAMLs.
+**Key changes in v7:** `scripts/split.py` replaces `split_jurisdictions.py` + `split_road_type.py` + `aggregate_by_scope.py`. Two road type sets: SET A (state/region: all_roads, dot_roads, primary_roads, non_dot_roads) and SET B (county/MPO/PD/city: all_roads, county_roads, city_roads, no_interstate). Output directory changed from `$DATA_DIR/splits/` to `data/{state}/`. Stage 4.5 validation removed from pipeline (now frontend-triggered). `skip_validation` input removed from workflow YAMLs.
 
 ---
 
-## 8. Validation and Auto-Correction (Stage 4.5)
+## 8. Validation (Frontend-Triggered)
 
-### Architecture
+Validation is **no longer part of the pipeline**. It was removed in v7.
 
-Stage 4.5 runs the **same `crash-data-validator-v13.html`** engine used in the Upload tab UI, but driven headlessly by Playwright in the pipeline. This ensures a single validation codebase for both manual and autonomous triggers.
+The `crash-data-validator-v13.html` engine runs in the browser when the user opens the Upload tab in the frontend. It performs interactive review, auto-correction, and pushes corrected data back to R2.
 
-**Script:** `scripts/run-validator-headless.py`
-
-**Flow:**
-```
-Stage 4 uploads CSVs to R2
-    ↓
-Stage 4.5: run-validator-headless.py
-    ├─ Launches headless Chromium via Playwright
-    ├─ Serves crash-data-validator-v13.html locally
-    ├─ For each jurisdiction × road_type:
-    │   ├─ Injects jurisdiction config (state, county, bounds, r2Path)
-    │   ├─ Triggers selectFile() → runAutonomousPipeline()
-    │   │   ├─ Load CSV from R2 CDN
-    │   │   ├─ Run all validation checks (bounds, GPS, severity, dates, duplicates, etc.)
-    │   │   └─ Run auto-corrections (route-median GPS, severity fix, date normalization, etc.)
-    │   ├─ Extracts corrected CSV from page memory
-    │   └─ Saves validation_report_{jurisdiction}_{road_type}.json
-    ├─ Re-uploads corrected CSVs to R2 (overwrites originals)
-    ├─ Uploads validation reports to R2
-    └─ Outputs validation_summary.json
-    ↓
-Stage 5 runs forecasts against validated data
-```
-
-**Road types validated:** `all_roads`, `county_roads`, `city_roads` (if `splitConfig.cityRoads` exists), `no_interstate`.
-
-**Skippable:** `skip_validation: 'true'` input parameter.
-
-**Non-blocking:** Issues produce `::warning::` GitHub Actions annotations but do not fail the pipeline.
-
-### Validation Checks (from crash-data-validator-v13.html)
-
-| Check | What It Does |
-|-------|-------------|
-| County boundary | Flags coordinates outside jurisdiction bbox |
-| Missing GPS | Detects zero/null/missing x,y coordinates |
-| Coordinate precision | Warns on <4 decimal places |
-| Duplicates | Composite key: Document Nbr + Date + Time |
-| KABCO severity | Cross-checks severity vs injury counts |
-| Date/time | Validates parseable dates in expected range |
-| Missing fields | Checks critical fields (severity, collision type, etc.) |
-| Cross-field | Consistency between related fields |
-
-### Auto-Corrections Applied
-
-| Fix | Method |
-|-----|--------|
-| KABCO severity | Recalculates from K/A/B/C people counts |
-| Cross-field flags | Fixes inconsistent pedestrian/bike/work zone flags |
-| Date normalization | Standardizes date formats |
-| Missing GPS | Route-median inference (median coords from same route) |
-| Out-of-bounds | Route-median snap (replace with route's median coords) |
-| Whitespace | Trim + normalize all text fields |
-| Missing fields | Infer Functional Class/Facility Type from route patterns |
-
-### Previous Architecture (v5)
-
-For reference, the v5 pipeline included separate Stage 1 (Validate) and Stage 2 (Geocode) as Python scripts. These were replaced by Stage 4.5 which uses the same browser-based validator engine as the UI, ensuring feature parity between manual and autonomous validation.
+**Previous pipeline validation (v6 Stage 4.5)** used headless Playwright to run the same engine autonomously. This was removed because:
+1. Frontend validation provides the same coverage
+2. Pipeline validation added significant runtime (Playwright install + Chromium + per-jurisdiction validation)
+3. Keeping validation frontend-triggered gives users control over when corrections are applied
 
 ---
 
@@ -1027,14 +949,16 @@ Each state defines its own `splitConfig` in `states/{state}/config.json` → `ro
 | Download filter defaults to `countyOnly` | `all_roads.csv` only contains county roads (~50% of data missing) | Always pass `--filter allRoads` in download workflow |
 | SYSTEM column doesn't match Ownership semantics | County roads filter includes/excludes wrong roads | Use the column that the state DOT uses for road ownership classification |
 | ArcGIS API WHERE clause stops at first partial match | Jurisdiction filter misses Interstate/State Hwy roads because `Juris_Code` only covers local roads | Order WHERE clauses to try `Physical_Juris_Name` first (broadest match) |
-| `split_jurisdictions.py` and `split_road_type.py` use different filtering | Inconsistent results depending on pipeline path | Both scripts now read `splitConfig` from state config when available |
+| Old scripts used different filtering logic | Inconsistent results depending on pipeline path | Unified into `scripts/split.py` which handles all filtering in one pass |
 
 ### Scripts Involved
 
 | Script | Role | Config Source |
 |--------|------|---------------|
-| `scripts/split_road_type.py` | Splits individual jurisdiction's `all_roads.csv` → 3 variants | `states/{state}/config.json` → `roadSystems.splitConfig` |
-| `scripts/split_jurisdictions.py` | Splits statewide CSV → per-jurisdiction CSVs with 3 road-type variants | Same `splitConfig` (preferred) or falls back to `config.json` → `filterProfiles` |
+| `scripts/split.py` | **v7 unified splitter** — jurisdiction split + road type split + scope aggregation in one pass | `states/{state}/hierarchy.json`, auto-detected column strategies |
+| `scripts/split_road_type.py` | Legacy — splits individual jurisdiction's `all_roads.csv` → 3 variants (no longer called by pipeline) | `states/{state}/config.json` → `roadSystems.splitConfig` |
+| `scripts/split_jurisdictions.py` | Legacy — splits statewide CSV → per-jurisdiction CSVs (no longer called by pipeline) | Same `splitConfig` (preferred) or falls back to `config.json` → `filterProfiles` |
+| `scripts/aggregate_by_scope.py` | Legacy — builds region/MPO aggregates (no longer called by pipeline) | `states/{state}/hierarchy.json` |
 | `download_crash_data.py` | Downloads and optionally filters during download | `config.json` → `filterProfiles` (must use `allRoads` for `_all_roads.csv`) |
 
 ---

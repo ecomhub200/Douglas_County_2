@@ -347,10 +347,13 @@ CURRENT batch-pipeline.yml stages (IMPLEMENTED):
         --input "$INPUT_CSV" \
         --state "$STATE" \
         --hierarchy states/$STATE/hierarchy.json \
-        --output-dir "$DATA_DIR/splits"
+        --output-dir "data/$STATE"
 
-  Stage 4 then uploads everything in $DATA_DIR/splits/ to R2,
+  Stage 4 then uploads everything in data/$STATE/ to R2,
   using the directory structure as the R2 path directly.
+
+  NOTE: Stage 4.5 (validation) has been removed from the pipeline.
+  Validation is now triggered from the frontend.
 
 
 ═══════════════════════════════════════════════════════════════════════════
