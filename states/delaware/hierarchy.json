@@ -202,5 +202,178 @@
     "001": "Kent",
     "003": "New Castle",
     "005": "Sussex"
+  },
+  "cities": {
+    "city_of_wilmington": {
+      "name": "City of Wilmington",
+      "shortName": "Wilmington",
+      "type": "city",
+      "county": "003",
+      "placeFips": "77580",
+      "center": [-75.5398, 39.7391],
+      "zoom": 13
+    },
+    "city_of_newark": {
+      "name": "City of Newark",
+      "shortName": "Newark",
+      "type": "city",
+      "county": "003",
+      "placeFips": "50670",
+      "center": [-75.7497, 39.6837],
+      "zoom": 13
+    },
+    "city_of_dover": {
+      "name": "City of Dover",
+      "shortName": "Dover",
+      "type": "city",
+      "county": "001",
+      "placeFips": "21200",
+      "center": [-75.5244, 39.1582],
+      "zoom": 13
+    },
+    "town_of_middletown": {
+      "name": "Town of Middletown",
+      "shortName": "Middletown",
+      "type": "town",
+      "county": "003",
+      "placeFips": "47030",
+      "center": [-75.7164, 39.4496],
+      "zoom": 14
+    },
+    "town_of_smyrna": {
+      "name": "Town of Smyrna",
+      "shortName": "Smyrna",
+      "type": "town",
+      "county": "003",
+      "placeFips": "66790",
+      "center": [-75.6046, 39.2998],
+      "zoom": 14
+    },
+    "city_of_milford": {
+      "name": "City of Milford",
+      "shortName": "Milford",
+      "type": "city",
+      "county": "001",
+      "placeFips": "47200",
+      "center": [-75.4279, 38.9126],
+      "zoom": 14
+    },
+    "city_of_seaford": {
+      "name": "City of Seaford",
+      "shortName": "Seaford",
+      "type": "city",
+      "county": "005",
+      "placeFips": "64930",
+      "center": [-75.6110, 38.6413],
+      "zoom": 14
+    },
+    "city_of_new_castle": {
+      "name": "City of New Castle",
+      "shortName": "New Castle",
+      "type": "city",
+      "county": "003",
+      "placeFips": "50580",
+      "center": [-75.5663, 39.6621],
+      "zoom": 14
+    },
+    "town_of_georgetown": {
+      "name": "Town of Georgetown",
+      "shortName": "Georgetown",
+      "type": "town",
+      "county": "005",
+      "placeFips": "29060",
+      "center": [-75.3852, 38.6901],
+      "zoom": 14
+    },
+    "town_of_elsmere": {
+      "name": "Town of Elsmere",
+      "shortName": "Elsmere",
+      "type": "town",
+      "county": "003",
+      "placeFips": "23560",
+      "center": [-75.5977, 39.7394],
+      "zoom": 15
+    },
+    "town_of_camden": {
+      "name": "Town of Camden",
+      "shortName": "Camden",
+      "type": "town",
+      "county": "001",
+      "placeFips": "10720",
+      "center": [-75.5347, 39.1133],
+      "zoom": 14
+    },
+    "town_of_harrington": {
+      "name": "Town of Harrington",
+      "shortName": "Harrington",
+      "type": "town",
+      "county": "001",
+      "placeFips": "32250",
+      "center": [-75.5720, 38.9280],
+      "zoom": 14
+    },
+    "city_of_lewes": {
+      "name": "City of Lewes",
+      "shortName": "Lewes",
+      "type": "city",
+      "county": "005",
+      "placeFips": "42200",
+      "center": [-75.1370, 38.7746],
+      "zoom": 14
+    },
+    "town_of_laurel": {
+      "name": "Town of Laurel",
+      "shortName": "Laurel",
+      "type": "town",
+      "county": "005",
+      "placeFips": "41060",
+      "center": [-75.5713, 38.5566],
+      "zoom": 14
+    },
+    "town_of_milton": {
+      "name": "Town of Milton",
+      "shortName": "Milton",
+      "type": "town",
+      "county": "005",
+      "placeFips": "47640",
+      "center": [-75.3098, 38.7776],
+      "zoom": 14
+    },
+    "town_of_rehoboth_beach": {
+      "name": "Town of Rehoboth Beach",
+      "shortName": "Rehoboth Beach",
+      "type": "town",
+      "county": "005",
+      "placeFips": "60170",
+      "center": [-75.0762, 38.7210],
+      "zoom": 14
+    },
+    "town_of_newport": {
+      "name": "Town of Newport",
+      "shortName": "Newport",
+      "type": "town",
+      "county": "003",
+      "placeFips": "51220",
+      "center": [-75.6087, 39.7137],
+      "zoom": 15
+    },
+    "town_of_bridgeville": {
+      "name": "Town of Bridgeville",
+      "shortName": "Bridgeville",
+      "type": "town",
+      "county": "005",
+      "placeFips": "08210",
+      "center": [-75.6042, 38.7426],
+      "zoom": 14
+    },
+    "town_of_selbyville": {
+      "name": "Town of Selbyville",
+      "shortName": "Selbyville",
+      "type": "town",
+      "county": "005",
+      "placeFips": "65200",
+      "center": [-75.2207, 38.4615],
+      "zoom": 14
+    }
   }
 }

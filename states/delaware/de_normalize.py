@@ -159,6 +159,39 @@ DE_COUNTIES = {
 DE_COUNTY_CODE_MAP = {"K": "Kent", "N": "New Castle", "S": "Sussex"}
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  DELAWARE CITIES & TOWNS  (GPS bounding boxes for Physical Juris Name)
+#  Used in Phase 3 to assign "City of X" / "Town of X" labels so that
+#  split.py split_city_level() can produce per-city R2 folders.
+#  Format: (south, west, north, east) — bbox from Census/OSM boundaries.
+#  Order matters: first match wins. Larger cities listed first.
+# ─────────────────────────────────────────────────────────────────────────────
+
+DE_CITIES = {
+    # ── New Castle County (FIPS 003) ──
+    "City of Wilmington":     {"bbox": (39.7170, -75.5850, 39.7720, -75.5000), "fips": "003", "place_fips": "77580"},
+    "City of Newark":         {"bbox": (39.6500, -75.7700, 39.7050, -75.7100), "fips": "003", "place_fips": "50670"},
+    "Town of Middletown":     {"bbox": (39.4350, -75.7350, 39.4700, -75.6900), "fips": "003", "place_fips": "47030"},
+    "City of New Castle":     {"bbox": (39.6450, -75.5800, 39.6750, -75.5450), "fips": "003", "place_fips": "50580"},
+    "Town of Elsmere":        {"bbox": (39.7350, -75.6050, 39.7530, -75.5830), "fips": "003", "place_fips": "23560"},
+    "Town of Newport":        {"bbox": (39.7100, -75.6180, 39.7250, -75.5900), "fips": "003", "place_fips": "51220"},
+    "Town of Smyrna":         {"bbox": (39.2800, -75.6200, 39.3150, -75.5900), "fips": "003", "place_fips": "66790"},
+    # ── Kent County (FIPS 001) ──
+    "City of Dover":          {"bbox": (39.1250, -75.5700, 39.1950, -75.4800), "fips": "001", "place_fips": "21200"},
+    "Town of Camden":         {"bbox": (39.1050, -75.5500, 39.1270, -75.5200), "fips": "001", "place_fips": "10720"},
+    "City of Milford":        {"bbox": (38.8950, -75.4450, 38.9350, -75.4050), "fips": "001", "place_fips": "47200"},
+    "Town of Harrington":     {"bbox": (38.9150, -75.5900, 38.9450, -75.5500), "fips": "001", "place_fips": "32250"},
+    # ── Sussex County (FIPS 005) ──
+    "City of Seaford":        {"bbox": (38.6300, -75.6300, 38.6650, -75.5850), "fips": "005", "place_fips": "64930"},
+    "Town of Georgetown":     {"bbox": (38.6800, -75.4000, 38.7050, -75.3700), "fips": "005", "place_fips": "29060"},
+    "City of Lewes":          {"bbox": (38.7600, -75.1550, 38.7850, -75.1200), "fips": "005", "place_fips": "42200"},
+    "Town of Laurel":         {"bbox": (38.5500, -75.5850, 38.5700, -75.5550), "fips": "005", "place_fips": "41060"},
+    "Town of Milton":         {"bbox": (38.7700, -75.3200, 38.7900, -75.2850), "fips": "005", "place_fips": "47640"},
+    "Town of Rehoboth Beach": {"bbox": (38.7100, -75.0900, 38.7300, -75.0650), "fips": "005", "place_fips": "60170"},
+    "Town of Bridgeville":    {"bbox": (38.7350, -75.6150, 38.7500, -75.5900), "fips": "005", "place_fips": "08210"},
+    "Town of Selbyville":     {"bbox": (38.4550, -75.2350, 38.4750, -75.2050), "fips": "005", "place_fips": "65200"},
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  VALUE MAPPING TABLES  (Delaware → CrashLens Standard)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -565,7 +598,34 @@ def resolve_fips(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     df = df.apply(_assign, axis=1)
     # Force 3-digit zero-padding — pandas apply can strip leading zeros
     df["FIPS"] = df["FIPS"].fillna("").astype(str).str.zfill(3).replace("000", "")
+
+    # ── City/Town assignment via GPS bounding box ──
+    # Overrides Physical Juris Name for crashes within city boundaries
+    # so split.py split_city_level() can produce per-city R2 folders.
+    df = _assign_cities_by_gps(df)
+
     return df, fips_lookup
+
+
+def _assign_cities_by_gps(df: pd.DataFrame) -> pd.DataFrame:
+    """Assign 'City of X' / 'Town of X' to Physical Juris Name using GPS bbox."""
+    lats = pd.to_numeric(df["y"], errors="coerce")
+    lons = pd.to_numeric(df["x"], errors="coerce")
+    valid = lats.notna() & lons.notna() & (lats != 0) & (lons != 0)
+
+    city_assigned = 0
+    for city_name, info in DE_CITIES.items():
+        s, w, n, e = info["bbox"]
+        in_bbox = valid & (lats >= s) & (lats <= n) & (lons >= w) & (lons <= e)
+        count = in_bbox.sum()
+        if count > 0:
+            df.loc[in_bbox, "Physical Juris Name"] = city_name
+            df.loc[in_bbox, "Place FIPS"] = info.get("place_fips", "")
+            city_assigned += count
+
+    if city_assigned:
+        print(f"        {city_assigned:,} crashes assigned to {len(DE_CITIES)} cities/towns")
+    return df
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1092,7 +1152,7 @@ def normalize(
     df = apply_value_transforms(df)
 
     # [4/8] FIPS Resolution
-    print("  [4/8] Phase 3: FIPS resolution (DE hardcoded — 3 counties)...")
+    print(f"  [4/8] Phase 3: FIPS resolution (DE hardcoded — 3 counties + {len(DE_CITIES)} cities/towns)...")
     df, fips_lookup = resolve_fips(df)
     resolved = sum(1 for v in fips_lookup.values() if v["fips"])
     print(f"        {resolved}/{len(fips_lookup)} jurisdictions resolved")
