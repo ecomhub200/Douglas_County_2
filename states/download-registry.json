@@ -128,7 +128,7 @@
     "dotDir": "data/DelawareDOT",
     "script": "data/DelawareDOT/download_delaware_crash_data.py",
     "tier": 3,
-    "requiresPlaywright": false,
+    "requiresPlaywright": true,
     "defaultJurisdiction": "statewide",
     "scriptArgs": "--data-dir data/DelawareDOT",
     "statewideFlagArgs": "--gzip",
