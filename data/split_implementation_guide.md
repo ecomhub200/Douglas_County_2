@@ -1,6 +1,7 @@
 # split.py — Implementation Guide for Claude Code
 # CrashLens Universal Jurisdiction & Road Type Splitter v2.0
 # ===========================================================
+# Location: scripts/split.py (moved from data/split.py)
 # Read this entire file before touching split.py or the pipeline workflow.
 # Every decision is explained with "WHY" reasoning, not just "WHAT".
 
@@ -326,33 +327,30 @@ split.py requires ZERO code changes for new states. The steps are:
  10. BATCH-PIPELINE.YML INTEGRATION
 ═══════════════════════════════════════════════════════════════════════════
 
-Current batch-pipeline.yml stages:
-  Stage 0:   Download statewide CSV from R2
-  Stage 1:   Split by jurisdiction    ← split.py --county-only (just counties)
-  Stage 2:   Split by road type       ← currently separate, now MERGED into split.py
-  Stage 3:   Aggregate by scope       ← split.py handles this (region/MPO/PD)
-  Stage 4:   Upload CSVs to R2
-  Stage 4.5: Validate & Auto-Correct
-  Stage 5:   Generate Forecasts
-  Stage 6:   Commit Manifest
+CURRENT batch-pipeline.yml stages (IMPLEMENTED):
+  Stage 0:     Download statewide CSV from R2
+  Stage 0.5:   Normalize to CrashLens standard
+  Stages 1-3:  split.py (jurisdiction + road type + aggregate in ONE pass)
+  Stage 4:     Upload all split CSVs to R2
+  Stage 4.5:   Validate & Auto-Correct
+  Stage 5:     Generate Forecasts
+  Stage 5b:    Upload forecast JSONs to R2
+  Stage 5c:    Aggregate Forecasts (Region + MPO)
+  Stage 5d:    Upload aggregated forecast JSONs to R2
+  Stage 6:     Commit Manifest
 
-RECOMMENDED WORKFLOW CHANGE:
-  Replace Stages 1-3 with a single split.py call:
+  Stages 1-3 are unified into a single split.py call:
 
-  - name: Split by jurisdiction and road type
+  - name: Stages 1-3: Split by jurisdiction, road type & aggregate
     run: |
-      python split.py \
-        --input ${{ steps.download.outputs.statewide_path }} \
-        --state ${{ env.STATE }} \
-        --hierarchy states/${{ env.STATE }}/hierarchy.json \
-        --output-dir splits/${{ env.STATE }}/ \
-        --gzip
+      python scripts/split.py \
+        --input "$INPUT_CSV" \
+        --state "$STATE" \
+        --hierarchy states/$STATE/hierarchy.json \
+        --output-dir "$DATA_DIR/splits"
 
-  Then Stage 4 uploads everything in splits/{state}/ to R2.
-
-  Note: --upload-r2 flag can replace Stage 4 entirely if preferred.
-  The split.py upload logic uses the same aws s3 cp approach as the
-  existing workflow, with 4-retry exponential backoff.
+  Stage 4 then uploads everything in $DATA_DIR/splits/ to R2,
+  using the directory structure as the R2 path directly.
 
 
 ═══════════════════════════════════════════════════════════════════════════

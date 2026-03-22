@@ -4,8 +4,8 @@
 # Processes Virginia-compatible CSVs through the generic pipeline.
 # Auto-triggered by state-specific download workflows.
 #
-# Stage order: Init Cache → Split Jurisdiction → Split Road Type →
-#              Aggregate (CSV) → Upload → Predict → Manifest
+# Stage order: Init Cache → Split (jurisdiction + road type + aggregate) →
+#              Upload → Validate → Predict → Manifest
 #
 # NOTE: Validation and Geocoding are handled separately on Cloudflare.
 #
@@ -260,106 +260,72 @@ jobs:
           print(f'  Total downloaded: {downloaded}/{len(jurisdictions)}')
           "
 
-      # ── Stage 1: Split by Jurisdiction ──
-      # Always run: pipeline may receive statewide CSV that needs splitting
-      # into per-jurisdiction files (including city_roads, county_roads,
-      # no_interstate variants).
-      # NOTE: Validation and Geocoding are handled separately on Cloudflare.
-      - name: "Stage 1: Split by jurisdiction"
+      # ── Stages 1-3 (unified): Split by jurisdiction + road type + aggregate ──
+      # split.py v2.0 merges the old Stage 1 (split by jurisdiction),
+      # Stage 2 (split by road type), and Stage 3 (aggregate by scope)
+      # into a single pass. Produces the full R2 folder structure:
+      #   _state/          SET A: all_roads, dot_roads, primary_roads, non_dot_roads
+      #   _region/{id}/    SET A: all_roads, dot_roads, primary_roads, non_dot_roads
+      #   _mpo/{id}/       SET B: all_roads, county_roads, city_roads, no_interstate
+      #   _planning_district/{id}/  SET B
+      #   _city/{slug}/    SET B
+      #   {county_key}/    SET B: all_roads, county_roads, city_roads, no_interstate
+      - name: "Stages 1-3: Split by jurisdiction, road type & aggregate"
         run: |
           STATE="${{ needs.prepare.outputs.state }}"
           DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
           INPUT_CSV="${{ needs.prepare.outputs.input_csv }}"
-          JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
 
           echo "=========================================="
-          echo "Stage 1: Split CSV into jurisdictions"
+          echo "Stages 1-3: Universal split (jurisdiction + road type + aggregate)"
           echo "=========================================="
 
+          # Find input CSV
           SPLIT_INPUT="$INPUT_CSV"
-
-          # If original input_csv not found, check for R2-downloaded file
           if [ -z "$SPLIT_INPUT" ] || [ ! -f "$SPLIT_INPUT" ]; then
+            # Try statewide CSV
+            SPLIT_INPUT="$DATA_DIR/${STATE}_statewide_all_roads.csv"
+          fi
+          if [ ! -f "$SPLIT_INPUT" ]; then
+            # Try R2-downloaded single jurisdiction CSV
             SELECTION="${{ needs.prepare.outputs.selection }}"
-            ALT_CSV="${{ needs.prepare.outputs.data_dir }}/${SELECTION}_all_roads.csv"
-            if [ -f "$ALT_CSV" ]; then
-              SPLIT_INPUT="$ALT_CSV"
-              echo "  Using R2-downloaded CSV: $SPLIT_INPUT"
-            else
-              echo "WARNING: No input CSV found for splitting"
-              exit 0
-            fi
+            SPLIT_INPUT="$DATA_DIR/${SELECTION}_all_roads.csv"
+          fi
+          if [ ! -f "$SPLIT_INPUT" ]; then
+            echo "WARNING: No input CSV found for splitting"
+            exit 0
           fi
 
-          ARGS="--state $STATE --input $SPLIT_INPUT --output-dir $DATA_DIR"
+          SPLIT_OUTPUT="$DATA_DIR/splits"
 
-          JCOUNT="${{ needs.prepare.outputs.jurisdiction_count }}"
-          TOTAL_STATE=$(python scripts/resolve_scope.py --state $STATE --scope statewide --json | \
-                        python3 -c "import json,sys; print(json.load(sys.stdin)['jurisdiction_count'])")
-
-          if [ "$JCOUNT" != "$TOTAL_STATE" ]; then
-            JURIS_LIST=$(echo "$JURISDICTIONS" | python3 -c "import json,sys; print(' '.join(json.load(sys.stdin)))")
-            ARGS="$ARGS --jurisdictions $JURIS_LIST"
-          fi
-
-          python scripts/split_jurisdictions.py $ARGS
-
-      # ── Stage 2: Split by Road Type ──
-      - name: "Stage 2: Split by road type"
-        run: |
-          STATE="${{ needs.prepare.outputs.state }}"
-          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
-          JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
-
-          echo "=========================================="
-          echo "Stage 2: Split by road type (4 CSVs per jurisdiction)"
-          echo "=========================================="
-
-          # Use --auto to detect jurisdictions from Stage 1's actual output files
-          # (avoids naming mismatches between config.json keys and hierarchy-derived IDs)
-          python scripts/split_road_type.py \
+          python scripts/split.py \
+            --input "$SPLIT_INPUT" \
             --state "$STATE" \
-            --auto \
-            --data-dir "$DATA_DIR" || {
-            echo "WARNING: Road-type split had issues (non-fatal)"
+            --hierarchy "states/$STATE/hierarchy.json" \
+            --output-dir "$SPLIT_OUTPUT" || {
+            echo "::error::split.py failed"
+            exit 1
           }
 
-      # ── Stage 3: Aggregate by Scope (CSV) ──
-      - name: "Stage 3: Aggregate by scope (CSV)"
-        if: github.event.inputs.dry_run != 'true'
-        run: |
-          STATE="${{ needs.prepare.outputs.state }}"
-          SCOPE="${{ needs.prepare.outputs.scope }}"
-          SELECTION="${{ needs.prepare.outputs.selection }}"
-          DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
-
-          echo "=========================================="
-          echo "Stage 3: Aggregate by scope (scope=$SCOPE, format=CSV)"
-          echo "=========================================="
-
-          # Scope-aware CSV aggregation
-          python scripts/aggregate_by_scope.py \
-            --state "$STATE" \
-            --scope "$SCOPE" \
-            --selection "$SELECTION" \
-            --data-dir "$DATA_DIR" \
-            --output-format csv \
-            --output-dir "$DATA_DIR" || {
-            echo "WARNING: State aggregates failed (non-fatal)"
-          }
-
-          # Federal cross-state aggregates (only for statewide scope)
-          if [ "$SCOPE" = "statewide" ]; then
-            python scripts/aggregate_by_scope.py \
-              --federal \
-              --output-format csv \
-              --data-dir "$DATA_DIR" \
-              --output-dir data || {
-              echo "WARNING: Federal aggregates failed (non-fatal)"
-            }
+          # Verify manifest was created
+          if [ -f "$SPLIT_OUTPUT/split_manifest.json" ]; then
+            python3 -c "
+          import json
+          with open('$SPLIT_OUTPUT/split_manifest.json') as f:
+              m = json.load(f)
+          print(f'  Input rows:  {m[\"total_input_rows\"]:,}')
+          print(f'  Elapsed:     {m[\"elapsed_s\"]}s')
+          print(f'  Counties:    {len(m[\"splits\"].get(\"counties\", {}))}')
+          print(f'  Regions:     {len(m[\"splits\"].get(\"regions\", {}))}')
+          print(f'  MPOs:        {len(m[\"splits\"].get(\"mpos\", {}))}')
+          print(f'  PDs:         {len(m[\"splits\"].get(\"planning_districts\", {}))}')
+          print(f'  Cities:      {len(m[\"splits\"].get(\"cities\", {}))}')
+          "
           fi
 
       # ── Stage 4: Upload to R2 ──
+      # Uploads all CSVs produced by split.py from the splits/ directory.
+      # The directory structure maps 1:1 to R2 paths.
       - name: "Stage 4: Upload to R2"
         if: github.event.inputs.dry_run != 'true'
         env:
@@ -370,33 +336,44 @@ jobs:
           STATE="${{ needs.prepare.outputs.state }}"
           DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
           R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
-          SCOPE="${{ needs.prepare.outputs.scope }}"
           R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
           R2_BUCKET="crash-lens-data"
+          SPLIT_DIR="$DATA_DIR/splits"
 
           echo "=========================================="
-          echo "Stage 4: Upload to R2 (all CSVs)"
+          echo "Stage 4: Upload all split CSVs to R2"
           echo "=========================================="
 
-          # 4a: Upload jurisdiction CSVs (county-level road-type splits) — gzip-compressed
-          MANIFEST=$(python scripts/split_jurisdictions.py \
-            --state "$STATE" --r2-manifest --r2-prefix "$R2_PREFIX" --output-dir "$DATA_DIR")
+          if [ ! -d "$SPLIT_DIR" ]; then
+            echo "::error::Split output directory not found: $SPLIT_DIR"
+            exit 1
+          fi
 
-          echo "$MANIFEST" | python3 -c "
-          import json, sys, subprocess, os, gzip as gz, shutil
-          files = json.load(sys.stdin)
-          endpoint = '$R2_ENDPOINT'
-          bucket = '$R2_BUCKET'
-          success = failed = skipped = 0
+          # Upload every CSV in the splits directory, gzip-compressed
+          python3 -c "
+          import os, sys, subprocess, gzip as gz, shutil
+
+          split_dir = '$SPLIT_DIR'
+          r2_prefix = '$R2_PREFIX'
+          endpoint  = '$R2_ENDPOINT'
+          bucket    = '$R2_BUCKET'
+          success = failed = 0
           saved_bytes = 0
-          for i, entry in enumerate(files):
-              local = entry['local_path']
-              r2_key = entry['r2_key']
-              if not os.path.exists(local):
-                  skipped += 1
-                  continue
+
+          csv_files = []
+          for root, dirs, files in os.walk(split_dir):
+              for f in files:
+                  if f.endswith('.csv'):
+                      csv_files.append(os.path.join(root, f))
+
+          csv_files.sort()
+          total = len(csv_files)
+          print(f'  Found {total} CSV files to upload')
+
+          for i, local in enumerate(csv_files):
+              rel = os.path.relpath(local, split_dir)
+              r2_key = f'{r2_prefix}/{rel}'
               try:
-                  # Gzip the CSV before uploading
                   gz_path = local + '.gz'
                   orig_size = os.path.getsize(local)
                   with open(local, 'rb') as f_in:
@@ -404,57 +381,43 @@ jobs:
                           shutil.copyfileobj(f_in, f_out)
                   gz_size = os.path.getsize(gz_path)
                   saved_bytes += (orig_size - gz_size)
-                  subprocess.run([
-                      'aws', 's3', 'cp', gz_path, f's3://{bucket}/{r2_key}',
-                      '--endpoint-url', endpoint,
-                      '--content-type', 'text/csv',
-                      '--content-encoding', 'gzip',
-                      '--only-show-errors'
-                  ], check=True, capture_output=True, timeout=120)
+
+                  # Retry up to 4 times with exponential backoff
+                  uploaded = False
+                  for attempt in range(1, 5):
+                      result = subprocess.run([
+                          'aws', 's3', 'cp', gz_path, f's3://{bucket}/{r2_key}',
+                          '--endpoint-url', endpoint,
+                          '--content-type', 'text/csv',
+                          '--content-encoding', 'gzip',
+                          '--only-show-errors'
+                      ], capture_output=True, timeout=120)
+                      if result.returncode == 0:
+                          uploaded = True
+                          break
+                      import time
+                      time.sleep(2 ** attempt)
+
                   os.remove(gz_path)
-                  success += 1
+                  if uploaded:
+                      success += 1
+                  else:
+                      print(f'  FAIL after 4 attempts: {r2_key}')
+                      failed += 1
               except Exception as e:
                   print(f'  FAIL: {r2_key}: {e}')
                   failed += 1
-                  # Clean up temp gz file
                   if os.path.exists(local + '.gz'):
                       os.remove(local + '.gz')
-              if (i + 1) % 50 == 0 or (i + 1) == len(files):
-                  print(f'  Progress: {i+1}/{len(files)} ({success} ok, {failed} fail, {skipped} skip)')
-          print(f'County CSV upload: {success} ok, {failed} fail, {skipped} skip')
+
+              if (i + 1) % 100 == 0 or (i + 1) == total:
+                  print(f'  Progress: {i+1}/{total} ({success} ok, {failed} fail)')
+
+          print(f'Upload complete: {success} ok, {failed} fail')
           print(f'  Gzip savings: {saved_bytes / 1024 / 1024:.1f} MB saved')
+          if failed > 0:
+              sys.exit(1)
           "
-
-          # 4b: Upload region/MPO aggregate CSVs (gzip-compressed)
-          find "$DATA_DIR" -path "*/_region/*" -name "*.csv" -o -path "*/_mpo/*" -name "*.csv" 2>/dev/null | while read f; do
-            REL="${f#$DATA_DIR/}"
-            R2_KEY="$R2_PREFIX/$REL"
-            GZ_FILE="${f}.gz"
-            gzip -c "$f" > "$GZ_FILE"
-            aws s3 cp "$GZ_FILE" "s3://$R2_BUCKET/$R2_KEY" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --content-type "text/csv" \
-              --content-encoding "gzip" \
-              --only-show-errors || echo "  WARN: failed to upload $R2_KEY"
-            rm -f "$GZ_FILE"
-          done
-
-          # 4c: Upload federal aggregate CSVs (statewide scope only, gzip-compressed)
-          if [ "$SCOPE" = "statewide" ]; then
-            find "data/_federal" -name "*.csv" 2>/dev/null | while read f; do
-              R2_KEY="_federal/${f#data/_federal/}"
-              GZ_FILE="${f}.gz"
-              gzip -c "$f" > "$GZ_FILE"
-              aws s3 cp "$GZ_FILE" "s3://$R2_BUCKET/$R2_KEY" \
-                --endpoint-url "$R2_ENDPOINT" \
-                --content-type "text/csv" \
-                --content-encoding "gzip" \
-                --only-show-errors || true
-              rm -f "$GZ_FILE"
-            done
-          fi
-
-          # NOTE: Statewide gzip upload removed — validation handled in Stage 4.5
 
       # ── Stage 4.5: Validate & Auto-Correct (Headless) ──
       - name: "Stage 4.5: Validate & auto-correct (headless)"
@@ -490,11 +453,30 @@ jobs:
 
           # Re-upload corrected CSVs to R2 (overwrite originals with validated versions)
           CORRECTED_COUNT=0
+          SPLIT_DIR="$DATA_DIR/splits"
+
+          # Check split.py folder structure first
+          if [ -d "$SPLIT_DIR" ]; then
+            find "$SPLIT_DIR" -name "*.csv" -newer "$SPLIT_DIR/split_manifest.json" 2>/dev/null | while read csv_file; do
+              REL="${csv_file#$SPLIT_DIR/}"
+              R2_KEY="${R2_PREFIX}/${REL}"
+              GZ_FILE="${csv_file}.gz"
+              gzip -c "$csv_file" > "$GZ_FILE"
+              aws s3 cp "$GZ_FILE" "s3://$R2_BUCKET/$R2_KEY" \
+                --endpoint-url "$R2_ENDPOINT" \
+                --content-type "text/csv" \
+                --content-encoding "gzip" \
+                --only-show-errors || true
+              rm -f "$GZ_FILE"
+              CORRECTED_COUNT=$((CORRECTED_COUNT + 1))
+            done
+          fi
+
+          # Also handle legacy flat-format corrected files
           for csv_file in "$DATA_DIR"/*_all_roads.csv "$DATA_DIR"/*_county_roads.csv \
                           "$DATA_DIR"/*_city_roads.csv "$DATA_DIR"/*_no_interstate.csv; do
             [ -f "$csv_file" ] || continue
             BASENAME=$(basename "$csv_file")
-            # Extract jurisdiction from filename (everything before _roadtype.csv)
             JURIS=$(echo "$BASENAME" | sed -E 's/_(all_roads|county_roads|city_roads|no_interstate)\.csv$//')
             R2_KEY="${R2_PREFIX}/${JURIS}/${BASENAME#${JURIS}_}"
             GZ_FILE="${csv_file}.gz"
@@ -512,7 +494,6 @@ jobs:
           for report in "$DATA_DIR"/validation_report_*.json; do
             [ -f "$report" ] || continue
             BASENAME=$(basename "$report")
-            # Extract jurisdiction: validation_report_{jurisdiction}_{roadtype}.json
             JURIS=$(echo "$BASENAME" | sed -E 's/^validation_report_//; s/_(all_roads|county_roads|city_roads|no_interstate)\.json$//')
             R2_KEY="${R2_PREFIX}/${JURIS}/${BASENAME}"
             aws s3 cp "$report" "s3://$R2_BUCKET/$R2_KEY" \
@@ -549,13 +530,16 @@ jobs:
           echo "Stage 5: Forecast generation (per county only)"
           echo "=========================================="
 
+          SPLIT_DIR="$DATA_DIR/splits"
+
           echo "$JURISDICTIONS" | python3 -c "
-          import json, sys, subprocess
+          import json, sys, subprocess, os
           jurisdictions = json.load(sys.stdin)
           state = '$STATE'
-          data_dir = '$DATA_DIR'
+          split_dir = '$SPLIT_DIR'
           success = 0
           for j in jurisdictions:
+              data_dir = os.path.join(split_dir, j) if os.path.isdir(os.path.join(split_dir, j)) else '$DATA_DIR'
               cmd = ['python', 'scripts/generate_forecast.py',
                      '--all-road-types', '--jurisdiction', j, '--data-dir', data_dir,
                      '--state', state, '--source', 'r2']
@@ -578,65 +562,70 @@ jobs:
           STATE="${{ needs.prepare.outputs.state }}"
           DATA_DIR="${{ needs.prepare.outputs.data_dir }}"
           R2_PREFIX="${{ needs.prepare.outputs.r2_prefix }}"
-          JURISDICTIONS='${{ needs.prepare.outputs.jurisdictions_json }}'
           R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
           R2_BUCKET="crash-lens-data"
+          SPLIT_DIR="$DATA_DIR/splits"
 
           echo "=========================================="
           echo "Stage 5b: Upload forecast JSONs to R2"
           echo "=========================================="
 
-          UPLOADED=0
-          SKIPPED=0
+          # Upload all forecast JSONs found in splits/ directory tree
+          python3 -c "
+          import os, sys, subprocess, gzip as gz, shutil
 
-          echo "$JURISDICTIONS" | python3 -c "
-          import json, sys, subprocess, os, gzip as gz, shutil
-
-          jurisdictions = json.load(sys.stdin)
+          split_dir = '$SPLIT_DIR'
           data_dir = '$DATA_DIR'
           r2_prefix = '$R2_PREFIX'
           endpoint = '$R2_ENDPOINT'
           bucket = '$R2_BUCKET'
           uploaded = 0
-          skipped = 0
           saved_bytes = 0
 
-          for j in jurisdictions:
-              for rt in ['county_roads', 'city_roads', 'no_interstate', 'all_roads']:
-                  local_path = os.path.join(data_dir, f'forecasts_{rt}.json')
-                  # Also check jurisdiction-prefixed path
-                  if not os.path.exists(local_path):
-                      local_path = os.path.join(data_dir, j, f'forecasts_{rt}.json')
-                  if not os.path.exists(local_path):
-                      skipped += 1
-                      continue
+          forecast_files = []
+          for search_dir in [split_dir, data_dir]:
+              if not os.path.isdir(search_dir):
+                  continue
+              for root, dirs, files in os.walk(search_dir):
+                  for f in files:
+                      if f.startswith('forecasts_') and f.endswith('.json'):
+                          forecast_files.append(os.path.join(root, f))
 
-                  r2_key = f'{r2_prefix}/{j}/forecasts_{rt}.json'
-                  try:
-                      # Gzip the JSON before uploading
-                      gz_path = local_path + '.gz'
-                      orig_size = os.path.getsize(local_path)
-                      with open(local_path, 'rb') as f_in:
-                          with gz.open(gz_path, 'wb', compresslevel=6) as f_out:
-                              shutil.copyfileobj(f_in, f_out)
-                      gz_size = os.path.getsize(gz_path)
-                      saved_bytes += (orig_size - gz_size)
-                      subprocess.run([
-                          'aws', 's3', 'cp', gz_path, f's3://{bucket}/{r2_key}',
-                          '--endpoint-url', endpoint,
-                          '--content-type', 'application/json',
-                          '--content-encoding', 'gzip',
-                          '--only-show-errors'
-                      ], check=True, capture_output=True, timeout=120)
-                      os.remove(gz_path)
-                      print(f'  Uploaded: {r2_key} ({orig_size:,} -> {gz_size:,} bytes)')
-                      uploaded += 1
-                  except Exception as e:
-                      print(f'  FAIL: {r2_key}: {e}')
-                      if os.path.exists(local_path + '.gz'):
-                          os.remove(local_path + '.gz')
+          seen = set()
+          for local_path in sorted(forecast_files):
+              if local_path.startswith(split_dir):
+                  rel = os.path.relpath(local_path, split_dir)
+              else:
+                  rel = os.path.relpath(local_path, data_dir)
+              r2_key = f'{r2_prefix}/{rel}'
 
-          print(f'Forecast upload: {uploaded} uploaded, {skipped} skipped')
+              if r2_key in seen:
+                  continue
+              seen.add(r2_key)
+
+              try:
+                  gz_path = local_path + '.gz'
+                  orig_size = os.path.getsize(local_path)
+                  with open(local_path, 'rb') as f_in:
+                      with gz.open(gz_path, 'wb', compresslevel=6) as f_out:
+                          shutil.copyfileobj(f_in, f_out)
+                  gz_size = os.path.getsize(gz_path)
+                  saved_bytes += (orig_size - gz_size)
+                  subprocess.run([
+                      'aws', 's3', 'cp', gz_path, f's3://{bucket}/{r2_key}',
+                      '--endpoint-url', endpoint,
+                      '--content-type', 'application/json',
+                      '--content-encoding', 'gzip',
+                      '--only-show-errors'
+                  ], check=True, capture_output=True, timeout=120)
+                  os.remove(gz_path)
+                  uploaded += 1
+              except Exception as e:
+                  print(f'  FAIL: {r2_key}: {e}')
+                  if os.path.exists(local_path + '.gz'):
+                      os.remove(local_path + '.gz')
+
+          print(f'Forecast upload: {uploaded} uploaded')
           print(f'  Gzip savings: {saved_bytes / 1024 / 1024:.1f} MB saved')
           "
 
@@ -654,6 +643,7 @@ jobs:
 
           git add data/r2-manifest.json 2>/dev/null || true
           git add data/*/.split_report.json 2>/dev/null || true
+          git add data/*/splits/split_manifest.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No metadata changes to commit"
