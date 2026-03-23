@@ -453,7 +453,7 @@ if (window.parent !== window) { document.body.classList.add('embedded'); }
       <div class="logo-icon">🔄</div>
       <span>CRASH LENS</span>
     </div>
-    <span class="badge badge-cyan">Normalization & Rank Validation v1.0</span>
+    <span class="badge badge-cyan">Normalization & Rank Validation v2.6.3</span>
     <span class="badge badge-purple" id="envBadge">Select State</span>
   </div>
   <div class="topbar-right">
@@ -933,9 +933,9 @@ function calcRowEPDO(row, weights) {
 // ═══════════════════════════════════════════════════════════════
 const DELAWARE_GEO = {
   counties: {
-    'Kent':       { fips: '001', geoid: '10001', centLat: 39.1557, centLon: -75.5058 },
-    'New Castle': { fips: '003', geoid: '10003', centLat: 39.5783, centLon: -75.6339 },
-    'Sussex':     { fips: '005', geoid: '10005', centLat: 38.6833, centLon: -75.3386 },
+    'Kent':       { fips: '001', geoid: '10001', centLat: 39.097088, centLon: -75.502982, area_type: 'Urban' },
+    'New Castle': { fips: '003', geoid: '10003', centLat: 39.575915, centLon: -75.644132, area_type: 'Urban' },
+    'Sussex':     { fips: '005', geoid: '10005', centLat: 38.673227, centLon: -75.337024, area_type: 'Rural' },
   },
   // Delaware county codes used in source data (single letter)
   countyCodeMap: { 'K': 'Kent', 'N': 'New Castle', 'S': 'Sussex' },
@@ -2007,6 +2007,200 @@ async function runFIPSResolution() {
 
   setProgress('fipsProgFill', 'fipsProgLabel', 'fipsProgPct', 100, 'FIPS resolution complete');
 
+  // ─── Phase 3.5: GPS Jurisdiction Validation via TIGERweb PIP (v2.6.2) ───
+  // Same pattern as CrashLens frontend: fetch county boundaries from TIGERweb,
+  // ray-casting point-in-polygon, with centroid fallback if offline.
+  log(logEl, 'Phase 3.5: GPS jurisdiction validation (TIGERweb point-in-polygon)...', 'info');
+  const gpsReassignStats = {};
+  let gpsChecked = 0, gpsReassigned = 0;
+  let pipMethod = 'centroid'; // will upgrade to 'tigerweb_pip' if boundaries load
+
+  // ── Ray-casting PIP (identical to CrashLens BoundaryService.pointInPolygon) ──
+  function _pointInRing(lon, lat, ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      if (((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+  function _pointInFeature(lon, lat, feature) {
+    if (!feature || !feature.geometry) return false;
+    const geom = feature.geometry;
+    // Fast bounding box pre-check
+    if (feature._bbox) {
+      const [minLon, minLat, maxLon, maxLat] = feature._bbox;
+      if (lon < minLon || lon > maxLon || lat < minLat || lat > maxLat) return false;
+    }
+    if (geom.type === 'Polygon') {
+      return _pointInRing(lon, lat, geom.coordinates[0]);
+    } else if (geom.type === 'MultiPolygon') {
+      for (const poly of geom.coordinates) {
+        if (_pointInRing(lon, lat, poly[0])) return true;
+      }
+    }
+    return false;
+  }
+  function _computeBbox(feature) {
+    const coords = feature.geometry.type === 'Polygon'
+      ? feature.geometry.coordinates[0]
+      : feature.geometry.coordinates.flat(1).flat(0);
+    let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+    for (const ring of (feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates[0]] : feature.geometry.coordinates.map(p => p[0]))) {
+      for (const [ln, lt] of ring) {
+        if (ln < minLon) minLon = ln; if (ln > maxLon) maxLon = ln;
+        if (lt < minLat) minLat = lt; if (lt > maxLat) maxLat = lt;
+      }
+    }
+    feature._bbox = [minLon, minLat, maxLon, maxLat];
+  }
+
+  // ── Fetch county boundaries from TIGERweb (one request, all state counties) ──
+  let countyFeatures = []; // GeoJSON features with geometry
+  const tigerwebUrl = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query';
+  try {
+    const stateFips = APP.stateConfig ? APP.stateConfig.fips : '';
+    if (stateFips) {
+      log(logEl, `Fetching county boundaries from TIGERweb (state FIPS ${stateFips})...`, 'info');
+      const params = new URLSearchParams({
+        where: `STATE = '${stateFips}'`,
+        outFields: 'GEOID,STATE,COUNTY,NAME,BASENAME',
+        returnGeometry: 'true',
+        outSR: '4326',
+        f: 'geojson'
+      });
+      const resp = await fetch(`${tigerwebUrl}?${params.toString()}`);
+      if (resp.ok) {
+        const geojson = await resp.json();
+        if (geojson.features && geojson.features.length > 0) {
+          countyFeatures = geojson.features;
+          countyFeatures.forEach(f => _computeBbox(f));
+          pipMethod = 'tigerweb_pip';
+          log(logEl, `✅ Loaded ${countyFeatures.length} county boundary polygons from TIGERweb`, 'success');
+        }
+      }
+    }
+  } catch (e) {
+    log(logEl, `⚠️ TIGERweb fetch failed (${e.message}) — falling back to centroid`, 'warning');
+  }
+
+  // ── Centroid fallback data (used if TIGERweb fetch fails) ──
+  function _haversineKm(lat1, lon1, lat2, lon2) {
+    const R = 6371.0;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+  const _countyCentroids = {};
+  if (typeof DELAWARE_GEO !== 'undefined' && DELAWARE_GEO.counties) {
+    for (const [cName, cGeo] of Object.entries(DELAWARE_GEO.counties)) {
+      if (cGeo.centLat && cGeo.centLon) {
+        _countyCentroids[cName] = { lat: cGeo.centLat, lon: cGeo.centLon, fips: cGeo.fips, area_type: cGeo.area_type || 'Rural' };
+      }
+    }
+  }
+
+  // ── Build FIPS→county name lookup from TIGERweb features ──
+  const _fipsToCountyName = {};
+  if (typeof DELAWARE_GEO !== 'undefined' && DELAWARE_GEO.counties) {
+    for (const [cName, cGeo] of Object.entries(DELAWARE_GEO.counties)) {
+      _fipsToCountyName[cGeo.fips] = cName;
+    }
+  }
+
+  // ── Function to resolve a single point ──
+  function _resolvePoint(lon, lat) {
+    // Tier 1: TIGERweb polygon PIP
+    if (countyFeatures.length > 0) {
+      for (const feat of countyFeatures) {
+        if (_pointInFeature(lon, lat, feat)) {
+          const fips3 = (feat.properties.COUNTY || '').padStart(3, '0');
+          const basename = (feat.properties.BASENAME || '').trim();
+          let countyName = _fipsToCountyName[fips3] || '';
+          if (!countyName) {
+            // Try matching by basename
+            for (const name of Object.keys(DELAWARE_GEO?.counties || {})) {
+              if (name.toLowerCase() === basename.toLowerCase()) { countyName = name; break; }
+            }
+          }
+          return { county: countyName, fips: fips3, source: 'tigerweb_pip' };
+        }
+      }
+    }
+    // Tier 2: Centroid fallback
+    let bestCounty = null, bestDist = Infinity;
+    for (const [cName, cData] of Object.entries(_countyCentroids)) {
+      const dist = _haversineKm(lat, lon, cData.lat, cData.lon);
+      if (dist < bestDist) { bestDist = dist; bestCounty = cName; }
+    }
+    if (bestCounty) {
+      return { county: bestCounty, fips: _countyCentroids[bestCounty].fips, source: 'centroid' };
+    }
+    return null;
+  }
+
+  // ── Validate all crashes ──
+  if (APP.normalizedData) {
+    // Compute bounding box from centroids
+    const centLats = Object.values(_countyCentroids).map(c => c.lat);
+    const centLons = Object.values(_countyCentroids).map(c => c.lon);
+    const latSpan = Math.max(...centLats) - Math.min(...centLats) || 1.0;
+    const lonSpan = Math.max(...centLons) - Math.min(...centLons) || 1.0;
+    const bbLatMin = Math.min(...centLats) - 0.02 * latSpan, bbLatMax = Math.max(...centLats) + 0.02 * latSpan;
+    const bbLonMin = Math.min(...centLons) - 0.02 * lonSpan, bbLonMax = Math.max(...centLons) + 0.02 * lonSpan;
+
+    for (let ri = 0; ri < APP.normalizedData.length; ri++) {
+      const row = APP.normalizedData[ri];
+      const crashLon = parseFloat(row['x']);
+      const crashLat = parseFloat(row['y']);
+      if (isNaN(crashLon) || isNaN(crashLat) || crashLon === 0 || crashLat === 0) continue;
+      if (crashLat < bbLatMin || crashLat > bbLatMax || crashLon < bbLonMin || crashLon > bbLonMax) continue;
+      gpsChecked++;
+
+      const statedJuris = (row['Physical Juris Name'] || '').trim();
+      const result = _resolvePoint(crashLon, crashLat);
+      if (!result || !result.county) continue;
+
+      if (result.county !== statedJuris && result.county) {
+        const oldJuris = statedJuris;
+        row['Physical Juris Name'] = result.county;
+        row['FIPS'] = (result.fips || '').padStart(3, '0');
+
+        // Cascade from DELAWARE_GEO (or equivalent state config)
+        if (typeof DELAWARE_GEO !== 'undefined') {
+          const cGeo = (DELAWARE_GEO.counties || {})[result.county] || {};
+          row['Area Type'] = cGeo.area_type || 'Rural';
+          row['MPO Name'] = (DELAWARE_GEO.mpos || {})[result.county] || '';
+          row['VDOT District'] = (DELAWARE_GEO.regions || {})[result.county] || '';
+          row['Planning District'] = (DELAWARE_GEO.regions || {})[result.county] || '';
+        }
+
+        gpsReassigned++;
+        const pairKey = `${oldJuris} → ${result.county}`;
+        gpsReassignStats[pairKey] = (gpsReassignStats[pairKey] || 0) + 1;
+      }
+
+      if (ri % 5000 === 0) {
+        setProgress('fipsProgFill', 'fipsProgLabel', 'fipsProgPct', 95 + (ri/APP.normalizedData.length)*5, `GPS PIP: ${ri.toLocaleString()}`);
+        await sleep(0);
+      }
+    }
+  }
+
+  if (gpsReassigned > 0) {
+    log(logEl, `<strong>⚠️ GPS validation (${pipMethod}): ${gpsReassigned.toLocaleString()} of ${gpsChecked.toLocaleString()} crashes reassigned to correct county</strong>`, 'warning');
+    for (const [pair, count] of Object.entries(gpsReassignStats).sort((a,b) => b[1] - a[1])) {
+      log(logEl, `  • ${pair}: <strong>${count.toLocaleString()}</strong> crashes`, 'warning');
+    }
+  } else {
+    log(logEl, `✅ All ${gpsChecked.toLocaleString()} GPS-validated crashes match stated jurisdiction (${pipMethod})`, 'success');
+  }
+  APP.gpsReassignStats = gpsReassignStats;
+
   // Stats
   document.getElementById('fipsStats').innerHTML = `
     <div class="stat-card"><div class="stat-label">JURISDICTIONS</div><div class="stat-value">${total}</div></div>
@@ -2014,6 +2208,7 @@ async function runFIPSResolution() {
     <div class="stat-card"><div class="stat-label">CENTROID MATCHED</div><div class="stat-value" style="color:var(--accent-blue)">${centroidMatched}</div></div>
     <div class="stat-card"><div class="stat-label">HIERARCHY FALLBACK</div><div class="stat-value" style="color:var(--accent-yellow)">${hierarchyFallback}</div></div>
     <div class="stat-card"><div class="stat-label">UNRESOLVED</div><div class="stat-value" style="color:${unresolved > 0 ? 'var(--accent-red)' : 'var(--accent-green)'}">${unresolved}</div></div>
+    <div class="stat-card"><div class="stat-label">GPS REASSIGNED</div><div class="stat-value" style="color:${gpsReassigned > 0 ? 'var(--accent-orange)' : 'var(--accent-green)'}">${gpsReassigned.toLocaleString()}</div><div class="stat-sub">of ${gpsChecked.toLocaleString()} checked</div></div>
     <div class="stat-card"><div class="stat-label">CONFLICTS</div><div class="stat-value" style="color:${APP.conflictReport.length > 0 ? 'var(--accent-orange)' : 'var(--accent-green)'}">${APP.conflictReport.length}</div></div>
   `;
 
