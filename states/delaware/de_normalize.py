@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-de_normalize.py — CrashLens Delaware (DelDOT) Normalization Script  v2.6
+de_normalize.py — CrashLens Delaware (DelDOT) Normalization Script  v2.6.3
 State: Delaware | FIPS: 10 | DOT: DelDOT
 
 Pipeline:
   Phase 1 — Column Mapping & Rename
   Phase 2 — State-Specific Post-Normalization Transforms
   Phase 3 — FIPS Resolution (hardcoded — DE has only 3 counties)
+  Phase 3.5 — GPS Jurisdiction Validation (v2.6.3 — reassign mismatched crashes)
   Phase 4 — Composite Crash ID Generation (OBJECTID = de-0000001)
   Phase 5 — EPDO Scoring
   Phase 6 — Jurisdiction Ranking (24 columns: 4 scopes × 6 metrics)
@@ -151,9 +152,9 @@ MANDATORY_COLUMNS = {"Physical Juris Name", "x", "y", "Crash Severity", "FIPS"}
 # ─────────────────────────────────────────────────────────────────────────────
 
 DE_COUNTIES = {
-    "Kent":        {"fips": "001", "geoid": "10001", "district": "Central District", "mpo": "Dover/Kent County MPO",         "area_type": "Urban"},
-    "New Castle":  {"fips": "003", "geoid": "10003", "district": "North District",   "mpo": "WILMAPCO",                      "area_type": "Urban"},
-    "Sussex":      {"fips": "005", "geoid": "10005", "district": "South District",   "mpo": "Salisbury-Wicomico MPO",        "area_type": "Rural"},
+    "Kent":        {"fips": "001", "geoid": "10001", "district": "Central District", "mpo": "Dover/Kent County MPO",         "area_type": "Urban",  "centlat": 39.097088, "centlon": -75.502982},
+    "New Castle":  {"fips": "003", "geoid": "10003", "district": "North District",   "mpo": "WILMAPCO",                      "area_type": "Urban",  "centlat": 39.575915, "centlon": -75.644132},
+    "Sussex":      {"fips": "005", "geoid": "10005", "district": "South District",   "mpo": "Salisbury-Wicomico MPO",        "area_type": "Rural",  "centlat": 38.673227, "centlon": -75.337024},
 }
 
 DE_COUNTY_CODE_MAP = {"K": "Kent", "N": "New Castle", "S": "Sussex"}
@@ -569,6 +570,133 @@ def resolve_fips(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  PHASE 3.5 — GPS JURISDICTION VALIDATION  (v2.6.3)
+#  Fallback: built-in centroid nearest-neighbor if tigerweb_pip not available
+# ─────────────────────────────────────────────────────────────────────────────
+
+def validate_gps_jurisdiction(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """
+    Phase 3.5: Cross-check crash GPS against county boundaries.
+
+    Tries tigerweb_pip.TIGERwebValidator (shapely PIP → TIGERweb API → centroid).
+    Falls back to built-in centroid nearest-neighbor if module not available.
+    """
+    # Try universal TIGERweb validator first
+    try:
+        from tigerweb_pip import TIGERwebValidator
+
+        # Find us_counties.json
+        counties_path = ""
+        for candidate in [
+            str(_SCRIPT_DIR / "us_counties.json"),
+            str(_REPO_ROOT / "states" / "geography" / "us_counties.json"),
+        ]:
+            if Path(candidate).exists():
+                counties_path = candidate
+                break
+
+        validator = TIGERwebValidator(
+            state_fips=STATE_FIPS,
+            state_abbreviation=STATE_ABBREVIATION,
+            county_dict=DE_COUNTIES,
+            cache_dir=str(_CACHE_DIR),
+            counties_json_path=counties_path,
+        )
+        return validator.validate_jurisdiction(df)
+
+    except ImportError:
+        print("        tigerweb_pip.py not found — using built-in centroid fallback")
+
+    # ── Built-in centroid fallback (zero dependencies) ──
+    import math
+
+    def _haversine_km(lat1, lon1, lat2, lon2):
+        R = 6371.0
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = (math.sin(dlat / 2) ** 2 +
+             math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+             math.sin(dlon / 2) ** 2)
+        return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    centroids = {}
+    for county, geo in DE_COUNTIES.items():
+        if "centlat" in geo and "centlon" in geo:
+            centroids[county] = (geo["centlat"], geo["centlon"])
+
+    if not centroids:
+        print("        ⚠️  No county centroids — skipping GPS validation")
+        return df, {}
+
+    # State bounding box (2% buffer of centroid span)
+    lats = [c[0] for c in centroids.values()]
+    lons = [c[1] for c in centroids.values()]
+    lat_span = max(lats) - min(lats) or 1.0
+    lon_span = max(lons) - min(lons) or 1.0
+    lat_min = min(lats) - 0.02 * lat_span
+    lat_max = max(lats) + 0.02 * lat_span
+    lon_min = min(lons) - 0.02 * lon_span
+    lon_max = max(lons) + 0.02 * lon_span
+
+    stats = {}
+    total_checked = 0
+    total_reassigned = 0
+
+    for idx in range(len(df)):
+        try:
+            x_val = float(df.at[idx, "x"]) if pd.notna(df.at[idx, "x"]) else None
+            y_val = float(df.at[idx, "y"]) if pd.notna(df.at[idx, "y"]) else None
+        except (ValueError, TypeError):
+            continue
+
+        if x_val is None or y_val is None or x_val == 0.0 or y_val == 0.0:
+            continue
+
+        crash_lon, crash_lat = x_val, y_val
+        if not (lat_min <= crash_lat <= lat_max and lon_min <= crash_lon <= lon_max):
+            continue
+
+        total_checked += 1
+        stated_juris = str(df.at[idx, "Physical Juris Name"]).strip()
+
+        best_county = None
+        best_dist = float("inf")
+        for county, (clat, clon) in centroids.items():
+            dist = _haversine_km(crash_lat, crash_lon, clat, clon)
+            if dist < best_dist:
+                best_dist = dist
+                best_county = county
+
+        if best_county and best_county != stated_juris:
+            new_geo = DE_COUNTIES[best_county]
+            old_juris = stated_juris
+
+            df.at[idx, "Physical Juris Name"] = best_county
+            df.at[idx, "FIPS"]                = new_geo["fips"]
+            df.at[idx, "DOT District"]        = new_geo.get("district", "")
+            if "VDOT District" in df.columns:
+                df.at[idx, "VDOT District"]   = new_geo.get("district", "")
+            df.at[idx, "Planning District"]   = new_geo.get("district", "")
+            df.at[idx, "MPO Name"]            = new_geo.get("mpo", "")
+            df.at[idx, "Area Type"]           = new_geo.get("area_type", "Rural")
+
+            total_reassigned += 1
+            pair_key = f"{old_juris} → {best_county}"
+            stats[pair_key] = stats.get(pair_key, 0) + 1
+
+    df["FIPS"] = df["FIPS"].fillna("").astype(str).str.zfill(3).replace("000", "")
+
+    if total_reassigned > 0:
+        print(f"        ⚠️  GPS validation (centroid): {total_reassigned:,} of {total_checked:,} reassigned")
+        for pair, count in sorted(stats.items(), key=lambda x: -x[1]):
+            print(f"           {pair}: {count:,} crashes")
+    else:
+        print(f"        ✅ All {total_checked:,} crashes match stated jurisdiction")
+
+    return df, stats
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  PHASE 4 — CRASH ID GENERATION  (v2.6 lowercase prefix)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -763,6 +891,7 @@ def build_validation_report(
     epdo_preset_name: str,
     epdo_weights: dict,
     column_mapping: dict,
+    gps_reassign_stats: dict = None,
 ) -> dict:
     total = len(df)
     sev_dist = {}
@@ -838,6 +967,10 @@ def build_validation_report(
         "intersection_name_coverage": {
             "filled": int((df.get("Intersection Name", pd.Series(dtype=str)).fillna("").str.strip() != "").sum()) if "Intersection Name" in df.columns else 0,
             "pct": round((df.get("Intersection Name", pd.Series(dtype=str)).fillna("").str.strip() != "").sum() / max(total, 1) * 100, 1) if "Intersection Name" in df.columns else 0.0,
+        },
+        "gps_jurisdiction_validation": {
+            "reassignments": gps_reassign_stats or {},
+            "total_reassigned": sum((gps_reassign_stats or {}).values()),
         },
     }
 
@@ -1057,14 +1190,14 @@ def normalize(
         raise FileNotFoundError(f"Input not found: {src}")
 
     print(f"\n{'═'*60}")
-    print(f"  CrashLens Delaware Normalization v2.6  |  {datetime.now():%Y-%m-%d %H:%M}")
+    print(f"  CrashLens Delaware Normalization v2.6.3  |  {datetime.now():%Y-%m-%d %H:%M}")
     print(f"  Input : {src.name}")
     print(f"  State : {STATE_NAME} ({STATE_ABBREVIATION}) | FIPS: {STATE_FIPS} | DOT: {STATE_DOT}")
     print(f"{'═'*60}")
 
     # Module status check
     print("\n  Module status:")
-    for name in ["geo_resolver.py", "crash_enricher.py", "osm_road_enricher.py"]:
+    for name in ["geo_resolver.py", "crash_enricher.py", "osm_road_enricher.py", "tigerweb_pip.py"]:
         found = any((Path(p) / name).exists() for p in sys.path if p)
         status = "OK" if found else "MISSING — put in same folder"
         print(f"    {name:<25} {status}")
@@ -1097,6 +1230,10 @@ def normalize(
     resolved = sum(1 for v in fips_lookup.values() if v["fips"])
     print(f"        {resolved}/{len(fips_lookup)} jurisdictions resolved")
 
+    # Phase 3.5: GPS Jurisdiction Validation (v2.6.3)
+    print("        Phase 3.5: GPS jurisdiction cross-check...")
+    df, gps_reassign_stats = validate_gps_jurisdiction(df)
+
     # [5/8] Crash IDs  (v2.6: lowercase prefix)
     print("  [5/8] Phase 4: Generating crash IDs...")
     df = generate_crash_ids(df)
@@ -1112,7 +1249,7 @@ def normalize(
 
     # [7/8] Validation + Fill Strategies
     print("  [7/8] Phase 7: Validation report...")
-    report = build_validation_report(df, fips_lookup, metrics, epdo_preset, weights, col_mapping)
+    report = build_validation_report(df, fips_lookup, metrics, epdo_preset, weights, col_mapping, gps_reassign_stats)
     print(f"        Quality score: {report['quality_score']}%")
     sev = report["severity_distribution"]
     print(f"        Severity: K={sev['K']}  A={sev['A']}  B={sev['B']}  C={sev['C']}  O={sev['O']}")
