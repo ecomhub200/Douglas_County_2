@@ -1058,8 +1058,17 @@ def run_enrichment(df: pd.DataFrame, skip_enrichment: bool = False) -> pd.DataFr
             df["Intersection Name"] = ""
         return df
 
+    # Step 1: Try to import crash_enricher (separate from execution)
     try:
         from crash_enricher import CrashEnricher
+    except ImportError:
+        print("  [8/8] Phase 8: crash_enricher.py not found — put in same folder for enrichment")
+        print("         Applying inline Tier 1 flag enrichment...")
+        df = _inline_tier1_enrichment(df)
+        return df
+
+    # Step 2: Run enrichment (any errors here are real bugs, not missing modules)
+    try:
         osm_ready = _ensure_osm_cache()
         print(f"  [8/8] Phase 8: Enrichment (Tier 1 always, Tier 2 {'ready' if osm_ready else 'SKIPPED — osmnx+scipy not importable'})...")
         enricher = CrashEnricher(
@@ -1070,9 +1079,11 @@ def run_enrichment(df: pd.DataFrame, skip_enrichment: bool = False) -> pd.DataFr
         )
         df = enricher.enrich_all(df, skip_tier2=not osm_ready)
         return df
-    except ImportError:
-        print("  [8/8] Phase 8: crash_enricher.py not found — put in same folder for enrichment")
-        print("         Applying inline Tier 1 flag enrichment...")
+    except Exception as e:
+        print(f"  [8/8] Phase 8: crash_enricher FAILED: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        print("         Falling back to inline Tier 1 enrichment...")
         df = _inline_tier1_enrichment(df)
         return df
 
