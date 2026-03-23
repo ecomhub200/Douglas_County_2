@@ -1058,8 +1058,17 @@ def run_enrichment(df: pd.DataFrame, skip_enrichment: bool = False) -> pd.DataFr
             df["Intersection Name"] = ""
         return df
 
+    # Step 1: Try to import crash_enricher (separate from execution)
     try:
         from crash_enricher import CrashEnricher
+    except ImportError:
+        print("  [8/8] Phase 8: crash_enricher.py not found — put in same folder for enrichment")
+        print("         Applying inline Tier 1 flag enrichment...")
+        df = _inline_tier1_enrichment(df)
+        return df
+
+    # Step 2: Run enrichment (any errors here are real bugs, not missing modules)
+    try:
         osm_ready = _ensure_osm_cache()
         print(f"  [8/8] Phase 8: Enrichment (Tier 1 always, Tier 2 {'ready' if osm_ready else 'SKIPPED — osmnx+scipy not importable'})...")
         enricher = CrashEnricher(
@@ -1070,9 +1079,11 @@ def run_enrichment(df: pd.DataFrame, skip_enrichment: bool = False) -> pd.DataFr
         )
         df = enricher.enrich_all(df, skip_tier2=not osm_ready)
         return df
-    except ImportError:
-        print("  [8/8] Phase 8: crash_enricher.py not found — put in same folder for enrichment")
-        print("         Applying inline Tier 1 flag enrichment...")
+    except Exception as e:
+        print(f"  [8/8] Phase 8: crash_enricher FAILED: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        print("         Falling back to inline Tier 1 enrichment...")
         df = _inline_tier1_enrichment(df)
         return df
 
@@ -1189,6 +1200,7 @@ def normalize(
     epdo_preset: str = DEFAULT_EPDO_PRESET,
     skip_if_normalized: bool = False,
     skip_enrichment: bool = False,
+    rerank_only: bool = False,
     report_path: str | None = None,
 ) -> str:
     t0 = time.time()
@@ -1222,6 +1234,47 @@ def normalize(
         return str(src)
 
     col_mapping = build_column_mapping_record(df.columns.tolist())
+
+    # ── RERANK-ONLY MODE ──
+    # Skip Phases 1-4 and 7-8. Only recompute OBJECTIDs, EPDO, rankings.
+    # Used after merging existing normalized CSV with newly normalized delta.
+    if rerank_only:
+        print("  ⚡ RERANK-ONLY mode — skipping normalization phases")
+        print(f"     Input is already normalized ({total_rows:,} rows)")
+
+        # Regenerate OBJECTIDs (sequential order changes after merge)
+        print("     Regenerating OBJECTIDs...")
+        df["OBJECTID"] = [f"{STATE_ABBREVIATION}-{i+1:07d}" for i in range(len(df))]
+
+        # Recompute EPDO
+        weights = EPDO_PRESETS.get(epdo_preset, EPDO_PRESETS[DEFAULT_EPDO_PRESET])
+        print(f"     Recomputing EPDO ({epdo_preset.upper()})...")
+        df = compute_epdo(df, weights)
+
+        # Recompute rankings
+        print(f"     Recomputing rankings...")
+        df, metrics = compute_rankings(df)
+        print(f"     Ranked {len(metrics)} jurisdictions across {len(RANKING_SCOPES)} scopes × {len(RANKING_METRICS)} metrics")
+
+        # Determine output paths
+        if output_path is None:
+            output_path = str(src.parent / f"{src.stem}_normalized_ranked.csv")
+
+        # Build output column order (same as full pipeline)
+        ranking_cols = [f"{s}_Rank_{m}" for s in RANKING_SCOPES for m in RANKING_METRICS]
+        standard_set = set(GOLDEN_COLUMNS + ENRICHMENT_COLUMNS + ranking_cols)
+        extra_cols = [c for c in df.columns if c not in standard_set]
+        all_out_cols = GOLDEN_COLUMNS + ENRICHMENT_COLUMNS + ranking_cols + extra_cols
+        all_out_cols = [c for c in all_out_cols if c in df.columns]
+
+        df[all_out_cols].to_csv(output_path, index=False)
+
+        elapsed = time.time() - t0
+        print(f"\n  ✅ Rerank done in {elapsed:.1f}s")
+        print(f"     Output  → {output_path}")
+        print(f"     Columns → {len(all_out_cols)}")
+        print(f"{'═'*60}\n")
+        return output_path
 
     # [2/8] Column renames
     print("  [2/8] Phase 1: Column renames...")
@@ -1319,6 +1372,10 @@ if __name__ == "__main__":
         "--skip-enrichment", action="store_true",
         help="Skip Phase 8 enrichment (Tier 1 + Tier 2)"
     )
+    parser.add_argument(
+        "--rerank-only", action="store_true",
+        help="Skip normalization — only recompute EPDO + rankings + OBJECTIDs on an already-normalized CSV"
+    )
     args = parser.parse_args()
 
     try:
@@ -1328,6 +1385,7 @@ if __name__ == "__main__":
             epdo_preset=args.epdo,
             skip_if_normalized=args.skip_if_normalized,
             skip_enrichment=args.skip_enrichment,
+            rerank_only=args.rerank_only,
             report_path=args.report,
         )
     except Exception as exc:
