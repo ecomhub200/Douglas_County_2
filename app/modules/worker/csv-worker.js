@@ -1,19 +1,27 @@
 /**
  * CrashLens CSV Web Worker
  * Parses CSV data off the main thread, computes aggregates and mapPoints.
- * Keeps UI responsive during large dataset loading (100k+ rows).
+ * Keeps UI responsive during large dataset loading (1M+ rows).
  *
  * Messages IN:
- *   { type: 'parse', csvText, colMapping, stateNormalization }
+ *   { type: 'parse', csvText, colMapping }
  *
  * Messages OUT:
  *   { type: 'progress', rows: number }
- *   { type: 'complete', aggregates, mapPoints, totalRows, years, routes, nodes, missingGPS, minDate, maxDate }
+ *   { type: 'mapPointsChunk', points: array, chunkIndex: number }
+ *   { type: 'complete', aggregates, totalRows, mapPointCount, years, routes, nodes, missingGPS, minDate, maxDate }
  *   { type: 'error', message: string }
+ *
+ * MapPoints are sent in chunks of 50k to avoid main-thread freeze from
+ * deserializing 1M+ objects in a single structured clone.
  */
 
 /* global importScripts, Papa */
 importScripts('https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js');
+
+// ── Constants ──
+
+var MAP_POINTS_CHUNK_SIZE = 50000; // Send mapPoints in 50k batches
 
 // ── Helpers (replicated from main thread for worker isolation) ──
 
@@ -79,6 +87,9 @@ function initAggregates() {
 }
 
 // ── Row processing (mirrors processRow() from app/index.html) ──
+// Uses _routeSets object for O(1) route dedup per node (converted to arrays before postMessage)
+
+var _routeSets = {}; // node -> {routeName: true} for O(1) dedup
 
 function processRowForAggregates(row, agg, COL, mapPoints, missingGPSRef) {
     var year = parseInt(row[COL.YEAR]) || null;
@@ -142,12 +153,16 @@ function processRowForAggregates(row, agg, COL, mapPoints, missingGPSRef) {
         }
     }
 
-    // By node (intersection) — use arrays instead of Sets (can't postMessage Sets)
+    // By node (intersection) — O(1) route dedup via _routeSets object lookup
     if (node) {
-        if (!agg.byNode[node]) agg.byNode[node] = { total: 0, K: 0, A: 0, B: 0, C: 0, O: 0, routes: [], ctrl: trafficCtrl };
+        if (!agg.byNode[node]) {
+            agg.byNode[node] = { total: 0, K: 0, A: 0, B: 0, C: 0, O: 0, routes: [], ctrl: trafficCtrl };
+            _routeSets[node] = {};
+        }
         agg.byNode[node].total++;
         if (sev) agg.byNode[node][sev]++;
-        if (route && agg.byNode[node].routes.indexOf(route) === -1) {
+        if (route && !_routeSets[node][route]) {
+            _routeSets[node][route] = true;
             agg.byNode[node].routes.push(route);
         }
     }
@@ -274,6 +289,22 @@ function processRowForAggregates(row, agg, COL, mapPoints, missingGPSRef) {
     }
 }
 
+// ── Send mapPoints in chunks to avoid main-thread freeze from structured clone ──
+
+function flushMapPointChunks(mapPoints) {
+    var chunkIndex = 0;
+    for (var i = 0; i < mapPoints.length; i += MAP_POINTS_CHUNK_SIZE) {
+        var chunk = mapPoints.slice(i, i + MAP_POINTS_CHUNK_SIZE);
+        self.postMessage({
+            type: 'mapPointsChunk',
+            points: chunk,
+            chunkIndex: chunkIndex
+        });
+        chunkIndex++;
+    }
+    return chunkIndex; // total chunks sent
+}
+
 // ── Main message handler ──
 
 self.onmessage = function(e) {
@@ -292,6 +323,9 @@ self.onmessage = function(e) {
         return;
     }
 
+    // Reset route dedup sets
+    _routeSets = {};
+
     var agg = initAggregates();
     var mapPoints = [];
     var missingGPSRef = { count: 0 };
@@ -304,6 +338,7 @@ self.onmessage = function(e) {
         Papa.parse(csvText, {
             header: true,
             skipEmptyLines: true,
+            chunkSize: 1024 * 1024 * 5, // 5MB chunks for better throughput on large files
             chunk: function(results) {
                 results.data.forEach(function(row) {
                     try {
@@ -329,16 +364,24 @@ self.onmessage = function(e) {
                 }
             },
             complete: function() {
+                // Free route dedup memory
+                _routeSets = {};
+
                 // Derive years, routes, nodes from aggregates
                 var years = Object.keys(agg.byYear).map(Number).sort(function(a, b) { return a - b; });
                 var routes = Object.keys(agg.byRoute).filter(function(r) { return r !== 'Unknown'; }).sort();
                 var nodes = Object.keys(agg.byNode).sort();
 
+                // Send mapPoints in chunks (50k each) to avoid main-thread freeze
+                var chunkCount = flushMapPointChunks(mapPoints);
+
+                // Send completion (aggregates are small — safe as single message)
                 self.postMessage({
                     type: 'complete',
                     aggregates: agg,
-                    mapPoints: mapPoints,
                     totalRows: totalRows,
+                    mapPointCount: mapPoints.length,
+                    mapPointChunks: chunkCount,
                     missingGPS: missingGPSRef.count,
                     years: years,
                     routes: routes,
@@ -346,6 +389,9 @@ self.onmessage = function(e) {
                     minDate: minDate === Infinity ? null : minDate,
                     maxDate: maxDate === -Infinity ? null : maxDate
                 });
+
+                // Free mapPoints memory in Worker
+                mapPoints = null;
             },
             error: function(err) {
                 self.postMessage({ type: 'error', message: 'CSV parse error: ' + err.message });
