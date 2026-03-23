@@ -294,6 +294,26 @@ jobs:
           echo "statewide_path=$STATEWIDE" >> $GITHUB_OUTPUT
           echo "data_dir=$DOT_DIR" >> $GITHUB_OUTPUT
 
+      # ── Restore OSM road cache from R2 (saves 2-10 min download) ──
+      - name: "Restore OSM cache from R2"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+          mkdir -p cache
+          for FILE in de_roads.parquet de_intersections.parquet; do
+            if aws s3 cp "s3://$R2_BUCKET/delaware/cache/$FILE" "cache/$FILE" \
+              --endpoint-url "$R2_ENDPOINT" --only-show-errors 2>/dev/null; then
+              SIZE=$(stat -c%s "cache/$FILE" 2>/dev/null || echo "?")
+              echo "Restored cache/$FILE ($SIZE bytes)"
+            else
+              echo "No cached $FILE in R2 — will download from OSM if needed"
+            fi
+          done
+
       # ══════════════════════════════════════════════════════════════
       # DELAWARE-SPECIFIC: Normalize raw data to CrashLens 69-column standard
       # This step transforms Delaware's non-standard column names, severity
@@ -341,6 +361,26 @@ jobs:
 
           echo "All critical columns verified ✓"
           echo "normalized_csv=$NORMALIZED_CSV" >> $GITHUB_OUTPUT
+
+      # ── Save OSM cache to R2 (persist across CI runs) ──
+      - name: "Save OSM cache to R2"
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          R2_ENDPOINT="https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          R2_BUCKET="crash-lens-data"
+          for FILE in cache/de_roads.parquet cache/de_intersections.parquet; do
+            if [ -f "$FILE" ]; then
+              BASENAME=$(basename "$FILE")
+              aws s3 cp "$FILE" "s3://$R2_BUCKET/delaware/cache/$BASENAME" \
+                --endpoint-url "$R2_ENDPOINT" --only-show-errors
+              SIZE=$(stat -c%s "$FILE" 2>/dev/null || echo "?")
+              echo "Cached $BASENAME to R2 ($SIZE bytes)"
+            fi
+          done
 
       # ── Step 5: Merge source files (if needed) ──
       - name: "Merge source files (if needed)"
@@ -403,12 +443,9 @@ jobs:
             exit 1
           fi
 
-          GZ_PATH="${CSV_PATH}.gz"
-          gzip -cn "$CSV_PATH" > "$GZ_PATH"
-          GZ_SIZE=$(stat -c%s "$GZ_PATH" 2>/dev/null || stat -f%z "$GZ_PATH")
           ORIG_SIZE=$(stat -c%s "$CSV_PATH" 2>/dev/null || stat -f%z "$CSV_PATH")
-          GZ_MD5=$(md5sum "$GZ_PATH" | awk '{print $1}')
-          echo "  Gzip: ${ORIG_SIZE} -> ${GZ_SIZE} bytes"
+          LOCAL_MD5=$(md5sum "$CSV_PATH" | awk '{print $1}')
+          echo "  Size: ${ORIG_SIZE} bytes, MD5: ${LOCAL_MD5}"
 
           DATA_CHANGED="true"
 
@@ -419,30 +456,29 @@ jobs:
               --endpoint-url "$R2_ENDPOINT" \
               --query 'ETag' --output text 2>/dev/null || echo "none")
             R2_MD5=$(echo "$R2_ETAG" | tr -d '"')
-            if [ "$R2_MD5" = "$GZ_MD5" ]; then
+            if [ "$R2_MD5" = "$LOCAL_MD5" ]; then
               echo "Data unchanged — skipping upload and pipeline"
               DATA_CHANGED="false"
               echo "r2_data_key=$R2_KEY" >> $GITHUB_OUTPUT
               echo "data_changed=false" >> $GITHUB_OUTPUT
-              rm -f "$GZ_PATH"
               exit 0
             fi
           fi
 
+          # Upload raw CSV (not gzipped) so it's directly readable when
+          # downloaded from R2. The _state/ path has the gzipped version.
           for i in 1 2 3 4; do
-            if aws s3 cp "$GZ_PATH" "s3://$R2_BUCKET/$R2_KEY" \
+            if aws s3 cp "$CSV_PATH" "s3://$R2_BUCKET/$R2_KEY" \
               --endpoint-url "$R2_ENDPOINT" \
               --content-type "text/csv" \
-              --content-encoding "gzip" \
               --only-show-errors; then
-              echo "Upload succeeded (gzip-compressed)"
+              echo "Upload succeeded (raw CSV)"
               break
             fi
             DELAY=$((2 ** i))
             echo "Upload failed (attempt $i/4), retrying in ${DELAY}s..."
             sleep $DELAY
           done
-          rm -f "$GZ_PATH"
 
           SIZE=$(aws s3api head-object \
             --bucket "$R2_BUCKET" --key "$R2_KEY" \

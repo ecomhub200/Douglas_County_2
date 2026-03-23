@@ -237,8 +237,15 @@ def _load_or_download_road_network(state_name, state_abbr, cache_dir="cache"):
         print(f"    Loading cached road network: {cache_path}")
         return pd.read_parquet(cache_path)
 
+    # ── Import osmnx separately so we don't mask internal ImportErrors ──
     try:
         import osmnx as ox
+    except ImportError:
+        print("    osmnx not installed — Tier 2 OSM enrichment skipped")
+        print("    Install: pip install osmnx")
+        return None
+
+    try:
         print(f"    Downloading {state_name} road network from OSM (this takes 2-10 min)...")
 
         # Download drivable road network for the state
@@ -320,12 +327,13 @@ def _load_or_download_road_network(state_name, state_abbr, cache_dir="cache"):
         print(f"    Cached {len(road_df):,} road segments, {len(intersection_df):,} intersections")
         return road_df
 
-    except ImportError:
-        print("    osmnx not installed — Tier 2 OSM enrichment skipped")
-        print("    Install: pip install osmnx")
+    except ImportError as e:
+        print(f"    OSM download failed — missing dependency: {e}")
         return None
     except Exception as e:
         print(f"    OSM download error: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
