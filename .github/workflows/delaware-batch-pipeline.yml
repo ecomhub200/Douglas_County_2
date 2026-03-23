@@ -57,6 +57,9 @@ on:
         default: 'false'
         type: string
 
+permissions:
+  contents: write
+
 env:
   NOTIFICATION_EMAIL: ecomhub200@gmail.com
 
