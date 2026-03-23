@@ -46,8 +46,9 @@ for p in [str(_REPO_ROOT), str(_SCRIPT_DIR)]:
     if p not in sys.path:
         sys.path.insert(0, p)
 _CACHE_DIR = _REPO_ROOT / "cache"
-if not _CACHE_DIR.exists():
-    _CACHE_DIR = _SCRIPT_DIR / "cache"
+# Always use repo-root cache/ — create it if needed rather than falling back
+# to states/delaware/cache/ which won't match CI R2 cache restore paths.
+_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CONFIG & CONSTANTS  (v2.6 naming: lowercase abbreviation, full word)
@@ -1025,10 +1026,16 @@ def _ensure_osm_cache() -> bool:
         if road_df is not None and cache_file.exists():
             print(f"        OSM cache created: {cache_file}")
             return True
-    except ImportError:
-        pass
+        elif road_df is not None:
+            print(f"        WARNING: road_df returned but cache file not at {cache_file}")
+        else:
+            print(f"        WARNING: _load_or_download_road_network returned None")
+    except ImportError as e:
+        print(f"        crash_enricher import failed: {e}")
     except Exception as e:
         print(f"        OSM pre-download failed: {e}")
+        import traceback
+        traceback.print_exc()
 
     # Fallback: if osmnx + scipy importable, enrich_tier2() can download itself
     try:
