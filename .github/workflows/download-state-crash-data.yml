@@ -131,7 +131,7 @@ jobs:
   # ============================================================
   download:
     name: "Download — ${{ github.event.inputs.state }} (${{ github.event.inputs.scope }})"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
 
     outputs:
@@ -589,7 +589,7 @@ jobs:
     name: "Trigger pipeline — ${{ github.event.inputs.scope }}"
     needs: download
     if: github.event.inputs.skip_pipeline != 'true' && github.event.inputs.dry_run != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/github-script@v7

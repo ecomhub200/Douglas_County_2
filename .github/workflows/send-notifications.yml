@@ -26,7 +26,7 @@ on:
 
 jobs:
   send-notifications:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # Brevo credentials - set EITHER API key OR SMTP login+password
     env:

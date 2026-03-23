@@ -69,7 +69,7 @@ jobs:
   # ============================================================
   prepare:
     name: "Prepare (Delaware)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
       state: ${{ steps.resolve.outputs.state }}
@@ -195,7 +195,7 @@ jobs:
   process:
     name: "Process (Delaware)"
     needs: prepare
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
 
     steps:

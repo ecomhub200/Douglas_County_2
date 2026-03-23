@@ -116,7 +116,7 @@ jobs:
   # ============================================================
   normalize:
     name: "Normalize (${{ github.event.inputs.state }})"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
 
     outputs:
@@ -555,7 +555,7 @@ jobs:
     if: >-
       github.event.inputs.skip_pipeline != 'true' &&
       github.event.inputs.dry_run != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Dispatch pipeline

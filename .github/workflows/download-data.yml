@@ -176,7 +176,7 @@ env:
 
 jobs:
   download-crash-data:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Run crash download on first Monday of month OR manual trigger (not grants_only)
     if: |
       github.event_name == 'workflow_dispatch' && github.event.inputs.download_type != 'grants_only' ||
@@ -623,7 +623,7 @@ jobs:
           exit 1
 
   download-grants-data:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Run grants download every Monday OR manual trigger (not crash_only)
     if: |
       github.event_name == 'workflow_dispatch' && github.event.inputs.download_type != 'crash_only' ||
@@ -706,7 +706,7 @@ jobs:
           exit 1
 
   download-cmf-data:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Run CMF download quarterly (Jan, Apr, Jul, Oct) OR manual trigger (cmf_only or all)
     if: |
       github.event_name == 'workflow_dispatch' && (github.event.inputs.download_type == 'cmf_only' || github.event.inputs.download_type == 'all') ||
@@ -798,7 +798,7 @@ jobs:
           exit 1
 
   notify-on-failure:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [download-crash-data, download-grants-data, download-cmf-data]
     if: failure()
     steps:
@@ -829,7 +829,7 @@ jobs:
             CRASH LENS Automated Notification
 
   notify-on-success:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [download-crash-data, download-grants-data, download-cmf-data]
     if: success() && github.event_name == 'schedule'
     steps:
