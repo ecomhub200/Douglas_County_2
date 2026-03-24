@@ -482,7 +482,7 @@ jobs:
 
           for i, local in enumerate(csv_files):
               rel = os.path.relpath(local, split_dir)
-              r2_key = f'{r2_prefix}/{rel}'
+              r2_key = f'{r2_prefix}/{rel}.gz'
               try:
                   gz_path = local + '.gz'
                   orig_size = os.path.getsize(local)

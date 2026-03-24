@@ -112,27 +112,27 @@ CL.upload = CL.upload || {};
         var r2Prefix = (appConfig && appConfig.states && appConfig.states[stateKey] && appConfig.states[stateKey].r2Prefix) || stateKey;
         var roadType = getActiveRoadTypeSuffix(tier);
 
-        if (tier === 'federal') return '_national/' + roadType + '.csv';
-        if (tier === 'state') return r2Prefix + '/_state/' + roadType + '.csv';
+        if (tier === 'federal') return '_national/' + roadType + '.csv.gz';
+        if (tier === 'state') return r2Prefix + '/_state/' + roadType + '.csv.gz';
 
         if (tier === 'region') {
             var regionId = jurisdictionContext.tierRegion && jurisdictionContext.tierRegion.id;
-            if (regionId) return r2Prefix + '/_region/' + regionId + '/' + roadType + '.csv';
+            if (regionId) return r2Prefix + '/_region/' + regionId + '/' + roadType + '.csv.gz';
         }
 
         if (tier === 'mpo') {
             var mpoId = jurisdictionContext.tierMpo && jurisdictionContext.tierMpo.id;
-            if (mpoId) return r2Prefix + '/_mpo/' + mpoId + '/' + roadType + '.csv';
+            if (mpoId) return r2Prefix + '/_mpo/' + mpoId + '/' + roadType + '.csv.gz';
         }
 
         if (tier === 'planning_district') {
             var pdId = jurisdictionContext.tierPlanningDistrict && jurisdictionContext.tierPlanningDistrict.id;
-            if (pdId) return r2Prefix + '/_planning_district/' + pdId.toLowerCase() + '/' + roadType + '.csv';
+            if (pdId) return r2Prefix + '/_planning_district/' + pdId.toLowerCase() + '/' + roadType + '.csv.gz';
         }
 
         if (tier === 'city') {
             var cityId = jurisdictionContext.tierCity && jurisdictionContext.tierCity.id;
-            if (cityId) return r2Prefix + '/_city/' + cityId.toLowerCase() + '/' + roadType + '.csv';
+            if (cityId) return r2Prefix + '/_city/' + cityId.toLowerCase() + '/' + roadType + '.csv.gz';
         }
 
         // County tier (default)
@@ -146,7 +146,7 @@ CL.upload = CL.upload || {};
         // Normalize to lowercase for R2 case-sensitive paths
         r2Jurisdiction = r2Jurisdiction.toLowerCase();
 
-        return r2Prefix + '/' + r2Jurisdiction + '/' + roadType + '.csv';
+        return r2Prefix + '/' + r2Jurisdiction + '/' + roadType + '.csv.gz';
     }
 
     /**
@@ -178,7 +178,8 @@ CL.upload = CL.upload || {};
             if (stateConfig && stateConfig.r2Prefix) {
                 var filename = normalizedPath.split('/').pop();
                 if (filename) {
-                    var knownSuffixes = ['_county_roads.csv', '_city_roads.csv', '_no_interstate.csv', '_all_roads.csv'];
+                    var knownSuffixes = ['_county_roads.csv.gz', '_city_roads.csv.gz', '_no_interstate.csv.gz', '_all_roads.csv.gz',
+                                         '_county_roads.csv', '_city_roads.csv', '_no_interstate.csv', '_all_roads.csv'];
                     var jurisdiction = null, filterWithExt = null;
                     for (var i = 0; i < knownSuffixes.length; i++) {
                         if (filename.indexOf(knownSuffixes[i], filename.length - knownSuffixes[i].length) !== -1) {
@@ -241,7 +242,9 @@ CL.upload = CL.upload || {};
 
         var statePrefix = parts[0];
         var jurisdiction = parts[1];
+        // Strip .gz suffix for local fallback paths (R2 uses .csv.gz, local uses .csv)
         var filename = parts.slice(2).join('/');
+        if (filename.indexOf('.gz', filename.length - 3) !== -1) filename = filename.slice(0, -3);
         var stateDataDir = appConfig && appConfig.states && appConfig.states[statePrefix] && appConfig.states[statePrefix].dataDir;
 
         if (stateDataDir) {

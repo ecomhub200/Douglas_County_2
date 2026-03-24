@@ -62,26 +62,26 @@ CL.upload.pipeline = CL.upload.pipeline || {};
         var roadType = 'all_roads'; // Default road type for pipeline uploads
 
         if (tier === 'federal') {
-            return '_national/' + roadType + '.csv';
+            return '_national/' + roadType + '.csv.gz';
         }
         if (tier === 'state') {
-            return statePrefix + '/_state/statewide_' + roadType + '.csv';
+            return statePrefix + '/_state/statewide_' + roadType + '.csv.gz';
         }
         if (tier === 'region' && entityId) {
-            return statePrefix + '/_region/' + entityId + '/' + roadType + '.csv';
+            return statePrefix + '/_region/' + entityId + '/' + roadType + '.csv.gz';
         }
         if (tier === 'mpo' && entityId) {
-            return statePrefix + '/_mpo/' + entityId + '/' + roadType + '.csv';
+            return statePrefix + '/_mpo/' + entityId + '/' + roadType + '.csv.gz';
         }
         if (tier === 'planning_district' && entityId) {
-            return statePrefix + '/_planning_district/' + entityId + '/' + roadType + '.csv';
+            return statePrefix + '/_planning_district/' + entityId + '/' + roadType + '.csv.gz';
         }
         if (tier === 'city' && entityId) {
-            return statePrefix + '/_city/' + entityId + '/' + roadType + '.csv';
+            return statePrefix + '/_city/' + entityId + '/' + roadType + '.csv.gz';
         }
         // County tier (default)
         if (entityId) {
-            return statePrefix + '/' + entityId.toLowerCase() + '/' + roadType + '.csv';
+            return statePrefix + '/' + entityId.toLowerCase() + '/' + roadType + '.csv.gz';
         }
         return '';
     }
