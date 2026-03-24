@@ -72,7 +72,7 @@ jobs:
   # ============================================================
   prepare:
     name: "Prepare (${{ github.event.inputs.state }})"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
       state: ${{ steps.resolve.outputs.state }}
@@ -151,7 +151,7 @@ jobs:
   process:
     name: "Process (${{ needs.prepare.outputs.state }})"
     needs: prepare
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
 
     steps:

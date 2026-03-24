@@ -31,7 +31,7 @@ on:
 
 jobs:
   resolve:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.build.outputs.matrix }}
     steps:
@@ -69,7 +69,7 @@ jobs:
 
   generate:
     needs: resolve
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       matrix: ${{ fromJson(needs.resolve.outputs.matrix) }}
