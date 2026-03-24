@@ -31,6 +31,22 @@ from pathlib import Path
 
 import pandas as pd
 
+
+def _is_empty(val) -> bool:
+    """Check if a cell value is empty (NaN, None, or blank string).
+
+    NaN is truthy in Python so ``not NaN`` returns False — the opposite
+    of what you'd expect for an "is empty" check.  This helper handles
+    NaN, None, and whitespace-only strings correctly.
+    """
+    if val is None:
+        return True
+    if isinstance(val, float) and math.isnan(val):
+        return True
+    if isinstance(val, str) and val.strip() == "":
+        return True
+    return False
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  CROSSWALK TABLES — OSM Tags → CrashLens Standard Values
 # ─────────────────────────────────────────────────────────────────────────────
@@ -235,7 +251,17 @@ def _load_or_download_road_network(state_name, state_abbr, cache_dir="cache"):
 
     if cache_path.exists():
         print(f"    Loading cached road network: {cache_path}")
-        return pd.read_parquet(cache_path)
+        road_df = pd.read_parquet(cache_path)
+        print(f"    Parquet columns: {list(road_df.columns)}")
+        print(f"    Parquet rows: {len(road_df):,}")
+        required_cols = {"mid_lat", "mid_lon", "highway"}
+        missing = required_cols - set(road_df.columns)
+        if missing:
+            print(f"    ⚠️ WRONG PARQUET FORMAT — missing columns: {missing}")
+            print(f"    Expected flat format with mid_lat/mid_lon (not GeoPandas geometry).")
+            print(f"    Re-upload correct parquets to R2 at {{state}}/cache/")
+            return None
+        return road_df
 
     # ── Import osmnx separately so we don't mask internal ImportErrors ──
     try:
@@ -665,7 +691,8 @@ class CrashEnricher:
                 for mi in member_indices:
                     actual_idx = valid_indices[mi]
                     # Only fill if Intersection Type is currently blank
-                    if df.at[actual_idx, "Intersection Type"] in ("", "Not Applicable", None):
+                    it_val = df.at[actual_idx, "Intersection Type"]
+                    if _is_empty(it_val) or it_val == "Not Applicable":
                         df.at[actual_idx, "Intersection Type"] = "4. Four Approaches"  # conservative default
                         cluster_count += 1
 
@@ -728,6 +755,13 @@ class CrashEnricher:
         """
         print("\n  [Tier 2] OSM road network matching...")
 
+        # Diagnostic: show pre-enrichment state of key columns
+        key_cols = ["Functional Class", "Ownership", "SYSTEM", "RTE Name"]
+        for kc in key_cols:
+            if kc in df.columns:
+                non_empty = df[kc].fillna("").str.strip().ne("").sum()
+                print(f"    Pre-enrich {kc}: {non_empty:,}/{len(df):,} filled")
+
         # Load or download road network
         road_df = _load_or_download_road_network(
             self.state_name, self.state_abbr, self.cache_dir
@@ -761,6 +795,11 @@ class CrashEnricher:
             return df
 
         valid = lats.notna() & lons.notna() & (lats != 0) & (lons != 0)
+        print(f"    GPS valid: {valid.sum():,}/{len(df):,} crashes have non-zero lat/lon")
+        if valid.sum() > 0:
+            sample_lat = lats[valid].iloc[0]
+            sample_lon = lons[valid].iloc[0]
+            print(f"    Sample coordinate: ({sample_lat:.4f}, {sample_lon:.4f})")
         if valid.sum() == 0:
             return df
 
@@ -791,21 +830,21 @@ class CrashEnricher:
 
             # RTE Name — from OSM name or ref
             rte_name = road.get("ref", "") or road.get("name", "")
-            if rte_name and not df.at[idx, "RTE Name"]:
+            if rte_name and _is_empty(df.at[idx, "RTE Name"]):
                 df.at[idx, "RTE Name"] = rte_name
                 filled["RTE Name"] += 1
 
             # Functional Class
-            if fc and not df.at[idx, "Functional Class"]:
+            if fc and _is_empty(df.at[idx, "Functional Class"]):
                 df.at[idx, "Functional Class"] = fc
                 filled["Functional Class"] += 1
 
                 # Derive downstream columns from FC
-                if not df.at[idx, "Ownership"]:
+                if _is_empty(df.at[idx, "Ownership"]):
                     df.at[idx, "Ownership"] = FC_TO_OWNERSHIP.get(fc, "")
                     filled["Ownership"] += 1
 
-                if not df.at[idx, "Facility Type"]:
+                if _is_empty(df.at[idx, "Facility Type"]):
                     oneway = road.get("oneway", "")
                     if oneway in OSM_ONEWAY_FACILITY:
                         df.at[idx, "Facility Type"] = OSM_ONEWAY_FACILITY[oneway]
@@ -813,7 +852,7 @@ class CrashEnricher:
                         df.at[idx, "Facility Type"] = FC_TO_FACILITY_TYPE.get(fc, "")
                     filled["Facility Type"] += 1
 
-                if not df.at[idx, "SYSTEM"]:
+                if _is_empty(df.at[idx, "SYSTEM"]):
                     df.at[idx, "SYSTEM"] = FC_TO_SYSTEM.get(fc, "")
                     filled["SYSTEM"] += 1
 
@@ -821,7 +860,7 @@ class CrashEnricher:
                 df.at[idx, "Mainline?"] = FC_TO_MAINLINE.get(fc, "No")
 
             # Roadway Description from OSM attributes
-            if not df.at[idx, "Roadway Description"]:
+            if _is_empty(df.at[idx, "Roadway Description"]):
                 oneway = road.get("oneway", "")
                 lanes = road.get("lanes", "")
                 divided = ""  # OSM doesn't always have this
@@ -844,16 +883,16 @@ class CrashEnricher:
                 node_id = node_info["node_id"]
                 dist_ft = node_info["distance_ft"]
 
-                if not df.at[idx, "Node"]:
+                if _is_empty(df.at[idx, "Node"]):
                     df.at[idx, "Node"] = str(node_id)
-                if not df.at[idx, "Node Offset (ft)"]:
+                if _is_empty(df.at[idx, "Node Offset (ft)"]):
                     df.at[idx, "Node Offset (ft)"] = str(dist_ft)
-                if not df.at[idx, "Intersection Type"]:
+                if _is_empty(df.at[idx, "Intersection Type"]):
                     df.at[idx, "Intersection Type"] = node_info["intersection_type"]
                     int_filled += 1
 
                 # Derive Intersection Name from road names at this node
-                if not df.at[idx, "Intersection Name"]:
+                if _is_empty(df.at[idx, "Intersection Name"]):
                     names = sorted(node_road_names.get(node_id, set()))
                     if len(names) >= 2:
                         int_name = f"{names[0]} & {names[1]}"
