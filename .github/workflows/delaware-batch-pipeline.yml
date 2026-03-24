@@ -413,6 +413,12 @@ jobs:
                   os.remove(gz_path)
                   if uploaded:
                       success += 1
+                      # Delete legacy .csv key (without .gz) to avoid duplicates in R2
+                      legacy_key = r2_key[:-3]  # strip .gz → gets the old .csv key
+                      subprocess.run([
+                          'aws', 's3', 'rm', f's3://{bucket}/{legacy_key}',
+                          '--endpoint-url', endpoint, '--only-show-errors'
+                      ], capture_output=True, timeout=30)
                   else:
                       print(f'  FAIL after 4 attempts: {r2_key}')
                       failed += 1
