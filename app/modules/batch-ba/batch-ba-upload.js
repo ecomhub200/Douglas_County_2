@@ -237,17 +237,26 @@ CL.batchBA.applyMapping = function() {
     }
 };
 
-/** Parse various date formats */
+/** Parse various date formats including Excel serial numbers */
 CL.batchBA._parseDate = function(val) {
     if (!val) return null;
     if (val instanceof Date && !isNaN(val)) return val;
+    // Excel serial number (e.g., 44927 = 2023-01-10)
+    if (typeof val === 'number' && val > 10000 && val < 100000) {
+        var d = new Date((val - 25569) * 86400 * 1000);
+        if (!isNaN(d)) return d;
+    }
     var d = new Date(val);
-    if (!isNaN(d)) return d;
-    // Try MM/DD/YYYY
+    if (!isNaN(d) && d.getFullYear() > 1900) return d;
+    // Try MM/DD/YYYY or DD/MM/YYYY
     var parts = String(val).split(/[\/\-\.]/);
     if (parts.length === 3) {
+        // Try M/D/Y first
         d = new Date(parts[2], parts[0] - 1, parts[1]);
-        if (!isNaN(d)) return d;
+        if (!isNaN(d) && d.getFullYear() > 1900) return d;
+        // Try Y-M-D
+        d = new Date(parts[0], parts[1] - 1, parts[2]);
+        if (!isNaN(d) && d.getFullYear() > 1900) return d;
     }
     return null;
 };
