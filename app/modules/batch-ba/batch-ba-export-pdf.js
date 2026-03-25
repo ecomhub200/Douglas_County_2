@@ -73,6 +73,12 @@ CL.batchBA.exportPDF = function() {
         { label: 'Crashes Prevented', value: sum.crashesPrevented, color: colors.secondary }
     ];
 
+    // Handle null avgCMF
+    if (sum.avgCMF === null) {
+        kpis[2].value = 'N/A';
+        kpis[2].color = colors.gray;
+    }
+
     kpis.forEach(function(kpi, i) {
         var x = m + i * (kpiW + 4);
         doc.setFillColor(...colors.white);
@@ -140,7 +146,7 @@ CL.batchBA.exportPDF = function() {
             r.beforeTotal,
             r.afterTotal,
             r.changePct.toFixed(1) + '%',
-            r.cmf.toFixed(3),
+            r.cmf !== null ? r.cmf.toFixed(3) : 'N/A',
             r.isSignificant ? 'Yes' : 'No',
             rating.label
         ];
@@ -198,7 +204,7 @@ CL.batchBA.exportPDF = function() {
         // Mini stats
         doc.setFontSize(8);
         doc.setTextColor(...colors.text);
-        var statsLine = 'Before: ' + r.beforeTotal + ' crashes | After: ' + r.afterTotal + ' | Change: ' + r.changePct.toFixed(1) + '% | CMF: ' + r.cmf.toFixed(3) + ' | EPDO: ' + Math.round(r.beforeEPDO) + ' → ' + Math.round(r.afterEPDO);
+        var statsLine = 'Before: ' + r.beforeTotal + ' crashes | After: ' + r.afterTotal + ' | Change: ' + r.changePct.toFixed(1) + '% | CMF: ' + (r.cmf !== null ? r.cmf.toFixed(3) : 'N/A') + ' | EPDO: ' + Math.round(r.beforeEPDO) + ' → ' + Math.round(r.afterEPDO);
         doc.text(statsLine, m + 3, y);
         y += 5;
 

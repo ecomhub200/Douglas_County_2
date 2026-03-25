@@ -61,6 +61,9 @@ CL.batchBA.resetState = function() {
     s.validRows = [];
     s.invalidRows = [];
     s.autoDetected = false;
+    s.globalRadiusFt = 250;
+    s.analysisMethod = 'eb';
+    s.confidenceLevel = 0.95;
     s.processing = false;
     s.progress = { current: 0, total: 0, currentName: '' };
     s.results = [];
@@ -71,6 +74,22 @@ CL.batchBA.resetState = function() {
     s.filterEffectiveness = 'all';
     s.filterSignificance = 'all';
     s.searchText = '';
+
+    // Destroy any existing chart instances
+    if (CL.batchBA._charts) {
+        Object.keys(CL.batchBA._charts).forEach(function(key) {
+            if (CL.batchBA._charts[key]) {
+                CL.batchBA._charts[key].destroy();
+                CL.batchBA._charts[key] = null;
+            }
+        });
+    }
+
+    // Reset radius slider UI
+    var slider = document.getElementById('batchBARadiusSlider');
+    var display = document.getElementById('batchBARadiusDisplay');
+    if (slider) slider.value = 250;
+    if (display) display.textContent = '250 ft';
 };
 
 /**
@@ -79,6 +98,7 @@ CL.batchBA.resetState = function() {
  * @returns {{ label: string, color: string, badgeClass: string }}
  */
 CL.batchBA.getEffectivenessRating = function(cmf) {
+    if (cmf === null || cmf === undefined) return { label: 'N/A', color: '#94a3b8', badgeClass: 'secondary' };
     if (cmf < 0.70) return { label: 'Highly Effective', color: '#16a34a', badgeClass: 'success' };
     if (cmf < 0.90) return { label: 'Effective', color: '#65a30d', badgeClass: 'success' };
     if (cmf < 1.00) return { label: 'Marginal', color: '#ca8a04', badgeClass: 'warning' };

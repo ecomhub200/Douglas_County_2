@@ -46,8 +46,8 @@ CL.batchBA.exportCSV = function() {
             before_epdo: Math.round(r.beforeEPDO),
             after_epdo: Math.round(r.afterEPDO),
             epdo_change_pct: r.epdoChangePct.toFixed(2),
-            cmf: r.cmf.toFixed(4),
-            crf: r.crf.toFixed(2),
+            cmf: r.cmf !== null ? r.cmf.toFixed(4) : '',
+            crf: r.crf !== null ? r.crf.toFixed(2) : '',
             p_value: r.pValue.toFixed(6),
             significant: r.isSignificant ? 'Yes' : 'No',
             effectiveness_rating: rating.label

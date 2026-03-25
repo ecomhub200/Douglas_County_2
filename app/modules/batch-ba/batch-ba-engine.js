@@ -137,8 +137,9 @@ CL.batchBA._analyzeLocation = function(location) {
         pValue = 1.0;
         isSignificant = false;
     } else if (beforeStats.total === 0) {
-        cmf = afterStats.total > 0 ? 999 : 1.0;
-        crf = (1 - cmf) * 100;
+        // Cannot compute meaningful CMF with zero before-crashes
+        cmf = null;
+        crf = null;
         pValue = 1.0;
         isSignificant = false;
     } else {
@@ -229,7 +230,10 @@ CL.batchBA._haversineMeters = function(lat1, lng1, lat2, lng2) {
 CL.batchBA._filterByPeriod = function(crashes, startDate, endDate) {
     return crashes.filter(function(c) {
         var dateVal = c.date !== undefined ? c.date : (c[COL.DATE] || 0);
-        var d = new Date(Number(dateVal));
+        var num = Number(dateVal);
+        // If numeric (epoch ms), use directly; otherwise parse as date string
+        var d = !isNaN(num) && num > 0 ? new Date(num) : new Date(dateVal);
+        if (isNaN(d.getTime())) return false;
         return d >= startDate && d <= endDate;
     });
 };
@@ -288,18 +292,19 @@ CL.batchBA._computeSummary = function() {
     var byEffectiveness = { 'Highly Effective': 0, 'Effective': 0, 'Marginal': 0, 'Ineffective': 0, 'Negative Impact': 0 };
     var byType = {};
 
+    var cmfCount = 0; // track locations with valid CMF
     successful.forEach(function(r) {
         totalCrashChange += r.changePct;
-        totalCMF += r.cmf;
+        if (r.cmf !== null) { totalCMF += r.cmf; cmfCount++; }
         if (r.isSignificant) significantCount++;
         if (r.afterTotal < r.beforeTotal) crashesPrevented += (r.beforeTotal - r.afterTotal);
         var rating = CL.batchBA.getEffectivenessRating(r.cmf).label;
         byEffectiveness[rating] = (byEffectiveness[rating] || 0) + 1;
 
         var type = r.countermeasureType || 'Not specified';
-        if (!byType[type]) byType[type] = { count: 0, totalCMF: 0, totalChange: 0 };
+        if (!byType[type]) byType[type] = { count: 0, totalCMF: 0, cmfCount: 0, totalChange: 0 };
         byType[type].count++;
-        byType[type].totalCMF += r.cmf;
+        if (r.cmf !== null) { byType[type].totalCMF += r.cmf; byType[type].cmfCount++; }
         byType[type].totalChange += r.changePct;
     });
 
@@ -307,7 +312,7 @@ CL.batchBA._computeSummary = function() {
         totalAnalyzed: successful.length,
         errors: errors.length,
         avgCrashReduction: -(totalCrashChange / successful.length),
-        avgCMF: totalCMF / successful.length,
+        avgCMF: cmfCount > 0 ? (totalCMF / cmfCount) : null,
         significantCount: significantCount,
         significantPct: (significantCount / successful.length * 100),
         crashesPrevented: crashesPrevented,

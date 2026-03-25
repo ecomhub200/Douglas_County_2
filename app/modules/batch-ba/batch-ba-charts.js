@@ -25,17 +25,19 @@ CL.batchBA.renderCharts = function() {
 
     document.getElementById('batchBAChartsSection').style.display = 'block';
 
+    var withCMF = results.filter(function(r) { return r.cmf !== null; });
+
     CL.batchBA._renderBeforeAfterBar(results);
-    CL.batchBA._renderCMFDistribution(results);
+    CL.batchBA._renderCMFDistribution(withCMF);
     CL.batchBA._renderSeverityShift(results);
     CL.batchBA._renderScatterPlot(results);
 
     // Box plot by type if multiple types
     var types = {};
-    results.forEach(function(r) { types[r.countermeasureType] = true; });
+    withCMF.forEach(function(r) { types[r.countermeasureType] = true; });
     if (Object.keys(types).length > 1) {
         document.getElementById('batchBACMFByTypeContainer').style.display = 'block';
-        CL.batchBA._renderCMFByType(results);
+        CL.batchBA._renderCMFByType(withCMF);
     }
 };
 
@@ -122,20 +124,8 @@ CL.batchBA._renderCMFDistribution = function(results) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                title: { display: true, text: 'CMF Distribution (1.0 = no change)', font: { size: 13 } },
-                legend: { display: false },
-                annotation: {
-                    annotations: {
-                        line1: {
-                            type: 'line',
-                            xMin: 5.5, xMax: 5.5,
-                            borderColor: '#1e40af',
-                            borderWidth: 2,
-                            borderDash: [6, 3],
-                            label: { content: 'CMF = 1.0', display: true, position: 'start' }
-                        }
-                    }
-                }
+                title: { display: true, text: 'CMF Distribution (1.0 = no change, bins at 0.9-1.0 / 1.0-1.1 boundary)', font: { size: 12 } },
+                legend: { display: false }
             },
             scales: {
                 y: { beginAtZero: true, title: { display: true, text: 'Number of Locations' } },
@@ -202,7 +192,7 @@ CL.batchBA._renderScatterPlot = function(results) {
         if (r.beforeTotal > maxVal) maxVal = r.beforeTotal;
         if (r.afterTotal > maxVal) maxVal = r.afterTotal;
         var rating = CL.batchBA.getEffectivenessRating(r.cmf);
-        return { x: r.beforeTotal, y: r.afterTotal, label: r.locationName, color: rating.color };
+        return { x: r.beforeTotal, y: r.afterTotal, label: r.locationName, color: rating.color || '#94a3b8' };
     });
 
     // y=x reference line data

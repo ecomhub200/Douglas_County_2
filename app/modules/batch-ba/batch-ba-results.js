@@ -34,9 +34,13 @@ CL.batchBA._renderSummaryCards = function() {
     var sum = CL.batchBA.state.summary;
     var html = '<div class="kpi-grid" style="grid-template-columns:repeat(5,1fr);gap:.75rem;margin-bottom:1.5rem">';
 
+    var avgCMFDisplay = sum.avgCMF !== null ? sum.avgCMF.toFixed(3) : 'N/A';
+    var avgCMFColor = sum.avgCMF !== null && sum.avgCMF < 1 ? '#15803d' : (sum.avgCMF !== null ? '#dc2626' : '#64748b');
+    var avgCMFLight = sum.avgCMF !== null && sum.avgCMF < 1 ? '#22c55e' : (sum.avgCMF !== null ? '#ef4444' : '#94a3b8');
+
     html += CL.batchBA._kpiCard(sum.totalAnalyzed, 'Locations Analyzed', '#1e40af', '#3b82f6');
     html += CL.batchBA._kpiCard(sum.avgCrashReduction.toFixed(1) + '%', 'Avg Crash Reduction', sum.avgCrashReduction > 0 ? '#15803d' : '#dc2626', sum.avgCrashReduction > 0 ? '#22c55e' : '#ef4444');
-    html += CL.batchBA._kpiCard(sum.avgCMF.toFixed(3), 'Average CMF', sum.avgCMF < 1 ? '#15803d' : '#dc2626', sum.avgCMF < 1 ? '#22c55e' : '#ef4444');
+    html += CL.batchBA._kpiCard(avgCMFDisplay, 'Average CMF', avgCMFColor, avgCMFLight);
     html += CL.batchBA._kpiCard(sum.crashesPrevented, 'Crashes Prevented', '#7c3aed', '#a78bfa');
     html += CL.batchBA._kpiCard(sum.significantPct.toFixed(0) + '%', 'Significant Improvement', '#0369a1', '#38bdf8');
 
@@ -177,7 +181,7 @@ CL.batchBA._renderResultsTable = function() {
             html += '<td style="text-align:center">' + Math.round(r.beforeEPDO) + '</td>';
             html += '<td style="text-align:center">' + Math.round(r.afterEPDO) + '</td>';
             html += '<td style="text-align:center;color:' + epdoColor + ';font-weight:600">' + r.epdoChangePct.toFixed(1) + '%</td>';
-            html += '<td style="text-align:center;font-weight:700;color:' + rating.color + '">' + r.cmf.toFixed(3) + '</td>';
+            html += '<td style="text-align:center;font-weight:700;color:' + rating.color + '">' + (r.cmf !== null ? r.cmf.toFixed(3) : 'N/A') + '</td>';
             html += '<td style="text-align:center">' + (r.isSignificant ? '<span style="color:#16a34a;font-weight:700">✓</span>' : '<span style="color:#94a3b8">✗</span>') + '</td>';
             html += '<td><span style="display:inline-block;padding:.15rem .5rem;border-radius:9999px;font-size:.72rem;font-weight:600;background:' + rating.color + '20;color:' + rating.color + '">' + rating.label + '</span></td>';
             html += '</tr>';
@@ -239,8 +243,8 @@ CL.batchBA._toggleRowDetail = function(rowEl, filteredIdx) {
     html += '<div>';
     html += '<div style="font-weight:700;color:#1e40af;margin-bottom:.5rem">Statistical Results</div>';
     html += '<div style="font-size:.82rem;line-height:1.8">';
-    html += '<div>CMF: <strong style="color:' + rating.color + '">' + r.cmf.toFixed(3) + '</strong></div>';
-    html += '<div>CRF: ' + (r.crf > 0 ? '+' : '') + r.crf.toFixed(1) + '%</div>';
+    html += '<div>CMF: <strong style="color:' + rating.color + '">' + (r.cmf !== null ? r.cmf.toFixed(3) : 'N/A (no before-period crashes)') + '</strong></div>';
+    html += '<div>CRF: ' + (r.crf !== null ? ((r.crf > 0 ? '+' : '') + r.crf.toFixed(1) + '%') : 'N/A') + '</div>';
     html += '<div>p-value: ' + r.pValue.toFixed(4) + '</div>';
     html += '<div>Before Period: ' + r.beforeStart.toLocaleDateString() + ' — ' + r.beforeEnd.toLocaleDateString() + ' (' + r.beforeYears.toFixed(1) + ' yr)</div>';
     html += '<div>After Period: ' + r.afterStart.toLocaleDateString() + ' — ' + r.afterEnd.toLocaleDateString() + ' (' + r.afterYears.toFixed(1) + ' yr)</div>';
