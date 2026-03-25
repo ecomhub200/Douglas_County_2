@@ -102,13 +102,49 @@ These pipelines are working correctly in production. If a change seems needed, *
 The application **MUST NOT** be a single monolithic HTML file. All new code and refactoring must follow a modular structure:
 
 - **Separate HTML, CSS, and JavaScript** into distinct files
-- **JavaScript modules**: Break functionality into logical modules (e.g., `app/js/map.js`, `app/js/dashboard.js`, `app/js/cmf.js`, etc.)
+- **JavaScript modules**: Break functionality into logical modules under `app/modules/` using the `CL` namespace
 - **CSS files**: Organize styles by component or feature area (e.g., `app/css/map.css`, `app/css/dashboard.css`)
-- **HTML**: `app/index.html` should be the entry point that loads modules via `<script>` tags or ES module imports
+- **HTML**: `app/index.html` should be the entry point that loads modules via `<script>` tags
 - **Do NOT inline large blocks of CSS or JavaScript** into HTML files
 - **Each tab/feature should have its own JS module** to keep files maintainable and under a reasonable size
 - When modifying existing code, **actively refactor monolithic sections into separate modules** when practical
-- Shared utilities, constants, and helper functions should live in dedicated shared modules (e.g., `app/js/utils.js`, `app/js/constants.js`)
+- Shared utilities, constants, and helper functions should live in dedicated shared modules (e.g., `app/modules/core/constants.js`, `app/modules/utils/date-utils.js`)
+
+#### Module Conventions (MUST follow for all new code)
+
+1. **Namespace pattern**: All modules attach to `window.CL` global namespace
+   ```javascript
+   window.CL = window.CL || {};
+   CL.featureName = CL.featureName || {};
+   CL.featureName.subModule = { /* functions */ };
+   CL._registerModule('featureName/subModule');
+   ```
+2. **Directory structure**: `app/modules/{feature}/{feature}-{submodule}.js`
+   - Example: `app/modules/batch-ba/batch-ba-engine.js`
+3. **Registration**: Every module MUST call `CL._registerModule('namespace/name')` at the end
+4. **Global function wrappers**: If a module function needs to be called from HTML `onclick`, create a thin global wrapper:
+   ```javascript
+   // In the module file:
+   CL.batchBA.startProcessing = function() { /* ... */ };
+   // Global wrapper at bottom of file or in index.html:
+   function startBatchBAProcessing() { CL.batchBA.startProcessing(); }
+   ```
+5. **Loading order**: Add `<script>` tags in `app/index.html` after `modules/loader.js` and core dependencies
+6. **Max file size**: Keep individual module files under **500 lines**. Split larger features into sub-modules (e.g., `-state.js`, `-engine.js`, `-ui.js`, `-export.js`)
+7. **No duplicate function names**: Always search for existing function names before creating new ones. Use unique, descriptive names prefixed with the feature abbreviation
+
+#### Existing Module Map
+
+| Namespace | Directory | Purpose |
+|-----------|-----------|---------|
+| `CL.core` | `app/modules/core/` | Constants, EPDO calculations |
+| `CL.analysis` | `app/modules/analysis/` | Crash profiles, baselines, hotspots |
+| `CL.warrants` | `app/modules/warrants/` | Signal warrant analysis |
+| `CL.grants` | `app/modules/grants/` | Grant ranking |
+| `CL.ai` | `app/modules/ai/` | AI context awareness |
+| `CL.upload` | `app/modules/upload/` | Data upload pipeline, R2 |
+| `CL.utils` | `app/modules/utils/` | Date utilities |
+| `CL.batchBA` | `app/modules/batch-ba/` | Batch Before/After evaluation |
 
 ### Hosting: Coolify (Docker)
 - **Docker container** running Nginx (static files, port 80) + Node.js API server (port 3001)
