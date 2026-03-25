@@ -15,6 +15,7 @@ CL.data = CL.data || {};
 CL.spatial = CL.spatial || {};
 CL.upload = CL.upload || {};
 CL.utils = CL.utils || {};
+CL.batchBA = CL.batchBA || {};
 
 // Module loading tracker (for debugging)
 CL._loaded = [];
