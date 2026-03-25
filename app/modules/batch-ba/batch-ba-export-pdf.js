@@ -1,6 +1,7 @@
 /**
  * CrashLens Batch Before/After Evaluation — PDF Report Export
- * Professional multi-page PDF using jsPDF + AutoTable.
+ * Professional multi-page PDF matching the Standard Report design pattern.
+ * Uses jsPDF + AutoTable with hex color palette, section accent bars, severity bars, and KPI cards.
  */
 window.CL = window.CL || {};
 CL.batchBA = CL.batchBA || {};
@@ -16,136 +17,353 @@ CL.batchBA.exportPDF = function() {
     }
 
     var jsPDF = window.jspdf.jsPDF;
-    var doc = new jsPDF('p', 'mm', 'a4');
-    var pw = doc.internal.pageSize.getWidth();
-    var ph = doc.internal.pageSize.getHeight();
-    var m = 15;
+    var doc = new jsPDF('p', 'mm', 'letter');
+    var pw = 215.9;
+    var ph = 279.4;
+    var m = 18;
     var cw = pw - m * 2;
+    var footerH = 20;
+    var headerH = 12;
+    var safeBottom = ph - footerH - 5;
 
-    var colors = {
-        primary: [30, 64, 175], secondary: [124, 58, 237],
-        success: [22, 163, 74], danger: [220, 38, 38],
-        warning: [234, 88, 12], gray: [100, 116, 139],
-        lightGray: [248, 250, 252], white: [255, 255, 255], text: [51, 51, 51]
+    // Professional color palette (matching Fatal & Speed tab)
+    var C = {
+        primary: '#1E3A5F', primaryLight: '#2563eb',
+        text: '#374151', textLight: '#6b7280',
+        fatal: '#991B1B', fatalLight: '#dc2626',
+        serious: '#C2410C', moderate: '#f97316',
+        minor: '#facc15', pdo: '#9CA3AF',
+        success: '#065f46', successLight: '#16a34a',
+        danger: '#dc2626', warning: '#ea580c',
+        white: '#ffffff', gray: '#9CA3AF',
+        border: '#e5e7eb', lightBg: '#f8fafc',
+        secondary: '#7c3aed'
     };
 
-    var dateStamp = new Date().toISOString().split('T')[0];
-    var generatedDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     var successful = s.results.filter(function(r) { return r.status === 'success'; });
     var sum = s.summary;
+    var dateStamp = new Date().toISOString().split('T')[0];
+    var generatedDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    var epdoInfo = CL.core.epdo.getStateEPDOWeights(typeof STATE_FIPS !== 'undefined' ? STATE_FIPS : '_default');
+    var pageNum = 0;
+    var y = m + headerH;
 
-    // ========== COVER PAGE ==========
-    doc.setFillColor(...colors.primary);
-    doc.rect(0, 0, pw, 60, 'F');
-    doc.setFillColor(...colors.secondary);
-    doc.rect(0, 52, pw, 8, 'F');
+    // === HELPER FUNCTIONS (matching Standard Report pattern) ===
 
-    doc.setTextColor(...colors.white);
-    doc.setFontSize(28);
-    doc.setFont('helvetica', 'bold');
-    doc.text('CRASH LENS', m, 25);
-
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Before/After Study — Batch Evaluation Report', m, 40);
-
-    var y = 80;
-    doc.setTextColor(...colors.text);
-    doc.setFontSize(11);
-    doc.text('Generated: ' + generatedDate, m, y);
-    y += 8;
-    doc.text('Total Locations: ' + sum.totalAnalyzed, m, y);
-    y += 8;
-    doc.text('Analysis Radius: ' + s.globalRadiusFt + ' ft', m, y);
-    y += 8;
-    doc.text('Confidence Level: ' + (s.confidenceLevel * 100) + '%', m, y);
-
-    // ========== EXECUTIVE SUMMARY PAGE ==========
-    doc.addPage();
-    y = CL.batchBA._pdfHeader(doc, pw, m, colors, 'Executive Summary');
-
-    // KPI boxes
-    var kpiW = (cw - 12) / 4;
-    var kpis = [
-        { label: 'Locations Analyzed', value: sum.totalAnalyzed, color: colors.primary },
-        { label: 'Avg Crash Reduction', value: sum.avgCrashReduction.toFixed(1) + '%', color: sum.avgCrashReduction > 0 ? colors.success : colors.danger },
-        { label: 'Average CMF', value: sum.avgCMF.toFixed(3), color: sum.avgCMF < 1 ? colors.success : colors.danger },
-        { label: 'Crashes Prevented', value: sum.crashesPrevented, color: colors.secondary }
-    ];
-
-    // Handle null avgCMF
-    if (sum.avgCMF === null) {
-        kpis[2].value = 'N/A';
-        kpis[2].color = colors.gray;
+    function hexToRgb(hex) {
+        var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : { r: 0, g: 0, b: 0 };
     }
 
-    kpis.forEach(function(kpi, i) {
-        var x = m + i * (kpiW + 4);
-        doc.setFillColor(...colors.white);
-        doc.roundedRect(x, y, kpiW, 22, 2, 2, 'F');
-        doc.setDrawColor(220, 220, 220);
-        doc.roundedRect(x, y, kpiW, 22, 2, 2, 'S');
-        doc.setFillColor(...kpi.color);
-        doc.rect(x, y, kpiW, 3, 'F');
+    function setColor(hex) {
+        var rgb = hexToRgb(hex);
+        doc.setTextColor(rgb.r, rgb.g, rgb.b);
+    }
 
-        doc.setFontSize(13);
+    function setFill(hex) {
+        var rgb = hexToRgb(hex);
+        doc.setFillColor(rgb.r, rgb.g, rgb.b);
+    }
+
+    function cleanText(text) {
+        if (!text) return '';
+        return String(text).replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"')
+            .replace(/[\u2013\u2014]/g, '-').replace(/[\u2026]/g, '...')
+            .replace(/[\u00A0]/g, ' ').replace(/[^\x00-\x7F]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    function drawPageHeader() {
+        var rgb = hexToRgb(C.primary);
+        doc.setFillColor(rgb.r, rgb.g, rgb.b);
+        doc.rect(0, 0, pw, headerH, 'F');
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...kpi.color);
-        doc.text(String(kpi.value), x + kpiW / 2, y + 12, { align: 'center' });
+        doc.setTextColor(255, 255, 255);
+        doc.text('CRASH LENS', m, 8);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Before/After Batch Evaluation Report', pw - m, 8, { align: 'right' });
+    }
 
+    function drawPageFooter(page, total) {
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.3);
+        doc.line(m, ph - 15, pw - m, ph - 15);
+        doc.setFontSize(7);
+        setColor(C.gray);
+        var attr = typeof getReportAttribution === 'function' ? getReportAttribution() : 'CRASH LENS';
+        doc.text('Generated by ' + attr + ' | ' + generatedDate, m, ph - 10);
+        doc.text('Page ' + page + ' of ' + total, pw - m, ph - 10, { align: 'right' });
+    }
+
+    function newPage() {
+        if (pageNum > 0) doc.addPage();
+        pageNum++;
+        drawPageHeader();
+        y = m + headerH + 5;
+    }
+
+    function checkPageBreak(needed) {
+        if (y + (needed || 20) > safeBottom) { newPage(); return true; }
+        return false;
+    }
+
+    // Section title with left accent bar
+    function addSectionTitle(title, color) {
+        checkPageBreak(15);
+        var rgb = hexToRgb(color || C.primary);
+        doc.setFillColor(rgb.r, rgb.g, rgb.b);
+        doc.rect(m, y - 4, 3, 10, 'F');
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(rgb.r, rgb.g, rgb.b);
+        doc.text(cleanText(title), m + 6, y + 3);
+        y += 12;
+    }
+
+    function addSubsectionTitle(title, color) {
+        checkPageBreak(12);
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        setColor(color || C.text);
+        doc.text(cleanText(title), m, y);
+        y += 7;
+    }
+
+    // KPI card (matching Standard Report)
+    function drawKPICard(x, yy, width, height, value, label, color) {
+        var rgb = hexToRgb(color);
+        doc.setFillColor(rgb.r, rgb.g, rgb.b);
+        doc.roundedRect(x, yy, width, height, 2, 2, 'F');
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.text(String(value), x + width / 2, yy + height / 2 - 2, { align: 'center' });
         doc.setFontSize(7);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...colors.gray);
-        doc.text(kpi.label, x + kpiW / 2, y + 18, { align: 'center' });
+        var lines = doc.splitTextToSize(cleanText(label), width - 4);
+        doc.text(lines, x + width / 2, yy + height / 2 + 8, { align: 'center' });
+    }
+
+    // Severity bar (matching Standard Report)
+    function drawSeverityBar(severity, maxWidth) {
+        checkPageBreak(18);
+        var total = (severity.K || 0) + (severity.A || 0) + (severity.B || 0) + (severity.C || 0) + (severity.O || 0);
+        if (total === 0) return;
+        var barH = 8;
+        var curX = m;
+        var segs = [
+            { key: 'K', color: C.fatal, label: 'Fatal' },
+            { key: 'A', color: C.fatalLight, label: 'Serious' },
+            { key: 'B', color: C.moderate, label: 'Moderate' },
+            { key: 'C', color: C.minor, label: 'Minor' },
+            { key: 'O', color: C.pdo, label: 'PDO' }
+        ];
+        segs.forEach(function(seg) {
+            var count = severity[seg.key] || 0;
+            if (count > 0) {
+                var w = (count / total) * maxWidth;
+                setFill(seg.color);
+                doc.rect(curX, y, w, barH, 'F');
+                curX += w;
+            }
+        });
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.3);
+        doc.rect(m, y, maxWidth, barH, 'S');
+        y += barH + 3;
+        // Legend
+        doc.setFontSize(7);
+        var legendX = m;
+        segs.forEach(function(seg) {
+            var count = severity[seg.key] || 0;
+            if (count > 0) {
+                setFill(seg.color);
+                doc.rect(legendX, y, 6, 4, 'F');
+                setColor(C.text);
+                doc.text(seg.label + ': ' + count, legendX + 8, y + 3);
+                legendX += 35;
+            }
+        });
+        y += 10;
+    }
+
+    // Effectiveness color for rating labels
+    function ratingColor(label) {
+        var map = { 'Highly Effective': C.successLight, 'Effective': '#65a30d', 'Marginal': '#ca8a04', 'Ineffective': C.warning, 'Negative Impact': C.danger };
+        return map[label] || C.gray;
+    }
+
+    // ================================================================
+    // PAGE 1: COVER PAGE
+    // ================================================================
+    newPage();
+    y = 55;
+    doc.setFontSize(26);
+    doc.setFont('helvetica', 'bold');
+    setColor(C.primary);
+    doc.text('BATCH BEFORE/AFTER STUDY', pw / 2, y, { align: 'center' });
+    y += 10;
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'normal');
+    setColor(C.textLight);
+    doc.text('Countermeasure Effectiveness Evaluation Report', pw / 2, y, { align: 'center' });
+
+    // KPI Cards Row (5 cards, centered)
+    y += 25;
+    var cardW = 35;
+    var cardH = 26;
+    var cardGap = 5;
+    var totalW = cardW * 5 + cardGap * 4;
+    var cardX = (pw - totalW) / 2;
+
+    drawKPICard(cardX, y, cardW, cardH, sum.totalAnalyzed, 'Locations Analyzed', C.primary);
+    cardX += cardW + cardGap;
+    var avgRedStr = sum.avgCrashReduction.toFixed(1) + '%';
+    drawKPICard(cardX, y, cardW, cardH, avgRedStr, 'Avg Reduction', sum.avgCrashReduction > 0 ? C.success : C.danger);
+    cardX += cardW + cardGap;
+    drawKPICard(cardX, y, cardW, cardH, sum.avgCMF !== null ? sum.avgCMF.toFixed(3) : 'N/A', 'Average CMF', sum.avgCMF !== null && sum.avgCMF < 1 ? C.success : C.primaryLight);
+    cardX += cardW + cardGap;
+    drawKPICard(cardX, y, cardW, cardH, sum.crashesPrevented, 'Crashes Prevented', C.secondary);
+    cardX += cardW + cardGap;
+    drawKPICard(cardX, y, cardW, cardH, sum.significantPct.toFixed(0) + '%', 'Significant', C.primaryLight);
+
+    y += cardH + 25;
+
+    // Report details box
+    setFill(C.lightBg);
+    var rgb = hexToRgb(C.border);
+    doc.setDrawColor(rgb.r, rgb.g, rgb.b);
+    doc.roundedRect(m + 20, y, cw - 40, 55, 3, 3, 'FD');
+    y += 12;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    setColor(C.text);
+    doc.text('Report Details', pw / 2, y, { align: 'center' });
+    y += 10;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text('Generated: ' + generatedDate, pw / 2, y, { align: 'center' });
+    y += 6;
+    doc.text('Analysis Radius: ' + s.globalRadiusFt + ' ft | Confidence Level: ' + (s.confidenceLevel * 100) + '%', pw / 2, y, { align: 'center' });
+    y += 6;
+    doc.text('EPDO Weights: ' + epdoInfo.name + ' (K=' + epdoInfo.weights.K + ', A=' + epdoInfo.weights.A + ', B=' + epdoInfo.weights.B + ', C=' + epdoInfo.weights.C + ', O=' + epdoInfo.weights.O + ')', pw / 2, y, { align: 'center' });
+    y += 6;
+    doc.text('Method: Empirical Bayes (simplified) | Significance: Two-tailed z-test (Poisson)', pw / 2, y, { align: 'center' });
+
+    // ================================================================
+    // PAGE 2: EXECUTIVE SUMMARY
+    // ================================================================
+    newPage();
+    addSectionTitle('Executive Summary');
+
+    // Effectiveness distribution with colored badges
+    addSubsectionTitle('Effectiveness Distribution');
+    var effLabels = ['Highly Effective', 'Effective', 'Marginal', 'Ineffective', 'Negative Impact'];
+    var effDescs = ['CMF < 0.70', 'CMF 0.70-0.90', 'CMF 0.90-1.00', 'CMF 1.00-1.10', 'CMF > 1.10'];
+    var effData = effLabels.map(function(label, i) {
+        return [label, effDescs[i], String(sum.byEffectiveness[label] || 0)];
     });
 
-    y += 30;
-
-    // Effectiveness distribution
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...colors.primary);
-    doc.text('Effectiveness Distribution', m, y);
-    y += 7;
-
-    var effData = [
-        ['Highly Effective (CMF < 0.70)', sum.byEffectiveness['Highly Effective'] || 0],
-        ['Effective (CMF 0.70–0.90)', sum.byEffectiveness['Effective'] || 0],
-        ['Marginal (CMF 0.90–1.00)', sum.byEffectiveness['Marginal'] || 0],
-        ['Ineffective (CMF 1.00–1.10)', sum.byEffectiveness['Ineffective'] || 0],
-        ['Negative Impact (CMF > 1.10)', sum.byEffectiveness['Negative Impact'] || 0]
-    ];
+    var effColors = [C.successLight, '#65a30d', '#ca8a04', C.warning, C.danger];
 
     doc.autoTable({
         startY: y,
-        head: [['Rating', 'Count']],
+        head: [['Rating', 'CMF Range', 'Count']],
         body: effData,
         margin: { left: m, right: m },
-        styles: { fontSize: 9, cellPadding: 2 },
-        headStyles: { fillColor: colors.primary, textColor: 255 },
-        columnStyles: { 1: { halign: 'center', cellWidth: 30 } }
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: hexToRgb(C.primary), textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: hexToRgb(C.lightBg) },
+        columnStyles: { 2: { halign: 'center', cellWidth: 25, fontStyle: 'bold' } },
+        didParseCell: function(data) {
+            if (data.column.index === 0 && data.section === 'body') {
+                var idx = data.row.index;
+                if (idx < effColors.length) {
+                    data.cell.styles.textColor = hexToRgb(effColors[idx]);
+                    data.cell.styles.fontStyle = 'bold';
+                }
+            }
+        }
     });
-
     y = doc.lastAutoTable.finalY + 10;
 
     // Significance summary
-    doc.setFontSize(10);
+    addSubsectionTitle('Statistical Significance');
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...colors.text);
-    doc.text(sum.significantCount + ' of ' + sum.totalAnalyzed + ' locations (' + sum.significantPct.toFixed(0) + '%) showed statistically significant changes.', m, y);
+    setColor(C.text);
+    doc.text(sum.significantCount + ' of ' + sum.totalAnalyzed + ' locations (' + sum.significantPct.toFixed(0) + '%) showed statistically significant crash changes at the ' + (s.confidenceLevel * 100) + '% confidence level.', m, y);
+    y += 8;
+    doc.text('Total estimated crashes prevented: ' + sum.crashesPrevented + ' (locations where after-count < before-count).', m, y);
+    y += 12;
 
-    // ========== SUMMARY TABLE PAGE ==========
-    doc.addPage();
-    y = CL.batchBA._pdfHeader(doc, pw, m, colors, 'Location Summary Table');
+    // Aggregated severity comparison
+    if (successful.length > 0) {
+        addSubsectionTitle('Aggregated Severity: Before vs After');
+        var aggBefore = { K: 0, A: 0, B: 0, C: 0, O: 0 };
+        var aggAfter = { K: 0, A: 0, B: 0, C: 0, O: 0 };
+        successful.forEach(function(r) {
+            ['K', 'A', 'B', 'C', 'O'].forEach(function(sev) {
+                aggBefore[sev] += (r.beforeStats[sev] || 0);
+                aggAfter[sev] += (r.afterStats[sev] || 0);
+            });
+        });
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        setColor(C.fatalLight);
+        doc.text('BEFORE', m, y);
+        y += 2;
+        drawSeverityBar(aggBefore, cw * 0.7);
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        setColor(C.successLight);
+        doc.text('AFTER', m, y);
+        y += 2;
+        drawSeverityBar(aggAfter, cw * 0.7);
+    }
+
+    // By countermeasure type (if multiple types)
+    var typeKeys = Object.keys(sum.byType);
+    if (typeKeys.length > 1) {
+        checkPageBreak(40);
+        addSubsectionTitle('Performance by Countermeasure Type');
+        var typeRows = typeKeys.sort().map(function(t) {
+            var info = sum.byType[t];
+            var avgCmf = info.cmfCount > 0 ? (info.totalCMF / info.cmfCount).toFixed(3) : 'N/A';
+            var avgChange = (info.totalChange / info.count).toFixed(1) + '%';
+            return [t, String(info.count), avgCmf, avgChange];
+        });
+        doc.autoTable({
+            startY: y,
+            head: [['Countermeasure Type', 'Locations', 'Avg CMF', 'Avg Change']],
+            body: typeRows,
+            margin: { left: m, right: m },
+            styles: { fontSize: 9, cellPadding: 2.5 },
+            headStyles: { fillColor: hexToRgb(C.secondary), textColor: [255, 255, 255] },
+            alternateRowStyles: { fillColor: hexToRgb(C.lightBg) },
+            columnStyles: { 1: { halign: 'center', cellWidth: 25 }, 2: { halign: 'center', cellWidth: 25 }, 3: { halign: 'center', cellWidth: 25 } }
+        });
+        y = doc.lastAutoTable.finalY + 10;
+    }
+
+    // ================================================================
+    // PAGE 3+: LOCATION SUMMARY TABLE
+    // ================================================================
+    newPage();
+    addSectionTitle('Location Summary Table');
 
     var tableBody = successful.map(function(r) {
         var rating = CL.batchBA.getEffectivenessRating(r.cmf);
         return [
-            r.locationName.substring(0, 25),
-            r.countermeasureType || '-',
+            r.locationName.substring(0, 28),
+            r.countermeasureType ? r.countermeasureType.substring(0, 15) : '-',
             r.beforeTotal,
             r.afterTotal,
             r.changePct.toFixed(1) + '%',
+            Math.round(r.beforeEPDO),
+            Math.round(r.afterEPDO),
             r.cmf !== null ? r.cmf.toFixed(3) : 'N/A',
             r.isSignificant ? 'Yes' : 'No',
             rating.label
@@ -154,148 +372,190 @@ CL.batchBA.exportPDF = function() {
 
     doc.autoTable({
         startY: y,
-        head: [['Location', 'Type', 'Before', 'After', 'Change', 'CMF', 'Sig.', 'Rating']],
+        head: [['Location', 'Type', 'Before', 'After', 'Change', 'EPDO B', 'EPDO A', 'CMF', 'Sig.', 'Rating']],
         body: tableBody,
         margin: { left: m, right: m },
         styles: { fontSize: 7, cellPadding: 1.5 },
-        headStyles: { fillColor: colors.primary, textColor: 255, fontSize: 7 },
-        alternateRowStyles: { fillColor: colors.lightGray },
+        headStyles: { fillColor: hexToRgb(C.primary), textColor: [255, 255, 255], fontSize: 7 },
+        alternateRowStyles: { fillColor: hexToRgb(C.lightBg) },
         columnStyles: {
-            0: { cellWidth: 35 },
-            2: { halign: 'center', cellWidth: 14 },
-            3: { halign: 'center', cellWidth: 14 },
-            4: { halign: 'center', cellWidth: 18 },
-            5: { halign: 'center', cellWidth: 16 },
-            6: { halign: 'center', cellWidth: 12 }
+            0: { cellWidth: 35 }, 1: { cellWidth: 22 },
+            2: { halign: 'center', cellWidth: 12 }, 3: { halign: 'center', cellWidth: 12 },
+            4: { halign: 'center', cellWidth: 15 },
+            5: { halign: 'center', cellWidth: 14 }, 6: { halign: 'center', cellWidth: 14 },
+            7: { halign: 'center', cellWidth: 14 }, 8: { halign: 'center', cellWidth: 10 }
         },
         didParseCell: function(data) {
-            if (data.column.index === 4 && data.section === 'body') {
-                var val = parseFloat(data.cell.raw);
-                if (val < 0) { data.cell.styles.textColor = colors.success; data.cell.styles.fontStyle = 'bold'; }
-                else if (val > 0) { data.cell.styles.textColor = colors.danger; data.cell.styles.fontStyle = 'bold'; }
+            if (data.section === 'body') {
+                // Color the Change column
+                if (data.column.index === 4) {
+                    var val = parseFloat(data.cell.raw);
+                    if (val < 0) { data.cell.styles.textColor = hexToRgb(C.successLight); data.cell.styles.fontStyle = 'bold'; }
+                    else if (val > 0) { data.cell.styles.textColor = hexToRgb(C.danger); data.cell.styles.fontStyle = 'bold'; }
+                }
+                // Color the Rating column
+                if (data.column.index === 9) {
+                    var rc = ratingColor(data.cell.raw);
+                    data.cell.styles.textColor = hexToRgb(rc);
+                    data.cell.styles.fontStyle = 'bold';
+                }
             }
         }
     });
 
-    // ========== INDIVIDUAL LOCATION PAGES (3 per page) ==========
-    var locPerPage = 3;
+    // ================================================================
+    // INDIVIDUAL LOCATION DETAIL PAGES
+    // ================================================================
     for (var i = 0; i < successful.length; i++) {
-        if (i % locPerPage === 0) {
-            doc.addPage();
-            y = CL.batchBA._pdfHeader(doc, pw, m, colors, 'Individual Location Results (Page ' + (Math.floor(i / locPerPage) + 1) + ')');
-        }
-
         var r = successful[i];
         var rating = CL.batchBA.getEffectivenessRating(r.cmf);
 
-        // Location header
-        doc.setFillColor(...colors.lightGray);
-        doc.roundedRect(m, y, cw, 8, 1, 1, 'F');
+        // Each location needs ~65mm. Start new page if insufficient space.
+        if (i === 0 || y > safeBottom - 65) {
+            newPage();
+            addSectionTitle('Individual Location Results');
+        }
+
+        // Location header bar
+        checkPageBreak(65);
+        setFill(C.lightBg);
+        var borderRgb = hexToRgb(C.primary);
+        doc.setDrawColor(borderRgb.r, borderRgb.g, borderRgb.b);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(m, y, cw, 8, 1, 1, 'FD');
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...colors.primary);
-        doc.text(r.locationName.substring(0, 50), m + 3, y + 5.5);
-
+        setColor(C.primary);
+        doc.text((i + 1) + '. ' + cleanText(r.locationName).substring(0, 50), m + 3, y + 5.5);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...colors.gray);
+        setColor(C.textLight);
         doc.text(r.countermeasureType || '-', pw - m - 3, y + 5.5, { align: 'right' });
         y += 11;
 
-        // Mini stats
+        // Two-column: left = key metrics, right = effectiveness badge
         doc.setFontSize(8);
-        doc.setTextColor(...colors.text);
-        var statsLine = 'Before: ' + r.beforeTotal + ' crashes | After: ' + r.afterTotal + ' | Change: ' + r.changePct.toFixed(1) + '% | CMF: ' + (r.cmf !== null ? r.cmf.toFixed(3) : 'N/A') + ' | EPDO: ' + Math.round(r.beforeEPDO) + ' → ' + Math.round(r.afterEPDO);
-        doc.text(statsLine, m + 3, y);
+        doc.setFont('helvetica', 'normal');
+        setColor(C.text);
+        doc.text('Install Date: ' + r.installDate.toLocaleDateString() + '  |  Radius: ' + r.radiusFt + ' ft  |  Lat: ' + r.lat.toFixed(4) + '  Lng: ' + r.lng.toFixed(4), m + 3, y);
+        y += 4;
+        doc.text('Before: ' + r.beforeStart.toLocaleDateString() + ' - ' + r.beforeEnd.toLocaleDateString() + ' (' + r.beforeYears.toFixed(1) + ' yr)  |  After: ' + r.afterStart.toLocaleDateString() + ' - ' + r.afterEnd.toLocaleDateString() + ' (' + r.afterYears.toFixed(1) + ' yr)', m + 3, y);
         y += 5;
 
-        var sigLine = 'Period: ' + r.beforeStart.toLocaleDateString() + ' to ' + r.afterEnd.toLocaleDateString() + ' | Radius: ' + r.radiusFt + ' ft | p=' + r.pValue.toFixed(4) + ' | ' + rating.label;
-        doc.text(sigLine, m + 3, y);
-        y += 5;
+        // Effectiveness badge
+        var badgeColor = ratingColor(rating.label);
+        setFill(badgeColor);
+        doc.roundedRect(pw - m - 40, y - 7, 37, 6, 1, 1, 'F');
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.text(rating.label, pw - m - 21.5, y - 3, { align: 'center' });
 
-        // Severity mini table
+        // Severity comparison table
         doc.autoTable({
             startY: y,
-            head: [['', 'K', 'A', 'B', 'C', 'O', 'Total', 'EPDO']],
+            head: [['Period', 'K', 'A', 'B', 'C', 'O', 'Total', 'EPDO', 'Rate/Yr']],
             body: [
-                ['Before', r.beforeStats.K, r.beforeStats.A, r.beforeStats.B, r.beforeStats.C, r.beforeStats.O, r.beforeTotal, Math.round(r.beforeEPDO)],
-                ['After', r.afterStats.K, r.afterStats.A, r.afterStats.B, r.afterStats.C, r.afterStats.O, r.afterTotal, Math.round(r.afterEPDO)]
+                ['Before', r.beforeStats.K, r.beforeStats.A, r.beforeStats.B, r.beforeStats.C, r.beforeStats.O, r.beforeTotal, Math.round(r.beforeEPDO), (r.beforeTotal / r.beforeYears).toFixed(1)],
+                ['After', r.afterStats.K, r.afterStats.A, r.afterStats.B, r.afterStats.C, r.afterStats.O, r.afterTotal, Math.round(r.afterEPDO), (r.afterTotal / r.afterYears).toFixed(1)]
             ],
             margin: { left: m + 3, right: m + 3 },
-            styles: { fontSize: 7, cellPadding: 1 },
-            headStyles: { fillColor: colors.secondary, textColor: 255, fontSize: 7 },
-            columnStyles: { 0: { fontStyle: 'bold' }, 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' }, 6: { halign: 'center', fontStyle: 'bold' }, 7: { halign: 'center' } }
+            styles: { fontSize: 7, cellPadding: 1.5 },
+            headStyles: { fillColor: hexToRgb(C.primary), textColor: [255, 255, 255], fontSize: 7 },
+            columnStyles: {
+                0: { fontStyle: 'bold', cellWidth: 16 },
+                1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' },
+                4: { halign: 'center' }, 5: { halign: 'center' },
+                6: { halign: 'center', fontStyle: 'bold' },
+                7: { halign: 'center' }, 8: { halign: 'center' }
+            }
         });
+        y = doc.lastAutoTable.finalY + 2;
 
-        y = doc.lastAutoTable.finalY + 8;
-
-        // Check if we need a new page
-        if (y > ph - 40 && i < successful.length - 1 && (i + 1) % locPerPage !== 0) {
-            doc.addPage();
-            y = CL.batchBA._pdfHeader(doc, pw, m, colors, 'Individual Location Results (cont.)');
-        }
+        // CMF/CRF/Significance inline
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        setColor(C.text);
+        var cmfStr = r.cmf !== null ? r.cmf.toFixed(3) : 'N/A';
+        var crfStr = r.crf !== null ? ((r.crf > 0 ? '+' : '') + r.crf.toFixed(1) + '%') : 'N/A';
+        doc.text('CMF: ' + cmfStr + '  |  CRF: ' + crfStr + '  |  p-value: ' + r.pValue.toFixed(4) + '  |  ' + (r.isSignificant ? 'Statistically Significant' : 'Not Significant'), m + 3, y + 3);
+        y += 10;
     }
 
-    // ========== METHODOLOGY APPENDIX ==========
-    doc.addPage();
-    y = CL.batchBA._pdfHeader(doc, pw, m, colors, 'Methodology Notes');
+    // ================================================================
+    // METHODOLOGY APPENDIX
+    // ================================================================
+    newPage();
+    addSectionTitle('Methodology Notes');
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...colors.text);
+    setColor(C.text);
 
-    var epdoInfo = CL.core.epdo.getStateEPDOWeights(typeof STATE_FIPS !== 'undefined' ? STATE_FIPS : '_default');
-    var methodText = [
-        'Analysis Method: Empirical Bayes (simplified) with Poisson variance approximation.',
-        'Confidence Level: ' + (s.confidenceLevel * 100) + '%. Statistical significance determined by two-tailed z-test.',
-        'CMF (Crash Modification Factor): Ratio of observed after-period crashes to expected crashes based on before period.',
-        'CRF (Crash Reduction Factor): (1 - CMF) × 100. Positive values indicate crash reduction.',
-        'EPDO Weights (' + epdoInfo.name + '): K=' + epdoInfo.weights.K + ', A=' + epdoInfo.weights.A + ', B=' + epdoInfo.weights.B + ', C=' + epdoInfo.weights.C + ', O=' + epdoInfo.weights.O,
+    var methodLines = [
+        'Analysis Method',
+        'Empirical Bayes (simplified) with Poisson variance approximation. The expected after-period crash count',
+        'is estimated by adjusting the before-period count for the ratio of study period lengths.',
+        '',
+        'Statistical Significance',
+        'Two-tailed z-test based on Poisson distribution. Confidence level: ' + (s.confidenceLevel * 100) + '%.',
+        'A location is flagged as significant when p-value < ' + (1 - s.confidenceLevel).toFixed(2) + '.',
+        '',
+        'Crash Modification Factor (CMF)',
+        'CMF = Observed After-Period Crashes / Expected After-Period Crashes.',
+        'Values less than 1.0 indicate crash reduction. Values greater than 1.0 indicate crash increase.',
+        '',
+        'Crash Reduction Factor (CRF)',
+        'CRF = (1 - CMF) x 100. Positive values = crash reduction percentage.',
+        '',
+        'EPDO (Equivalent Property Damage Only)',
+        'Weights: ' + epdoInfo.name,
+        'K = ' + epdoInfo.weights.K + ', A = ' + epdoInfo.weights.A + ', B = ' + epdoInfo.weights.B + ', C = ' + epdoInfo.weights.C + ', O = ' + epdoInfo.weights.O,
         'Source: ' + epdoInfo.source,
         '',
-        'Effectiveness Ratings:',
-        '  Highly Effective: CMF < 0.70 (>30% crash reduction)',
-        '  Effective: CMF 0.70–0.90 (10-30% reduction)',
-        '  Marginal: CMF 0.90–1.00 (0-10% reduction)',
-        '  Ineffective: CMF 1.00–1.10 (0-10% increase)',
-        '  Negative Impact: CMF > 1.10 (>10% increase)',
+        'Effectiveness Ratings',
+        '  Highly Effective:   CMF < 0.70 (greater than 30% crash reduction)',
+        '  Effective:          CMF 0.70 - 0.90 (10-30% reduction)',
+        '  Marginal:           CMF 0.90 - 1.00 (0-10% reduction)',
+        '  Ineffective:        CMF 1.00 - 1.10 (0-10% increase)',
+        '  Negative Impact:    CMF > 1.10 (greater than 10% increase)',
         '',
-        'Note: The simplified EB method adjusts for different before/after period lengths but does not use',
-        'Safety Performance Functions (SPFs) or reference group data. For HSIP-grade analysis, consider',
-        'using the full single-location Before/After Study tab with EB methodology.'
+        'Limitations',
+        'This analysis uses a simplified EB method that adjusts for period length but does not incorporate',
+        'Safety Performance Functions (SPFs) or reference group data. For HSIP-grade documentation,',
+        'use the full single-location Before/After Study tab with complete EB methodology.'
     ];
 
-    methodText.forEach(function(line) {
-        doc.text(line, m, y);
-        y += 5;
+    methodLines.forEach(function(line) {
+        if (line === '') { y += 3; return; }
+        // Bold section headers
+        if (line === line.trim() && line.indexOf('  ') !== 0 && methodLines.indexOf(line) !== -1 &&
+            ['Analysis Method', 'Statistical Significance', 'Crash Modification Factor (CMF)',
+             'Crash Reduction Factor (CRF)', 'EPDO (Equivalent Property Damage Only)',
+             'Effectiveness Ratings', 'Limitations'].indexOf(line) !== -1) {
+            checkPageBreak(12);
+            doc.setFont('helvetica', 'bold');
+            setColor(C.primary);
+            doc.text(line, m, y);
+            y += 5;
+            doc.setFont('helvetica', 'normal');
+            setColor(C.text);
+        } else {
+            checkPageBreak(6);
+            doc.text(line, m, y);
+            y += 4.5;
+        }
     });
 
-    // ========== FOOTERS ON ALL PAGES ==========
+    // ================================================================
+    // ADD FOOTERS TO ALL PAGES
+    // ================================================================
     var totalPages = doc.internal.getNumberOfPages();
     for (var p = 1; p <= totalPages; p++) {
         doc.setPage(p);
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.3);
-        doc.line(m, ph - 15, pw - m, ph - 15);
-        doc.setFontSize(7);
-        doc.setTextColor(...colors.gray);
-        var attribution = typeof getReportAttribution === 'function' ? getReportAttribution() : 'CRASH LENS';
-        doc.text('Generated by ' + attribution, m, ph - 10);
-        doc.text('Page ' + p + ' of ' + totalPages, pw - m, ph - 10, { align: 'right' });
+        drawPageFooter(p, totalPages);
     }
 
-    // Save
     doc.save('Batch_BA_Report_' + dateStamp + '.pdf');
-};
-
-/** Draw page header and return Y position after it */
-CL.batchBA._pdfHeader = function(doc, pw, m, colors, title) {
-    doc.setFillColor(...colors.primary);
-    doc.rect(0, 0, pw, 18, 'F');
-    doc.setTextColor(...colors.white);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('CRASH LENS — ' + title, m, 12);
-    return 28;
 };
 
 CL._registerModule('batch-ba/export-pdf');
