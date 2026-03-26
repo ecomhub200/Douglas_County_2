@@ -1140,8 +1140,14 @@ def _enrichment_chunked(df: pd.DataFrame, enricher, osm_ready: bool, engine: str
       - Caches (HPMS, OSM, POIs): loaded once by CrashEnricher (~200MB)
       - Each county chunk: 10-200K rows (~100MB-2GB)
       - gc.collect() between chunks frees intermediate arrays
+      - SUB_CHUNK_SIZE: counties larger than 150K rows are split further
+        to keep peak memory under 7GB (GitHub Actions runner limit).
+        Delaware example: New Castle County has ~350K rows — split into
+        3 sub-chunks of ~117K each.
     """
     import gc
+
+    SUB_CHUNK_SIZE = 150_000
 
     counties = df["FIPS"].fillna("").str.strip()
     unique_fips = [f for f in counties.unique() if f]
@@ -1152,6 +1158,7 @@ def _enrichment_chunked(df: pd.DataFrame, enricher, osm_ready: bool, engine: str
 
     print(f"  [8/8] Phase 8: Enrichment ({len(df):,} rows, {len(unique_fips)} counties, {engine})...")
     print(f"        Tier 2 {'ready' if osm_ready else 'SKIPPED'}")
+    print(f"        Sub-chunk limit: {SUB_CHUNK_SIZE:,} rows per pass")
 
     chunks = []
     for i, fips in enumerate(sorted(unique_fips)):
@@ -1159,11 +1166,28 @@ def _enrichment_chunked(df: pd.DataFrame, enricher, osm_ready: bool, engine: str
         county_df = df.loc[county_mask].copy()
         county_name = county_df["Physical Juris Name"].iloc[0] if "Physical Juris Name" in county_df.columns else fips
 
-        print(f"\n  ── County {i+1}/{len(unique_fips)}: {county_name} ({len(county_df):,} rows) ──")
-        enriched = enricher.enrich_all(county_df, skip_tier2=not osm_ready)
-        chunks.append(enriched)
-        del county_df, enriched
-        gc.collect()
+        if len(county_df) <= SUB_CHUNK_SIZE:
+            # Small enough to process at once
+            print(f"\n  ── County {i+1}/{len(unique_fips)}: {county_name} ({len(county_df):,} rows) ──")
+            enriched = enricher.enrich_all(county_df, skip_tier2=not osm_ready)
+            chunks.append(enriched)
+            del county_df, enriched
+            gc.collect()
+        else:
+            # Large county — sub-chunk to stay under memory limit
+            n_sub = (len(county_df) + SUB_CHUNK_SIZE - 1) // SUB_CHUNK_SIZE
+            print(f"\n  ── County {i+1}/{len(unique_fips)}: {county_name} ({len(county_df):,} rows → {n_sub} sub-chunks) ──")
+            for si in range(n_sub):
+                start = si * SUB_CHUNK_SIZE
+                end = min((si + 1) * SUB_CHUNK_SIZE, len(county_df))
+                sub_df = county_df.iloc[start:end].copy()
+                print(f"      sub-chunk {si+1}/{n_sub}: rows {start:,}–{end:,} ({len(sub_df):,})")
+                enriched = enricher.enrich_all(sub_df, skip_tier2=not osm_ready)
+                chunks.append(enriched)
+                del sub_df, enriched
+                gc.collect()
+            del county_df
+            gc.collect()
 
     # Handle rows with no FIPS (unresolved GPS)
     no_fips = counties == ""

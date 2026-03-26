@@ -750,53 +750,48 @@ def _make_crash_points(lats, lons, lon_scale):
 def _match_crashes_to_roads(crash_lats, crash_lons, road_df, max_dist_m=100):
     """
     Match each crash GPS point to the nearest road segment using KD-tree.
-    Returns dict of crash_index → road attributes.
+
+    Returns (distances, road_indices, mask) — numpy arrays.
+      - distances: distance in meters for each crash point
+      - road_indices: index into road_df for nearest road
+      - mask: boolean array where True = within max_dist_m
+
+    Memory-efficient: returns raw arrays instead of per-crash Python dicts.
+    The caller reads road_df columns directly using road_indices.
     """
+    import numpy as np
+
     if road_df is None or len(road_df) == 0:
-        return {}
+        empty = np.array([], dtype=np.float64)
+        return empty, np.array([], dtype=np.intp), np.array([], dtype=bool)
 
     try:
         from scipy.spatial import KDTree
     except ImportError:
         print("    scipy not installed — KD-tree matching unavailable")
-        return {}
+        empty = np.array([], dtype=np.float64)
+        return empty, np.array([], dtype=np.intp), np.array([], dtype=bool)
 
     # Build tree from road midpoints
-    road_lats = road_df["mid_lat"].values.tolist()
-    road_lons = road_df["mid_lon"].values.tolist()
+    road_lats = road_df["mid_lat"].values
+    road_lons = road_df["mid_lon"].values
 
-    mid_lat = sum(road_lats) / max(len(road_lats), 1)
+    mid_lat = float(road_lats.mean())
     lon_scale = math.cos(math.radians(mid_lat))
 
-    import numpy as np
     road_points = np.column_stack([
-        np.array(road_lats, dtype=np.float64) * 111000,
-        np.array(road_lons, dtype=np.float64) * 111000 * lon_scale,
+        road_lats.astype(np.float64) * 111000,
+        road_lons.astype(np.float64) * 111000 * lon_scale,
     ])
     tree = KDTree(road_points)
+    del road_points  # free ~2MB per 122K roads
 
     crash_points = _make_crash_points(crash_lats, crash_lons, lon_scale)
     distances, indices = _chunked_kdtree_query(tree, crash_points, k=1)
+    del tree, crash_points
 
-    matches = {}
-    for i, (dist, idx) in enumerate(zip(distances, indices)):
-        if dist <= max_dist_m:
-            road = road_df.iloc[idx]
-            matches[i] = {
-                "highway":  road["highway"],
-                "name":     road["name"],
-                "ref":      road["ref"],
-                "oneway":   road["oneway"],
-                "lanes":    road["lanes"],
-                "maxspeed": road["maxspeed"],
-                "length_m": road["length_m"],
-                "bridge":   road["bridge"],
-                "distance_m": dist,
-                "u_node":   road["u_node"],
-                "v_node":   road["v_node"],
-            }
-
-    return matches
+    mask = distances <= max_dist_m
+    return distances, indices, mask
 
 
 def _match_crashes_to_intersections(crash_lats, crash_lons, state_abbr, cache_dir="cache"):
@@ -1644,15 +1639,22 @@ class CrashEnricher:
             df["Intersection Name"] = ""
 
         # Build node → road names lookup for Intersection Name derivation
+        # Vectorized: extract columns as arrays, avoid iterrows() (saves ~500MB on 122K roads)
         node_road_names = defaultdict(set)
         if "u_node" in road_df.columns and "v_node" in road_df.columns:
-            for _, road_row in road_df.iterrows():
-                name = str(road_row.get("name", "") or "").strip()
-                ref = str(road_row.get("ref", "") or "").strip()
+            names_arr = road_df["name"].fillna("").astype(str).values
+            refs_arr = road_df["ref"].fillna("").astype(str).values
+            u_nodes = road_df["u_node"].values
+            v_nodes = road_df["v_node"].values
+
+            for i in range(len(road_df)):
+                name = names_arr[i].strip()
+                ref = refs_arr[i].strip()
                 label = name if name and name != "nan" else ref if ref and ref != "nan" else ""
                 if label:
-                    node_road_names[road_row["u_node"]].add(label)
-                    node_road_names[road_row["v_node"]].add(label)
+                    node_road_names[u_nodes[i]].add(label)
+                    node_road_names[v_nodes[i]].add(label)
+            del names_arr, refs_arr, u_nodes, v_nodes
             print(f"    Intersection name lookup: {len(node_road_names):,} nodes with road names")
 
         # Get valid crash coordinates
@@ -1673,19 +1675,51 @@ class CrashEnricher:
 
         # Match crashes to nearest road segments
         print(f"    Matching {len(crash_lats):,} crashes to road network...")
-        matches = _match_crashes_to_roads(crash_lats, crash_lons, road_df, max_dist_m=100)
-        print(f"    Matched: {len(matches):,} / {len(crash_lats):,} ({len(matches)/max(len(crash_lats),1)*100:.1f}%)")
+        distances, road_indices, match_mask = _match_crashes_to_roads(
+            crash_lats, crash_lons, road_df, max_dist_m=100
+        )
+        matched_count = int(match_mask.sum()) if len(match_mask) > 0 else 0
+        print(f"    Matched: {matched_count:,} / {len(crash_lats):,} ({matched_count/max(len(crash_lats),1)*100:.1f}%)")
+
+        # Pre-extract road_df columns as numpy arrays (avoid per-row iloc)
+        rd_highway  = road_df["highway"].fillna("").values
+        rd_name     = road_df["name"].fillna("").values
+        rd_ref      = road_df["ref"].fillna("").values
+        rd_oneway   = road_df["oneway"].fillna("").values
+        rd_lanes    = road_df["lanes"].fillna("").values
+        rd_maxspeed = road_df["maxspeed"].fillna("").values
+        rd_bridge   = road_df["bridge"].fillna("").values
+        # Optional columns — may not exist in all road caches
+        rd_surface   = road_df["surface"].fillna("").values if "surface" in road_df.columns else None
+        rd_curvature = road_df["curvature"].values if "curvature" in road_df.columns else None
+        rd_lit       = road_df["lit"].fillna("").values if "lit" in road_df.columns else None
+        rd_sidewalk  = road_df["sidewalk"].fillna("").values if "sidewalk" in road_df.columns else None
+        rd_cycleway  = road_df["cycleway"].fillna("").values if "cycleway" in road_df.columns else None
+
+        # Free road_df now — columns extracted, no longer needed
+        del road_df
+        gc.collect()
+
+        # Ensure enrichment columns exist
+        for col in ["Has_Street_Lighting", "Has_Sidewalk", "Has_Bike_Lane", "On_Bridge"]:
+            if col not in df.columns:
+                df[col] = ""
 
         # Apply road attributes to crash rows
         filled = defaultdict(int)
 
-        for i, road in matches.items():
+        matched_indices = []  # track for stats
+        for i in range(len(crash_lats)):
+            if not match_mask[i]:
+                continue
+            matched_indices.append(i)
+            ri = int(road_indices[i])
             idx = valid_indices[i]
-            highway = road["highway"]
+            highway = str(rd_highway[ri])
             fc = OSM_HIGHWAY_TO_FC.get(highway, "")
 
             # Apply route ref override (I-95, US-13, DE-1, etc.)
-            ref = road.get("ref", "")
+            ref = str(rd_ref[ri])
             if ref:
                 for pattern, override_fc in ROUTE_PREFIX_TO_FC.items():
                     if re.match(pattern, ref.upper()):
@@ -1693,7 +1727,8 @@ class CrashEnricher:
                         break
 
             # RTE Name — from OSM name or ref
-            rte_name = road.get("ref", "") or road.get("name", "")
+            name = str(rd_name[ri])
+            rte_name = ref if ref else name
             if rte_name and not df.at[idx, "RTE Name"]:
                 df.at[idx, "RTE Name"] = rte_name
                 filled["RTE Name"] += 1
@@ -1708,8 +1743,8 @@ class CrashEnricher:
                     df.at[idx, "Ownership"] = FC_TO_OWNERSHIP.get(fc, "")
                     filled["Ownership"] += 1
 
+                oneway = str(rd_oneway[ri])
                 if not df.at[idx, "Facility Type"]:
-                    oneway = road.get("oneway", "")
                     if oneway in OSM_ONEWAY_FACILITY:
                         df.at[idx, "Facility Type"] = OSM_ONEWAY_FACILITY[oneway]
                     else:
@@ -1725,88 +1760,80 @@ class CrashEnricher:
 
             # Roadway Description from OSM attributes
             if not df.at[idx, "Roadway Description"]:
-                oneway = road.get("oneway", "")
-                lanes = road.get("lanes", "")
+                oneway = str(rd_oneway[ri])
+                lanes = str(rd_lanes[ri])
                 divided = ""  # OSM doesn't always have this
                 desc = derive_roadway_description(oneway, lanes, divided)
                 df.at[idx, "Roadway Description"] = desc
                 filled["Roadway Description"] += 1
 
-            # ── NEW: Roadway Surface Type from OSM surface tag ──
-            if not df.at[idx, "Roadway Surface Type"]:
-                surface = str(road.get("surface", "")).strip().split(';')[0].strip().lower()
+            # Roadway Surface Type from OSM surface tag
+            if rd_surface is not None and not df.at[idx, "Roadway Surface Type"]:
+                surface = str(rd_surface[ri]).strip().split(';')[0].strip().lower()
                 if surface and surface != 'nan':
                     mapped = OSM_SURFACE_MAP.get(surface, "")
                     if mapped:
                         df.at[idx, "Roadway Surface Type"] = mapped
                         filled["Roadway Surface Type"] += 1
 
-            # ── NEW: Roadway Alignment from computed curvature ──
-            if not df.at[idx, "Roadway Alignment"]:
-                curvature = road.get("curvature", 1.0)
-                if curvature and str(curvature) != 'nan':
-                    try:
-                        curv_val = float(curvature)
+            # Roadway Alignment from computed curvature
+            if rd_curvature is not None and not df.at[idx, "Roadway Alignment"]:
+                try:
+                    curv_val = float(rd_curvature[ri])
+                    if not math.isnan(curv_val):
                         alignment = derive_roadway_alignment(curv_val)
                         df.at[idx, "Roadway Alignment"] = alignment
                         filled["Roadway Alignment"] += 1
-                    except (ValueError, TypeError):
-                        pass
+                except (ValueError, TypeError):
+                    pass
 
-            # ── NEW: Max Speed Diff from OSM maxspeed tag ──
+            # Max Speed Diff from OSM maxspeed tag
             if not df.at[idx, "Max Speed Diff"]:
-                speed_mph = parse_maxspeed_mph(road.get("maxspeed", ""))
+                speed_mph = parse_maxspeed_mph(str(rd_maxspeed[ri]))
                 if speed_mph:
                     df.at[idx, "Max Speed Diff"] = str(speed_mph)
                     filled["Max Speed Diff"] += 1
 
-            # ── NEW: Has_Street_Lighting from OSM lit tag ──
-            col_lit = "Has_Street_Lighting"
-            if col_lit not in df.columns:
-                df[col_lit] = ""
-            if not df.at[idx, col_lit]:
-                lit = str(road.get("lit", "")).strip().lower()
+            # Has_Street_Lighting from OSM lit tag
+            if rd_lit is not None and not df.at[idx, "Has_Street_Lighting"]:
+                lit = str(rd_lit[ri]).strip().lower()
                 if lit in ("yes", "automatic"):
-                    df.at[idx, col_lit] = "Yes"
-                    filled[col_lit] += 1
+                    df.at[idx, "Has_Street_Lighting"] = "Yes"
+                    filled["Has_Street_Lighting"] += 1
                 elif lit in ("no",):
-                    df.at[idx, col_lit] = "No"
+                    df.at[idx, "Has_Street_Lighting"] = "No"
 
-            # ── NEW: Has_Sidewalk from OSM sidewalk tag ──
-            col_sw = "Has_Sidewalk"
-            if col_sw not in df.columns:
-                df[col_sw] = ""
-            if not df.at[idx, col_sw]:
-                sw = str(road.get("sidewalk", "")).strip().lower()
+            # Has_Sidewalk from OSM sidewalk tag
+            if rd_sidewalk is not None and not df.at[idx, "Has_Sidewalk"]:
+                sw = str(rd_sidewalk[ri]).strip().lower()
                 if sw in ("yes", "both", "left", "right", "separate"):
-                    df.at[idx, col_sw] = "Yes"
-                    filled[col_sw] += 1
+                    df.at[idx, "Has_Sidewalk"] = "Yes"
+                    filled["Has_Sidewalk"] += 1
                 elif sw in ("no", "none"):
-                    df.at[idx, col_sw] = "No"
+                    df.at[idx, "Has_Sidewalk"] = "No"
 
-            # ── NEW: Has_Bike_Lane from OSM cycleway tag ──
-            col_bk = "Has_Bike_Lane"
-            if col_bk not in df.columns:
-                df[col_bk] = ""
-            if not df.at[idx, col_bk]:
-                cw = str(road.get("cycleway", "")).strip().lower()
+            # Has_Bike_Lane from OSM cycleway tag
+            if rd_cycleway is not None and not df.at[idx, "Has_Bike_Lane"]:
+                cw = str(rd_cycleway[ri]).strip().lower()
                 if cw in ("lane", "track", "shared_lane", "shared_busway", "separate"):
-                    df.at[idx, col_bk] = "Yes"
-                    filled[col_bk] += 1
+                    df.at[idx, "Has_Bike_Lane"] = "Yes"
+                    filled["Has_Bike_Lane"] += 1
                 elif cw in ("no", "none"):
-                    df.at[idx, col_bk] = "No"
+                    df.at[idx, "Has_Bike_Lane"] = "No"
 
-            # ── NEW: On_Bridge from OSM bridge tag ──
-            col_br = "On_Bridge"
-            if col_br not in df.columns:
-                df[col_br] = ""
-            if not df.at[idx, col_br]:
-                bridge = str(road.get("bridge", "")).strip().lower()
+            # On_Bridge from OSM bridge tag
+            if not df.at[idx, "On_Bridge"]:
+                bridge = str(rd_bridge[ri]).strip().lower()
                 if bridge and bridge not in ("", "nan", "no"):
-                    df.at[idx, col_br] = "Yes"
-                    filled[col_br] += 1
+                    df.at[idx, "On_Bridge"] = "Yes"
+                    filled["On_Bridge"] += 1
                 else:
-                    df.at[idx, col_br] = "No"
+                    df.at[idx, "On_Bridge"] = "No"
+
+        # Free road column arrays
+        del rd_highway, rd_name, rd_ref, rd_oneway, rd_lanes, rd_maxspeed, rd_bridge
+        del rd_surface, rd_curvature, rd_lit, rd_sidewalk, rd_cycleway
+        del distances, road_indices, match_mask
 
         for col, count in sorted(filled.items()):
             print(f"    {col}: {count} rows enriched")
@@ -1848,7 +1875,11 @@ class CrashEnricher:
             if int_name_filled:
                 print(f"    Intersection Name: {int_name_filled:,} rows (cross-street names from OSM)")
 
-        self.stats["tier2_matched"] = len(matches)
+        # Free intersection data and node lookup
+        del node_road_names, int_matches
+        gc.collect()
+
+        self.stats["tier2_matched"] = matched_count
         return df
 
     # ─── TIER 2b: POI PROXIMITY ANALYSIS ─────────────────────────────────
