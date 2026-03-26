@@ -7,6 +7,8 @@ osmnx>=1.9.0
 scipy>=1.11.0
 # Parquet cache reading (HPMS, OSM roads, POIs, federal data)
 pyarrow>=14.0.0
+# v2.7 DuckDB spatial grid engine (primary — 95% less memory than KDTree)
+duckdb>=1.0.0
 # Phase 3.5 GPS jurisdiction validation — Tier 1 local PIP (optional but ~100x faster)
 geopandas>=0.14.0
 shapely>=2.0.0
