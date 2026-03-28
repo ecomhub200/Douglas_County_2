@@ -18,6 +18,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { S3Client, PutObjectCommand, HeadObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
+const parquet = require('@dsnp/parquetjs');
 
 const PORT = process.env.PROXY_PORT || 3001;
 
@@ -208,6 +209,114 @@ function sendViaBrevoSmtp(toEmail, subject, htmlBody) {
     return new Promise((resolve, reject) => {
         // Node.js doesn't have built-in SMTP - use Brevo API if available, else error
         reject(new Error('SMTP mode requires BREVO_API_KEY. Set BREVO_API_KEY in Coolify environment variables.'));
+    });
+}
+
+// ── Parquet helper functions ──
+
+/**
+ * Convert CSV header+row arrays into a gzipped Parquet buffer.
+ * @param {string[]} headers - Column names
+ * @param {string[][]} rows - Row data (array of arrays)
+ * @returns {Promise<Buffer>} gzipped parquet bytes
+ */
+async function csvRowsToParquetGz(headers, rows) {
+    const { PassThrough } = require('stream');
+    const schemaFields = {};
+    headers.forEach(h => { schemaFields[h] = { type: 'UTF8', optional: true }; });
+    const schema = new parquet.ParquetSchema(schemaFields);
+
+    const stream = new PassThrough();
+    const chunks = [];
+    stream.on('data', chunk => chunks.push(chunk));
+
+    const writer = await parquet.ParquetWriter.openStream(schema, stream);
+    for (const row of rows) {
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = (row[i] != null ? String(row[i]) : ''); });
+        await writer.appendRow(obj);
+    }
+    await writer.close();
+
+    const parquetBuffer = Buffer.concat(chunks);
+    return zlib.gzipSync(parquetBuffer);
+}
+
+/**
+ * Read a gzipped Parquet buffer and return headers + rows.
+ * @param {Buffer} gzBuffer - gzipped parquet bytes
+ * @returns {Promise<{headers: string[], rows: string[][]}>}
+ */
+async function readParquetGzBuffer(gzBuffer) {
+    const parquetBuffer = zlib.gunzipSync(gzBuffer);
+
+    // Write to temp file since parquetjs needs file or buffer reader
+    const tmpPath = path.join(require('os').tmpdir(), `inventory_${Date.now()}_${Math.random().toString(36).slice(2)}.parquet`);
+    fs.writeFileSync(tmpPath, parquetBuffer);
+
+    try {
+        const reader = await parquet.ParquetReader.openFile(tmpPath);
+        const schema = reader.getSchema();
+        const headers = Object.keys(schema.fields);
+        const cursor = reader.getCursor();
+        const rows = [];
+        let record;
+        while ((record = await cursor.next())) {
+            rows.push(headers.map(h => (record[h] != null ? String(record[h]) : '')));
+        }
+        await reader.close();
+        return { headers, rows };
+    } finally {
+        try { fs.unlinkSync(tmpPath); } catch (e) { /* ignore cleanup errors */ }
+    }
+}
+
+/**
+ * Upload binary data to R2 via Worker (supports Buffer for parquet.gz).
+ */
+function uploadR2Binary(key, buffer, contentType) {
+    return new Promise((resolve, reject) => {
+        const uploadUrl = `${R2_WORKER_URL.replace(/\/+$/, '')}/${key}`;
+        const parsedUrl = new URL(uploadUrl);
+        const options = {
+            hostname: parsedUrl.hostname,
+            port: 443,
+            path: parsedUrl.pathname + parsedUrl.search,
+            method: 'PUT',
+            headers: {
+                'X-Upload-Secret': R2_WORKER_SECRET,
+                'Content-Type': contentType,
+                'Content-Length': buffer.length
+            }
+        };
+        const workerReq = https.request(options, (workerRes) => {
+            let responseData = '';
+            workerRes.on('data', chunk => { responseData += chunk; });
+            workerRes.on('end', () => {
+                if (workerRes.statusCode >= 200 && workerRes.statusCode < 300) resolve(responseData);
+                else reject(new Error(`Upload failed: HTTP ${workerRes.statusCode}`));
+            });
+        });
+        workerReq.on('error', err => reject(err));
+        workerReq.write(buffer);
+        workerReq.end();
+    });
+}
+
+/**
+ * Fetch a file from R2 as a Buffer (for binary parquet.gz files).
+ */
+function fetchR2Binary(key) {
+    const R2_PUBLIC = 'https://data.aicreatesai.com';
+    return new Promise((resolve, reject) => {
+        const fileUrl = `${R2_PUBLIC}/${key}`;
+        https.get(fileUrl, (resp) => {
+            if (resp.statusCode === 404) { resolve(null); return; }
+            if (resp.statusCode !== 200) { reject(new Error(`HTTP ${resp.statusCode} for ${key}`)); return; }
+            const chunks = [];
+            resp.on('data', chunk => { chunks.push(chunk); });
+            resp.on('end', () => resolve(Buffer.concat(chunks)));
+        }).on('error', err => reject(err));
     });
 }
 
@@ -942,6 +1051,56 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // ---- R2 Upload Inventory as Parquet.gz ----
+    if (req.url.startsWith('/r2/upload-inventory-parquet') && req.method === 'POST') {
+        if (!R2_WORKER_URL || !R2_WORKER_SECRET) {
+            res.writeHead(503, corsHeaders);
+            res.end(JSON.stringify({ error: 'R2 Worker not configured' }));
+            return;
+        }
+
+        collectBody(req, 200 * 1024 * 1024).then(async body => {
+            let payload;
+            try { payload = JSON.parse(body); } catch (e) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+            }
+
+            const { r2Key, headers, rows } = payload;
+            if (!r2Key || !headers || !rows) {
+                res.writeHead(400, corsHeaders);
+                res.end(JSON.stringify({ error: 'Missing required fields: r2Key, headers, rows' }));
+                return;
+            }
+
+            try {
+                console.log(`[Parquet Upload] Converting ${rows.length} rows to parquet.gz: ${r2Key}`);
+                const parquetGzBuffer = await csvRowsToParquetGz(headers, rows);
+
+                // Upload binary to R2 via worker
+                await uploadR2Binary(r2Key, parquetGzBuffer, 'application/octet-stream');
+
+                console.log(`[Parquet Upload] Success: ${r2Key} (${parquetGzBuffer.length} bytes)`);
+                res.writeHead(200, corsHeaders);
+                res.end(JSON.stringify({
+                    success: true,
+                    r2Key,
+                    sizeBytes: parquetGzBuffer.length,
+                    rowCount: rows.length
+                }));
+            } catch (err) {
+                console.error(`[Parquet Upload] Error: ${err.message}`);
+                res.writeHead(500, corsHeaders);
+                res.end(JSON.stringify({ error: 'Parquet conversion failed', message: err.message }));
+            }
+        }).catch(err => {
+            res.writeHead(413, corsHeaders);
+            res.end(JSON.stringify({ error: 'Request too large', message: err.message }));
+        });
+        return;
+    }
+
     // ---- R2 Inventory Consolidation: Merge jurisdiction CSVs into statewide file ----
     if (req.url.startsWith('/r2/consolidate-inventory') && req.method === 'POST') {
         if (!R2_WORKER_URL || !R2_WORKER_SECRET) {
@@ -1102,13 +1261,13 @@ const server = http.createServer((req, res) => {
                         }).on('error', reject);
                     });
 
-                    // Extract jurisdiction folders that have traffic-inventory.csv
+                    // Extract jurisdiction folders that have traffic-inventory.parquet.gz
                     const jurSet = new Set();
                     if (listData.files) {
                         listData.files.forEach(f => {
                             const key = f.key || f;
-                            const match = key.match(new RegExp(`^${state}/([^/]+)/traffic-inventory\\.csv$`));
-                            if (match && match[1] !== '_statewide') jurSet.add(match[1]);
+                            const match = key.match(new RegExp(`^${state}/([^/]+)/traffic-inventory\\.parquet\\.gz$`));
+                            if (match && match[1] !== '_statewide' && match[1] !== 'cache') jurSet.add(match[1]);
                         });
                     }
                     jurList = [...jurSet];
@@ -1128,14 +1287,14 @@ const server = http.createServer((req, res) => {
                 let processed = 0, skipped = 0;
 
                 for (const jur of jurList) {
-                    const csvKey = `${state}/${jur}/traffic-inventory.csv`;
+                    const pqKey = `${state}/${jur}/traffic-inventory.parquet.gz`;
                     const ledgerKey = `${state}/${jur}/traffic-inventory-edits.json`;
 
                     try {
-                        const csvText = await fetchR2File(csvKey);
-                        if (!csvText) { skipped++; continue; }
+                        const pqBuffer = await fetchR2Binary(pqKey);
+                        if (!pqBuffer) { skipped++; continue; }
 
-                        const { headers, rows } = parseCSV(csvText);
+                        const { headers, rows } = await readParquetGzBuffer(pqBuffer);
                         if (!headers.length) { skipped++; continue; }
 
                         // Load and apply ledger
@@ -1181,20 +1340,10 @@ const server = http.createServer((req, res) => {
                     return;
                 }
 
-                // Build merged CSV
-                const quotedHeaders = mergedHeaders.map(h => `"${h}"`).join(',');
-                const csvLines = [quotedHeaders];
-                allRows.forEach(row => {
-                    csvLines.push(row.map(v => {
-                        const s = String(v || '');
-                        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
-                    }).join(','));
-                });
-                const mergedCSV = csvLines.join('\n');
-
-                // Upload statewide file
-                const statewideKey = `${state}/_statewide/traffic-inventory.csv`;
-                await uploadR2File(statewideKey, mergedCSV, 'text/csv');
+                // Build merged parquet.gz
+                const statewideKey = `${state}/cache/traffic-inventory.parquet.gz`;
+                const mergedParquetGz = await csvRowsToParquetGz(mergedHeaders, allRows);
+                await uploadR2Binary(statewideKey, mergedParquetGz, 'application/octet-stream');
 
                 console.log(`[Inventory Consolidation] Complete: ${allRows.length} rows from ${processed} jurisdictions, ${skipped} skipped`);
 
@@ -1205,7 +1354,7 @@ const server = http.createServer((req, res) => {
                     processed,
                     skipped,
                     statewideKey,
-                    sizeBytes: Buffer.byteLength(mergedCSV)
+                    sizeBytes: mergedParquetGz.length
                 }));
 
             } catch (err) {
