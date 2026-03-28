@@ -306,6 +306,9 @@ def get_city_folders(project_root, state_prefix, state_fips):
     """Get city/town folder slugs from us_places.json for a state.
 
     Filters to active (FUNCSTAT=A) incorporated places only.
+    Uses BASENAME (without entity type suffix like "city", "town") to avoid
+    redundant type info in _city/ folder paths (e.g. _city/alexandria/ instead
+    of _city/alexandria_city/).
     """
     records = _load_geography_json(project_root, "us_places.json")
     # Filter by state FIPS, active status
@@ -314,7 +317,10 @@ def get_city_folders(project_root, state_prefix, state_fips):
         if r.get("STATE") == state_fips
         and r.get("FUNCSTAT") == "A"
     ]
-    return sorted(set(_name_to_slug(r["NAME"]) for r in cities if r.get("NAME")))
+    return sorted(set(
+        _name_to_slug(r.get("BASENAME") or r["NAME"])
+        for r in cities if r.get("BASENAME") or r.get("NAME")
+    ))
 
 
 def get_town_folders(project_root, state_prefix, state_fips):
@@ -322,6 +328,7 @@ def get_town_folders(project_root, state_prefix, state_fips):
 
     Filters to active governmental entities (FUNCSTAT A/B/G).
     These are merged into _city/ on R2 alongside places.
+    Uses BASENAME for consistency with get_city_folders().
     """
     records = _load_geography_json(project_root, "us_county_subdivisions.json")
     active_funcstat = {"A", "B", "G"}
@@ -330,7 +337,10 @@ def get_town_folders(project_root, state_prefix, state_fips):
         if r.get("STATE") == state_fips
         and r.get("FUNCSTAT") in active_funcstat
     ]
-    return sorted(set(_name_to_slug(r["NAME"]) for r in towns if r.get("NAME")))
+    return sorted(set(
+        _name_to_slug(r.get("BASENAME") or r["NAME"])
+        for r in towns if r.get("BASENAME") or r.get("NAME")
+    ))
 
 
 def get_mpo_folders_from_geography(project_root, state_abbr):
