@@ -9,6 +9,7 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5/dist/leaflet.markercluster.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5/dist/MarkerCluster.Default.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -182,7 +183,7 @@ input,select{width:100%;padding:.3rem .45rem;border:1px solid var(--bd);border-r
   <div class="card"><div class="ch"><span class="ct">☁️ Data Sources</span><span class="badge b-bl">R2 Cloud Storage</span></div>
     <div class="fg">
       <div><label class="fl">Crash Data CSV</label><div class="row"><input id="uCr" value="" placeholder="Auto-populated from jurisdiction selection"><button class="btn btn-p btn-sm" onclick="loadUrl('crash')">Load</button></div></div>
-      <div><label class="fl">Inventory Downloader CSV</label><div class="row"><input id="uIn" value="" placeholder="Auto-populated from jurisdiction selection"><button class="btn btn-p btn-sm" onclick="loadUrl('inv')">Load</button></div></div>
+      <div><label class="fl">Inventory Data (Parquet/CSV)</label><div class="row"><input id="uIn" value="" placeholder="Auto-populated from jurisdiction selection"><button class="btn btn-p btn-sm" onclick="loadUrl('inv')">Load</button></div></div>
     </div>
     <div style="margin-top:.3rem;display:flex;gap:.3rem;flex-wrap:wrap">
       <button class="btn btn-p" onclick="loadBoth()">⬇️ Load Both</button>
@@ -498,7 +499,22 @@ async function loadUrl(type){
   const cached=await cacheGet(url);
   if(cached){toast(`${type} loaded from cache`,'ok');procData(cached,type,url.split('/').pop()+' (cached)');return}
   toast(`Loading ${type}...`);
-  try{const r=await fetch(url);if(!r.ok)throw new Error(`HTTP ${r.status}`);const txt=await r.text();await cacheSet(url,txt);procData(txt,type,url.split('/').pop())}catch(e){toast(e.message,'err');$('loadSt').innerHTML=`<span style="color:var(--er)">❌ ${e.message}</span>`}
+  try{
+    const r=await fetch(url);if(!r.ok)throw new Error(`HTTP ${r.status}`);
+    if(url.endsWith('.parquet.gz')||url.endsWith('.parquet')){
+      const gzBytes=new Uint8Array(await r.arrayBuffer());
+      let bytes=gzBytes;
+      if(url.endsWith('.gz'))bytes=pako.ungzip(gzBytes);
+      const buf=bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);
+      const hp=await import('https://cdn.jsdelivr.net/npm/hyparquet@1.7.1/+esm');
+      const meta=hp.parquetMetadata(buf);const cols=meta.schema.slice(1).map(s=>s.name);
+      let rows;await hp.parquetRead({file:buf,onComplete:data=>{rows=data}});
+      const txt=cols.join(',')+'\n'+rows.map(r=>r.map(v=>{const s=String(v==null?'':v);return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s}).join(',')).join('\n');
+      await cacheSet(url,txt);procData(txt,type,url.split('/').pop());
+    }else{
+      const txt=await r.text();await cacheSet(url,txt);procData(txt,type,url.split('/').pop());
+    }
+  }catch(e){toast(e.message,'err');$('loadSt').innerHTML=`<span style="color:var(--er)">❌ ${e.message}</span>`}
 }
 async function loadBoth(){await loadUrl('crash');await loadUrl('inv')}
 function loadFile(ev,type){const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=e=>procData(e.target.result,type,f.name);r.readAsText(f)}
@@ -1540,7 +1556,7 @@ document.addEventListener('DOMContentLoaded',()=>{initMap()});
       // Populate R2 URLs for crash data and traffic inventory
       if(cfg.r2BaseUrl&&cfg.r2Path){
         const crEl=$('uCr');if(crEl)crEl.value=cfg.r2BaseUrl+'/'+cfg.r2Path+'/all_roads.csv';
-        const inEl=$('uIn');if(inEl)inEl.value=cfg.r2BaseUrl+'/'+cfg.r2Path+'/traffic-inventory.csv';
+        const inEl=$('uIn');if(inEl)inEl.value=cfg.r2BaseUrl+'/'+cfg.r2Path+'/traffic-inventory.parquet.gz';
       }
       // Update map center to jurisdiction
       if(cfg.mapCenter&&map){

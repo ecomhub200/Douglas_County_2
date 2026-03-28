@@ -9,6 +9,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -502,7 +503,7 @@ window.addEventListener('message',function(evt){
 // ═══════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════
-function getR2Key(){var base=imR2BasePath||($('stSel').value+'/'+$('coSel').value);return base+'/traffic-inventory.csv'}
+function getR2Key(){var base=imR2BasePath||($('stSel').value+'/'+$('coSel').value);return base+'/traffic-inventory.parquet.gz'}
 function getLedgerKey(){var base=imR2BasePath||($('stSel').value+'/'+$('coSel').value);return base+'/traffic-inventory-edits.json'}
 function saveCfg(){localStorage.setItem('aim3_cfg',JSON.stringify({pub:$('pubUrl').value,state:$('stSel').value,county:$('coSel').value,r2BasePath:imR2BasePath||''}))}
 function loadCfg(){try{const c=JSON.parse(localStorage.getItem('aim3_cfg')||'{}');if(c.pub){$('pubUrl').value=c.pub;r2Cfg.publicUrl=c.pub}var isEmbedded=false;try{isEmbedded=window.self!==window.top}catch(e2){isEmbedded=true}if(!isEmbedded){if(c.state)$('stSel').value=c.state;if(c.county)$('coSel').value=c.county;if(c.r2BasePath)imR2BasePath=c.r2BasePath}}catch(e){}if(!imR2BasePath)imR2BasePath=$('stSel').value+'/'+$('coSel').value;$('r2Path').textContent=imR2BasePath}
@@ -514,14 +515,46 @@ async function loadData(){
   saveCfg();
   try{
     const fk=getR2Key(),pub=r2Cfg.publicUrl.replace(/\/$/,'');let csv=null;
-    try{const r=await fetch(pub+'/'+fk);if(r.ok){csv=await r.text();toast('Data loaded','ok')}}catch(e){}
+    // Try parquet.gz first
+    try{
+      const r=await fetch(pub+'/'+fk);
+      if(r.ok){
+        const gzBytes=new Uint8Array(await r.arrayBuffer());
+        const parquetBytes=pako.ungzip(gzBytes);
+        const buf=parquetBytes.buffer.slice(parquetBytes.byteOffset,parquetBytes.byteOffset+parquetBytes.byteLength);
+        const hp=await import('https://cdn.jsdelivr.net/npm/hyparquet@1.7.1/+esm');
+        const meta=hp.parquetMetadata(buf);
+        const cols=meta.schema.slice(1).map(s=>s.name);
+        let rows;
+        await hp.parquetRead({file:buf,onComplete:data=>{rows=data}});
+        // Convert to CSV text for existing parseCSV pipeline
+        csv=cols.join(',')+'\n'+rows.map(r=>r.map(v=>{const s=String(v==null?'':v);return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s}).join(',')).join('\n');
+        toast('Data loaded (parquet.gz)','ok');
+      }
+    }catch(e){console.warn('[IM] Parquet load failed, trying cache:',e.message)}
     if(!csv){csv=await cGet(fk);if(csv)toast('Loaded from cache','warn')}
     if(!csv){toast('No data — check server configuration','err');return}
     await cSet(fk,csv).catch(()=>{});
     assets=await parseCSV(csv);await loadLedger();applyLedger();onDataLoaded();
   }catch(e){toast('Error: '+e.message,'err');console.error(e)}
 }
-function loadLocal(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async ev=>{try{assets=await parseCSV(ev.target.result);await cSet(getR2Key(),ev.target.result).catch(()=>{});applyLedger();onDataLoaded();toast(assets.length.toLocaleString()+' assets — '+Object.keys(ledger).length+' edits preserved','ok')}catch(err){toast('Error: '+err.message,'err')}};r.readAsText(f)}
+function loadLocal(e){const f=e.target.files[0];if(!f)return;
+  if(f.name.endsWith('.parquet.gz')||f.name.endsWith('.parquet')){
+    const r=new FileReader();r.onload=async ev=>{try{
+      let bytes=new Uint8Array(ev.target.result);
+      if(f.name.endsWith('.gz'))bytes=pako.ungzip(bytes);
+      const buf=bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);
+      const hp=await import('https://cdn.jsdelivr.net/npm/hyparquet@1.7.1/+esm');
+      const meta=hp.parquetMetadata(buf);const cols=meta.schema.slice(1).map(s=>s.name);
+      let rows;await hp.parquetRead({file:buf,onComplete:data=>{rows=data}});
+      const csv=cols.join(',')+'\n'+rows.map(r=>r.map(v=>{const s=String(v==null?'':v);return s.includes(',')||s.includes('"')?'"'+s.replace(/"/g,'""')+'"':s}).join(',')).join('\n');
+      assets=await parseCSV(csv);applyLedger();onDataLoaded();
+      toast(assets.length.toLocaleString()+' assets loaded (parquet)','ok');
+    }catch(err){toast('Error: '+err.message,'err')}};r.readAsArrayBuffer(f);
+  }else{
+    const r=new FileReader();r.onload=async ev=>{try{assets=await parseCSV(ev.target.result);await cSet(getR2Key(),ev.target.result).catch(()=>{});applyLedger();onDataLoaded();toast(assets.length.toLocaleString()+' assets — '+Object.keys(ledger).length+' edits preserved','ok')}catch(err){toast('Error: '+err.message,'err')}};r.readAsText(f);
+  }
+}
 
 // ═══════════════════════════════════════════════
 // LEDGER

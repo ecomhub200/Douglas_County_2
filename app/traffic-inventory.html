@@ -618,13 +618,13 @@
         function saveR2Config(){r2Cfg.publicUrl=document.getElementById('r2PublicUrl').value.trim().replace(/\/+$/,'');localStorage.setItem('r2cfg',JSON.stringify({publicUrl:r2Cfg.publicUrl}));showToast('R2 config saved','success');updateR2Path();}
         async function testR2(){saveR2Config();try{const r=await fetch('/api/r2/worker-list?prefix=');if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();r2Cfg.serverConfigured=true;document.getElementById('r2Status').className='badge badge-success';document.getElementById('r2Status').textContent='✓ Connected';const rb=document.getElementById('r2HeaderBadge');if(rb){rb.textContent='R2: ✓';rb.style.background='rgba(16,185,129,0.3)';}showToast(`R2 connected! ${d.files?.length||0} objects`,'success');}catch(e){document.getElementById('r2Status').className='badge badge-warning';document.getElementById('r2Status').textContent='Failed';showToast('R2: '+e.message,'error');}}
         // Build R2 key for traffic inventory — uses tier-aware path from parent when available
-        function getTiR2Key(jur){var base=tiR2BasePath||(jur?jur.state+'/'+jur.folder:'');return base+'/traffic-inventory.csv';}
+        function getTiR2Key(jur){var base=tiR2BasePath||(jur?jur.state+'/'+jur.folder:'');return base+'/traffic-inventory.parquet.gz';}
         function updateR2Path(){if(!currentJurisdiction)return;const p=document.getElementById('r2PathDisplay');p.style.display='block';document.getElementById('r2PathText').textContent=`${r2Cfg.publicUrl}/${getTiR2Key(currentJurisdiction)}`;}
         async function uploadToR2(){
             if(!allFeatures.length)return showToast('No data','error');if(!r2Cfg.serverConfigured)return showToast('R2 not configured on server','error');if(!currentJurisdiction)return showToast('No jurisdiction','error');
-            const csv=generateCSV();const key=getTiR2Key(currentJurisdiction);
-            addLog(`☁️ Uploading via server proxy: ${key}`,'r2');
-            try{const r=await fetch('/api/r2/worker-upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({r2Key:key,data:csv,contentType:'text/csv'})});
+            const {headers,rows}=generateInventoryData();const key=getTiR2Key(currentJurisdiction);
+            addLog(`☁️ Uploading parquet.gz via server: ${key}`,'r2');
+            try{const r=await fetch('/api/r2/upload-inventory-parquet',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({r2Key:key,headers:headers,rows:rows})});
             if(!r.ok){const err=await r.json().catch(()=>({}));throw new Error(err.message||'HTTP '+r.status);}addLog(`✅ Uploaded! ${r2Cfg.publicUrl}/${key}`,'success');showToast('Uploaded to R2!','success');}
             catch(e){addLog('Upload failed: '+e.message,'error');showToast('Upload failed','error');}
         }
@@ -1408,17 +1408,17 @@
                     }
 
                     if(allFeatures.length > 0){
-                        // Generate CSV and upload to R2
-                        const csv = generateCSV();
-                        const key = `${jur.state}/${jur.folder}/traffic-inventory.csv`;
+                        // Generate data and upload to R2 as parquet.gz
+                        const {headers, rows} = generateInventoryData();
+                        const key = `${jur.state}/${jur.folder}/traffic-inventory.parquet.gz`;
                         try {
-                            const r = await fetch('/api/r2/worker-upload', {
+                            const r = await fetch('/api/r2/upload-inventory-parquet', {
                                 method: 'POST',
                                 headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({r2Key: key, data: csv, contentType: 'text/csv'})
+                                body: JSON.stringify({r2Key: key, headers: headers, rows: rows})
                             });
                             if(!r.ok) throw new Error('HTTP ' + r.status);
-                            swLog(`  ✅ ${jur.name}: ${allFeatures.length} assets uploaded`, 'success');
+                            swLog(`  ✅ ${jur.name}: ${allFeatures.length} assets uploaded (parquet.gz)`, 'success');
                         } catch(e){
                             swLog(`  ⚠️ ${jur.name}: ${allFeatures.length} found but upload failed: ${e.message}`, 'warn');
                         }
@@ -1859,16 +1859,17 @@
             if (r2ps) { r2ps.style.display = 'block'; r2bar.style.width = '30%'; r2pct.textContent = 'Preparing...'; }
             try {
                 if (!allFeatures.length) { showToast('No data', 'error'); return; }
-                if (!r2Cfg.workerUrl || !r2Cfg.secret) { showToast('Configure R2 first', 'error'); return; }
                 if (!currentJurisdiction) { showToast('No jurisdiction', 'error'); return; }
-                const csv = generateCSV();
+                const {headers, rows} = generateInventoryData();
                 const key = getTiR2Key(currentJurisdiction);
-                if (r2bar) { r2bar.style.width = '50%'; r2pct.textContent = 'Uploading...'; }
-                addLog(`☁️ Uploading: ${key}`, 'info');
-                const r = await fetch(`${r2Cfg.workerUrl}/${encodeURIComponent(key)}`, {
-                    method: 'PUT', headers: { 'Content-Type': 'text/csv', 'X-Upload-Secret': r2Cfg.secret }, body: csv
+                if (r2bar) { r2bar.style.width = '50%'; r2pct.textContent = 'Uploading parquet.gz...'; }
+                addLog(`☁️ Uploading parquet.gz: ${key}`, 'info');
+                const r = await fetch('/api/r2/upload-inventory-parquet', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ r2Key: key, headers: headers, rows: rows })
                 });
-                if (!r.ok) throw new Error('HTTP ' + r.status);
+                if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.message || 'HTTP ' + r.status); }
                 if (r2bar) { r2bar.style.width = '100%'; r2pct.textContent = '100%'; }
                 addLog(`✅ Uploaded! ${r2Cfg.publicUrl}/${key}`, 'success');
                 showToast('Uploaded to R2!', 'success');
@@ -1882,7 +1883,7 @@
                         state: currentJurisdiction?.state,
                         folder: currentJurisdiction?.folder,
                         assetCount: allFeatures.length,
-                        csvUrl: `${r2Cfg.publicUrl}/${key}`,
+                        parquetUrl: `${r2Cfg.publicUrl}/${key}`,
                         pipeline: { ...pipelineStats },
                         timestamp: new Date().toISOString()
                     });
@@ -2764,15 +2765,38 @@
 
         // CSV with signal_heads column
         generateCSV = function() {
+            const {headers, rows} = generateInventoryData();
+            const csvLines = [headers.join(',')];
+            rows.forEach(r => {
+                csvLines.push(r.map(v => {
+                    const s = String(v || '');
+                    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+                }).join(','));
+            });
+            return csvLines.join('\n');
+        };
+
+        // Structured data for parquet upload (no CSV quoting)
+        function generateInventoryData() {
             const headers = ['id','mutcd','name','class','speed','lat','lon','first_seen','signal_heads'];
-            const rows = [headers.join(',')];
+            const rows = [];
             allFeatures.forEach(f => {
                 const coords = f.geometry?.coordinates || [0, 0];
                 const sm = f.object_value?.match(/speed-limit-(\d+)/);
-                rows.push([f.id, `"${getMUTCDCode(f.object_value)}"`, `"${getMUTCDName(f.object_value)}"`, `"${f.object_value || ''}"`, sm ? sm[1] : '', coords[1], coords[0], f.first_seen_at?.split('T')[0] || '', f._cluster_count || ''].join(','));
+                rows.push([
+                    f.id || '',
+                    getMUTCDCode(f.object_value) || '',
+                    getMUTCDName(f.object_value) || '',
+                    f.object_value || '',
+                    sm ? sm[1] : '',
+                    String(coords[1]),
+                    String(coords[0]),
+                    f.first_seen_at?.split('T')[0] || '',
+                    f._cluster_count ? String(f._cluster_count) : ''
+                ]);
             });
-            return rows.join('\n');
-        };
+            return { headers, rows };
+        }
 
         // ================================================================
         // SUB-CATEGORY ICON FILTERS — Per-sign-type map layer control
