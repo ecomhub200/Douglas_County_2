@@ -151,16 +151,36 @@ def load_hierarchy(state_prefix, project_root):
         return None
 
 
-def load_virginia_jurisdictions(project_root):
-    """Load Virginia jurisdiction keys from config.json (authoritative source)."""
+def load_jurisdictions_from_config(project_root, state_abbreviation):
+    """Load jurisdiction keys from config.json for a given state (state-agnostic).
+
+    Filters the flat jurisdictions list by state abbreviation.
+    Strips state abbreviation prefix from keys to match R2 folder names
+    (e.g. config key 'co_adams' → R2 folder 'adams', matching frontend
+    getR2BasePath() which also strips the prefix).
+    """
     config_path = project_root / "config.json"
     if not config_path.exists():
         return []
     with open(config_path) as f:
         config = json.load(f)
-    jurisdictions = list(config.get("jurisdictions", {}).keys())
-    return [j for j in jurisdictions
-            if not j.startswith("_") and not j.startswith("co_")]
+    jurisdictions = config.get("jurisdictions", {})
+    abbr_prefix = state_abbreviation.lower() + "_"
+    result = []
+    for key, val in jurisdictions.items():
+        if key.startswith("_"):
+            continue
+        if not isinstance(val, dict):
+            continue
+        if val.get("state", "").upper() != state_abbreviation.upper():
+            continue
+        # Strip state abbreviation prefix (e.g. co_adams → adams)
+        # matching frontend getR2BasePath() behavior
+        r2_key = key
+        if r2_key.startswith(abbr_prefix):
+            r2_key = r2_key[len(abbr_prefix):]
+        result.append(r2_key)
+    return result
 
 
 def load_jurisdictions_from_manifest(project_root, data_dir):
@@ -204,20 +224,23 @@ def get_mpos(hierarchy):
 def get_jurisdictions(state_prefix, project_root, hierarchy):
     """Get jurisdiction list for a state, using the best available source.
 
-    Priority:
-      1. Virginia: config.json (has curated keys with _city/_county suffixes)
-      2. CO/MD: source_manifest.json (has curated keys)
-      3. All others: hierarchy.json allCounties (convert names to snake_case)
+    State-agnostic priority chain:
+      1. config.json jurisdictions filtered by state abbreviation (curated keys)
+      2. source_manifest.json (curated keys from data pipeline)
+      3. hierarchy.json allCounties (convert names to snake_case, fallback)
     """
-    # Virginia — config.json is authoritative (independent cities, etc.)
-    if state_prefix == "virginia":
-        return load_virginia_jurisdictions(project_root)
-
-    # NYC — hardcoded boroughs
+    # NYC — hardcoded boroughs (no hierarchy.json)
     if state_prefix == "nyc":
         return NYC_JURISDICTIONS
 
-    # States with curated source_manifest.json
+    # 1. config.json — curated jurisdiction keys (works for any state)
+    state_abbr = _get_state_abbreviation(state_prefix, project_root)
+    if state_abbr:
+        config_jurisdictions = load_jurisdictions_from_config(project_root, state_abbr)
+        if config_jurisdictions:
+            return config_jurisdictions
+
+    # 2. source_manifest.json — curated keys from data pipeline
     state_cfg = STATE_MAP.get(state_prefix, {})
     data_dir = state_cfg.get("data_dir")
     if data_dir:
@@ -225,11 +248,27 @@ def get_jurisdictions(state_prefix, project_root, hierarchy):
         if manifest_jurisdictions:
             return manifest_jurisdictions
 
-    # Fallback: derive from hierarchy.json allCounties
+    # 3. Fallback: derive from hierarchy.json allCounties
     if hierarchy:
         return get_jurisdictions_from_hierarchy(hierarchy)
 
     return []
+
+
+def _get_state_abbreviation(state_prefix, project_root):
+    """Look up state abbreviation from config.json states section."""
+    config_path = project_root / "config.json"
+    if not config_path.exists():
+        return None
+    try:
+        with open(config_path) as f:
+            config = json.load(f)
+        state_cfg = config.get("states", {}).get(state_prefix, {})
+        if isinstance(state_cfg, dict):
+            return state_cfg.get("abbreviation")
+    except (json.JSONDecodeError, IOError):
+        pass
+    return None
 
 
 # ─── Geography-based tier folder generation ─────────────────────────────────
@@ -306,6 +345,8 @@ def get_city_folders(project_root, state_prefix, state_fips):
     """Get city/town folder slugs from us_places.json for a state.
 
     Filters to active (FUNCSTAT=A) incorporated places only.
+    Uses NAME (includes entity type like "city", "town") to match
+    frontend populateGeoTierDropdown() which also uses p.NAME for slugs.
     """
     records = _load_geography_json(project_root, "us_places.json")
     # Filter by state FIPS, active status
@@ -581,6 +622,108 @@ def create_folders_batch(folders, dry_run=False):
     return failed == 0
 
 
+def list_existing_r2_folders(s3_client, prefix=""):
+    """List all folder markers (keys ending with /) currently in R2 under a prefix.
+
+    Uses paginated listing to handle buckets with many objects.
+    Returns a set of folder key strings.
+    """
+    existing = set()
+    paginator = s3_client.get_paginator("list_objects_v2")
+    kwargs = {"Bucket": BUCKET, "Prefix": prefix}
+
+    for page in paginator.paginate(**kwargs):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
+            # Only collect zero-byte folder markers (keys ending with /)
+            if key.endswith("/") and obj.get("Size", 0) == 0:
+                existing.add(key)
+
+    return existing
+
+
+def delete_folder_via_boto3(s3_client, folder_key):
+    """Delete a single zero-byte folder marker from R2."""
+    for attempt in range(3):
+        try:
+            s3_client.delete_object(Bucket=BUCKET, Key=folder_key)
+            return True
+        except Exception as exc:
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+            else:
+                print(f"  [ERROR] Failed to delete {folder_key}: {exc}")
+                return False
+    return False
+
+
+def cleanup_stale_folders(expected_folders, state_filter=None, dry_run=False):
+    """Delete R2 folder markers that are NOT in the expected set.
+
+    Only deletes zero-byte marker objects (folders), never real data files.
+    Scoped to a single state prefix if state_filter is provided.
+
+    Args:
+        expected_folders: list of expected folder paths from generate_all_folders()
+        state_filter: optional state prefix to scope cleanup (e.g. 'virginia')
+        dry_run: if True, only print what would be deleted
+    """
+    s3_client = _get_s3_client()
+    expected_set = set(expected_folders)
+
+    # Determine which R2 prefixes to scan
+    if state_filter:
+        prefixes = [f"{state_filter}/"]
+    else:
+        # Scan all known state prefixes + top-level folders
+        prefixes = ["_federal/", "_national/", "shared/", "states/"]
+        prefixes += [f"{sp}/" for sp in sorted(STATE_MAP.keys())]
+
+    print(f"\n{'='*60}")
+    print(f"Cleaning up stale R2 folders")
+    print(f"Scope: {state_filter or 'all states'}")
+    print(f"{'='*60}\n")
+
+    stale = []
+    for prefix in prefixes:
+        existing = list_existing_r2_folders(s3_client, prefix)
+        # Find folders that exist in R2 but are NOT in the expected set
+        for folder in sorted(existing):
+            if folder not in expected_set:
+                stale.append(folder)
+
+    if not stale:
+        print("  No stale folders found. R2 is clean.")
+        return True
+
+    print(f"  Found {len(stale)} stale folder(s) to delete:\n")
+    for f in stale:
+        print(f"    [STALE] {f}")
+
+    if dry_run:
+        print(f"\n  [DRY-RUN] Would delete {len(stale)} stale folders.")
+        return True
+
+    print(f"\n  Deleting {len(stale)} stale folders...")
+    deleted = 0
+    failed = 0
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {
+            executor.submit(delete_folder_via_boto3, s3_client, f): f
+            for f in stale
+        }
+        for future in as_completed(futures):
+            folder = futures[future]
+            if future.result():
+                deleted += 1
+                print(f"    [DELETED] {folder}")
+            else:
+                failed += 1
+
+    print(f"\n  Cleanup: {deleted} deleted, {failed} failed, {len(stale)} total stale")
+    return failed == 0
+
+
 GEOGRAPHY_FILES = [
     "us_counties.json",
     "us_county_subdivisions.json",
@@ -728,6 +871,8 @@ def main():
                         help="Upload geography JSONs and hierarchy files to R2")
     parser.add_argument("--geography-only", action="store_true",
                         help="ONLY upload geography files (skip folder creation)")
+    parser.add_argument("--cleanup", action="store_true",
+                        help="Delete stale R2 folders that don't match expected structure")
     args = parser.parse_args()
 
     # Validate environment
@@ -761,6 +906,21 @@ def main():
         print("\n[DRY-RUN MODE] No changes will be made.\n")
 
     success = create_folders_batch(folders, dry_run=args.dry_run)
+
+    # Cleanup stale folders if --cleanup flag
+    if args.cleanup:
+        # Generate the FULL expected folder list (not top-level-only) for accurate comparison
+        all_expected = generate_all_folders(
+            state_filter=args.state,
+            top_level_only=False
+        )
+        cleanup_ok = cleanup_stale_folders(
+            all_expected,
+            state_filter=args.state,
+            dry_run=args.dry_run
+        )
+        if not cleanup_ok:
+            success = False
 
     # Upload geography files if --upload-geography flag or running all states
     if args.upload_geography or (not args.state and not args.top_level_only):

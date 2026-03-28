@@ -84,7 +84,7 @@ crash-lens-data/
 | Region ID | from `hierarchy.json` regions keys | `bristol`, `region_1`, `hampton_roads` |
 | MPO ID | snake_case slug | `drcog`, `hrtpo`, `dover_kent_county_mpo` |
 | Planning District ID | from `hierarchy.json` planningDistricts keys | `pd_1`, `mount_rogers` |
-| City slug | lowercase, no apostrophes/periods, underscores | `arlington`, `virginia_beach` |
+| City slug | NAME (includes entity type), lowercase, underscores | `alexandria_city`, `bedford_town`, `virginia_beach_city` |
 | County/Jurisdiction ID | from `config.json` jurisdictions keys | `henrico`, `douglas`, `accomack` |
 
 ### County Key Conversion (`county_name_to_key()` in create_r2_folders.py)
@@ -326,7 +326,7 @@ Supports all tier patterns. No server-side changes needed for tier support.
 | `states/{state}/hierarchy.json` | Region IDs, MPO/TPR IDs, PD IDs, county FIPS->name |
 | `config.json` jurisdictions | Virginia jurisdiction keys (authoritative) |
 | `data/{StateDOT}/source_manifest.json` | CO, MD jurisdiction keys |
-| `states/geography/us_places.json` | City/town slugs for `_city/` folders |
+| `states/geography/us_places.json` | City/town NAME slugs for `_city/` folders (includes entity type suffix) |
 | `states/geography/us_mpos.json` | Additional MPO entries |
 
 **Key Functions:**

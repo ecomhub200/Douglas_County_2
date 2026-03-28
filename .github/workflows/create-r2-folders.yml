@@ -52,6 +52,11 @@ on:
         required: false
         default: true
         type: boolean
+      cleanup:
+        description: 'Delete stale R2 folders that do not match expected structure'
+        required: false
+        default: false
+        type: boolean
       dry_run:
         description: 'Dry run (list folders without creating)'
         required: false
@@ -130,6 +135,11 @@ jobs:
           if [ "${{ inputs.upload_geography }}" = "true" ] && [ "${{ inputs.scope }}" != "geography_only" ]; then
             ARGS="$ARGS --upload-geography"
             echo "Geography upload: enabled"
+          fi
+
+          if [ "${{ inputs.cleanup }}" = "true" ]; then
+            ARGS="$ARGS --cleanup"
+            echo "Cleanup: will delete stale folders not in expected structure"
           fi
 
           if [ "${{ inputs.dry_run }}" = "true" ]; then
