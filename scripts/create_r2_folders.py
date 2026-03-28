@@ -151,16 +151,36 @@ def load_hierarchy(state_prefix, project_root):
         return None
 
 
-def load_virginia_jurisdictions(project_root):
-    """Load Virginia jurisdiction keys from config.json (authoritative source)."""
+def load_jurisdictions_from_config(project_root, state_abbreviation):
+    """Load jurisdiction keys from config.json for a given state (state-agnostic).
+
+    Filters the flat jurisdictions list by state abbreviation.
+    Strips state abbreviation prefix from keys to match R2 folder names
+    (e.g. config key 'co_adams' → R2 folder 'adams', matching frontend
+    getR2BasePath() which also strips the prefix).
+    """
     config_path = project_root / "config.json"
     if not config_path.exists():
         return []
     with open(config_path) as f:
         config = json.load(f)
-    jurisdictions = list(config.get("jurisdictions", {}).keys())
-    return [j for j in jurisdictions
-            if not j.startswith("_") and not j.startswith("co_")]
+    jurisdictions = config.get("jurisdictions", {})
+    abbr_prefix = state_abbreviation.lower() + "_"
+    result = []
+    for key, val in jurisdictions.items():
+        if key.startswith("_"):
+            continue
+        if not isinstance(val, dict):
+            continue
+        if val.get("state", "").upper() != state_abbreviation.upper():
+            continue
+        # Strip state abbreviation prefix (e.g. co_adams → adams)
+        # matching frontend getR2BasePath() behavior
+        r2_key = key
+        if r2_key.startswith(abbr_prefix):
+            r2_key = r2_key[len(abbr_prefix):]
+        result.append(r2_key)
+    return result
 
 
 def load_jurisdictions_from_manifest(project_root, data_dir):
@@ -204,20 +224,23 @@ def get_mpos(hierarchy):
 def get_jurisdictions(state_prefix, project_root, hierarchy):
     """Get jurisdiction list for a state, using the best available source.
 
-    Priority:
-      1. Virginia: config.json (has curated keys with _city/_county suffixes)
-      2. CO/MD: source_manifest.json (has curated keys)
-      3. All others: hierarchy.json allCounties (convert names to snake_case)
+    State-agnostic priority chain:
+      1. config.json jurisdictions filtered by state abbreviation (curated keys)
+      2. source_manifest.json (curated keys from data pipeline)
+      3. hierarchy.json allCounties (convert names to snake_case, fallback)
     """
-    # Virginia — config.json is authoritative (independent cities, etc.)
-    if state_prefix == "virginia":
-        return load_virginia_jurisdictions(project_root)
-
-    # NYC — hardcoded boroughs
+    # NYC — hardcoded boroughs (no hierarchy.json)
     if state_prefix == "nyc":
         return NYC_JURISDICTIONS
 
-    # States with curated source_manifest.json
+    # 1. config.json — curated jurisdiction keys (works for any state)
+    state_abbr = _get_state_abbreviation(state_prefix, project_root)
+    if state_abbr:
+        config_jurisdictions = load_jurisdictions_from_config(project_root, state_abbr)
+        if config_jurisdictions:
+            return config_jurisdictions
+
+    # 2. source_manifest.json — curated keys from data pipeline
     state_cfg = STATE_MAP.get(state_prefix, {})
     data_dir = state_cfg.get("data_dir")
     if data_dir:
@@ -225,11 +248,27 @@ def get_jurisdictions(state_prefix, project_root, hierarchy):
         if manifest_jurisdictions:
             return manifest_jurisdictions
 
-    # Fallback: derive from hierarchy.json allCounties
+    # 3. Fallback: derive from hierarchy.json allCounties
     if hierarchy:
         return get_jurisdictions_from_hierarchy(hierarchy)
 
     return []
+
+
+def _get_state_abbreviation(state_prefix, project_root):
+    """Look up state abbreviation from config.json states section."""
+    config_path = project_root / "config.json"
+    if not config_path.exists():
+        return None
+    try:
+        with open(config_path) as f:
+            config = json.load(f)
+        state_cfg = config.get("states", {}).get(state_prefix, {})
+        if isinstance(state_cfg, dict):
+            return state_cfg.get("abbreviation")
+    except (json.JSONDecodeError, IOError):
+        pass
+    return None
 
 
 # ─── Geography-based tier folder generation ─────────────────────────────────
