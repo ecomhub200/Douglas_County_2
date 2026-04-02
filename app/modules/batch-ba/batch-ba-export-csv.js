@@ -45,11 +45,9 @@ CL.batchBA.exportCSV = function() {
             after_C: r.afterStats.C,
             after_O: r.afterStats.O,
             after_U: r.afterStats.U || 0,
-            before_epdo: Math.round(r.beforeEPDO),
-            after_epdo: Math.round(r.afterEPDO),
-            epdo_change_pct: (Math.round(r.beforeEPDO) > 0
-                ? ((Math.round(r.afterEPDO) - Math.round(r.beforeEPDO)) / Math.round(r.beforeEPDO) * 100).toFixed(2)
-                : '0.00'),
+            before_epdo: r.beforeEPDO.toFixed(1),
+            after_epdo: r.afterEPDO.toFixed(1),
+            epdo_change_pct: r.epdoChangePct.toFixed(2),
             cmf: r.cmf !== null ? r.cmf.toFixed(4) : '',
             crf: r.crf !== null ? r.crf.toFixed(2) : '',
             p_value: r.pValue.toFixed(6),

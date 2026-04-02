@@ -93,6 +93,9 @@ CL.batchBA.duration._computeLocationDurations = function() {
 
     s.locationDurations = [];
 
+    // Guard: cannot compute durations without valid crash data date range
+    if (!dataStart || !dataEnd || dataEnd <= dataStart) return;
+
     s.validRows.forEach(function(row) {
         var installDate = row.installDate;
         if (!installDate) {
@@ -516,7 +519,7 @@ CL.batchBA.duration._applyUniformIfNeeded = function() {
         if (d.maxAfterMonths < minMaxAfter) minMaxAfter = d.maxAfterMonths;
     });
 
-    var uniformBefore = Math.max(BA_MIN_STUDY_MONTHS, Math.min(minMaxBefore, minMaxAfter));
+    var uniformBefore = Math.max(BA_MIN_STUDY_MONTHS, s.symmetricLock ? Math.min(minMaxBefore, minMaxAfter) : minMaxBefore);
     var uniformAfter = s.symmetricLock ? uniformBefore : Math.max(BA_MIN_STUDY_MONTHS, minMaxAfter);
 
     s.locationDurations.forEach(function(d) {

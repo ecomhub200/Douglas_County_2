@@ -44,7 +44,8 @@ CL.batchBA.exportPDF = function() {
     var sum = s.summary;
     var dateStamp = new Date().toISOString().split('T')[0];
     var generatedDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    var epdoInfo = CL.core.epdo.getStateEPDOWeights(typeof STATE_FIPS !== 'undefined' ? STATE_FIPS : '_default');
+    var stateFips = (typeof getCurrentStateFips === 'function') ? getCurrentStateFips() : '_default';
+    var epdoInfo = CL.core.epdo.getStateEPDOWeights(stateFips);
     var pageNum = 0;
     var y = m + headerH;
 
@@ -367,8 +368,8 @@ CL.batchBA.exportPDF = function() {
             r.beforeTotal,
             r.afterTotal,
             r.changePct.toFixed(1) + '%',
-            Math.round(r.beforeEPDO),
-            Math.round(r.afterEPDO),
+            r.beforeEPDO.toFixed(1),
+            r.afterEPDO.toFixed(1),
             r.cmf !== null ? r.cmf.toFixed(3) : 'N/A',
             r.isSignificant ? 'Yes' : 'No',
             rating.label
@@ -460,8 +461,8 @@ CL.batchBA.exportPDF = function() {
             startY: y,
             head: [['Period', 'K', 'A', 'B', 'C', 'O', 'Unk', 'Total', 'EPDO', 'Rate/Yr']],
             body: [
-                ['Before', r.beforeStats.K, r.beforeStats.A, r.beforeStats.B, r.beforeStats.C, r.beforeStats.O, r.beforeStats.U || 0, r.beforeTotal, Math.round(r.beforeEPDO), (r.beforeTotal / r.beforeYears).toFixed(1)],
-                ['After', r.afterStats.K, r.afterStats.A, r.afterStats.B, r.afterStats.C, r.afterStats.O, r.afterStats.U || 0, r.afterTotal, Math.round(r.afterEPDO), (r.afterTotal / r.afterYears).toFixed(1)]
+                ['Before', r.beforeStats.K, r.beforeStats.A, r.beforeStats.B, r.beforeStats.C, r.beforeStats.O, r.beforeStats.U || 0, r.beforeTotal, r.beforeEPDO.toFixed(1), (r.beforeTotal / r.beforeYears).toFixed(1)],
+                ['After', r.afterStats.K, r.afterStats.A, r.afterStats.B, r.afterStats.C, r.afterStats.O, r.afterStats.U || 0, r.afterTotal, r.afterEPDO.toFixed(1), (r.afterTotal / r.afterYears).toFixed(1)]
             ],
             margin: { left: m + 3, right: m + 3 },
             styles: { fontSize: 7, cellPadding: 1.5 },

@@ -181,8 +181,8 @@ CL.batchBA._renderResultsTable = function() {
             html += '<td style="text-align:center">' + r.beforeTotal + '</td>';
             html += '<td style="text-align:center">' + r.afterTotal + '</td>';
             html += '<td style="text-align:center;color:' + changeColor + ';font-weight:600">' + r.changePct.toFixed(1) + '%</td>';
-            html += '<td style="text-align:center">' + Math.round(r.beforeEPDO) + '</td>';
-            html += '<td style="text-align:center">' + Math.round(r.afterEPDO) + '</td>';
+            html += '<td style="text-align:center">' + r.beforeEPDO.toFixed(1) + '</td>';
+            html += '<td style="text-align:center">' + r.afterEPDO.toFixed(1) + '</td>';
             html += '<td style="text-align:center;color:' + epdoColor + ';font-weight:600">' + r.epdoChangePct.toFixed(1) + '%</td>';
             html += '<td style="text-align:center;font-weight:700;color:' + rating.color + '">' + (r.cmf !== null ? r.cmf.toFixed(3) : 'N/A') + '</td>';
             var sigColor = r.isSignificant ? (r.changePct <= 0 ? '#16a34a' : '#dc2626') : '#94a3b8';

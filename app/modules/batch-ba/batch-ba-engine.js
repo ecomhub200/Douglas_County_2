@@ -140,6 +140,10 @@ CL.batchBA._analyzeLocation = function(location, locationIndex) {
         beforeEnd = new Date(afterStart);
         beforeEnd.setDate(beforeEnd.getDate() - 1);
     }
+    // Safety: ensure before period is not negative-length after clamping
+    if (beforeStart >= beforeEnd) {
+        beforeStart = new Date(beforeEnd);
+    }
 
     // Find crashes within radius using spatial filter
     var nearbyCrashes = CL.batchBA._findCrashesInRadius(location.lat, location.lng, radiusMeters);
@@ -188,7 +192,8 @@ CL.batchBA._analyzeLocation = function(location, locationIndex) {
     }
 
     // Get EPDO weights
-    var epdoInfo = CL.core.epdo.getStateEPDOWeights(typeof STATE_FIPS !== 'undefined' ? STATE_FIPS : '_default');
+    var stateFips = (typeof getCurrentStateFips === 'function') ? getCurrentStateFips() : '_default';
+    var epdoInfo = CL.core.epdo.getStateEPDOWeights(stateFips);
     var weights = epdoInfo.weights;
     var beforeEPDO = CL.core.epdo.calcEPDO(beforeStats, weights);
     var afterEPDO = CL.core.epdo.calcEPDO(afterStats, weights);
