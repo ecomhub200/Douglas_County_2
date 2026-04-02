@@ -108,7 +108,7 @@ CL.batchBA._analyzeLocation = function(location, locationIndex) {
         afterStart.setMonth(afterStart.getMonth() + buffer);
 
         beforeStart = new Date(beforeEnd);
-        beforeStart.setMonth(beforeStart.getMonth() - durationConfig.beforeMonths + 1);
+        beforeStart.setMonth(beforeStart.getMonth() - durationConfig.beforeMonths);
 
         afterEnd = new Date(afterStart);
         afterEnd.setMonth(afterEnd.getMonth() + durationConfig.afterMonths);
@@ -118,7 +118,9 @@ CL.batchBA._analyzeLocation = function(location, locationIndex) {
         var studyMonths = location.studyDuration || null;
         afterEnd = now;
         afterStart = new Date(installDate);
+        afterStart.setMonth(afterStart.getMonth() + buffer);
         beforeEnd = new Date(installDate);
+        beforeEnd.setMonth(beforeEnd.getMonth() - buffer);
         beforeEnd.setDate(beforeEnd.getDate() - 1);
 
         if (studyMonths) {
@@ -131,6 +133,12 @@ CL.batchBA._analyzeLocation = function(location, locationIndex) {
             var afterMs = afterEnd - afterStart;
             beforeStart = new Date(beforeEnd.getTime() - afterMs);
         }
+    }
+
+    // Safety: ensure no date overlap between before and after periods
+    if (beforeEnd >= afterStart) {
+        beforeEnd = new Date(afterStart);
+        beforeEnd.setDate(beforeEnd.getDate() - 1);
     }
 
     // Find crashes within radius using spatial filter
@@ -251,7 +259,8 @@ CL.batchBA._haversineMeters = function(lat1, lng1, lat2, lng2) {
 /** Filter crash points by date period */
 CL.batchBA._filterByPeriod = function(crashes, startDate, endDate) {
     return crashes.filter(function(c) {
-        var dateVal = c.date !== undefined ? c.date : (c[COL.DATE] || 0);
+        var dateVal = c.date !== undefined ? c.date :
+            (typeof COL !== 'undefined' && COL.DATE ? c[COL.DATE] : 0);
         var num = Number(dateVal);
         // If numeric (epoch ms), use directly; otherwise parse as date string
         var d = !isNaN(num) && num > 0 ? new Date(num) : new Date(dateVal);
@@ -262,11 +271,15 @@ CL.batchBA._filterByPeriod = function(crashes, startDate, endDate) {
 
 /** Compute severity breakdown from map points */
 CL.batchBA._computeSeverityStats = function(crashes) {
-    var stats = { total: crashes.length, K: 0, A: 0, B: 0, C: 0, O: 0, ped: 0, bike: 0 };
+    var stats = { total: crashes.length, K: 0, A: 0, B: 0, C: 0, O: 0, U: 0, ped: 0, bike: 0 };
     for (var i = 0; i < crashes.length; i++) {
         var c = crashes[i];
         var s = (c.sev || '').charAt(0).toUpperCase();
-        if (stats[s] !== undefined) stats[s]++;
+        if (s === 'K' || s === 'A' || s === 'B' || s === 'C' || s === 'O') {
+            stats[s]++;
+        } else {
+            stats.U++;
+        }
         if (c.isPed) stats.ped++;
         if (c.isBike) stats.bike++;
     }
@@ -319,7 +332,7 @@ CL.batchBA._computeSummary = function() {
         totalCrashChange += r.changePct;
         if (r.cmf !== null) { totalCMF += r.cmf; cmfCount++; }
         if (r.isSignificant) significantCount++;
-        if (r.afterTotal < r.beforeTotal) crashesPrevented += (r.beforeTotal - r.afterTotal);
+        crashesPrevented += (r.beforeTotal - r.afterTotal);
         var rating = CL.batchBA.getEffectivenessRating(r.cmf).label;
         byEffectiveness[rating] = (byEffectiveness[rating] || 0) + 1;
 

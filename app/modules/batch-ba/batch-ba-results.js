@@ -41,8 +41,11 @@ CL.batchBA._renderSummaryCards = function() {
     html += CL.batchBA._kpiCard(sum.totalAnalyzed, 'Locations Analyzed', '#1e40af', '#3b82f6');
     html += CL.batchBA._kpiCard(sum.avgCrashReduction.toFixed(1) + '%', 'Avg Crash Reduction', sum.avgCrashReduction > 0 ? '#15803d' : '#dc2626', sum.avgCrashReduction > 0 ? '#22c55e' : '#ef4444');
     html += CL.batchBA._kpiCard(avgCMFDisplay, 'Avg Safety Score', avgCMFColor, avgCMFLight);
-    html += CL.batchBA._kpiCard(sum.crashesPrevented, 'Crashes Prevented', '#7c3aed', '#a78bfa');
-    html += CL.batchBA._kpiCard(sum.significantPct.toFixed(0) + '%', 'Significant Improvement', '#0369a1', '#38bdf8');
+    var cpLabel = sum.crashesPrevented >= 0 ? 'Net Crashes Prevented' : 'Net Crash Increase';
+    var cpColor = sum.crashesPrevented >= 0 ? '#7c3aed' : '#dc2626';
+    var cpLight = sum.crashesPrevented >= 0 ? '#a78bfa' : '#ef4444';
+    html += CL.batchBA._kpiCard(Math.abs(sum.crashesPrevented), cpLabel, cpColor, cpLight);
+    html += CL.batchBA._kpiCard(sum.significantPct.toFixed(0) + '%', 'Statistically Significant', '#0369a1', '#38bdf8');
 
     html += '</div>';
 
@@ -182,7 +185,9 @@ CL.batchBA._renderResultsTable = function() {
             html += '<td style="text-align:center">' + Math.round(r.afterEPDO) + '</td>';
             html += '<td style="text-align:center;color:' + epdoColor + ';font-weight:600">' + r.epdoChangePct.toFixed(1) + '%</td>';
             html += '<td style="text-align:center;font-weight:700;color:' + rating.color + '">' + (r.cmf !== null ? r.cmf.toFixed(3) : 'N/A') + '</td>';
-            html += '<td style="text-align:center">' + (r.isSignificant ? '<span style="color:#16a34a;font-weight:700">✓</span>' : '<span style="color:#94a3b8">✗</span>') + '</td>';
+            var sigColor = r.isSignificant ? (r.changePct <= 0 ? '#16a34a' : '#dc2626') : '#94a3b8';
+            var sigSymbol = r.isSignificant ? '✓' : '✗';
+            html += '<td style="text-align:center"><span style="color:' + sigColor + ';font-weight:' + (r.isSignificant ? '700' : '400') + '">' + sigSymbol + '</span></td>';
             html += '<td><span style="display:inline-block;padding:.15rem .5rem;border-radius:9999px;font-size:.72rem;font-weight:600;background:' + rating.color + '20;color:' + rating.color + '">' + rating.label + '</span></td>';
             html += '</tr>';
         });
@@ -233,7 +238,7 @@ CL.batchBA._toggleRowDetail = function(rowEl, filteredIdx) {
     html += '<div>';
     html += '<div style="font-weight:700;color:#1e40af;margin-bottom:.5rem">Severity Comparison</div>';
     html += '<table style="font-size:.8rem;width:100%"><thead><tr><th></th><th>Before</th><th>After</th></tr></thead><tbody>';
-    ['K', 'A', 'B', 'C', 'O'].forEach(function(sev) {
+    ['K', 'A', 'B', 'C', 'O', 'U'].forEach(function(sev) {
         html += '<tr><td style="font-weight:600">' + sev + '</td><td style="text-align:center">' + (r.beforeStats[sev] || 0) + '</td><td style="text-align:center">' + (r.afterStats[sev] || 0) + '</td></tr>';
     });
     html += '<tr style="font-weight:700;border-top:1px solid #e2e8f0"><td>Total</td><td style="text-align:center">' + r.beforeTotal + '</td><td style="text-align:center">' + r.afterTotal + '</td></tr>';

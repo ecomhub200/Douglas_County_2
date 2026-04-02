@@ -223,7 +223,9 @@ CL.batchBA.exportPDF = function() {
     cardX += cardW + cardGap;
     drawKPICard(cardX, y, cardW, cardH, sum.avgCMF !== null ? sum.avgCMF.toFixed(3) : 'N/A', 'Average CMF', sum.avgCMF !== null && sum.avgCMF < 1 ? C.success : C.primaryLight);
     cardX += cardW + cardGap;
-    drawKPICard(cardX, y, cardW, cardH, sum.crashesPrevented, 'Crashes Prevented', C.secondary);
+    var cpPdfLabel = sum.crashesPrevented >= 0 ? 'Net Prevented' : 'Net Increase';
+    var cpPdfColor = sum.crashesPrevented >= 0 ? C.secondary : C.danger;
+    drawKPICard(cardX, y, cardW, cardH, Math.abs(sum.crashesPrevented), cpPdfLabel, cpPdfColor);
     cardX += cardW + cardGap;
     drawKPICard(cardX, y, cardW, cardH, sum.significantPct.toFixed(0) + '%', 'Significant', C.primaryLight);
 
@@ -294,7 +296,10 @@ CL.batchBA.exportPDF = function() {
     setColor(C.text);
     doc.text(sum.significantCount + ' of ' + sum.totalAnalyzed + ' locations (' + sum.significantPct.toFixed(0) + '%) showed statistically significant crash changes at the ' + (s.confidenceLevel * 100) + '% confidence level.', m, y);
     y += 8;
-    doc.text('Total estimated crashes prevented: ' + sum.crashesPrevented + ' (locations where after-count < before-count).', m, y);
+    var cpPdfText = sum.crashesPrevented >= 0
+        ? 'Net estimated crashes prevented: ' + sum.crashesPrevented + ' (sum of before minus after across all locations).'
+        : 'Net crash increase: ' + Math.abs(sum.crashesPrevented) + ' (sum of before minus after across all locations).';
+    doc.text(cpPdfText, m, y);
     y += 12;
 
     // Aggregated severity comparison
@@ -453,10 +458,10 @@ CL.batchBA.exportPDF = function() {
         // Severity comparison table
         doc.autoTable({
             startY: y,
-            head: [['Period', 'K', 'A', 'B', 'C', 'O', 'Total', 'EPDO', 'Rate/Yr']],
+            head: [['Period', 'K', 'A', 'B', 'C', 'O', 'Unk', 'Total', 'EPDO', 'Rate/Yr']],
             body: [
-                ['Before', r.beforeStats.K, r.beforeStats.A, r.beforeStats.B, r.beforeStats.C, r.beforeStats.O, r.beforeTotal, Math.round(r.beforeEPDO), (r.beforeTotal / r.beforeYears).toFixed(1)],
-                ['After', r.afterStats.K, r.afterStats.A, r.afterStats.B, r.afterStats.C, r.afterStats.O, r.afterTotal, Math.round(r.afterEPDO), (r.afterTotal / r.afterYears).toFixed(1)]
+                ['Before', r.beforeStats.K, r.beforeStats.A, r.beforeStats.B, r.beforeStats.C, r.beforeStats.O, r.beforeStats.U || 0, r.beforeTotal, Math.round(r.beforeEPDO), (r.beforeTotal / r.beforeYears).toFixed(1)],
+                ['After', r.afterStats.K, r.afterStats.A, r.afterStats.B, r.afterStats.C, r.afterStats.O, r.afterStats.U || 0, r.afterTotal, Math.round(r.afterEPDO), (r.afterTotal / r.afterYears).toFixed(1)]
             ],
             margin: { left: m + 3, right: m + 3 },
             styles: { fontSize: 7, cellPadding: 1.5 },
@@ -464,9 +469,9 @@ CL.batchBA.exportPDF = function() {
             columnStyles: {
                 0: { fontStyle: 'bold', cellWidth: 16 },
                 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' },
-                4: { halign: 'center' }, 5: { halign: 'center' },
-                6: { halign: 'center', fontStyle: 'bold' },
-                7: { halign: 'center' }, 8: { halign: 'center' }
+                4: { halign: 'center' }, 5: { halign: 'center' }, 6: { halign: 'center' },
+                7: { halign: 'center', fontStyle: 'bold' },
+                8: { halign: 'center' }, 9: { halign: 'center' }
             }
         });
         y = doc.lastAutoTable.finalY + 2;
