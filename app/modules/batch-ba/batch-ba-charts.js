@@ -79,7 +79,9 @@ CL.batchBA._renderKeyTakeaways = function(results) {
 
     // Crashes prevented
     if (sum.crashesPrevented > 0) {
-        takeaways.push('An estimated <strong>' + sum.crashesPrevented + ' crashes were prevented</strong> across all treated locations.');
+        takeaways.push('A net estimated <strong>' + sum.crashesPrevented + ' crashes were prevented</strong> across all treated locations.');
+    } else if (sum.crashesPrevented < 0) {
+        takeaways.push('There was a net <strong>increase of ' + Math.abs(sum.crashesPrevented) + ' crashes</strong> across all treated locations.');
     }
 
     // Statistical significance
