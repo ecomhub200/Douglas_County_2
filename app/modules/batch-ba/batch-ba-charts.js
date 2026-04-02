@@ -249,7 +249,7 @@ CL.batchBA._renderSeverityShift = function(results) {
     });
 
     var sevColors = { K: '#dc2626', A: '#ea580c', B: '#f97316', C: '#facc15', O: '#9ca3af' };
-    var sevLabels = { K: 'Fatal', A: 'Serious Injury', B: 'Moderate Injury', C: 'Minor Injury', O: 'Property Damage Only' };
+    var sevLabels = { K: 'Fatal (K)', A: 'Serious (A)', B: 'Moderate (B)', C: 'Minor (C)', O: 'PDO (O)' };
 
     // Description
     CL.batchBA._setChartDescription('batchBASeverityChartDesc',

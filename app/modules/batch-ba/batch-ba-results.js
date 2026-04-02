@@ -232,10 +232,9 @@ CL.batchBA._toggleRowDetail = function(rowEl, filteredIdx) {
     // Before/After comparison
     html += '<div>';
     html += '<div style="font-weight:700;color:#1e40af;margin-bottom:.5rem">Severity Comparison</div>';
-    var sevNames = { K: 'Fatal', A: 'Serious Injury', B: 'Moderate Injury', C: 'Minor Injury', O: 'Property Damage Only' };
     html += '<table style="font-size:.8rem;width:100%"><thead><tr><th></th><th>Before</th><th>After</th></tr></thead><tbody>';
     ['K', 'A', 'B', 'C', 'O'].forEach(function(sev) {
-        html += '<tr><td style="font-weight:600">' + sevNames[sev] + '</td><td style="text-align:center">' + (r.beforeStats[sev] || 0) + '</td><td style="text-align:center">' + (r.afterStats[sev] || 0) + '</td></tr>';
+        html += '<tr><td style="font-weight:600">' + sev + '</td><td style="text-align:center">' + (r.beforeStats[sev] || 0) + '</td><td style="text-align:center">' + (r.afterStats[sev] || 0) + '</td></tr>';
     });
     html += '<tr style="font-weight:700;border-top:1px solid #e2e8f0"><td>Total</td><td style="text-align:center">' + r.beforeTotal + '</td><td style="text-align:center">' + r.afterTotal + '</td></tr>';
     html += '</tbody></table></div>';
