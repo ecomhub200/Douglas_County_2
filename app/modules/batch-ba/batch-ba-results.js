@@ -40,7 +40,7 @@ CL.batchBA._renderSummaryCards = function() {
 
     html += CL.batchBA._kpiCard(sum.totalAnalyzed, 'Locations Analyzed', '#1e40af', '#3b82f6');
     html += CL.batchBA._kpiCard(sum.avgCrashReduction.toFixed(1) + '%', 'Avg Crash Reduction', sum.avgCrashReduction > 0 ? '#15803d' : '#dc2626', sum.avgCrashReduction > 0 ? '#22c55e' : '#ef4444');
-    html += CL.batchBA._kpiCard(avgCMFDisplay, 'Average CMF', avgCMFColor, avgCMFLight);
+    html += CL.batchBA._kpiCard(avgCMFDisplay, 'Avg Safety Score', avgCMFColor, avgCMFLight);
     html += CL.batchBA._kpiCard(sum.crashesPrevented, 'Crashes Prevented', '#7c3aed', '#a78bfa');
     html += CL.batchBA._kpiCard(sum.significantPct.toFixed(0) + '%', 'Significant Improvement', '#0369a1', '#38bdf8');
 
@@ -143,24 +143,24 @@ CL.batchBA._renderResultsTable = function() {
     var s = CL.batchBA.state;
 
     var columns = [
-        { key: 'locationName', label: 'Location' },
-        { key: 'countermeasureType', label: 'Type' },
-        { key: 'beforeTotal', label: 'Before' },
-        { key: 'afterTotal', label: 'After' },
-        { key: 'changePct', label: 'Change %' },
-        { key: 'beforeEPDO', label: 'Before EPDO' },
-        { key: 'afterEPDO', label: 'After EPDO' },
-        { key: 'epdoChangePct', label: 'EPDO Change %' },
-        { key: 'cmf', label: 'CMF' },
-        { key: 'pValue', label: 'Sig.' },
-        { key: '_effectiveness', label: 'Rating' }
+        { key: 'locationName', label: 'Location', title: 'Name of the treated location' },
+        { key: 'countermeasureType', label: 'Type', title: 'Type of safety treatment installed' },
+        { key: 'beforeTotal', label: 'Before', title: 'Total crashes before treatment' },
+        { key: 'afterTotal', label: 'After', title: 'Total crashes after treatment' },
+        { key: 'changePct', label: 'Change %', title: 'Percentage change in crashes (negative = fewer crashes)' },
+        { key: 'beforeEPDO', label: 'Before EPDO', title: 'Severity-weighted crash score before treatment (higher = more severe crashes)' },
+        { key: 'afterEPDO', label: 'After EPDO', title: 'Severity-weighted crash score after treatment' },
+        { key: 'epdoChangePct', label: 'EPDO Change %', title: 'Change in severity-weighted crash score' },
+        { key: 'cmf', label: 'Safety Score', title: 'Below 1.0 = improvement, above 1.0 = worsening' },
+        { key: 'pValue', label: 'Sig.', title: 'Statistical significance — check mark means the result is unlikely due to random chance' },
+        { key: '_effectiveness', label: 'Rating', title: 'Overall effectiveness rating based on safety score' }
     ];
 
     var html = '<div style="overflow-x:auto"><table class="data-table" style="font-size:.8rem;width:100%"><thead><tr>';
     columns.forEach(function(col) {
         var arrow = s.sortColumn === col.key ? (s.sortAsc ? ' ▲' : ' ▼') : '';
         var clickable = col.key !== '_effectiveness' ? ' onclick="CL.batchBA._onSortChange(\'' + col.key + '\')" style="cursor:pointer"' : '';
-        html += '<th' + clickable + '>' + col.label + arrow + '</th>';
+        html += '<th' + clickable + ' title="' + (col.title || '') + '">' + col.label + arrow + '</th>';
     });
     html += '</tr></thead><tbody>';
 
@@ -232,9 +232,10 @@ CL.batchBA._toggleRowDetail = function(rowEl, filteredIdx) {
     // Before/After comparison
     html += '<div>';
     html += '<div style="font-weight:700;color:#1e40af;margin-bottom:.5rem">Severity Comparison</div>';
+    var sevNames = { K: 'Fatal', A: 'Serious Injury', B: 'Moderate Injury', C: 'Minor Injury', O: 'Property Damage Only' };
     html += '<table style="font-size:.8rem;width:100%"><thead><tr><th></th><th>Before</th><th>After</th></tr></thead><tbody>';
     ['K', 'A', 'B', 'C', 'O'].forEach(function(sev) {
-        html += '<tr><td style="font-weight:600">' + sev + '</td><td style="text-align:center">' + (r.beforeStats[sev] || 0) + '</td><td style="text-align:center">' + (r.afterStats[sev] || 0) + '</td></tr>';
+        html += '<tr><td style="font-weight:600">' + sevNames[sev] + '</td><td style="text-align:center">' + (r.beforeStats[sev] || 0) + '</td><td style="text-align:center">' + (r.afterStats[sev] || 0) + '</td></tr>';
     });
     html += '<tr style="font-weight:700;border-top:1px solid #e2e8f0"><td>Total</td><td style="text-align:center">' + r.beforeTotal + '</td><td style="text-align:center">' + r.afterTotal + '</td></tr>';
     html += '</tbody></table></div>';
@@ -243,8 +244,8 @@ CL.batchBA._toggleRowDetail = function(rowEl, filteredIdx) {
     html += '<div>';
     html += '<div style="font-weight:700;color:#1e40af;margin-bottom:.5rem">Statistical Results</div>';
     html += '<div style="font-size:.82rem;line-height:1.8">';
-    html += '<div>CMF: <strong style="color:' + rating.color + '">' + (r.cmf !== null ? r.cmf.toFixed(3) : 'N/A (no before-period crashes)') + '</strong></div>';
-    html += '<div>CRF: ' + (r.crf !== null ? ((r.crf > 0 ? '+' : '') + r.crf.toFixed(1) + '%') : 'N/A') + '</div>';
+    html += '<div>Safety Score (CMF): <strong style="color:' + rating.color + '">' + (r.cmf !== null ? r.cmf.toFixed(3) : 'N/A (no before-period crashes)') + '</strong></div>';
+    html += '<div>Crash Reduction Factor (CRF): ' + (r.crf !== null ? ((r.crf > 0 ? '+' : '') + r.crf.toFixed(1) + '%') : 'N/A') + '</div>';
     html += '<div>p-value: ' + r.pValue.toFixed(4) + '</div>';
     html += '<div>Before Period: ' + r.beforeStart.toLocaleDateString() + ' — ' + r.beforeEnd.toLocaleDateString() + ' (' + r.beforeYears.toFixed(1) + ' yr)</div>';
     html += '<div>After Period: ' + r.afterStart.toLocaleDateString() + ' — ' + r.afterEnd.toLocaleDateString() + ' (' + r.afterYears.toFixed(1) + ' yr)</div>';
