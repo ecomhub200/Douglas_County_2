@@ -47,7 +47,7 @@ CL.batchBA._processChunk = function(startIdx, chunkSize) {
         s.progress.currentName = row.locationName;
 
         try {
-            var result = CL.batchBA._analyzeLocation(row);
+            var result = CL.batchBA._analyzeLocation(row, i);
             s.results.push(result);
         } catch (err) {
             console.error('[BatchBA] Error processing location:', row.locationName, err);
@@ -84,31 +84,53 @@ CL.batchBA._processChunk = function(startIdx, chunkSize) {
  * @param {Object} location - { locationName, lat, lng, installDate, countermeasureType, studyDuration, radiusFt }
  * @returns {Object} Result object with all computed metrics.
  */
-CL.batchBA._analyzeLocation = function(location) {
+CL.batchBA._analyzeLocation = function(location, locationIndex) {
     var s = CL.batchBA.state;
     var radiusFt = location.radiusFt || s.globalRadiusFt;
     var radiusMeters = radiusFt * 0.3048;
     var installDate = location.installDate;
     var now = new Date();
 
-    // Determine study periods
-    var studyMonths = location.studyDuration || null;
-    var afterEnd = now;
-    var afterStart = new Date(installDate);
-    var beforeEnd = new Date(installDate);
-    beforeEnd.setDate(beforeEnd.getDate() - 1);
-    var beforeStart;
+    // Determine study periods using duration configuration if available
+    var durationConfig = (typeof locationIndex === 'number' && s.locationDurations[locationIndex]) ?
+        s.locationDurations[locationIndex] : null;
+    var buffer = s.constructionBuffer || 0;
 
-    if (studyMonths) {
-        afterEnd = new Date(installDate);
-        afterEnd.setMonth(afterEnd.getMonth() + studyMonths);
+    var afterStart, afterEnd, beforeStart, beforeEnd;
+
+    if (durationConfig && durationConfig.beforeMonths > 0 && durationConfig.afterMonths > 0) {
+        // Use configured durations with construction buffer
+        beforeEnd = new Date(installDate);
+        beforeEnd.setMonth(beforeEnd.getMonth() - buffer);
+        beforeEnd.setDate(beforeEnd.getDate() - 1);
+
+        afterStart = new Date(installDate);
+        afterStart.setMonth(afterStart.getMonth() + buffer);
+
+        beforeStart = new Date(beforeEnd);
+        beforeStart.setMonth(beforeStart.getMonth() - durationConfig.beforeMonths + 1);
+
+        afterEnd = new Date(afterStart);
+        afterEnd.setMonth(afterEnd.getMonth() + durationConfig.afterMonths);
         if (afterEnd > now) afterEnd = now;
-        beforeStart = new Date(installDate);
-        beforeStart.setMonth(beforeStart.getMonth() - studyMonths);
     } else {
-        // Use equal periods: after period = install to now, before = same length before install
-        var afterMs = afterEnd - afterStart;
-        beforeStart = new Date(beforeEnd.getTime() - afterMs);
+        // Fallback: original logic (no duration config)
+        var studyMonths = location.studyDuration || null;
+        afterEnd = now;
+        afterStart = new Date(installDate);
+        beforeEnd = new Date(installDate);
+        beforeEnd.setDate(beforeEnd.getDate() - 1);
+
+        if (studyMonths) {
+            afterEnd = new Date(installDate);
+            afterEnd.setMonth(afterEnd.getMonth() + studyMonths);
+            if (afterEnd > now) afterEnd = now;
+            beforeStart = new Date(installDate);
+            beforeStart.setMonth(beforeStart.getMonth() - studyMonths);
+        } else {
+            var afterMs = afterEnd - afterStart;
+            beforeStart = new Date(beforeEnd.getTime() - afterMs);
+        }
     }
 
     // Find crashes within radius using spatial filter

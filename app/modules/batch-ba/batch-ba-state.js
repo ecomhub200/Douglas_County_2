@@ -25,6 +25,12 @@ CL.batchBA.state = {
     invalidRows: [],
     autoDetected: false,
 
+    // Duration configuration
+    constructionBuffer: 3,      // months: 0, 3, or 6
+    uniformDuration: true,       // apply same duration to all locations
+    symmetricLock: true,         // before = after duration
+    locationDurations: [],       // per-location: [{beforeMonths, afterMonths, maxBeforeMonths, maxAfterMonths, status}]
+
     // Processing config
     globalRadiusFt: 250,
     analysisMethod: 'eb', // 'eb' | 'naive'
@@ -74,6 +80,10 @@ CL.batchBA.resetState = function() {
     s.filterEffectiveness = 'all';
     s.filterSignificance = 'all';
     s.searchText = '';
+    s.constructionBuffer = 3;
+    s.uniformDuration = true;
+    s.symmetricLock = true;
+    s.locationDurations = [];
 
     // Destroy any existing chart instances
     if (CL.batchBA._charts) {
