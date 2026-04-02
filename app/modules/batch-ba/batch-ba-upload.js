@@ -232,6 +232,10 @@ CL.batchBA.applyMapping = function() {
     document.getElementById('batchBAValidationSection').style.display = 'block';
 
     if (valid.length > 0) {
+        // Initialize and show study duration configuration
+        CL.batchBA.duration.init();
+        CL.batchBA.duration.render();
+        document.getElementById('batchBADurationSection').style.display = 'block';
         document.getElementById('batchBAConfigSection').style.display = 'block';
         CL.batchBA._updateSummaryCard();
     }
@@ -288,9 +292,12 @@ CL.batchBA._renderValidationSummary = function(valid, invalid) {
 };
 
 CL.batchBA._proceedWithValid = function() {
+    CL.batchBA.duration.init();
+    CL.batchBA.duration.render();
+    document.getElementById('batchBADurationSection').style.display = 'block';
     document.getElementById('batchBAConfigSection').style.display = 'block';
     CL.batchBA._updateSummaryCard();
-    document.getElementById('batchBAConfigSection').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('batchBADurationSection').scrollIntoView({ behavior: 'smooth' });
 };
 
 /** Update the batch summary info card */
