@@ -154,21 +154,18 @@ CL.batchBA._onMappingChange = function() {
 /** Render preview table of first N rows */
 CL.batchBA._renderPreviewTable = function(rows, headers) {
     if (!rows.length) return;
-    var displayHeaders = headers.slice(0, 8);
     var html = '<div style="overflow-x:auto"><table class="data-table" style="font-size:.8rem"><thead><tr>';
     html += '<th style="width:30px">#</th>';
-    displayHeaders.forEach(function(h) { html += '<th>' + h + '</th>'; });
-    if (headers.length > 8) html += '<th>...</th>';
+    headers.forEach(function(h) { html += '<th>' + h + '</th>'; });
     html += '</tr></thead><tbody>';
 
     rows.forEach(function(row, idx) {
         html += '<tr>';
         html += '<td>' + (idx + 1) + '</td>';
-        displayHeaders.forEach(function(h) {
+        headers.forEach(function(h) {
             var val = row[h] != null ? String(row[h]).substring(0, 30) : '';
             html += '<td>' + val + '</td>';
         });
-        if (headers.length > 8) html += '<td>...</td>';
         html += '</tr>';
     });
     html += '</tbody></table></div>';
