@@ -192,9 +192,14 @@ CL.batchBA._analyzeLocation = function(location, locationIndex) {
     var weights = epdoInfo.weights;
     var beforeEPDO = CL.core.epdo.calcEPDO(beforeStats, weights);
     var afterEPDO = CL.core.epdo.calcEPDO(afterStats, weights);
-    var epdoChangePct = beforeEPDO > 0 ? ((afterEPDO - beforeEPDO) / beforeEPDO * 100) : 0;
 
-    var changePct = beforeStats.total > 0 ? ((afterStats.total - beforeStats.total) / beforeStats.total * 100) : 0;
+    // Rate-adjusted % change: normalize counts by period length before comparing
+    // expectedAfterEPDO = beforeEPDO scaled to the after period length
+    var expectedAfterEPDO = beforeEPDO * adjustmentFactor;
+    var epdoChangePct = expectedAfterEPDO > 0 ? ((afterEPDO - expectedAfterEPDO) / expectedAfterEPDO * 100) : 0;
+
+    // Rate-adjusted crash count % change (consistent with CMF calculation)
+    var changePct = expectedAfter > 0 ? ((afterStats.total - expectedAfter) / expectedAfter * 100) : 0;
 
     return {
         locationName: location.locationName,
@@ -332,7 +337,9 @@ CL.batchBA._computeSummary = function() {
         totalCrashChange += r.changePct;
         if (r.cmf !== null) { totalCMF += r.cmf; cmfCount++; }
         if (r.isSignificant) significantCount++;
-        crashesPrevented += (r.beforeTotal - r.afterTotal);
+        // Rate-adjusted: compare actual after to expected after (scaled to after period)
+        var expectedAfterForPrevented = r.beforeTotal * (r.afterYears / r.beforeYears);
+        crashesPrevented += Math.round(expectedAfterForPrevented - r.afterTotal);
         var rating = CL.batchBA.getEffectivenessRating(r.cmf).label;
         byEffectiveness[rating] = (byEffectiveness[rating] || 0) + 1;
 

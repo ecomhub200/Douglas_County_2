@@ -150,10 +150,10 @@ CL.batchBA._renderResultsTable = function() {
         { key: 'countermeasureType', label: 'Type', title: 'Type of safety treatment installed' },
         { key: 'beforeTotal', label: 'Before', title: 'Total crashes before treatment' },
         { key: 'afterTotal', label: 'After', title: 'Total crashes after treatment' },
-        { key: 'changePct', label: 'Change %', title: 'Percentage change in crashes (negative = fewer crashes)' },
+        { key: 'changePct', label: 'Change % \u25B2', title: 'Rate-adjusted percentage change in crash frequency (accounts for different before/after durations)' },
         { key: 'beforeEPDO', label: 'Before EPDO', title: 'Severity-weighted crash score before treatment (higher = more severe crashes)' },
         { key: 'afterEPDO', label: 'After EPDO', title: 'Severity-weighted crash score after treatment' },
-        { key: 'epdoChangePct', label: 'EPDO Change %', title: 'Change in severity-weighted crash score' },
+        { key: 'epdoChangePct', label: 'EPDO Change %', title: 'Rate-adjusted change in severity-weighted crash score (accounts for different before/after durations)' },
         { key: 'cmf', label: 'Safety Score', title: 'Below 1.0 = improvement, above 1.0 = worsening' },
         { key: 'pValue', label: 'Sig.', title: 'Statistical significance — check mark means the result is unlikely due to random chance' },
         { key: '_effectiveness', label: 'Rating', title: 'Overall effectiveness rating based on safety score' }
