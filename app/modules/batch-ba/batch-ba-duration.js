@@ -118,8 +118,9 @@ CL.batchBA.duration._computeLocationDurations = function() {
         maxBefore = Math.max(0, maxBefore);
         maxAfter = Math.max(0, maxAfter);
 
-        // Default: symmetric, clamped to min study duration
-        var defaultDur = Math.max(BA_MIN_STUDY_MONTHS, Math.min(maxBefore, maxAfter));
+        // Default: auto-symmetric — use the minimum of available before/after
+        // so each location gets a balanced study period based on its own data
+        var defaultDur = Math.min(maxBefore, maxAfter);
 
         // If CSV provided studyDuration, use as initial (clamped)
         var csvDuration = row.studyDuration || null;
@@ -152,12 +153,22 @@ CL.batchBA.duration.render = function() {
     var el = document.getElementById('batchBADurationContent');
     if (!el) return;
 
+    // Preserve scroll position of the location table before re-render
+    var tableContainer = el.querySelector('div[style*="overflow-y"]');
+    var scrollTop = tableContainer ? tableContainer.scrollTop : 0;
+
     var html = '';
     html += CL.batchBA.duration._renderGlobalControls();
     html += CL.batchBA.duration._renderSummaryStats();
     html += CL.batchBA.duration._renderLocationTable();
 
     el.innerHTML = html;
+
+    // Restore scroll position after re-render
+    if (scrollTop > 0) {
+        var newTableContainer = el.querySelector('div[style*="overflow-y"]');
+        if (newTableContainer) newTableContainer.scrollTop = scrollTop;
+    }
 };
 
 /**
