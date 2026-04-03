@@ -258,6 +258,52 @@ CL.batchBA.exportPDF = function() {
     newPage();
     addSectionTitle('Executive Summary');
 
+    // Key Takeaways box
+    var takeaways = [];
+    var improved = successful.filter(function(r) { return r.changePct < 0; }).length;
+    var pctImproved = (improved / successful.length * 100).toFixed(0);
+    takeaways.push(improved + ' of ' + successful.length + ' locations (' + pctImproved + '%) had fewer crashes after treatment.');
+    if (sum.avgCrashReduction > 0) {
+        takeaways.push('On average, crashes decreased by ' + sum.avgCrashReduction.toFixed(1) + '% across all locations.');
+    } else if (sum.avgCrashReduction < 0) {
+        takeaways.push('On average, crashes increased by ' + Math.abs(sum.avgCrashReduction).toFixed(1) + '% across all locations.');
+    }
+    var best = successful.slice().sort(function(a, b) { return a.changePct - b.changePct; })[0];
+    if (best && best.changePct < 0) {
+        takeaways.push('Best result: ' + cleanText(best.locationName) + ' saw a ' + Math.abs(best.changePct).toFixed(1) + '% reduction.');
+    }
+    if (sum.crashesPrevented > 0) {
+        takeaways.push('A net estimated ' + sum.crashesPrevented + ' crashes were prevented across all treated locations.');
+    } else if (sum.crashesPrevented < 0) {
+        takeaways.push('There was a net increase of ' + Math.abs(sum.crashesPrevented) + ' crashes across all treated locations.');
+    }
+    var sigCount = successful.filter(function(r) { return r.isSignificant; }).length;
+    if (sigCount > 0) {
+        takeaways.push(sigCount + ' location(s) showed statistically significant improvement.');
+    }
+
+    // Draw takeaways box
+    var takeawayH = 8 + takeaways.length * 5.5;
+    checkPageBreak(takeawayH + 5);
+    setFill('#eff6ff');
+    var borderRgbTk = hexToRgb('#bfdbfe');
+    doc.setDrawColor(borderRgbTk.r, borderRgbTk.g, borderRgbTk.b);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(m, y, cw, takeawayH, 2, 2, 'FD');
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    setColor('#1e40af');
+    doc.text('Key Takeaways', m + 5, y + 5.5);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    setColor(C.text);
+    var tkY = y + 11;
+    takeaways.forEach(function(t) {
+        doc.text('  *  ' + t, m + 5, tkY);
+        tkY += 5.5;
+    });
+    y += takeawayH + 8;
+
     // Effectiveness distribution with colored badges
     addSubsectionTitle('Effectiveness Distribution');
     var effLabels = ['Highly Effective', 'Effective', 'Marginal', 'Ineffective', 'Negative Impact'];
@@ -276,13 +322,21 @@ CL.batchBA.exportPDF = function() {
         styles: { fontSize: 9, cellPadding: 3 },
         headStyles: { fillColor: hexToRgb(C.primary), textColor: [255, 255, 255] },
         alternateRowStyles: { fillColor: hexToRgb(C.lightBg) },
-        columnStyles: { 2: { halign: 'center', cellWidth: 25, fontStyle: 'bold' } },
+        columnStyles: { 0: { cellWidth: 50 }, 2: { halign: 'center', cellWidth: 25, fontStyle: 'bold' } },
         didParseCell: function(data) {
+            if (data.column.index === 0 && data.section === 'body') {
+                // Keep text dark for readability — accent bar drawn in didDrawCell
+                data.cell.styles.textColor = hexToRgb(C.text);
+                data.cell.styles.fontStyle = 'bold';
+            }
+        },
+        didDrawCell: function(data) {
             if (data.column.index === 0 && data.section === 'body') {
                 var idx = data.row.index;
                 if (idx < effColors.length) {
-                    data.cell.styles.textColor = hexToRgb(effColors[idx]);
-                    data.cell.styles.fontStyle = 'bold';
+                    var accentRgb = hexToRgb(effColors[idx]);
+                    doc.setFillColor(accentRgb.r, accentRgb.g, accentRgb.b);
+                    doc.rect(data.cell.x, data.cell.y, 2.5, data.cell.height, 'F');
                 }
             }
         }
@@ -354,213 +408,116 @@ CL.batchBA.exportPDF = function() {
     }
 
     // ================================================================
-    // PAGE 3+: LOCATION SUMMARY TABLE
+    // VISUAL ANALYSIS PAGE — Chart Images
     // ================================================================
-    newPage();
-    addSectionTitle('Location Summary Table');
-
-    var tableBody = successful.map(function(r) {
-        var rating = CL.batchBA.getEffectivenessRating(r.cmf);
-        return [
-            r.locationName.substring(0, 28),
-            r.countermeasureType ? r.countermeasureType.substring(0, 15) : '-',
-            r.beforeTotal,
-            r.afterTotal,
-            r.changePct.toFixed(1) + '%',
-            Math.round(r.beforeEPDO),
-            Math.round(r.afterEPDO),
-            r.cmf !== null ? r.cmf.toFixed(3) : 'N/A',
-            r.isSignificant ? 'Yes' : 'No',
-            rating.label
-        ];
-    });
-
-    doc.autoTable({
-        startY: y,
-        head: [['Location', 'Type', 'Before', 'After', 'Change', 'EPDO B', 'EPDO A', 'CMF', 'Sig.', 'Rating']],
-        body: tableBody,
-        margin: { left: m, right: m },
-        styles: { fontSize: 7, cellPadding: 1.5 },
-        headStyles: { fillColor: hexToRgb(C.primary), textColor: [255, 255, 255], fontSize: 7 },
-        alternateRowStyles: { fillColor: hexToRgb(C.lightBg) },
-        columnStyles: {
-            0: { cellWidth: 35 }, 1: { cellWidth: 22 },
-            2: { halign: 'center', cellWidth: 12 }, 3: { halign: 'center', cellWidth: 12 },
-            4: { halign: 'center', cellWidth: 15 },
-            5: { halign: 'center', cellWidth: 14 }, 6: { halign: 'center', cellWidth: 14 },
-            7: { halign: 'center', cellWidth: 14 }, 8: { halign: 'center', cellWidth: 10 }
-        },
-        didParseCell: function(data) {
-            if (data.section === 'body') {
-                // Color the Change column
-                if (data.column.index === 4) {
-                    var val = parseFloat(data.cell.raw);
-                    if (val < 0) { data.cell.styles.textColor = hexToRgb(C.successLight); data.cell.styles.fontStyle = 'bold'; }
-                    else if (val > 0) { data.cell.styles.textColor = hexToRgb(C.danger); data.cell.styles.fontStyle = 'bold'; }
-                }
-                // Color the Rating column
-                if (data.column.index === 9) {
-                    var rc = ratingColor(data.cell.raw);
-                    data.cell.styles.textColor = hexToRgb(rc);
-                    data.cell.styles.fontStyle = 'bold';
-                }
-            }
-        }
-    });
-
-    // ================================================================
-    // INDIVIDUAL LOCATION DETAIL PAGES
-    // ================================================================
-    for (var i = 0; i < successful.length; i++) {
-        var r = successful[i];
-        var rating = CL.batchBA.getEffectivenessRating(r.cmf);
-
-        // Each location needs ~65mm. Start new page if insufficient space.
-        if (i === 0 || y > safeBottom - 65) {
-            newPage();
-            addSectionTitle('Individual Location Results');
-        }
-
-        // Location header bar
-        checkPageBreak(65);
-        setFill(C.lightBg);
-        var borderRgb = hexToRgb(C.primary);
-        doc.setDrawColor(borderRgb.r, borderRgb.g, borderRgb.b);
-        doc.setLineWidth(0.5);
-        doc.roundedRect(m, y, cw, 8, 1, 1, 'FD');
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        setColor(C.primary);
-        doc.text((i + 1) + '. ' + cleanText(r.locationName).substring(0, 50), m + 3, y + 5.5);
-        doc.setFont('helvetica', 'normal');
-        setColor(C.textLight);
-        doc.text(r.countermeasureType || '-', pw - m - 3, y + 5.5, { align: 'right' });
-        y += 11;
-
-        // Two-column: left = key metrics, right = effectiveness badge
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        setColor(C.text);
-        doc.text('Install Date: ' + r.installDate.toLocaleDateString() + '  |  Radius: ' + r.radiusFt + ' ft  |  Lat: ' + r.lat.toFixed(4) + '  Lng: ' + r.lng.toFixed(4), m + 3, y);
-        y += 4;
-        doc.text('Before: ' + r.beforeStart.toLocaleDateString() + ' - ' + r.beforeEnd.toLocaleDateString() + ' (' + r.beforeYears.toFixed(1) + ' yr)  |  After: ' + r.afterStart.toLocaleDateString() + ' - ' + r.afterEnd.toLocaleDateString() + ' (' + r.afterYears.toFixed(1) + ' yr)', m + 3, y);
-        y += 5;
-
-        // Effectiveness badge
-        var badgeColor = ratingColor(rating.label);
-        setFill(badgeColor);
-        doc.roundedRect(pw - m - 40, y - 7, 37, 6, 1, 1, 'F');
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(255, 255, 255);
-        doc.text(rating.label, pw - m - 21.5, y - 3, { align: 'center' });
-
-        // Severity comparison table
-        doc.autoTable({
-            startY: y,
-            head: [['Period', 'K', 'A', 'B', 'C', 'O', 'Unk', 'Total', 'EPDO', 'Rate/Yr']],
-            body: [
-                ['Before', r.beforeStats.K, r.beforeStats.A, r.beforeStats.B, r.beforeStats.C, r.beforeStats.O, r.beforeStats.U || 0, r.beforeTotal, Math.round(r.beforeEPDO), (r.beforeTotal / r.beforeYears).toFixed(1)],
-                ['After', r.afterStats.K, r.afterStats.A, r.afterStats.B, r.afterStats.C, r.afterStats.O, r.afterStats.U || 0, r.afterTotal, Math.round(r.afterEPDO), (r.afterTotal / r.afterYears).toFixed(1)]
-            ],
-            margin: { left: m + 3, right: m + 3 },
-            styles: { fontSize: 7, cellPadding: 1.5 },
-            headStyles: { fillColor: hexToRgb(C.primary), textColor: [255, 255, 255], fontSize: 7 },
-            columnStyles: {
-                0: { fontStyle: 'bold', cellWidth: 16 },
-                1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' },
-                4: { halign: 'center' }, 5: { halign: 'center' }, 6: { halign: 'center' },
-                7: { halign: 'center', fontStyle: 'bold' },
-                8: { halign: 'center' }, 9: { halign: 'center' }
-            }
-        });
-        y = doc.lastAutoTable.finalY + 2;
-
-        // CMF/CRF/Significance inline
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        setColor(C.text);
-        var cmfStr = r.cmf !== null ? r.cmf.toFixed(3) : 'N/A';
-        var crfStr = r.crf !== null ? ((r.crf > 0 ? '+' : '') + r.crf.toFixed(1) + '%') : 'N/A';
-        doc.text('CMF: ' + cmfStr + '  |  CRF: ' + crfStr + '  |  p-value: ' + r.pValue.toFixed(4) + '  |  ' + (r.isSignificant ? 'Statistically Significant' : 'Not Significant'), m + 3, y + 3);
-        y += 10;
+    function captureChart(canvasId) {
+        var canvas = document.getElementById(canvasId);
+        if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
+        try { return canvas.toDataURL('image/png'); } catch (e) { return null; }
     }
 
-    // ================================================================
-    // METHODOLOGY APPENDIX
-    // ================================================================
-    newPage();
-    addSectionTitle('Methodology Notes');
+    var chartBar = captureChart('batchBABarChart');
+    var chartCMF = captureChart('batchBACMFChart');
+    var chartSev = captureChart('batchBASeverityChart');
+    var chartScatter = captureChart('batchBAScatterChart');
+    var chartByType = captureChart('batchBACMFByTypeChart');
+    var hasCharts = chartBar || chartCMF || chartSev || chartScatter;
 
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    setColor(C.text);
+    if (hasCharts) {
+        newPage();
+        addSectionTitle('Visual Analysis');
 
-    var methodLines = [
-        'Analysis Method',
-        'Empirical Bayes (simplified) with Poisson variance approximation. The expected after-period crash count',
-        'is estimated by adjusting the before-period count for the ratio of study period lengths.',
-        '',
-        'Statistical Significance',
-        'Two-tailed z-test based on Poisson distribution. Confidence level: ' + (s.confidenceLevel * 100) + '%.',
-        'A location is flagged as significant when p-value < ' + (1 - s.confidenceLevel).toFixed(2) + '.',
-        '',
-        'Crash Modification Factor (CMF)',
-        'CMF = Observed After-Period Crashes / Expected After-Period Crashes.',
-        'Values less than 1.0 indicate crash reduction. Values greater than 1.0 indicate crash increase.',
-        '',
-        'Crash Reduction Factor (CRF)',
-        'CRF = (1 - CMF) x 100. Positive values = crash reduction percentage.',
-        '',
-        'EPDO (Equivalent Property Damage Only)',
-        'Weights: ' + epdoInfo.name,
-        'K = ' + epdoInfo.weights.K + ', A = ' + epdoInfo.weights.A + ', B = ' + epdoInfo.weights.B + ', C = ' + epdoInfo.weights.C + ', O = ' + epdoInfo.weights.O,
-        'Source: ' + epdoInfo.source,
-        '',
-        'Effectiveness Ratings',
-        '  Highly Effective:   CMF < 0.70 (greater than 30% crash reduction)',
-        '  Effective:          CMF 0.70 - 0.90 (10-30% reduction)',
-        '  Marginal:           CMF 0.90 - 1.00 (0-10% reduction)',
-        '  Ineffective:        CMF 1.00 - 1.10 (0-10% increase)',
-        '  Negative Impact:    CMF > 1.10 (greater than 10% increase)',
-        '',
-        'Limitations',
-        'This analysis uses a simplified EB method that adjusts for period length but does not incorporate',
-        'Safety Performance Functions (SPFs) or reference group data. For HSIP-grade documentation,',
-        'use the full single-location Before/After Study tab with complete EB methodology.'
-    ];
+        var halfW = (cw - 6) / 2;  // 2-column with 6mm gap
+        var chartH = 55;
+        var chartTitleH = 8;
 
-    methodLines.forEach(function(line) {
-        if (line === '') { y += 3; return; }
-        // Bold section headers
-        if (line === line.trim() && line.indexOf('  ') !== 0 && methodLines.indexOf(line) !== -1 &&
-            ['Analysis Method', 'Statistical Significance', 'Crash Modification Factor (CMF)',
-             'Crash Reduction Factor (CRF)', 'EPDO (Equivalent Property Damage Only)',
-             'Effectiveness Ratings', 'Limitations'].indexOf(line) !== -1) {
-            checkPageBreak(12);
+        // Row 1: Bar chart + CMF distribution
+        if (chartBar) {
+            doc.setFontSize(8);
             doc.setFont('helvetica', 'bold');
             setColor(C.primary);
-            doc.text(line, m, y);
-            y += 5;
-            doc.setFont('helvetica', 'normal');
-            setColor(C.text);
-        } else {
-            checkPageBreak(6);
-            doc.text(line, m, y);
-            y += 4.5;
+            doc.text('Crash Rate: Before vs After', m, y + 4);
+            try { doc.addImage(chartBar, 'PNG', m, y + chartTitleH, halfW, chartH); } catch (e) { /* skip */ }
         }
-    });
+        if (chartCMF) {
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            setColor(C.primary);
+            doc.text('Safety Score Distribution', m + halfW + 6, y + 4);
+            try { doc.addImage(chartCMF, 'PNG', m + halfW + 6, y + chartTitleH, halfW, chartH); } catch (e) { /* skip */ }
+        }
+        y += chartTitleH + chartH + 8;
 
-    // ================================================================
-    // ADD FOOTERS TO ALL PAGES
-    // ================================================================
-    var totalPages = doc.internal.getNumberOfPages();
-    for (var p = 1; p <= totalPages; p++) {
-        doc.setPage(p);
-        drawPageFooter(p, totalPages);
+        // Row 2: Severity comparison + Scatter plot
+        checkPageBreak(chartTitleH + chartH + 10);
+        if (chartSev) {
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            setColor(C.primary);
+            doc.text('Severity Comparison', m, y + 4);
+            try { doc.addImage(chartSev, 'PNG', m, y + chartTitleH, halfW, chartH); } catch (e) { /* skip */ }
+        }
+        if (chartScatter) {
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            setColor(C.primary);
+            doc.text('Improvement Scatter Plot', m + halfW + 6, y + 4);
+            try { doc.addImage(chartScatter, 'PNG', m + halfW + 6, y + chartTitleH, halfW, chartH); } catch (e) { /* skip */ }
+        }
+        y += chartTitleH + chartH + 8;
+
+        // Optional: CMF by Type chart (full width, only if visible)
+        if (chartByType) {
+            checkPageBreak(chartTitleH + 45);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            setColor(C.primary);
+            doc.text('Average Safety Score by Treatment Type', m, y + 4);
+            try { doc.addImage(chartByType, 'PNG', m, y + chartTitleH, cw, 40); } catch (e) { /* skip */ }
+            y += chartTitleH + 40 + 8;
+        }
     }
 
-    doc.save('Batch_BA_Report_' + dateStamp + '.pdf');
+    // ================================================================
+    // PAGES 3+: Location table, details, methodology (in separate module)
+    // ================================================================
+    CL.batchBA._pdfCtx = {
+        doc: doc, y: y, pageNum: pageNum,
+        m: m, pw: pw, ph: ph, cw: cw, C: C,
+        s: s, sum: sum, successful: successful, epdoInfo: epdoInfo,
+        safeBottom: safeBottom, generatedDate: generatedDate, dateStamp: dateStamp,
+        hexToRgb: hexToRgb, setColor: setColor, setFill: setFill, cleanText: cleanText,
+        drawPageHeader: drawPageHeader, drawPageFooter: drawPageFooter,
+        ratingColor: ratingColor,
+        // Wrapper functions that sync ctx.y with the closure y
+        newPage: function() {
+            var ctx = CL.batchBA._pdfCtx;
+            y = ctx.y; pageNum = ctx.pageNum;
+            newPage();
+            ctx.y = y; ctx.pageNum = pageNum;
+        },
+        checkPageBreak: function(needed) {
+            var ctx = CL.batchBA._pdfCtx;
+            y = ctx.y;
+            var result = checkPageBreak(needed);
+            ctx.y = y; ctx.pageNum = pageNum;
+            return result;
+        },
+        addSectionTitle: function(title, color) {
+            var ctx = CL.batchBA._pdfCtx;
+            y = ctx.y;
+            addSectionTitle(title, color);
+            ctx.y = y;
+        },
+        addSubsectionTitle: function(title, color) {
+            var ctx = CL.batchBA._pdfCtx;
+            y = ctx.y;
+            addSubsectionTitle(title, color);
+            ctx.y = y;
+        }
+    };
+
+    CL.batchBA._exportPDFDetails();
 };
 
 CL._registerModule('batch-ba/export-pdf');
