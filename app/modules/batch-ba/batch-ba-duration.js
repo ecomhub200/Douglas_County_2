@@ -431,6 +431,9 @@ CL.batchBA.duration._onUniformToggle = function(checked) {
     CL.batchBA.state.uniformDuration = checked;
     if (checked) {
         CL.batchBA.duration._applyUniformIfNeeded();
+    } else {
+        // Recompute per-location auto-defaults when switching off uniform
+        CL.batchBA.duration._computeLocationDurations();
     }
     CL.batchBA.duration.render();
 };
