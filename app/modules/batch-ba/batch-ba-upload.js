@@ -76,7 +76,7 @@ CL.batchBA._onParsed = function(rows, headers) {
     CL.batchBA.state.parsedRows = rows;
     CL.batchBA._autoDetectColumns(headers);
     CL.batchBA._renderColumnMapping(headers);
-    CL.batchBA._renderPreviewTable(rows.slice(0, 10), headers);
+    CL.batchBA._renderPreviewTable(rows, headers);
     document.getElementById('batchBAMappingSection').style.display = 'block';
     document.getElementById('batchBAPreviewSection').style.display = 'block';
 };
@@ -154,7 +154,7 @@ CL.batchBA._onMappingChange = function() {
 /** Render preview table of first N rows */
 CL.batchBA._renderPreviewTable = function(rows, headers) {
     if (!rows.length) return;
-    var html = '<div style="overflow-x:auto"><table class="data-table" style="font-size:.8rem"><thead><tr>';
+    var html = '<div style="overflow:auto;max-height:400px"><table class="data-table" style="font-size:.8rem"><thead><tr>';
     html += '<th style="width:30px">#</th>';
     headers.forEach(function(h) { html += '<th>' + h + '</th>'; });
     html += '</tr></thead><tbody>';
@@ -163,13 +163,13 @@ CL.batchBA._renderPreviewTable = function(rows, headers) {
         html += '<tr>';
         html += '<td>' + (idx + 1) + '</td>';
         headers.forEach(function(h) {
-            var val = row[h] != null ? String(row[h]).substring(0, 30) : '';
+            var val = row[h] != null ? String(row[h]) : '';
             html += '<td>' + val + '</td>';
         });
         html += '</tr>';
     });
     html += '</tbody></table></div>';
-    html += '<div style="font-size:.8rem;color:#64748b;margin-top:.5rem">Showing first ' + rows.length + ' of ' + CL.batchBA.state.parsedRows.length + ' rows</div>';
+    html += '<div style="font-size:.8rem;color:#64748b;margin-top:.5rem">Showing ' + rows.length + ' rows</div>';
 
     document.getElementById('batchBAPreviewContent').innerHTML = html;
 };

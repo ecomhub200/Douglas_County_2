@@ -361,7 +361,7 @@ CL.batchBA.duration._renderLocationTable = function() {
             html += '<input type="number" min="1" max="' + d.maxBeforeMonths + '" value="' + d.beforeMonths + '" ';
             html += 'onchange="CL.batchBA.duration._onLocationDurationChange(' + idx + ',\'before\',parseInt(this.value))" ';
             html += 'style="width:60px;font-size:.8rem;padding:2px 4px;text-align:center;border:1px solid #cbd5e1;border-radius:4px" ';
-            if (s.uniformDuration) html += 'disabled title="Controlled by uniform duration"';
+            /* Per-location override always allowed */
             html += '>';
         } else {
             html += '<span style="color:#94a3b8">\u2014</span>';
@@ -374,7 +374,7 @@ CL.batchBA.duration._renderLocationTable = function() {
             html += '<input type="number" min="1" max="' + d.maxAfterMonths + '" value="' + d.afterMonths + '" ';
             html += 'onchange="CL.batchBA.duration._onLocationDurationChange(' + idx + ',\'after\',parseInt(this.value))" ';
             html += 'style="width:60px;font-size:.8rem;padding:2px 4px;text-align:center;border:1px solid #cbd5e1;border-radius:4px" ';
-            if (s.uniformDuration || s.symmetricLock) html += 'disabled title="' + (s.uniformDuration ? 'Controlled by uniform duration' : 'Locked to before value') + '"';
+            if (s.symmetricLock) html += 'disabled title="Locked to before value (uncheck Symmetric to edit)"';
             html += '>';
         } else {
             html += '<span style="color:#94a3b8">\u2014</span>';
