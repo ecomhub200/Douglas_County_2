@@ -373,7 +373,7 @@ CL.upload.pipeline = CL.upload.pipeline || {};
     /**
      * Start the upload pipeline processing.
      *
-     * @param {File} file - The CSV file to process
+     * @param {File} file - The crash data file to process (CSV, CSV.GZ, or Parquet.GZ)
      */
     function startPipeline(file) {
         var progressContainer = document.getElementById('pipelineProgressContainer');
@@ -383,16 +383,62 @@ CL.upload.pipeline = CL.upload.pipeline || {};
         updateStage(1, 'active');
         updateProgress(5, 'Reading file...');
 
+        var fileName = file.name.toLowerCase();
         var reader = new FileReader();
-        reader.onload = function(e) {
-            pipelineState.rawData = e.target.result;
-            processStage1(e.target.result);
-        };
-        reader.onerror = function() {
-            updateStage(1, 'error');
-            updateProgress(0, 'Error reading file');
-        };
-        reader.readAsText(file);
+
+        if (fileName.endsWith('.parquet.gz')) {
+            // Parquet.GZ: decompress, parse parquet, convert to CSV text for pipeline
+            reader.onload = async function(e) {
+                try {
+                    updateProgress(8, 'Decompressing & parsing parquet...');
+                    var result = await _parseParquetGz(e.target.result);
+                    console.log('[Pipeline] Parquet parsed:', result.rows.length, 'rows');
+                    // Convert row objects to CSV text so pipeline stages work unchanged
+                    var csvText = Papa.unparse(result.rows, { columns: result.fields });
+                    pipelineState.rawData = csvText;
+                    processStage1(csvText);
+                } catch (err) {
+                    updateStage(1, 'error');
+                    updateProgress(0, 'Parquet parse error: ' + err.message);
+                    console.error('[Pipeline] Parquet error:', err);
+                }
+            };
+            reader.onerror = function() {
+                updateStage(1, 'error');
+                updateProgress(0, 'Error reading file');
+            };
+            reader.readAsArrayBuffer(file);
+        } else if (fileName.endsWith('.csv.gz') || (fileName.endsWith('.gz') && !fileName.endsWith('.parquet.gz'))) {
+            // CSV.GZ: decompress gzip to CSV text
+            reader.onload = function(e) {
+                try {
+                    updateProgress(8, 'Decompressing gzip...');
+                    var csvText = _decompressGzipToText(e.target.result);
+                    pipelineState.rawData = csvText;
+                    processStage1(csvText);
+                } catch (err) {
+                    updateStage(1, 'error');
+                    updateProgress(0, 'Gzip decompress error: ' + err.message);
+                    console.error('[Pipeline] Gzip error:', err);
+                }
+            };
+            reader.onerror = function() {
+                updateStage(1, 'error');
+                updateProgress(0, 'Error reading file');
+            };
+            reader.readAsArrayBuffer(file);
+        } else {
+            // Plain CSV / XLSX / XLS
+            reader.onload = function(e) {
+                pipelineState.rawData = e.target.result;
+                processStage1(e.target.result);
+            };
+            reader.onerror = function() {
+                updateStage(1, 'error');
+                updateProgress(0, 'Error reading file');
+            };
+            reader.readAsText(file);
+        }
     }
 
     /**
