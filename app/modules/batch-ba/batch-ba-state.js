@@ -27,7 +27,7 @@ CL.batchBA.state = {
 
     // Duration configuration
     constructionBuffer: 3,      // months: 0, 3, or 6
-    uniformDuration: true,       // apply same duration to all locations
+    uniformDuration: false,      // per-location auto-calculated duration by default
     symmetricLock: true,         // before = after duration
     locationDurations: [],       // per-location: [{beforeMonths, afterMonths, maxBeforeMonths, maxAfterMonths, status}]
 
@@ -81,7 +81,7 @@ CL.batchBA.resetState = function() {
     s.filterSignificance = 'all';
     s.searchText = '';
     s.constructionBuffer = 3;
-    s.uniformDuration = true;
+    s.uniformDuration = false;
     s.symmetricLock = true;
     s.locationDurations = [];
 
