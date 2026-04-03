@@ -22,9 +22,19 @@ var BATCH_BA_SYNONYMS = {
  */
 CL.batchBA.handleFileUpload = function(file) {
     if (!file) return;
-    var ext = file.name.split('.').pop().toLowerCase();
-    if (['csv', 'xlsx', 'xls'].indexOf(ext) === -1) {
-        alert('Please upload a .csv, .xlsx, or .xls file.');
+    var name = file.name.toLowerCase();
+    var ext = name.split('.').pop().toLowerCase();
+
+    // Determine file type from full filename (order matters: check compound extensions first)
+    var fileType;
+    if (name.endsWith('.parquet.gz')) {
+        fileType = 'parquet.gz';
+    } else if (name.endsWith('.csv.gz')) {
+        fileType = 'csv.gz';
+    } else if (ext === 'csv' || ext === 'xlsx' || ext === 'xls') {
+        fileType = ext;
+    } else {
+        alert('Please upload a .csv, .csv.gz, .parquet.gz, .xlsx, or .xls file.');
         return;
     }
 
@@ -32,8 +42,12 @@ CL.batchBA.handleFileUpload = function(file) {
     document.getElementById('batchBAFileName').textContent = file.name;
     document.getElementById('batchBAFileInfo').style.display = 'flex';
 
-    if (ext === 'csv') {
+    if (fileType === 'csv') {
         CL.batchBA._parseCSV(file);
+    } else if (fileType === 'csv.gz') {
+        CL.batchBA._parseCsvGz(file);
+    } else if (fileType === 'parquet.gz') {
+        CL.batchBA._parseParquetGz(file);
     } else {
         CL.batchBA._parseExcel(file);
     }
@@ -66,6 +80,35 @@ CL.batchBA._parseExcel = function(file) {
             CL.batchBA._onParsed(json, headers);
         } catch (err) {
             alert('Error parsing Excel file: ' + err.message);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+/** Parse CSV.GZ — decompress gzip then parse as CSV */
+CL.batchBA._parseCsvGz = function(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var csvText = _decompressGzipToText(e.target.result);
+            var results = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+            CL.batchBA._onParsed(results.data, results.meta.fields || []);
+        } catch (err) {
+            alert('Error decompressing/parsing CSV.GZ: ' + err.message);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+/** Parse Parquet.GZ — decompress gzip, parse parquet, convert to rows */
+CL.batchBA._parseParquetGz = function(file) {
+    var reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            var result = await _parseParquetGz(e.target.result);
+            CL.batchBA._onParsed(result.rows, result.fields || []);
+        } catch (err) {
+            alert('Error decompressing/parsing Parquet.GZ: ' + err.message);
         }
     };
     reader.readAsArrayBuffer(file);
