@@ -120,7 +120,8 @@ CL.batchBA._renderBeforeAfterBar = function(results) {
 
     // Description
     CL.batchBA._setChartDescription('batchBABarChartDesc',
-        'Each bar shows crashes before (red) and after (green) the safety treatment. ' +
+        'Each bar shows the annualized crash rate (crashes per year) before (red) and after (green) treatment. ' +
+        'Rates are normalized by study period length for accurate comparison. ' +
         'Sorted from most improved at top to least improved. ' +
         'Showing all ' + sorted.length + ' locations' + (sorted.length > 20 ? ' — scroll down to see more.' : '.'));
 
@@ -132,15 +133,15 @@ CL.batchBA._renderBeforeAfterBar = function(results) {
             }),
             datasets: [
                 {
-                    label: 'Before',
-                    data: sorted.map(function(r) { return r.beforeTotal; }),
+                    label: 'Before (per year)',
+                    data: sorted.map(function(r) { return Math.round((r.beforeTotal / (r.beforeYears || 1)) * 10) / 10; }),
                     backgroundColor: 'rgba(220, 38, 38, 0.7)',
                     borderColor: '#dc2626',
                     borderWidth: 1
                 },
                 {
-                    label: 'After',
-                    data: sorted.map(function(r) { return r.afterTotal; }),
+                    label: 'After (per year)',
+                    data: sorted.map(function(r) { return Math.round((r.afterTotal / (r.afterYears || 1)) * 10) / 10; }),
                     backgroundColor: 'rgba(22, 163, 74, 0.7)',
                     borderColor: '#16a34a',
                     borderWidth: 1
@@ -160,13 +161,13 @@ CL.batchBA._renderBeforeAfterBar = function(results) {
                             var idx = context[0].dataIndex;
                             var r = sorted[idx];
                             var change = r.changePct < 0 ? (Math.abs(r.changePct).toFixed(1) + '% fewer crashes') : (r.changePct.toFixed(1) + '% more crashes');
-                            return change;
+                            return change + ' (raw: ' + r.beforeTotal + ' in ' + (r.beforeYears * 12).toFixed(0) + 'mo, ' + r.afterTotal + ' in ' + (r.afterYears * 12).toFixed(0) + 'mo)';
                         }
                     }
                 }
             },
             scales: {
-                x: { beginAtZero: true },
+                x: { beginAtZero: true, title: { display: true, text: 'Crashes per Year' } },
                 y: { beginAtZero: true }
             }
         }
@@ -243,11 +244,20 @@ CL.batchBA._renderSeverityShift = function(results) {
     var beforeAgg = { K: 0, A: 0, B: 0, C: 0, O: 0 };
     var afterAgg = { K: 0, A: 0, B: 0, C: 0, O: 0 };
 
+    // Annualize severity counts per location before aggregating
     results.forEach(function(r) {
+        var bY = r.beforeYears || 1;
+        var aY = r.afterYears || 1;
         ['K', 'A', 'B', 'C', 'O'].forEach(function(s) {
-            beforeAgg[s] += (r.beforeStats[s] || 0);
-            afterAgg[s] += (r.afterStats[s] || 0);
+            beforeAgg[s] += (r.beforeStats[s] || 0) / bY;
+            afterAgg[s] += (r.afterStats[s] || 0) / aY;
         });
+    });
+
+    // Round for display
+    ['K', 'A', 'B', 'C', 'O'].forEach(function(s) {
+        beforeAgg[s] = Math.round(beforeAgg[s] * 10) / 10;
+        afterAgg[s] = Math.round(afterAgg[s] * 10) / 10;
     });
 
     var sevColors = { K: '#dc2626', A: '#ea580c', B: '#f97316', C: '#facc15', O: '#9ca3af' };
@@ -255,13 +265,13 @@ CL.batchBA._renderSeverityShift = function(results) {
 
     // Description
     CL.batchBA._setChartDescription('batchBASeverityChartDesc',
-        'Compares how severe crashes were before and after treatment. ' +
+        'Compares annualized severity distribution before and after treatment. ' +
         'A shift from red/orange (more severe) toward gray (less severe) means the treatment is reducing the most harmful crashes.');
 
     CL.batchBA._charts.severity = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: ['Before', 'After'],
+            labels: ['Before (per year)', 'After (per year)'],
             datasets: ['K', 'A', 'B', 'C', 'O'].map(function(s) {
                 return {
                     label: sevLabels[s],
@@ -293,13 +303,13 @@ CL.batchBA._renderSeverityShift = function(results) {
             },
             scales: {
                 x: { stacked: true },
-                y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Crash Count' } }
+                y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Crashes per Year' } }
             }
         }
     });
 };
 
-/** Scatter plot: Before vs After with shaded improvement/worsening zones */
+/** Scatter plot: Before vs After annualized crash rates with shaded zones */
 CL.batchBA._renderScatterPlot = function(results) {
     var ctx = document.getElementById('batchBAScatterChart');
     if (!ctx) return;
@@ -307,10 +317,12 @@ CL.batchBA._renderScatterPlot = function(results) {
     var maxVal = 0;
     var sorted = results.slice().sort(function(a, b) { return a.changePct - b.changePct; });
     var data = sorted.map(function(r) {
-        if (r.beforeTotal > maxVal) maxVal = r.beforeTotal;
-        if (r.afterTotal > maxVal) maxVal = r.afterTotal;
+        var bRate = r.beforeYears > 0 ? r.beforeTotal / r.beforeYears : 0;
+        var aRate = r.afterYears > 0 ? r.afterTotal / r.afterYears : 0;
+        if (bRate > maxVal) maxVal = bRate;
+        if (aRate > maxVal) maxVal = aRate;
         var rating = CL.batchBA.getEffectivenessRating(r.cmf);
-        return { x: r.beforeTotal, y: r.afterTotal, label: r.locationName, changePct: r.changePct, color: rating.color || '#94a3b8' };
+        return { x: Math.round(bRate * 10) / 10, y: Math.round(aRate * 10) / 10, label: r.locationName, changePct: r.changePct, color: rating.color || '#94a3b8', rawBefore: r.beforeTotal, rawAfter: r.afterTotal };
     });
 
     var refMax = Math.ceil(maxVal * 1.1) || 10;
@@ -347,17 +359,18 @@ CL.batchBA._renderScatterPlot = function(results) {
             // Zone labels
             drawCtx.font = '11px sans-serif';
             drawCtx.fillStyle = 'rgba(22, 163, 74, 0.55)';
-            drawCtx.fillText('Fewer crashes after', xAxis.getPixelForValue(xMax * 0.55), yAxis.getPixelForValue(xMax * 0.12));
+            drawCtx.fillText('Lower rate after', xAxis.getPixelForValue(xMax * 0.55), yAxis.getPixelForValue(xMax * 0.12));
             drawCtx.fillStyle = 'rgba(220, 38, 38, 0.55)';
-            drawCtx.fillText('More crashes after', xAxis.getPixelForValue(xMax * 0.08), yAxis.getPixelForValue(yMax * 0.55));
+            drawCtx.fillText('Higher rate after', xAxis.getPixelForValue(xMax * 0.08), yAxis.getPixelForValue(yMax * 0.55));
             drawCtx.restore();
         }
     };
 
     // Description
     CL.batchBA._setChartDescription('batchBAScatterChartDesc',
-        'Each dot is one location. Dots in the green zone (below the line) had fewer crashes after treatment. ' +
-        'Dots in the red zone (above the line) had more crashes. Hover over a dot to see details.');
+        'Each dot is one location plotted by annualized crash rate (crashes per year). ' +
+        'Dots in the green zone (below the line) had a lower crash rate after treatment. ' +
+        'Dots in the red zone (above the line) had a higher rate. Hover over a dot to see details.');
 
     CL.batchBA._charts.scatter = new Chart(ctx, {
         type: 'scatter',
@@ -397,15 +410,20 @@ CL.batchBA._renderScatterPlot = function(results) {
                             var change = d.changePct < 0
                                 ? Math.abs(d.changePct).toFixed(1) + '% fewer crashes'
                                 : d.changePct.toFixed(1) + '% more crashes';
-                            return d.label + ': ' + d.x + ' before, ' + d.y + ' after (' + change + ')';
+                            return d.label + ': ' + d.x + '/yr before, ' + d.y + '/yr after (' + change + ')';
+                        },
+                        afterLabel: function(context) {
+                            var d = context.raw;
+                            if (!d.rawBefore && d.rawBefore !== 0) return '';
+                            return 'Raw counts: ' + d.rawBefore + ' before, ' + d.rawAfter + ' after';
                         }
                     }
                 },
                 legend: { display: false }
             },
             scales: {
-                x: { beginAtZero: true, title: { display: true, text: 'Crashes Before Treatment' } },
-                y: { beginAtZero: true, title: { display: true, text: 'Crashes After Treatment' } }
+                x: { beginAtZero: true, title: { display: true, text: 'Crash Rate Before (per year)' } },
+                y: { beginAtZero: true, title: { display: true, text: 'Crash Rate After (per year)' } }
             }
         },
         plugins: [zonePlugin]
