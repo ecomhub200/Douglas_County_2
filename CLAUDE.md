@@ -130,7 +130,7 @@ The application **MUST NOT** be a single monolithic HTML file. All new code and 
    function startBatchBAProcessing() { CL.batchBA.startProcessing(); }
    ```
 5. **Loading order**: Add `<script>` tags in `app/index.html` after `modules/loader.js` and core dependencies
-6. **Max file size**: Keep individual module files under **500 lines**. Split larger features into sub-modules (e.g., `-state.js`, `-engine.js`, `-ui.js`, `-export.js`)
+6. **Modular structure**: Split larger features into sub-modules when it improves readability (e.g., `-state.js`, `-engine.js`, `-ui.js`, `-export.js`). No hard line limit — prioritize logical cohesion over arbitrary file size constraints
 7. **No duplicate function names**: Always search for existing function names before creating new ones. Use unique, descriptive names prefixed with the feature abbreviation
 
 #### Existing Module Map
