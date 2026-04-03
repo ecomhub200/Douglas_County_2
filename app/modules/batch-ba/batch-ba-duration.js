@@ -71,7 +71,8 @@ CL.batchBA.duration.init = function() {
                 var maxSymmetric = Math.min(d.maxBeforeMonths, d.maxAfterMonths);
                 if (maxSymmetric < uniformVal) uniformVal = maxSymmetric;
             });
-            uniformVal = Math.max(BA_MIN_STUDY_MONTHS, uniformVal);
+            // Use the auto-calculated minimum (no forced 12-month floor)
+            uniformVal = Math.max(0, uniformVal);
             s.locationDurations.forEach(function(d) {
                 if (d.status === 'missing') return;
                 d.beforeMonths = Math.min(uniformVal, d.maxBeforeMonths);
@@ -527,8 +528,8 @@ CL.batchBA.duration._applyUniformIfNeeded = function() {
         if (d.maxAfterMonths < minMaxAfter) minMaxAfter = d.maxAfterMonths;
     });
 
-    var uniformBefore = Math.max(BA_MIN_STUDY_MONTHS, Math.min(minMaxBefore, minMaxAfter));
-    var uniformAfter = s.symmetricLock ? uniformBefore : Math.max(BA_MIN_STUDY_MONTHS, minMaxAfter);
+    var uniformBefore = Math.min(minMaxBefore, minMaxAfter);
+    var uniformAfter = s.symmetricLock ? uniformBefore : minMaxAfter;
 
     s.locationDurations.forEach(function(d) {
         if (d.status === 'missing') return;
